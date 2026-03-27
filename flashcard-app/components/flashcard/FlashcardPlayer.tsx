@@ -1,23 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { FlashcardContent, FlashcardVocab } from "@/types";
+import { cn, cefrColor } from "@/lib/utils";
+import { useUIStore } from "@/features/auth/store";
 import { ChevronLeft, ChevronRight, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn, getCefrColor } from "@/lib/utils";
-import type { Flashcard } from "@/types";
-import { useUIStore } from "@/features/auth/store";
 
 interface FlashcardPlayerProps {
-  cards: Flashcard[];
-  deckTitle: string;
-  deckDesc?: string;
-  isDemo?: boolean;
+  units: FlashcardContent[];
+  isLimited?: boolean;
 }
 
-function slugify(w: string) {
-  return w.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
-}
+// ── Audio helpers (mirrors flashcard-mau.html logic) ──────────────────────
 
 async function fetchFreeDictAudio(word: string): Promise<string | null> {
   try {
@@ -27,15 +22,24 @@ async function fetchFreeDictAudio(word: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
     for (const entry of data) {
-      for (const ph of entry.phonetics || []) {
-        if (ph.audio && ph.audio.includes("us")) return ph.audio;
+      for (const ph of entry.phonetics ?? []) {
+        if (ph.audio?.includes("us")) return ph.audio;
       }
-      for (const ph of entry.phonetics || []) {
-        if (ph.audio && ph.audio.trim()) return ph.audio;
+      for (const ph of entry.phonetics ?? []) {
+        if (ph.audio?.trim()) return ph.audio;
       }
     }
   } catch {}
   return null;
+}
+
+function browserTTS(word: string) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = "en-US";
+  u.rate = 0.85;
+  window.speechSynthesis.speak(u);
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -45,325 +49,340 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-export function FlashcardPlayer({ cards, deckTitle, deckDesc, isDemo }: FlashcardPlayerProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
+// ── Component ──────────────────────────────────────────────────────────────
+
+export function FlashcardPlayer({ units, isLimited = false }: FlashcardPlayerProps) {
+  const { mode } = useUIStore();
+  const isKid = mode === "kid";
+
+  const [activeUnit, setActiveUnit] = useState(0);
+  const [cardIndex, setCardIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [jumpValue, setJumpValue] = useState("");
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
-  const { mode } = useUIStore();
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioTokenRef = useRef(0);
 
-  const card = cards[currentIndex];
-  const content = card?.content;
+  const currentVocab: FlashcardVocab[] = units[activeUnit]?.vocabulary ?? [];
+  const currentWord = currentVocab[cardIndex];
 
-  const speakWord = useCallback(async (word: string) => {
-    if (!word) return;
-    const rawWord = word.split("/")[0].replace(/[()]/g, "").trim();
+  // Auto-speak on card change
+  useEffect(() => {
+    if (!currentWord) return;
+    const timer = setTimeout(() => speakWord(), 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardIndex, activeUnit]);
+
+  const speakWord = useCallback(async () => {
+    if (!currentWord) return;
+    const rawWord = currentWord.word.split("/")[0].replace(/[()]/g, "").trim();
 
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    window.speechSynthesis?.cancel();
 
     setAudioLoading(true);
     const token = ++audioTokenRef.current;
-
-    const browserTTS = () => {
-      if (token !== audioTokenRef.current) return;
-      setAudioLoading(false);
-      if (!window.speechSynthesis) return;
-      const u = new SpeechSynthesisUtterance(rawWord);
-      u.lang = "en-US"; u.rate = 0.85;
-      window.speechSynthesis.speak(u);
-    };
 
     try {
       const apiUrl = await withTimeout(fetchFreeDictAudio(rawWord), 5000);
       if (token !== audioTokenRef.current) return;
 
-      let audioUrl = apiUrl;
-      if (!audioUrl) {
-        const slug = slugify(rawWord);
-        const mwUrl = `https://media.merriam-webster.com/audio/prons/en/us/mp3/${slug[0]}/${slug}.mp3`;
-        const works = await withTimeout(
-          new Promise<boolean>((res) => {
-            const a = new Audio();
-            a.oncanplaythrough = () => res(true);
-            a.onerror = () => res(false);
-            a.src = mwUrl;
-          }),
-          5000
-        );
-        if (token !== audioTokenRef.current) return;
-        if (works) audioUrl = mwUrl;
+      if (apiUrl) {
+        playUrl(apiUrl, rawWord, token);
+        return;
       }
-
-      if (!audioUrl) throw new Error("no_audio");
-
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      const fallback = setTimeout(() => { if (token === audioTokenRef.current) browserTTS(); }, 5000);
-
-      audio.oncanplaythrough = () => {
-        if (token !== audioTokenRef.current) { clearTimeout(fallback); audio.pause(); return; }
-        clearTimeout(fallback);
-        setAudioLoading(false);
-        audio.play().catch(() => { if (token === audioTokenRef.current) browserTTS(); });
-      };
-      audio.onerror = () => { clearTimeout(fallback); if (token === audioTokenRef.current) browserTTS(); };
-      audio.load();
+      throw new Error("no_mp3");
     } catch {
-      if (token === audioTokenRef.current) browserTTS();
+      if (token !== audioTokenRef.current) return;
+      setAudioLoading(false);
+      browserTTS(rawWord);
     }
-  }, []);
+  }, [currentWord]);
 
-  const goTo = useCallback((index: number) => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCurrentIndex(index);
-    }, 50);
-  }, []);
+  function playUrl(url: string, rawWord: string, token: number) {
+    const a = new Audio(url);
+    audioRef.current = a;
 
-  useEffect(() => {
-    if (isFirstLoad) { setIsFirstLoad(false); return; }
-    if (content?.word) {
-      const t = setTimeout(() => speakWord(content.word), 400);
-      return () => clearTimeout(t);
+    const fallback = setTimeout(() => {
+      if (token !== audioTokenRef.current) return;
+      a.pause();
+      audioRef.current = null;
+      setAudioLoading(false);
+      browserTTS(rawWord);
+    }, 5000);
+
+    a.oncanplaythrough = () => {
+      if (token !== audioTokenRef.current) { clearTimeout(fallback); a.pause(); return; }
+      clearTimeout(fallback);
+      setAudioLoading(false);
+      a.play().catch(() => { if (token !== audioTokenRef.current) return; browserTTS(rawWord); });
+    };
+
+    a.onerror = () => {
+      clearTimeout(fallback);
+      if (token !== audioTokenRef.current) return;
+      setAudioLoading(false);
+      browserTTS(rawWord);
+    };
+
+    a.load();
+  }
+
+  function goNext() {
+    setFlipped(false);
+    setTimeout(() => setCardIndex((i) => (i + 1) % currentVocab.length), 50);
+  }
+
+  function goPrev() {
+    setFlipped(false);
+    setTimeout(() => setCardIndex((i) => (i - 1 + currentVocab.length) % currentVocab.length), 50);
+  }
+
+  function switchUnit(idx: number) {
+    setActiveUnit(idx);
+    setCardIndex(0);
+    setFlipped(false);
+  }
+
+  function jumpTo(n: number) {
+    if (n >= 1 && n <= currentVocab.length) {
+      setFlipped(false);
+      setTimeout(() => setCardIndex(n - 1), 50);
     }
-  }, [currentIndex, content?.word, isFirstLoad, speakWord]);
+  }
 
-  if (!card || !content) return <div className="p-8 text-center text-muted-foreground">Không có từ nào</div>;
+  if (!currentWord) return <div className="text-center py-20 text-muted-foreground">Không có từ vựng</div>;
 
-  const isKid = mode === "kid";
+  const synonyms = Array.isArray(currentWord.synonyms) ? currentWord.synonyms.join(", ") : currentWord.synonyms ?? "";
+  const antonyms = Array.isArray(currentWord.antonyms) ? currentWord.antonyms.join(", ") : currentWord.antonyms ?? "";
 
   return (
-    <div className={cn("flex flex-1 min-h-0", isKid && "kid-mode")}>
-      {/* Left sidebar */}
+    <div className={cn("flex flex-1 min-h-0 overflow-hidden", isKid && "kid-mode")}>
+      {/* ── Left Sidebar: Units ── */}
       <nav
         className={cn(
-          "bg-white border-r-2 border-[#f0e0e7] flex flex-col flex-shrink-0 shadow-[2px_0_12px_rgba(0,0,0,0.06)] sticky top-[62px] h-[calc(100vh-62px)] transition-all duration-300 overflow-hidden",
-          leftCollapsed ? "w-[52px]" : "w-[230px]",
-          "hidden md:flex"
+          "bg-white border-r-2 border-border flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden",
+          leftCollapsed ? "w-[52px]" : "w-[220px]",
+          "sticky top-0 h-full"
         )}
       >
-        <div className="flex items-center justify-between p-4 border-b-2 border-[#f0e0e7] flex-shrink-0">
-          {!leftCollapsed && <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📚 Danh sách Unit</span>}
+        <div className="flex items-center justify-between p-3 border-b-2 border-border flex-shrink-0">
+          {!leftCollapsed && <span className="text-brand-red font-bold text-sm truncate">📚 Danh sách Unit</span>}
           <button
             onClick={() => setLeftCollapsed(!leftCollapsed)}
-            className="bg-none border-none cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light ml-auto"
+            className="p-1 rounded-lg hover:bg-brand-red-light text-brand-red flex-shrink-0 ml-auto"
           >
             {leftCollapsed ? "▶" : "◀"}
           </button>
         </div>
         <div className="overflow-y-auto flex-1 py-2">
-          <button
-            className={cn(
-              "flex items-center gap-2.5 w-full bg-none border-none py-3 px-3.5 text-left cursor-pointer font-semibold text-sm text-[#495057] transition-all border-l-4 border-brand bg-brand-light text-brand whitespace-nowrap overflow-hidden"
-            )}
-          >
-            <span className="bg-brand text-white w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-            {!leftCollapsed && <span className="truncate">{deckTitle}</span>}
-          </button>
+          {units.map((unit, i) => (
+            <button
+              key={unit.id ?? i}
+              onClick={() => switchUnit(i)}
+              title={unit.label}
+              className={cn(
+                "flex items-center gap-2 w-full text-left px-3 py-2.5 text-sm font-semibold transition-all border-l-[3px]",
+                i === activeUnit
+                  ? "bg-brand-red-light text-brand-red border-brand-red"
+                  : "text-gray-600 hover:bg-pink-50 hover:text-brand-red border-transparent"
+              )}
+            >
+              <span className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                i === activeUnit ? "bg-brand-red text-white" : "bg-gray-100 text-gray-500"
+              )}>
+                {i + 1}
+              </span>
+              {!leftCollapsed && <span className="truncate">{unit.label}</span>}
+            </button>
+          ))}
         </div>
       </nav>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <div className="flex-1 p-7 flex flex-col items-center px-4 md:px-[5%]">
-          <h1 className={cn(
-            "font-extrabold mb-1.5 text-center text-brand",
-            isKid ? "text-4xl" : "text-3xl"
-          )}>
-            {deckTitle}
+      {/* ── Main Content ── */}
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center py-8 px-4">
+          <h1 className={cn("font-extrabold text-brand-red mb-1 text-center", isKid ? "text-4xl" : "text-3xl")}>
+            {units[activeUnit]?.label}
           </h1>
-          {deckDesc && <p className="text-muted-foreground text-sm mb-5 text-center italic">{deckDesc}</p>}
-          {isDemo && (
-            <div className="mb-4 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700 text-center">
-              🎯 Đang xem <strong>demo</strong> — tối đa 10 từ. Đăng nhập để học đầy đủ.
+          <p className="text-muted-foreground text-sm mb-6 italic text-center">
+            {units[activeUnit]?.desc}
+          </p>
+
+          {isLimited && (
+            <div className="mb-4 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-700 text-sm font-medium">
+              ⚠️ Chế độ xem thử — chỉ hiển thị 10 thẻ đầu. Liên hệ để mở khoá toàn bộ.
             </div>
           )}
 
-          <div className={cn("w-full", isKid ? "max-w-2xl" : "max-w-[860px]")}>
-            {/* Card */}
-            <div
-              className={cn("card-scene mb-6 cursor-pointer", isKid ? "h-[500px]" : "h-[460px]")}
-              onClick={() => setIsFlipped(!isFlipped)}
-            >
-              <div className={cn("card-inner w-full h-full", isFlipped && "flipped")}>
+          {/* Card */}
+          <div className="w-full max-w-2xl">
+            <div className="card-scene w-full" style={{ height: isKid ? "520px" : "460px" }}>
+              <div
+                className={cn("card-inner w-full h-full cursor-pointer", flipped && "flipped")}
+                onClick={() => setFlipped(!flipped)}
+              >
                 {/* Front */}
                 <div className={cn(
-                  "card-face rounded-[20px] shadow-[0_5px_20px_rgba(0,0,0,0.1)] border-2 border-[#e9ecef] bg-white flex flex-col items-center justify-center p-8",
-                  isKid && "rounded-3xl"
+                  "card-face bg-white border-2 border-border rounded-[20px] shadow-md flex flex-col items-center justify-center gap-2 p-8",
+                  isKid && "rounded-[2rem]"
                 )}>
-                  <div className={cn(
-                    "font-extrabold text-brand mb-1.5 text-center flashcard-word",
-                    isKid ? "text-6xl" : "text-5xl"
-                  )}>
-                    {content.word}
+                  <div className={cn("font-extrabold text-brand-red text-center flashcard-word", isKid ? "text-5xl" : "text-4xl")}>
+                    {currentWord.word}
                   </div>
-                  <div className="text-muted-foreground text-xl mb-2">{content.phonetic}</div>
-                  {content.cefr && (
-                    <span className={cn("text-xs font-bold px-3 py-1 rounded-full mb-2", getCefrColor(content.cefr))}>
-                      {content.cefr}
+                  <div className="text-muted-foreground text-lg">{currentWord.phonetic}</div>
+                  {currentWord.cefr && (
+                    <span className={cn("text-xs font-bold px-3 py-1 rounded-full", cefrColor(currentWord.cefr))}>
+                      {currentWord.cefr}
                     </span>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); speakWord(content.word); }}
-                    className="bg-none border-none text-4xl cursor-pointer p-2 transition-transform hover:scale-110 my-1"
+                    onClick={(e) => { e.stopPropagation(); speakWord(); }}
+                    className="text-3xl p-2 hover:scale-110 transition-transform"
                     disabled={audioLoading}
                   >
-                    {audioLoading ? <Loader2 className="w-8 h-8 animate-spin text-brand" /> : "🔊"}
+                    {audioLoading ? <Loader2 className="h-7 w-7 animate-spin text-brand-red" /> : "🔊"}
                   </button>
-                  <div className="text-muted-foreground text-sm italic">Nhấn để xem nghĩa</div>
+                  <span className="text-muted-foreground text-sm italic">Nhấn để xem nghĩa</span>
                 </div>
 
                 {/* Back */}
                 <div className={cn(
-                  "card-face card-back rounded-[20px] bg-brand text-white flex flex-col items-center justify-center p-8 overflow-y-auto",
-                  isKid && "rounded-3xl"
+                  "card-face card-back-face bg-brand-red text-white rounded-[20px] shadow-md flex flex-col items-center justify-center gap-3 p-8 overflow-y-auto",
+                  isKid && "rounded-[2rem]"
                 )}>
-                  <div className="flex flex-col items-center gap-3 w-full text-center">
-                    <div className={cn("font-extrabold leading-tight flashcard-meaning", isKid ? "text-4xl" : "text-3xl")}>
-                      {content.meaning}
-                    </div>
-                    <div className="text-sm bg-white/25 px-4 py-1 rounded-full font-semibold">{content.type}</div>
-                    <div className="w-12 h-0.5 bg-white/40 rounded" />
-                    {content.example && (
-                      <div className="text-sm leading-relaxed max-w-[90%]">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Ví dụ</span>
-                        {content.example}
-                      </div>
-                    )}
-                    {content.translation && (
-                      <div className="text-sm leading-relaxed max-w-[90%] opacity-90">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Dịch</span>
-                        <em>{content.translation}</em>
-                      </div>
-                    )}
-                    <div className="w-12 h-0.5 bg-white/40 rounded" />
-                    {content.synonyms?.length > 0 && (
-                      <div className="text-sm max-w-[90%]">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Đồng nghĩa</span>
-                        {Array.isArray(content.synonyms) ? content.synonyms.join(", ") : content.synonyms}
-                      </div>
-                    )}
-                    {content.antonyms?.length > 0 && (
-                      <div className="text-sm max-w-[90%]">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Trái nghĩa</span>
-                        {Array.isArray(content.antonyms) ? content.antonyms.join(", ") : content.antonyms}
-                      </div>
-                    )}
+                  <div className={cn("font-extrabold text-center flashcard-meaning", isKid ? "text-3xl" : "text-2xl")}>
+                    {currentWord.meaning}
                   </div>
+                  <span className="bg-white/25 text-white text-sm px-4 py-1 rounded-full font-semibold">
+                    {currentWord.type}
+                  </span>
+                  <div className="w-12 h-0.5 bg-white/40 rounded-full" />
+                  {currentWord.example && (
+                    <div className="text-sm text-center max-w-[90%] leading-relaxed">
+                      <span className="bg-white/20 font-bold px-2 py-0.5 rounded-lg text-xs mr-1">Ví dụ</span>
+                      {currentWord.example}
+                    </div>
+                  )}
+                  {currentWord.translation && (
+                    <div className="text-sm text-center max-w-[90%] leading-relaxed italic opacity-90">
+                      <span className="bg-white/20 font-bold px-2 py-0.5 rounded-lg text-xs mr-1 not-italic">Dịch</span>
+                      {currentWord.translation}
+                    </div>
+                  )}
+                  <div className="w-12 h-0.5 bg-white/40 rounded-full" />
+                  {synonyms && (
+                    <div className="text-sm text-center max-w-[90%]">
+                      <span className="bg-white/20 font-bold px-2 py-0.5 rounded-lg text-xs mr-1">Đồng nghĩa</span>
+                      {synonyms}
+                    </div>
+                  )}
+                  {antonyms && (
+                    <div className="text-sm text-center max-w-[90%]">
+                      <span className="bg-white/20 font-bold px-2 py-0.5 rounded-lg text-xs mr-1">Trái nghĩa</span>
+                      {antonyms}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Controls */}
-            <div className="flex justify-center gap-4 mt-2">
-              <Button
-                variant="brand"
-                size="pill"
-                onClick={() => goTo((currentIndex - 1 + cards.length) % cards.length)}
-              >
-                <ChevronLeft className="w-5 h-5" /> Trước
+            <div className="flex justify-center gap-4 mt-5">
+              <Button onClick={goPrev} variant="default" size="lg">
+                <ChevronLeft className="mr-1 h-5 w-5" /> Trước
               </Button>
-              <Button
-                variant="brand"
-                size="pill"
-                onClick={() => goTo((currentIndex + 1) % cards.length)}
-              >
-                Tiếp <ChevronRight className="w-5 h-5" />
+              <Button onClick={goNext} variant="default" size="lg">
+                Tiếp <ChevronRight className="ml-1 h-5 w-5" />
               </Button>
             </div>
 
-            <div className="text-center text-[#495057] text-lg mt-4 font-semibold">
-              Thẻ {currentIndex + 1} / {cards.length}
+            <div className="text-center mt-4 font-semibold text-gray-600">
+              Thẻ {cardIndex + 1} / {currentVocab.length}
             </div>
 
-            {/* Jump */}
-            <div className="flex items-center justify-center gap-2.5 mt-3 flex-wrap">
-              <label className="text-[#495057] font-semibold text-sm">Đi đến thẻ:</label>
+            {/* Jump to card */}
+            <div className="flex items-center justify-center gap-3 mt-3 flex-wrap">
+              <label className="text-sm font-semibold text-gray-600">Đi đến thẻ:</label>
               <input
                 type="number"
-                value={jumpValue}
                 min={1}
-                max={cards.length}
-                onChange={(e) => setJumpValue(e.target.value)}
+                max={currentVocab.length}
+                placeholder="..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    const n = parseInt(jumpValue);
-                    if (n >= 1 && n <= cards.length) { goTo(n - 1); setJumpValue(""); }
+                    jumpTo(parseInt((e.target as HTMLInputElement).value));
+                    (e.target as HTMLInputElement).value = "";
                   }
                 }}
-                className="w-18 px-3 py-2 border-2 border-brand rounded-lg text-sm font-semibold text-center text-brand outline-none w-16"
-                placeholder="..."
+                className="w-20 text-center border-2 border-brand-red rounded-xl px-2 py-1.5 text-sm font-bold text-brand-red outline-none"
               />
-              <Button
-                variant="brand"
-                size="sm"
-                onClick={() => {
-                  const n = parseInt(jumpValue);
-                  if (n >= 1 && n <= cards.length) { goTo(n - 1); setJumpValue(""); }
+              <button
+                onClick={(e) => {
+                  const inp = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                  jumpTo(parseInt(inp.value));
+                  inp.value = "";
                 }}
+                className="bg-brand-red text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-brand-red-dark"
               >
                 Đi
-              </Button>
+              </button>
             </div>
-            <div className="text-center text-muted-foreground mt-2 text-sm">💡 Nhấn vào thẻ để lật</div>
+            <p className="text-center text-muted-foreground text-xs mt-2">💡 Nhấn vào thẻ để lật</p>
           </div>
         </div>
       </div>
 
-      {/* Right sidebar */}
+      {/* ── Right Sidebar: Word List ── */}
       <aside
         className={cn(
-          "bg-white border-l-2 border-[#f0e0e7] shadow-[-2px_0_12px_rgba(0,0,0,0.06)] flex flex-col sticky top-[62px] h-[calc(100vh-62px)] transition-all duration-300 overflow-hidden",
-          rightCollapsed ? "w-10" : "w-[280px]",
-          "hidden md:flex"
+          "bg-white border-l-2 border-border flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden",
+          rightCollapsed ? "w-[40px]" : "w-[260px]",
+          "sticky top-0 h-full"
         )}
       >
-        <div className="flex items-center justify-between p-4 border-b-2 border-[#f0e0e7] flex-shrink-0 gap-2">
+        <div className="flex items-center gap-2 p-3 border-b-2 border-border flex-shrink-0">
           <button
             onClick={() => setRightCollapsed(!rightCollapsed)}
-            className="bg-none border-none cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light flex-shrink-0"
+            className="p-1 rounded-lg hover:bg-brand-red-light text-brand-red flex-shrink-0"
           >
             {rightCollapsed ? "◀" : "▶"}
           </button>
-          {!rightCollapsed && <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📋 Danh sách từ</span>}
+          {!rightCollapsed && <span className="text-brand-red font-bold text-sm truncate">📋 Danh sách từ</span>}
         </div>
         {!rightCollapsed && (
-          <div className="overflow-y-auto flex-1 p-3">
-            {cards.map((c, i) => (
-              <div
-                key={c.id}
-                onClick={() => goTo(i)}
+          <div className="overflow-y-auto flex-1 p-2">
+            {currentVocab.map((v, i) => (
+              <button
+                key={i}
+                onClick={() => { setFlipped(false); setTimeout(() => setCardIndex(i), 50); }}
                 className={cn(
-                  "p-2.5 rounded-xl cursor-pointer transition-all border-2 flex items-center gap-2.5 mb-2",
-                  i === currentIndex
-                    ? "bg-brand text-white border-brand"
-                    : "bg-[#f8f9fa] border-transparent hover:bg-[#ffe5ed] hover:border-brand"
+                  "w-full flex items-center gap-2 p-2.5 rounded-xl mb-1.5 border-2 transition-all text-left",
+                  i === cardIndex
+                    ? "bg-brand-red text-white border-brand-red"
+                    : "bg-gray-50 border-transparent hover:bg-pink-50 hover:border-brand-red hover:translate-x-[-3px]"
                 )}
               >
-                <div className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0",
-                  i === currentIndex ? "bg-white text-brand" : "bg-brand text-white"
+                <span className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                  i === cardIndex ? "bg-white text-brand-red" : "bg-brand-red text-white"
                 )}>
                   {i + 1}
-                </div>
-                <span className="font-semibold text-sm flex-1 truncate">{c.content.word}</span>
-                {c.content.cefr && (
+                </span>
+                <span className="font-semibold text-sm flex-1 truncate">{v.word}</span>
+                {v.cefr && (
                   <span className={cn(
-                    "text-[0.7rem] px-1.5 py-0.5 rounded font-bold flex-shrink-0",
-                    i === currentIndex ? "bg-white/20 text-white" : getCefrColor(c.content.cefr)
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0",
+                    i === cardIndex ? "bg-white/25 text-white" : cefrColor(v.cefr)
                   )}>
-                    {c.content.cefr}
+                    {v.cefr}
                   </span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}

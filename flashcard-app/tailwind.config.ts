@@ -9,13 +9,12 @@ const config: Config = {
     "./features/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
   ],
+  prefix: "",
   theme: {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
       colors: {
@@ -53,10 +52,10 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
         brand: {
-          DEFAULT: "#ed0046",
-          dark: "#c0003a",
-          light: "#fff0f4",
-          mid: "#ffd6e4",
+          red: "#ed0046",
+          "red-dark": "#c0003a",
+          "red-light": "#fff0f4",
+          "red-mid": "#ffd6e4",
         },
       },
       borderRadius: {
@@ -74,19 +73,19 @@ const config: Config = {
           to: { height: "0" },
         },
         "flip-in": {
-          "0%": { transform: "rotateY(90deg)", opacity: "0" },
-          "100%": { transform: "rotateY(0deg)", opacity: "1" },
+          from: { transform: "rotateY(90deg)", opacity: "0" },
+          to: { transform: "rotateY(0deg)", opacity: "1" },
         },
-        "slide-up": {
-          "0%": { transform: "translateY(20px)", opacity: "0" },
-          "100%": { transform: "translateY(0)", opacity: "1" },
+        "slide-in": {
+          from: { transform: "translateX(-20px)", opacity: "0" },
+          to: { transform: "translateX(0)", opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "flip-in": "flip-in 0.3s ease-out",
-        "slide-up": "slide-up 0.3s ease-out",
+        "slide-in": "slide-in 0.3s ease-out",
       },
       fontFamily: {
         sans: ["var(--font-bricolage)", "sans-serif"],
@@ -95,4 +94,5 @@ const config: Config = {
   },
   plugins: [require("tailwindcss-animate")],
 };
+
 export default config;

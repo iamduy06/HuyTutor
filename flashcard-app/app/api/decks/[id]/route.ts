@@ -1,64 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
-import { DEMO_CARD_LIMIT } from "@/lib/constants";
 import { isExpired } from "@/lib/utils";
+import { DEMO_CARD_LIMIT } from "@/lib/constants";
+import { FlashcardContent } from "@/types";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient();
-  const adminSupabase = createAdminClient();
+  const { id: deckId } = await params;
+  const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: deck } = await adminSupabase
-    .from("decks")
-    .select("id, title, description, level")
-    .eq("id", params.id)
-    .single();
-
-  if (!deck) {
-    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
-  }
-
-  // Check user_decks for expiry
-  const { data: userDeck } = await adminSupabase
+  // Check user-deck access
+  const { data: userDeck } = await supabase
     .from("user_decks")
-    .select("expired_at, progress_percent, learned_count, streak")
+    .select("expired_at")
     .eq("user_id", user.id)
-    .eq("deck_id", params.id)
+    .eq("deck_id", deckId)
     .single();
 
-  const hasAccess = userDeck && !isExpired(userDeck.expired_at);
-  const limit = hasAccess ? undefined : DEMO_CARD_LIMIT;
+  if (!userDeck) return NextResponse.json({ error: "No access" }, { status: 403 });
 
-  let query = adminSupabase
+  const expired = isExpired(userDeck.expired_at);
+
+  const { data: deck } = await supabase.from("decks").select("*").eq("id", deckId).single();
+  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const { data: flashcards } = await supabase
     .from("flashcards")
-    .select("id, deck_id, content, order_index")
-    .eq("deck_id", params.id)
-    .order("order_index", { ascending: true });
+    .select("id, content")
+    .eq("deck_id", deckId)
+    .order("created_at", { ascending: true });
 
-  if (limit) {
-    query = query.limit(limit);
+  let units: FlashcardContent[] = (flashcards ?? []).map((fc) => fc.content as FlashcardContent);
+
+  if (expired) {
+    units = units.slice(0, 1).map((u) => ({
+      ...u,
+      vocabulary: u.vocabulary.slice(0, DEMO_CARD_LIMIT),
+    }));
   }
 
-  const { data: cards, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    deck,
-    cards: cards ?? [],
-    isDemo: !hasAccess,
-    userDeck: userDeck ?? null,
-    total: cards?.length ?? 0,
-  });
+  return NextResponse.json({ deck, units, isLimited: expired });
 }

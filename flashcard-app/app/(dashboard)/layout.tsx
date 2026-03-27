@@ -1,12 +1,19 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/services/supabase/server";
 import { SiteHeader } from "@/components/common/SiteHeader";
-import { SiteFooter } from "@/components/common/SiteFooter";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
-      <main className="flex-1 bg-[#f8f9fa]">{children}</main>
-      <SiteFooter />
+      <div className="flex-1">{children}</div>
+      <footer className="text-center py-4 text-muted-foreground text-xs border-t bg-white">
+        © Bản quyền thuộc về <strong>Huy Tutor</strong>
+      </footer>
     </div>
   );
 }

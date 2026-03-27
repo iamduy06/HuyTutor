@@ -2,79 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&display=swap');
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 98%;
+    --foreground: 240 10% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 344 100% 46%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 340 100% 46%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 344 100% 46%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 344 100% 46%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 344 100% 46%;
+    --secondary: 340 100% 97%;
+    --secondary-foreground: 340 100% 30%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 340 100% 97%;
+    --accent-foreground: 340 100% 36%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 340 30% 91%;
+    --input: 340 30% 91%;
+    --ring: 340 100% 46%;
+    --radius: 0.75rem;
+    --font-bricolage: 'Bricolage Grotesque', sans-serif;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-bricolage);
   }
 }
 
-/* Flashcard flip animation */
-.card-scene {
-  perspective: 1000px;
-}
-
+/* ── Flashcard flip animation ── */
+.card-scene { perspective: 1000px; }
 .card-inner {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.6s cubic-bezier(0.4,0.2,0.2,1);
 }
-
-.card-inner.flipped {
-  transform: rotateY(180deg);
-}
-
+.card-inner.flipped { transform: rotateY(180deg); }
 .card-face {
   position: absolute;
   width: 100%;
@@ -82,36 +55,15 @@
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+.card-back-face { transform: rotateY(180deg); }
 
-.card-back {
-  transform: rotateY(180deg);
-}
+/* ── Kid mode overrides ── */
+.kid-mode .flashcard-word { font-size: 3rem !important; }
+.kid-mode .flashcard-meaning { font-size: 2rem !important; }
+.kid-mode .card-face { border-radius: 2rem !important; }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #ed0046;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #c0003a;
-}
-
-/* Kid mode */
-.kid-mode {
-  --radius: 1rem;
-}
-
-.kid-mode .flashcard-word {
-  font-size: 3rem !important;
-}
-
-.kid-mode .flashcard-meaning {
-  font-size: 2rem !important;
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ed004655; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #ed0046; }

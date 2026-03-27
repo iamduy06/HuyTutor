@@ -1,70 +1,97 @@
-import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/services/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
+import { redirect, notFound } from "next/navigation";
+import { SiteHeader } from "@/components/common/SiteHeader";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
 import { isExpired } from "@/lib/utils";
+import { FlashcardContent } from "@/types";
 import { DEMO_CARD_LIMIT } from "@/lib/constants";
-import type { Flashcard } from "@/types";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { FACEBOOK_URL } from "@/lib/constants";
 
-interface Props { params: { deckId: string } }
-
-export default async function LearningPage({ params }: Props) {
-  const supabase = createClient();
+async function getLearningData(deckId: string) {
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
-
-  const { data: deck } = await admin
-    .from("decks")
-    .select("id, title, description, level")
-    .eq("id", params.deckId)
-    .single();
-
-  if (!deck) notFound();
-
-  // Check user access
-  const { data: userDeck } = await admin
+  // Check user has access to this deck
+  const { data: userDeck } = await supabase
     .from("user_decks")
-    .select("expired_at, progress_percent, learned_count, streak")
+    .select("*, deck:decks(*)")
     .eq("user_id", user.id)
-    .eq("deck_id", params.deckId)
+    .eq("deck_id", deckId)
     .single();
 
-  const hasFullAccess = userDeck && !isExpired(userDeck.expired_at);
+  if (!userDeck) return null;
 
-  let query = admin
+  const expired = isExpired(userDeck.expired_at);
+
+  // Fetch flashcards
+  const { data: flashcards } = await supabase
     .from("flashcards")
-    .select("id, deck_id, content, order_index")
-    .eq("deck_id", params.deckId)
-    .order("order_index", { ascending: true });
+    .select("id, content")
+    .eq("deck_id", deckId)
+    .order("created_at", { ascending: true });
 
-  if (!hasFullAccess) {
-    query = query.limit(DEMO_CARD_LIMIT) as typeof query;
+  let units: FlashcardContent[] = (flashcards ?? []).map((fc) => fc.content as FlashcardContent);
+
+  // If expired — limit to first 10 cards of first unit
+  if (expired) {
+    units = units.slice(0, 1).map((u) => ({
+      ...u,
+      vocabulary: u.vocabulary.slice(0, DEMO_CARD_LIMIT),
+    }));
   }
 
-  const { data: cards } = await query;
-  const typedCards = (cards ?? []) as Flashcard[];
+  return { userDeck, units, expired, deck: userDeck.deck };
+}
+
+export default async function LearningPage({
+  params,
+}: {
+  params: Promise<{ deckId: string }>;
+}) {
+  const { deckId } = await params;
+  const data = await getLearningData(deckId);
+
+  if (!data) notFound();
+
+  const { units, expired, deck } = data;
 
   return (
-    <div className="flex flex-col flex-1 min-h-[calc(100vh-62px)]">
-      {!hasFullAccess && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2.5 text-center text-sm text-yellow-800 flex items-center justify-center gap-3 flex-wrap">
-          <span>⚠️ Bộ đề đã <strong>hết hạn</strong> hoặc chưa được cấp quyền. Bạn chỉ xem được tối đa {DEMO_CARD_LIMIT} từ.</span>
-          <Button variant="brand" size="sm" asChild className="rounded-full">
-            <Link href={FACEBOOK_URL} target="_blank">💬 Liên hệ gia hạn</Link>
-          </Button>
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+
+      {/* Top bar */}
+      <div className="bg-white border-b-2 border-border px-5 py-2.5 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm">← Dashboard</Button>
+          </Link>
+          <span className="font-bold text-gray-900 truncate">{deck?.title}</span>
+          {expired && (
+            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
+              ⚠️ Hết hạn — xem thử 10 thẻ
+            </span>
+          )}
+        </div>
+        {expired && (
+          <a href="https://web.facebook.com/huytutor" target="_blank" rel="noopener noreferrer">
+            <Button size="sm">🔓 Gia hạn ngay</Button>
+          </a>
+        )}
+      </div>
+
+      {units.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center flex-col gap-3">
+          <div className="text-5xl">📭</div>
+          <p className="text-muted-foreground">Bộ đề chưa có nội dung</p>
+          <Link href="/dashboard"><Button variant="outline">← Quay lại</Button></Link>
+        </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 110px)" }}>
+          <FlashcardPlayer units={units} isLimited={expired} />
         </div>
       )}
-      <FlashcardPlayer
-        cards={typedCards}
-        deckTitle={deck.title}
-        deckDesc={deck.description ?? undefined}
-        isDemo={!hasFullAccess}
-      />
     </div>
   );
 }

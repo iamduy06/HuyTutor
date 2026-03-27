@@ -1,54 +1,52 @@
-import { createAdminClient } from "@/services/supabase/admin";
-import { DeckCard } from "@/components/flashcard/DeckCard";
-import type { Deck } from "@/types";
+import { createClient } from "@/services/supabase/server";
+import { DeckCard } from "@/components/common/DeckCard";
+import { SiteHeader } from "@/components/common/SiteHeader";
 
-export const revalidate = 60;
-
-async function getDecks(): Promise<Deck[]> {
-  const supabase = createAdminClient();
+async function getAllDecks() {
+  const supabase = await createClient();
   const { data } = await supabase
     .from("decks")
-    .select("*, flashcards(count)")
-    .order("created_at", { ascending: true });
+    .select(`*, flashcards(id, content)`)
+    .order("created_at", { ascending: false });
 
-  return (data ?? []).map((d: any) => ({
+  return (data ?? []).map((d) => ({
     ...d,
-    flashcard_count: d.flashcards?.[0]?.count ?? 0,
-    flashcards: undefined,
+    word_count: Array.isArray(d.flashcards)
+      ? d.flashcards.reduce((acc: number, fc: { content?: { vocabulary?: unknown[] } }) =>
+          acc + (fc?.content?.vocabulary?.length ?? 0), 0)
+      : 0,
   }));
 }
 
 export default async function DecksPage() {
-  const decks = await getDecks();
+  const decks = await getAllDecks();
 
   return (
-    <div className="py-12 px-[5%] max-w-6xl mx-auto">
-      <div className="mb-10">
-        <h1 className="text-4xl font-extrabold text-[#1a1a2e] mb-2">
-          📚 Bộ đề từ vựng
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Khám phá các bộ đề được biên soạn chuyên nghiệp. Học thử miễn phí, mua để học đầy đủ.
-        </p>
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 max-w-5xl mx-auto w-full px-5 py-10">
+        <div className="mb-8">
+          <h1 className="text-3xl font-extrabold text-brand-red mb-1">📚 Tất cả bộ đề</h1>
+          <p className="text-muted-foreground">Chọn bộ đề và học thử miễn phí ngay hôm nay</p>
+        </div>
+
+        {decks.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <div className="text-6xl mb-4">📭</div>
+            <p>Chưa có bộ đề nào. Vui lòng quay lại sau!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {decks.map((deck) => (
+              <DeckCard key={deck.id} deck={deck} href={`/decks/${deck.id}`} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {decks.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <div className="text-5xl mb-4">📭</div>
-          <p className="text-lg">Chưa có bộ đề nào. Hãy quay lại sau!</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {decks.map((deck) => (
-            <DeckCard
-              key={deck.id}
-              deck={deck}
-              href={`/decks/${deck.id}`}
-              ctaLabel="Học thử"
-            />
-          ))}
-        </div>
-      )}
+      <footer className="text-center py-5 text-muted-foreground text-xs border-t bg-white">
+        © Bản quyền thuộc về <strong>Huy Tutor</strong>
+      </footer>
     </div>
   );
 }

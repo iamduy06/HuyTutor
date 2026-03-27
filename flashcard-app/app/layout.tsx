@@ -1,18 +1,10 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/common/Providers";
-import { Toaster } from "@/components/ui/toaster";
-
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage",
-  weight: ["400", "600", "700", "800"],
-});
 
 export const metadata: Metadata = {
   title: "Huy Tutor Flashcard",
-  description: "Nền tảng học từ vựng tiếng Anh chuyên nghiệp",
+  description: "Học từ vựng tiếng Anh hiệu quả cùng Huy Tutor",
 };
 
 export default function RootLayout({
@@ -21,12 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body className={`${bricolage.variable} font-sans antialiased`}>
-        <Providers>
-          {children}
-          <Toaster />
-        </Providers>
+    <html lang="vi" suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

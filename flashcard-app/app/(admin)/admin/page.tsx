@@ -1,86 +1,60 @@
-import { createAdminClient } from "@/services/supabase/admin";
-import { Users, BookOpen, TrendingUp, Award } from "lucide-react";
+import { createClient } from "@/services/supabase/server";
+import { Users, BookOpen, TrendingUp, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
 export default async function AdminPage() {
-  const supabase = createAdminClient();
+  const supabase = await createClient();
 
   const [
-    { count: totalUsers },
-    { count: totalDecks },
-    { data: progressData },
+    { count: userCount },
+    { count: deckCount },
+    { data: userDecks },
   ] = await Promise.all([
     supabase.from("users").select("*", { count: "exact", head: true }),
     supabase.from("decks").select("*", { count: "exact", head: true }),
-    supabase.from("user_decks").select("progress_percent"),
+    supabase.from("user_decks").select("progress_percent, learned_count"),
   ]);
 
-  const avgProgress = progressData?.length
-    ? Math.round(progressData.reduce((s, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
+  const avgProgress = userDecks && userDecks.length > 0
+    ? Math.round(userDecks.reduce((a, b) => a + (b.progress_percent ?? 0), 0) / userDecks.length)
     : 0;
 
-  const { data: recentUsers } = await supabase
-    .from("users")
-    .select("id, email, role, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const totalLearned = userDecks?.reduce((a, b) => a + (b.learned_count ?? 0), 0) ?? 0;
+
+  const stats = [
+    { label: "Tổng người dùng", value: userCount ?? 0, icon: Users, color: "text-blue-500", bg: "bg-blue-50", href: "/admin/users" },
+    { label: "Bộ đề", value: deckCount ?? 0, icon: BookOpen, color: "text-brand-red", bg: "bg-brand-red-light", href: "/admin/decks" },
+    { label: "Tiến độ TB", value: `${avgProgress}%`, icon: TrendingUp, color: "text-green-500", bg: "bg-green-50", href: "/admin/analytics" },
+    { label: "Tổng từ đã học", value: totalLearned, icon: CheckCircle, color: "text-purple-500", bg: "bg-purple-50", href: "/admin/analytics" },
+  ];
 
   return (
-    <div className="p-6 max-w-5xl">
-      <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-6">🛡️ Tổng quan Admin</h1>
+    <div className="p-6 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-extrabold mb-6">🛠️ Admin Dashboard</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Tổng người dùng", value: totalUsers ?? 0, icon: <Users className="w-5 h-5" />, color: "text-blue-500", bg: "bg-blue-50" },
-          { label: "Bộ đề", value: totalDecks ?? 0, icon: <BookOpen className="w-5 h-5" />, color: "text-brand", bg: "bg-brand-light" },
-          { label: "Tiến độ TB", value: `${avgProgress}%`, icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Lượt giao bộ đề", value: progressData?.length ?? 0, icon: <Award className="w-5 h-5" />, color: "text-purple-600", bg: "bg-purple-50" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5 flex flex-col gap-2">
-            <div className={`w-10 h-10 rounded-xl ${s.bg} ${s.color} flex items-center justify-center`}>{s.icon}</div>
-            <div className="text-2xl font-extrabold text-[#1a1a2e]">{s.value}</div>
-            <div className="text-xs text-muted-foreground font-medium">{s.label}</div>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {stats.map((s) => (
+          <Link key={s.label} href={s.href} className="bg-white rounded-2xl border-2 border-border p-5 hover:border-brand-red transition-all hover:-translate-y-0.5">
+            <div className={`${s.bg} w-10 h-10 rounded-xl flex items-center justify-center mb-3`}>
+              <s.icon className={`h-5 w-5 ${s.color}`} />
+            </div>
+            <div className="text-2xl font-extrabold">{s.value}</div>
+            <div className="text-sm text-muted-foreground mt-0.5">{s.label}</div>
+          </Link>
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-[#1a1a2e]">Người dùng mới nhất</h2>
-            <Link href="/admin/users" className="text-brand text-sm font-semibold hover:underline">Xem tất cả →</Link>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {[
+          { title: "Quản lý người dùng", desc: "Tạo user, reset mật khẩu, gán deck và phân quyền.", href: "/admin/users", cta: "Đến trang người dùng →" },
+          { title: "Quản lý bộ đề", desc: "CRUD decks, flashcards và upload JSON hàng loạt.", href: "/admin/decks", cta: "Đến trang bộ đề →" },
+        ].map((card) => (
+          <div key={card.title} className="bg-white rounded-2xl border-2 border-border p-6">
+            <h3 className="font-bold text-lg mb-1">{card.title}</h3>
+            <p className="text-muted-foreground text-sm mb-4">{card.desc}</p>
+            <Link href={card.href} className="text-brand-red font-bold text-sm hover:underline">{card.cta}</Link>
           </div>
-          <div className="flex flex-col gap-2">
-            {(recentUsers ?? []).map((u: any) => (
-              <div key={u.id} className="flex items-center justify-between py-2 border-b border-[#f0e0e7] last:border-0">
-                <div>
-                  <div className="font-semibold text-sm text-[#1a1a2e] truncate max-w-[200px]">{u.email}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString("vi-VN")}</div>
-                </div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-brand-light text-brand"
-                }`}>{u.role}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5">
-          <h2 className="font-bold text-[#1a1a2e] mb-4">Thao tác nhanh</h2>
-          <div className="flex flex-col gap-3">
-            {[
-              { href: "/admin/users", label: "➕ Tạo người dùng mới", desc: "Thêm tài khoản và giao bộ đề" },
-              { href: "/admin/decks", label: "📚 Quản lý bộ đề", desc: "Thêm, sửa, xóa deck và flashcard" },
-              { href: "/admin/analytics", label: "📊 Xem thống kê chi tiết", desc: "Phân tích tiến độ học tập" },
-            ].map((item) => (
-              <Link key={item.href} href={item.href}
-                className="p-3 rounded-xl border-2 border-[#f0e0e7] hover:border-brand hover:bg-brand-light transition-all group">
-                <div className="font-semibold text-sm text-[#1a1a2e] group-hover:text-brand">{item.label}</div>
-                <div className="text-xs text-muted-foreground">{item.desc}</div>
-              </Link>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );

@@ -1,15 +1,14 @@
-import { notFound } from "next/navigation";
-import { createAdminClient } from "@/services/supabase/admin";
+import { createClient } from "@/services/supabase/server";
+import { SiteHeader } from "@/components/common/SiteHeader";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
-import { DEMO_CARD_LIMIT } from "@/lib/constants";
-import type { Flashcard } from "@/types";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-
-interface Props { params: { id: string } }
+import { DEMO_CARD_LIMIT } from "@/lib/constants";
+import { FlashcardContent } from "@/types";
 
 async function getDemoData(deckId: string) {
-  const supabase = createAdminClient();
+  const supabase = await createClient();
 
   const { data: deck } = await supabase
     .from("decks")
@@ -19,35 +18,70 @@ async function getDemoData(deckId: string) {
 
   if (!deck) return null;
 
-  const { data: cards } = await supabase
+  // Use separate demo query — NOT the full deck API
+  const { data: flashcards } = await supabase
     .from("flashcards")
-    .select("id, deck_id, content, order_index")
+    .select("id, content")
     .eq("deck_id", deckId)
-    .order("order_index", { ascending: true })
-    .limit(DEMO_CARD_LIMIT);
+    .limit(1); // get first unit for demo
 
-  return { deck, cards: (cards ?? []) as Flashcard[] };
+  if (!flashcards || flashcards.length === 0) return { deck, units: [] };
+
+  // Limit vocabulary to DEMO_CARD_LIMIT per unit
+  const units: FlashcardContent[] = flashcards.map((fc) => {
+    const content = fc.content as FlashcardContent;
+    return {
+      ...content,
+      vocabulary: (content.vocabulary ?? []).slice(0, DEMO_CARD_LIMIT),
+    };
+  });
+
+  return { deck, units };
 }
 
-export default async function DeckDemoPage({ params }: Props) {
-  const data = await getDemoData(params.id);
+export default async function DeckDemoPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const data = await getDemoData(id);
+
   if (!data) notFound();
 
+  const { deck, units } = data;
+
   return (
-    <div className="flex flex-col flex-1">
-      <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-center text-sm text-yellow-800">
-        🎯 Bạn đang xem <strong>bản demo</strong> (tối đa {DEMO_CARD_LIMIT} từ).{" "}
-        <Button variant="link" asChild className="p-0 h-auto text-brand font-bold">
-          <Link href="/login">Đăng nhập</Link>
-        </Button>{" "}
-        để truy cập đầy đủ.
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+
+      {/* Banner */}
+      <div className="bg-brand-red-light border-b border-brand-red/20 px-5 py-3 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <span className="font-bold text-brand-red">{deck.title}</span>
+          <span className="text-sm text-muted-foreground ml-2">— Chế độ xem thử (tối đa {DEMO_CARD_LIMIT} thẻ)</span>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/register">
+            <Button size="sm">🔓 Mở khoá toàn bộ</Button>
+          </Link>
+          <a href="https://web.facebook.com/huytutor" target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline">💬 Liên hệ</Button>
+          </a>
+        </div>
       </div>
-      <FlashcardPlayer
-        cards={data.cards}
-        deckTitle={data.deck.title}
-        deckDesc={data.deck.description ?? undefined}
-        isDemo
-      />
+
+      {units.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center flex-col gap-4 py-20">
+          <div className="text-6xl">📭</div>
+          <p className="text-muted-foreground">Bộ đề này chưa có nội dung</p>
+          <Link href="/decks"><Button variant="outline">← Quay lại</Button></Link>
+        </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 108px)" }}>
+          <FlashcardPlayer units={units} isLimited />
+        </div>
+      )}
     </div>
   );
 }

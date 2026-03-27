@@ -1,55 +1,61 @@
-# Huy Tutor Flashcard
+# Huy Tutor Flashcard App
 
-Nền tảng học từ vựng tiếng Anh chuyên nghiệp với Next.js 14, Supabase và TailwindCSS.
-
-## Tech Stack
-
-- **Frontend**: Next.js 14 (App Router), TypeScript, TailwindCSS, shadcn/ui
-- **State**: React Query (server state) + Zustand (UI state)
-- **Backend**: Supabase (Auth, PostgreSQL, RLS)
-- **Deployment**: Vercel
+Ứng dụng học từ vựng tiếng Anh qua Flashcard — Next.js 14, Supabase, TypeScript.
 
 ---
 
-## Cài đặt local
+## 🚀 Quick Start
 
-### 1. Clone và cài dependencies
+### 1. Clone & Install
 
 ```bash
-git clone <repo>
+git clone <your-repo>
 cd flashcard-app
 npm install
 ```
 
-### 2. Tạo file `.env.local`
+### 2. Cấu hình Supabase
+
+1. Tạo project tại [supabase.com](https://supabase.com)
+2. Vào **Settings → API** để lấy:
+   - `Project URL`
+   - `anon public` key
+   - `service_role` key (chỉ dùng server-side)
+
+### 3. Cấu hình biến môi trường
 
 ```bash
 cp .env.example .env.local
 ```
 
-Điền vào các giá trị từ Supabase dashboard:
+Điền vào `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-> ⚠️ **KHÔNG BAO GIỜ** commit `SUPABASE_SERVICE_ROLE_KEY` lên git.
+### 4. Chạy SQL Schema
 
-### 3. Setup Supabase
+1. Vào Supabase Dashboard → **SQL Editor**
+2. Copy toàn bộ nội dung file `supabase/schema.sql`
+3. Paste và chạy
 
-1. Tạo project tại [supabase.com](https://supabase.com)
-2. Vào **SQL Editor**, chạy file `supabase/schema.sql`
-3. Tạo admin user:
-   - Vào **Authentication > Users > Invite user**
-   - Email: `admin@example.com`, Password: `Admin@123`
-   - Sau đó chạy trong SQL Editor:
-     ```sql
-     UPDATE public.users SET role = 'ADMIN' WHERE email = 'admin@example.com';
-     ```
+### 5. Tạo Admin Account
 
-### 4. Chạy development
+1. Vào Supabase Dashboard → **Authentication → Users**
+2. Click **Add User**:
+   - Email: `admin@example.com`
+   - Password: `Admin@123`
+   - ✅ Auto-confirm email
+3. Sau khi tạo xong, chạy SQL sau để promote thành admin:
+
+```sql
+update public.users set role = 'ADMIN' where email = 'admin@example.com';
+```
+
+### 6. Chạy local
 
 ```bash
 npm run dev
@@ -59,81 +65,133 @@ Mở [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Deploy lên Vercel
-
-```bash
-npx vercel
-```
-
-Thêm environment variables trong Vercel Dashboard (Settings > Environment Variables):
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
----
-
-## Cấu trúc project
+## 📁 Cấu trúc thư mục
 
 ```
 flashcard-app/
 ├── app/
-│   ├── (public)/          # Landing, Deck Explorer, Demo
+│   ├── (public)/          # Landing, Decks explorer, Demo
 │   ├── (auth)/            # Login, Register
-│   ├── (dashboard)/       # Dashboard, Profile, Learning
-│   ├── (admin)/           # Admin Panel
-│   └── api/               # API Routes
+│   ├── (dashboard)/       # Dashboard, Profile, Learning workspace
+│   ├── (admin)/           # Admin panel (users, decks, analytics)
+│   └── api/               # API routes (demo, full deck, admin actions)
 ├── components/
 │   ├── ui/                # shadcn/ui components
-│   ├── common/            # Header, Footer, Providers
-│   └── flashcard/         # FlashcardPlayer, DeckCard
-├── features/auth/         # Zustand stores
-├── services/supabase/     # client / server / admin
-├── hooks/                 # useUser, use-toast
+│   ├── common/            # SiteHeader, DeckCard, Providers
+│   └── flashcard/         # FlashcardPlayer (core learning component)
+├── features/auth/         # Zustand store (UI mode)
+├── hooks/                 # useAuth, useDecks, use-toast
+├── services/supabase/     # client, server, admin clients
 ├── lib/                   # utils, constants
 ├── types/                 # TypeScript types
-├── middleware.ts           # Auth + role middleware
-└── supabase/schema.sql    # Full DB schema + RLS + seed
+├── middleware.ts           # Auth + role protection
+└── supabase/schema.sql    # Full DB schema + RLS + seed data
 ```
 
 ---
 
-## Tính năng
+## 🧩 Tính năng
 
 ### Public (không cần login)
 - Landing page với CTA
-- Xem danh sách bộ đề
-- Học thử demo (tối đa 10 từ)
+- Deck Explorer (danh sách bộ đề)
+- Demo Learning: xem thử tối đa 10 thẻ/deck
 
-### User (đăng nhập)
-- Dashboard cá nhân với streak, tiến độ
-- Học đầy đủ bộ đề (nếu còn hạn)
-- Text-to-Speech (Web Speech API + Dictionary API)
-- Flip card animation
-- Đổi mật khẩu
-- UI Mode: Standard / Kid
+### User (cần login)
+- Dashboard: thống kê cá nhân (streak, tiến độ, số từ đã học)
+- Learning Workspace: flip card, TTS, sidebar unit/từ vựng
+- Profile: xem thông tin, đổi mật khẩu
+- Phân quyền: deck còn hạn → full; hết hạn → 10 thẻ
 
-### Admin
-- Quản lý người dùng (tạo, reset password, giao bộ đề, xóa)
-- Quản lý bộ đề + flashcard (CRUD)
-- Bulk import: CSV (users) + JSON (flashcards)
-- Thống kê analytics
+### Admin Panel
+- User management: tạo, reset password, gán deck
+- Deck management: CRUD deck + flashcard
+- Bulk upload: CSV (users), JSON (flashcards)
+- Analytics: số user, deck phổ biến, tiến độ TB
 
 ---
 
-## Bảo mật
+## 🎨 UI Features
 
-- Row Level Security (RLS) trên tất cả bảng
+- **Standard Mode**: giao diện tối giản, màu đỏ thương hiệu
+- **Kid Mode**: font lớn, màu sắc tươi, bo góc nhiều hơn
+- Toggle lưu vào localStorage (Zustand persist)
+- Responsive: Mobile / Tablet / Desktop
+
+---
+
+## 🔊 Text-to-Speech
+
+Ưu tiên theo thứ tự:
+1. Free Dictionary API (giọng Mỹ chuẩn)
+2. Merriam-Webster audio
+3. Browser Web Speech API (fallback)
+4. Timeout 5 giây mỗi nguồn
+
+---
+
+## 🔐 Bảo mật
+
+- Row Level Security (RLS) cho tất cả bảng
 - Middleware kiểm tra auth + role
-- `SUPABASE_SERVICE_ROLE_KEY` chỉ dùng server-side
-- Session cookie 3 ngày
+- `service_role_key` chỉ dùng server-side (API routes)
+- Session cookie tự động hết hạn sau 3 ngày không hoạt động
 
 ---
 
-## Default Admin
+## 🚢 Deploy lên Vercel
 
-```
-Email:    admin@example.com
-Password: Admin@123
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel
+
+# Thêm environment variables trong Vercel Dashboard:
+# NEXT_PUBLIC_SUPABASE_URL
+# NEXT_PUBLIC_SUPABASE_ANON_KEY
+# SUPABASE_SERVICE_ROLE_KEY
 ```
 
-> Thay đổi mật khẩu ngay sau khi deploy!
+---
+
+## 📦 JSON Format cho Flashcards
+
+Khi upload qua Admin Panel, file JSON phải có dạng array:
+
+```json
+[
+  {
+    "id": "unit-1",
+    "label": "Unit 1 — Tên chủ đề",
+    "desc": "Mô tả ngắn về unit này",
+    "vocabulary": [
+      {
+        "word": "exacerbate",
+        "phonetic": "/ɪɡˈzæs.ə.beɪt/",
+        "meaning": "làm trầm trọng thêm",
+        "type": "Verb",
+        "example": "The situation was exacerbated by the delay.",
+        "translation": "Tình huống bị làm tệ hơn bởi sự chậm trễ.",
+        "synonyms": ["aggravate", "worsen"],
+        "antonyms": ["alleviate", "improve"],
+        "cefr": "C1"
+      }
+    ]
+  }
+]
+```
+
+## 📋 CSV Format cho Users
+
+```csv
+email,role
+user1@example.com,USER
+user2@example.com,USER
+teacher@example.com,ADMIN
+```
+
+---
+
+© Huy Tutor — [www.huytutor.io.vn](https://www.huytutor.io.vn)

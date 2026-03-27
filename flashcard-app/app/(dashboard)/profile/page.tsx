@@ -1,98 +1,96 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { redirect } from "next/navigation";
-import { Loader2, User, Mail, Calendar, Shield, KeyRound } from "lucide-react";
+import { useState } from "react";
+import { createClient } from "@/services/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/services/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@/hooks/useUser";
 import { formatDate } from "@/lib/utils";
+import { Loader2, User, Mail, Calendar, Shield } from "lucide-react";
 
 export default function ProfilePage() {
-  const { user, loading } = useUser();
-  const { toast } = useToast();
+  const { user, appUser, loading } = useAuth();
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+  const supabase = createClient();
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPw !== confirmPw) {
+      toast({ title: "Lỗi", description: "Mật khẩu xác nhận không khớp", variant: "destructive" });
+      return;
+    }
+    if (newPw.length < 8) {
+      toast({ title: "Lỗi", description: "Mật khẩu phải có ít nhất 8 ký tự", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      // Re-auth first
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: currentPw,
+      });
+      if (authError) throw new Error("Mật khẩu hiện tại không đúng");
+
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) throw error;
+
+      toast({ title: "Thành công!", description: "Mật khẩu đã được đổi" });
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Đổi mật khẩu thất bại";
+      toast({ title: "Lỗi", description: msg, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-brand" />
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-brand-red" />
       </div>
     );
   }
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault();
-    if (newPw !== confirmPw) {
-      toast({ title: "Mật khẩu mới không khớp", variant: "destructive" });
-      return;
-    }
-    if (newPw.length < 6) {
-      toast({ title: "Mật khẩu phải có ít nhất 6 ký tự", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: newPw });
-    setSaving(false);
-    if (error) {
-      toast({ title: "Đổi mật khẩu thất bại", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Đổi mật khẩu thành công! 🎉" });
-      setCurrentPw(""); setNewPw(""); setConfirmPw("");
-    }
-  }
-
   return (
-    <div className="max-w-2xl mx-auto px-4 md:px-[5%] py-10">
-      <h1 className="text-3xl font-extrabold text-[#1a1a2e] mb-8">👤 Hồ sơ cá nhân</h1>
+    <div className="max-w-2xl mx-auto px-5 py-8">
+      <h1 className="text-3xl font-extrabold mb-8">Hồ sơ cá nhân</h1>
 
       {/* Info card */}
-      <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-6 mb-6">
-        <h2 className="font-bold text-lg text-[#1a1a2e] mb-5">Thông tin tài khoản</h2>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-              <Mail className="w-5 h-5 text-brand" />
-            </div>
+      <div className="bg-white rounded-2xl border-2 border-border p-6 mb-6">
+        <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+          <User className="h-5 w-5 text-brand-red" /> Thông tin tài khoản
+        </h2>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <Mail className="h-4 w-4 text-muted-foreground" />
             <div>
-              <div className="text-xs text-muted-foreground font-medium">Email</div>
-              <div className="font-semibold text-[#1a1a2e]">{user.email}</div>
+              <div className="text-xs text-muted-foreground">Email</div>
+              <div className="font-semibold">{user?.email}</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-5 h-5 text-brand" />
-            </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
-              <div className="text-xs text-muted-foreground font-medium">Ngày tham gia</div>
-              <div className="font-semibold text-[#1a1a2e]">{formatDate(user.created_at)}</div>
+              <div className="text-xs text-muted-foreground">Ngày đăng ký</div>
+              <div className="font-semibold">
+                {appUser?.created_at ? formatDate(appUser.created_at) : "—"}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-              <Shield className="w-5 h-5 text-brand" />
-            </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <Shield className="h-4 w-4 text-muted-foreground" />
             <div>
-              <div className="text-xs text-muted-foreground font-medium">Membership</div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                  user.role === "ADMIN"
-                    ? "bg-purple-100 text-purple-700"
-                    : "bg-brand-light text-brand"
-                }`}>
-                  {user.role === "ADMIN" ? "🛡️ Admin" : "👤 User"}
-                </span>
+              <div className="text-xs text-muted-foreground">Loại tài khoản</div>
+              <div className="font-semibold">
+                {appUser?.role === "ADMIN" ? "👑 Admin" : "👤 Thành viên"}
               </div>
             </div>
           </div>
@@ -100,24 +98,33 @@ export default function ProfilePage() {
       </div>
 
       {/* Change password */}
-      <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-6">
-        <h2 className="font-bold text-lg text-[#1a1a2e] mb-5 flex items-center gap-2">
-          <KeyRound className="w-5 h-5 text-brand" /> Đổi mật khẩu
-        </h2>
-        <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
-          <div>
+      <div className="bg-white rounded-2xl border-2 border-border p-6">
+        <h2 className="font-bold text-lg mb-4">🔒 Đổi mật khẩu</h2>
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="currentPw">Mật khẩu hiện tại</Label>
+            <Input
+              id="currentPw" type="password" placeholder="••••••••"
+              value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} required
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="newPw">Mật khẩu mới</Label>
-            <Input id="newPw" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự" required className="mt-1" />
+            <Input
+              id="newPw" type="password" placeholder="Tối thiểu 8 ký tự"
+              value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={8}
+            />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label htmlFor="confirmPw">Xác nhận mật khẩu mới</Label>
-            <Input id="confirmPw" type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
-              placeholder="Nhập lại mật khẩu mới" required className="mt-1" />
+            <Input
+              id="confirmPw" type="password" placeholder="Nhập lại mật khẩu mới"
+              value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} required
+            />
           </div>
-          <Button type="submit" variant="brand" className="w-full rounded-full" disabled={saving}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Cập nhật mật khẩu
+          <Button type="submit" disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            Lưu mật khẩu
           </Button>
         </form>
       </div>

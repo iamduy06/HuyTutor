@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/services/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/types";
 
 export function useUser() {
