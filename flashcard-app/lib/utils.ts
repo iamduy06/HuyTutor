@@ -6,19 +6,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function generatePassword(length = 8): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
-  return Array.from({ length }, () =>
-    chars.charAt(Math.floor(Math.random() * chars.length))
-  ).join("");
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("vi-VN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+export function formatDate(d: string): string {
+  return new Date(d).toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export function isExpired(expiredAt: string | null): boolean {

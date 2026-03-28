@@ -4,14 +4,10 @@ import { Providers } from "@/components/common/Providers";
 
 export const metadata: Metadata = {
   title: "Huy Tutor Flashcard",
-  description: "Học từ vựng tiếng Anh hiệu quả cùng Huy Tutor",
+  description: "Học từ vựng tiếng Anh hiệu quả",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
       <body>

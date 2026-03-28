@@ -8,62 +8,53 @@
   :root {
     --background: 0 0% 98%;
     --foreground: 240 10% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
-    --primary: 340 100% 46%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 340 100% 97%;
-    --secondary-foreground: 340 100% 30%;
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
-    --accent: 340 100% 97%;
-    --accent-foreground: 340 100% 36%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
     --border: 340 30% 91%;
-    --input: 340 30% 91%;
-    --ring: 340 100% 46%;
     --radius: 0.75rem;
-    --font-bricolage: 'Bricolage Grotesque', sans-serif;
   }
-}
 
-@layer base {
-  * { @apply border-border; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-bricolage);
+    font-family: 'Bricolage Grotesque', sans-serif;
   }
 }
 
-/* ── Flashcard flip animation ── */
-.card-scene { perspective: 1000px; }
+/* ── Flashcard 3-D flip ── */
+.card-scene { perspective: 1200px; }
+
 .card-inner {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.4,0.2,0.2,1);
+  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+  cursor: pointer;
 }
 .card-inner.flipped { transform: rotateY(180deg); }
+
 .card-face {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  border-radius: 20px;
 }
-.card-back-face { transform: rotateY(180deg); }
+.card-back { transform: rotateY(180deg); }
 
-/* ── Kid mode overrides ── */
-.kid-mode .flashcard-word { font-size: 3rem !important; }
-.kid-mode .flashcard-meaning { font-size: 2rem !important; }
+/* ── Kid mode ── */
 .kid-mode .card-face { border-radius: 2rem !important; }
+.kid-mode .fc-word  { font-size: 3.2rem !important; }
+.kid-mode .fc-meaning { font-size: 2rem !important; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #ed004655; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #ed0046; }
+::-webkit-scrollbar-thumb:hover { background: #ed0046bb; }

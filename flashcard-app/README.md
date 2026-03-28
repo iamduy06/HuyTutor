@@ -1,195 +1,130 @@
 # Huy Tutor Flashcard App
 
-Ứng dụng học từ vựng tiếng Anh qua Flashcard — Next.js 14, Supabase, TypeScript.
+Next.js 14 · TypeScript · Supabase · TailwindCSS
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Setup & Run
 
-### 1. Clone & Install
-
+### 1. Install
 ```bash
-git clone <your-repo>
-cd flashcard-app
 npm install
 ```
 
-### 2. Cấu hình Supabase
-
-1. Tạo project tại [supabase.com](https://supabase.com)
-2. Vào **Settings → API** để lấy:
-   - `Project URL`
-   - `anon public` key
-   - `service_role` key (chỉ dùng server-side)
-
-### 3. Cấu hình biến môi trường
-
+### 2. Environment
 ```bash
 cp .env.example .env.local
+# Fill in your Supabase URL and keys
 ```
 
-Điền vào `.env.local`:
-
-```env
+`.env.local`:
+```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### 4. Chạy SQL Schema
+### 3. Database
+1. Supabase Dashboard → SQL Editor → paste `supabase/schema.sql` → Run
 
-1. Vào Supabase Dashboard → **SQL Editor**
-2. Copy toàn bộ nội dung file `supabase/schema.sql`
-3. Paste và chạy
-
-### 5. Tạo Admin Account
-
-1. Vào Supabase Dashboard → **Authentication → Users**
-2. Click **Add User**:
+### 4. Create Admin
+1. Supabase → Authentication → Users → Add User:
    - Email: `admin@example.com`
    - Password: `Admin@123`
    - ✅ Auto-confirm email
-3. Sau khi tạo xong, chạy SQL sau để promote thành admin:
-
+2. Run in SQL Editor:
 ```sql
 update public.users set role = 'ADMIN' where email = 'admin@example.com';
 ```
 
-### 6. Chạy local
-
+### 5. Run
 ```bash
 npm run dev
-```
-
-Mở [http://localhost:3000](http://localhost:3000)
-
----
-
-## 📁 Cấu trúc thư mục
-
-```
-flashcard-app/
-├── app/
-│   ├── (public)/          # Landing, Decks explorer, Demo
-│   ├── (auth)/            # Login, Register
-│   ├── (dashboard)/       # Dashboard, Profile, Learning workspace
-│   ├── (admin)/           # Admin panel (users, decks, analytics)
-│   └── api/               # API routes (demo, full deck, admin actions)
-├── components/
-│   ├── ui/                # shadcn/ui components
-│   ├── common/            # SiteHeader, DeckCard, Providers
-│   └── flashcard/         # FlashcardPlayer (core learning component)
-├── features/auth/         # Zustand store (UI mode)
-├── hooks/                 # useAuth, useDecks, use-toast
-├── services/supabase/     # client, server, admin clients
-├── lib/                   # utils, constants
-├── types/                 # TypeScript types
-├── middleware.ts           # Auth + role protection
-└── supabase/schema.sql    # Full DB schema + RLS + seed data
+# → http://localhost:3000
 ```
 
 ---
 
-## 🧩 Tính năng
+## 🔑 Auth Fix — What Was Wrong
 
-### Public (không cần login)
-- Landing page với CTA
-- Deck Explorer (danh sách bộ đề)
-- Demo Learning: xem thử tối đa 10 thẻ/deck
+The original project had 3 bugs causing silent login failure:
 
-### User (cần login)
-- Dashboard: thống kê cá nhân (streak, tiến độ, số từ đã học)
-- Learning Workspace: flip card, TTS, sidebar unit/từ vựng
-- Profile: xem thông tin, đổi mật khẩu
-- Phân quyền: deck còn hạn → full; hết hạn → 10 thẻ
-
-### Admin Panel
-- User management: tạo, reset password, gán deck
-- Deck management: CRUD deck + flashcard
-- Bulk upload: CSV (users), JSON (flashcards)
-- Analytics: số user, deck phổ biến, tiến độ TB
+| Bug | File | Fix |
+|-----|------|-----|
+| `setAll` recreated `NextResponse` losing cookies | `middleware.ts` | Never reassign inside `setAll` |
+| `router.push` before `router.refresh` | `login/page.tsx` | Call `refresh()` first |
+| `useSearchParams` without `Suspense` | `login/page.tsx` | Wrap in `<Suspense>` |
 
 ---
 
-## 🎨 UI Features
+## 📦 JSONB Format
 
-- **Standard Mode**: giao diện tối giản, màu đỏ thương hiệu
-- **Kid Mode**: font lớn, màu sắc tươi, bo góc nhiều hơn
-- Toggle lưu vào localStorage (Zustand persist)
-- Responsive: Mobile / Tablet / Desktop
+Flashcard `content` column accepts **both** formats:
 
----
-
-## 🔊 Text-to-Speech
-
-Ưu tiên theo thứ tự:
-1. Free Dictionary API (giọng Mỹ chuẩn)
-2. Merriam-Webster audio
-3. Browser Web Speech API (fallback)
-4. Timeout 5 giây mỗi nguồn
-
----
-
-## 🔐 Bảo mật
-
-- Row Level Security (RLS) cho tất cả bảng
-- Middleware kiểm tra auth + role
-- `service_role_key` chỉ dùng server-side (API routes)
-- Session cookie tự động hết hạn sau 3 ngày không hoạt động
-
----
-
-## 🚢 Deploy lên Vercel
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-
-# Thêm environment variables trong Vercel Dashboard:
-# NEXT_PUBLIC_SUPABASE_URL
-# NEXT_PUBLIC_SUPABASE_ANON_KEY
-# SUPABASE_SERVICE_ROLE_KEY
+**Single unit (object):**
+```json
+{
+  "id": "unit-1",
+  "label": "Unit 1",
+  "desc": "Description",
+  "vocabulary": [{ "word": "...", ... }]
+}
 ```
 
----
-
-## 📦 JSON Format cho Flashcards
-
-Khi upload qua Admin Panel, file JSON phải có dạng array:
-
+**Multiple units (array):**
 ```json
 [
-  {
-    "id": "unit-1",
-    "label": "Unit 1 — Tên chủ đề",
-    "desc": "Mô tả ngắn về unit này",
-    "vocabulary": [
-      {
-        "word": "exacerbate",
-        "phonetic": "/ɪɡˈzæs.ə.beɪt/",
-        "meaning": "làm trầm trọng thêm",
-        "type": "Verb",
-        "example": "The situation was exacerbated by the delay.",
-        "translation": "Tình huống bị làm tệ hơn bởi sự chậm trễ.",
-        "synonyms": ["aggravate", "worsen"],
-        "antonyms": ["alleviate", "improve"],
-        "cefr": "C1"
-      }
-    ]
-  }
+  { "id": "unit-1", "label": "Unit 1", "vocabulary": [...] },
+  { "id": "unit-2", "label": "Unit 2", "vocabulary": [...] }
 ]
 ```
 
-## 📋 CSV Format cho Users
+The `normalizeUnits()` function in `types/index.ts` handles both transparently.
 
-```csv
-email,role
-user1@example.com,USER
-user2@example.com,USER
-teacher@example.com,ADMIN
+---
+
+## 📁 Structure
+
+```
+├── app/
+│   ├── page.tsx                    # Landing
+│   ├── decks/                      # Public deck explorer + demo
+│   ├── dashboard/                  # User dashboard (auth required)
+│   ├── learning/[deckId]/          # Learning workspace
+│   ├── profile/                    # User profile + change password
+│   ├── admin/                      # Admin panel (ADMIN role only)
+│   ├── (auth)/login|register       # Auth pages
+│   └── api/                        # API routes
+├── components/
+│   ├── flashcard/FlashcardPlayer   # Core flip card + TTS + sidebars
+│   ├── common/SiteHeader           # Nav
+│   └── ui/                         # Button, Input, Dialog, etc.
+├── services/supabase/
+│   ├── client.ts                   # Browser client
+│   ├── server.ts                   # Server component client
+│   ├── middleware.ts               # Middleware-specific client ← KEY
+│   └── admin.ts                    # Service-role client
+├── middleware.ts                   # Route protection
+├── types/index.ts                  # Types + normalizeUnits()
+└── supabase/schema.sql             # Full DB schema + RLS
+```
+
+---
+
+## 🔐 Security
+
+- RLS on all tables
+- `SUPABASE_SERVICE_ROLE_KEY` only used in API routes (never exposed to client)
+- Session enforced server-side via middleware on every request
+- Expired deck → max 10 cards (enforced in API, not just UI)
+
+---
+
+## 🚀 Deploy to Vercel
+
+```bash
+vercel
+# Add env vars in Vercel Dashboard
 ```
 
 ---

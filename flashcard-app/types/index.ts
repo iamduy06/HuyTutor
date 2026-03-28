@@ -1,4 +1,38 @@
-// ── Core Domain Types ──────────────────────────────────────────────────────
+// ── Vocabulary & Flashcard ─────────────────────────────────────────────────
+
+export interface VocabWord {
+  word: string;
+  phonetic: string;
+  meaning: string;
+  type: string;
+  example: string;
+  translation: string;
+  synonyms: string[];
+  antonyms: string[];
+  cefr: string;
+}
+
+export interface FlashcardUnit {
+  id: string;
+  label: string;
+  desc: string;
+  vocabulary: VocabWord[];
+}
+
+// Raw JSONB from DB can be object (1 unit) or array (many units)
+export type RawFlashcardContent = FlashcardUnit | FlashcardUnit[];
+
+// Always normalized to array
+export function normalizeUnits(raw: RawFlashcardContent): FlashcardUnit[] {
+  if (Array.isArray(raw)) return raw;
+  return [raw];
+}
+
+export function countWords(raw: RawFlashcardContent): number {
+  return normalizeUnits(raw).reduce((acc, u) => acc + (u.vocabulary?.length ?? 0), 0);
+}
+
+// ── Database rows ──────────────────────────────────────────────────────────
 
 export type UserRole = "USER" | "ADMIN";
 
@@ -15,33 +49,13 @@ export interface Deck {
   description: string | null;
   level: string | null;
   created_at: string;
-  flashcards?: Flashcard[];
   word_count?: number;
-}
-
-export interface FlashcardVocab {
-  word: string;
-  phonetic: string;
-  meaning: string;
-  type: string;
-  example: string;
-  translation: string;
-  synonyms: string[];
-  antonyms: string[];
-  cefr: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | string;
-}
-
-export interface FlashcardContent {
-  id: string;
-  label: string;
-  desc: string;
-  vocabulary: FlashcardVocab[];
 }
 
 export interface Flashcard {
   id: string;
   deck_id: string;
-  content: FlashcardContent;
+  content: RawFlashcardContent;
   created_at: string;
 }
 
@@ -56,50 +70,6 @@ export interface UserDeck {
   deck?: Deck;
 }
 
-// ── UI State Types ──────────────────────────────────────────────────────────
+// ── UI ─────────────────────────────────────────────────────────────────────
 
 export type UIMode = "standard" | "kid";
-
-export interface UIStore {
-  mode: UIMode;
-  setMode: (mode: UIMode) => void;
-  toggleMode: () => void;
-}
-
-// ── API Response Types ──────────────────────────────────────────────────────
-
-export interface ApiResponse<T> {
-  data: T | null;
-  error: string | null;
-}
-
-export interface DemoCardsResponse {
-  cards: FlashcardVocab[];
-  deck: Pick<Deck, "id" | "title" | "description" | "level">;
-}
-
-export interface FullDeckResponse {
-  deck: Deck;
-  cards: FlashcardContent[];
-  isLimited: boolean;
-}
-
-// ── Admin Types ─────────────────────────────────────────────────────────────
-
-export interface AdminCreateUserPayload {
-  email: string;
-  role?: UserRole;
-}
-
-export interface AdminAssignDeckPayload {
-  user_id: string;
-  deck_id: string;
-  expired_at: string;
-}
-
-export interface AdminAnalytics {
-  total_users: number;
-  total_decks: number;
-  popular_decks: { deck_id: string; title: string; user_count: number }[];
-  avg_progress: number;
-}

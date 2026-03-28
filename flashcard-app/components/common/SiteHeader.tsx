@@ -1,46 +1,41 @@
 "use client";
-
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { useUIStore } from "@/features/auth/store";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
+import { useUIStore } from "@/features/auth/uiStore";
+import { Switch } from "@/components/ui/Switch";
+import { Button } from "@/components/ui/Button";
 import { LogOut, LayoutDashboard, Shield } from "lucide-react";
-import { ROUTES } from "@/lib/constants";
 
 export function SiteHeader() {
-  const { user, appUser, loading, signOut, isAdmin } = useAuth();
-  const { mode, toggleMode } = useUIStore();
+  const { user, isAdmin, loading, signOut } = useAuth();
+  const { mode, toggle } = useUIStore();
 
   return (
-    <header className="flex items-center justify-between px-[5%] h-[62px] bg-white border-b-[1.5px] border-border sticky top-0 z-[200] flex-shrink-0">
-      <Link href={ROUTES.home} className="flex items-center gap-2.5 no-underline">
-        <div className="w-9 h-9 bg-brand-red rounded-xl flex items-center justify-center font-extrabold text-white text-lg">H</div>
-        <span className="font-extrabold text-[1.05em] text-gray-900 hidden sm:block">
+    <header className="sticky top-0 z-50 flex h-[62px] items-center justify-between border-b-2 border-gray-100 bg-white px-[5%]">
+      <Link href="/" className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red font-extrabold text-lg text-white">H</div>
+        <span className="hidden font-extrabold text-gray-900 sm:block">
           Huy Tutor <span className="text-brand-red">Flashcard</span>
         </span>
       </Link>
 
-      <div className="flex items-center gap-2">
-        {/* Kid mode toggle */}
-        <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground cursor-pointer">
-          🎓
-          <Switch checked={mode === "kid"} onCheckedChange={toggleMode} />
-          🎈
+      <div className="flex items-center gap-3">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-gray-500">
+          🎓 <Switch checked={mode === "kid"} onCheckedChange={toggle} /> 🎈
         </label>
 
         {!loading && (
           <>
             {user ? (
-              <>
-                <Link href={ROUTES.dashboard}>
+              <div className="flex items-center gap-2">
+                <Link href="/dashboard">
                   <Button variant="outline" size="sm" className="gap-1.5">
                     <LayoutDashboard className="h-4 w-4" />
                     <span className="hidden sm:inline">Dashboard</span>
                   </Button>
                 </Link>
                 {isAdmin && (
-                  <Link href={ROUTES.admin.root}>
+                  <Link href="/admin">
                     <Button variant="outline" size="sm" className="gap-1.5">
                       <Shield className="h-4 w-4 text-brand-red" />
                       <span className="hidden sm:inline">Admin</span>
@@ -50,16 +45,12 @@ export function SiteHeader() {
                 <Button variant="ghost" size="icon" onClick={signOut} title="Đăng xuất">
                   <LogOut className="h-4 w-4" />
                 </Button>
-              </>
+              </div>
             ) : (
-              <>
-                <Link href={ROUTES.login}>
-                  <Button variant="outline" size="sm">Đăng nhập</Button>
-                </Link>
-                <Link href={ROUTES.register}>
-                  <Button size="sm">Đăng ký</Button>
-                </Link>
-              </>
+              <div className="flex items-center gap-2">
+                <Link href="/login"><Button variant="outline" size="sm">Đăng nhập</Button></Link>
+                <Link href="/register"><Button size="sm">Đăng ký</Button></Link>
+              </div>
             )}
           </>
         )}
