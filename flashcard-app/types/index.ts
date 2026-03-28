@@ -1,42 +1,8 @@
-// ── Vocabulary & Flashcard ─────────────────────────────────────────────────
-
-export interface VocabWord {
-  word: string;
-  phonetic: string;
-  meaning: string;
-  type: string;
-  example: string;
-  translation: string;
-  synonyms: string[];
-  antonyms: string[];
-  cefr: string;
-}
-
-export interface FlashcardUnit {
-  id: string;
-  label: string;
-  desc: string;
-  vocabulary: VocabWord[];
-}
-
-// Raw JSONB from DB can be object (1 unit) or array (many units)
-export type RawFlashcardContent = FlashcardUnit | FlashcardUnit[];
-
-// Always normalized to array
-export function normalizeUnits(raw: RawFlashcardContent): FlashcardUnit[] {
-  if (Array.isArray(raw)) return raw;
-  return [raw];
-}
-
-export function countWords(raw: RawFlashcardContent): number {
-  return normalizeUnits(raw).reduce((acc, u) => acc + (u.vocabulary?.length ?? 0), 0);
-}
-
-// ── Database rows ──────────────────────────────────────────────────────────
-
 export type UserRole = "USER" | "ADMIN";
+export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+export type UIMode = "standard" | "kid";
 
-export interface AppUser {
+export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
@@ -49,14 +15,28 @@ export interface Deck {
   description: string | null;
   level: string | null;
   created_at: string;
-  word_count?: number;
+  flashcard_count?: number;
+}
+
+export interface FlashcardContent {
+  word: string;
+  phonetic: string;
+  meaning: string;
+  type: string;
+  example: string;
+  translation: string;
+  /** DB may store comma-separated string OR string[]. Use toArray() helper. */
+  synonyms: string | string[];
+  /** DB may store comma-separated string OR string[]. Use toArray() helper. */
+  antonyms: string | string[];
+  cefr: CefrLevel;
 }
 
 export interface Flashcard {
   id: string;
   deck_id: string;
-  content: RawFlashcardContent;
-  created_at: string;
+  content: FlashcardContent;
+  order_index: number;
 }
 
 export interface UserDeck {
@@ -67,9 +47,14 @@ export interface UserDeck {
   learned_count: number;
   streak: number;
   expired_at: string | null;
+  last_studied_at: string | null;
   deck?: Deck;
 }
 
-// ── UI ─────────────────────────────────────────────────────────────────────
-
-export type UIMode = "standard" | "kid";
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+  user_decks?: UserDeck[];
+}

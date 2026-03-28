@@ -1,132 +1,139 @@
-# Huy Tutor Flashcard App
+# Huy Tutor Flashcard
 
-Next.js 14 · TypeScript · Supabase · TailwindCSS
+Nền tảng học từ vựng tiếng Anh chuyên nghiệp với Next.js 14, Supabase và TailwindCSS.
+
+## Tech Stack
+
+- **Frontend**: Next.js 14 (App Router), TypeScript, TailwindCSS, shadcn/ui
+- **State**: React Query (server state) + Zustand (UI state)
+- **Backend**: Supabase (Auth, PostgreSQL, RLS)
+- **Deployment**: Vercel
 
 ---
 
-## 🚀 Setup & Run
+## Cài đặt local
 
-### 1. Install
+### 1. Clone và cài dependencies
+
 ```bash
+git clone <repo>
+cd flashcard-app
 npm install
 ```
 
-### 2. Environment
+### 2. Tạo file `.env.local`
+
 ```bash
 cp .env.example .env.local
-# Fill in your Supabase URL and keys
 ```
 
-`.env.local`:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
+Điền vào các giá trị từ Supabase dashboard:
 
-### 3. Database
-1. Supabase Dashboard → SQL Editor → paste `supabase/schema.sql` → Run
-
-### 4. Create Admin
-1. Supabase → Authentication → Users → Add User:
-   - Email: `admin@example.com`
-   - Password: `Admin@123`
-   - ✅ Auto-confirm email
-2. Run in SQL Editor:
-```sql
-update public.users set role = 'ADMIN' where email = 'admin@example.com';
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
-### 5. Run
+> ⚠️ **KHÔNG BAO GIỜ** commit `SUPABASE_SERVICE_ROLE_KEY` lên git.
+
+### 3. Setup Supabase
+
+1. Tạo project tại [supabase.com](https://supabase.com)
+2. Vào **SQL Editor**, chạy file `supabase/schema.sql`
+3. Tạo admin user:
+   - Vào **Authentication > Users > Invite user**
+   - Email: `admin@example.com`, Password: `Admin@123`
+   - Sau đó chạy trong SQL Editor:
+     ```sql
+     UPDATE public.users SET role = 'ADMIN' WHERE email = 'admin@example.com';
+     ```
+
+### 4. Chạy development
+
 ```bash
 npm run dev
-# → http://localhost:3000
 ```
+
+Mở [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🔑 Auth Fix — What Was Wrong
-
-The original project had 3 bugs causing silent login failure:
-
-| Bug | File | Fix |
-|-----|------|-----|
-| `setAll` recreated `NextResponse` losing cookies | `middleware.ts` | Never reassign inside `setAll` |
-| `router.push` before `router.refresh` | `login/page.tsx` | Call `refresh()` first |
-| `useSearchParams` without `Suspense` | `login/page.tsx` | Wrap in `<Suspense>` |
-
----
-
-## 📦 JSONB Format
-
-Flashcard `content` column accepts **both** formats:
-
-**Single unit (object):**
-```json
-{
-  "id": "unit-1",
-  "label": "Unit 1",
-  "desc": "Description",
-  "vocabulary": [{ "word": "...", ... }]
-}
-```
-
-**Multiple units (array):**
-```json
-[
-  { "id": "unit-1", "label": "Unit 1", "vocabulary": [...] },
-  { "id": "unit-2", "label": "Unit 2", "vocabulary": [...] }
-]
-```
-
-The `normalizeUnits()` function in `types/index.ts` handles both transparently.
-
----
-
-## 📁 Structure
-
-```
-├── app/
-│   ├── page.tsx                    # Landing
-│   ├── decks/                      # Public deck explorer + demo
-│   ├── dashboard/                  # User dashboard (auth required)
-│   ├── learning/[deckId]/          # Learning workspace
-│   ├── profile/                    # User profile + change password
-│   ├── admin/                      # Admin panel (ADMIN role only)
-│   ├── (auth)/login|register       # Auth pages
-│   └── api/                        # API routes
-├── components/
-│   ├── flashcard/FlashcardPlayer   # Core flip card + TTS + sidebars
-│   ├── common/SiteHeader           # Nav
-│   └── ui/                         # Button, Input, Dialog, etc.
-├── services/supabase/
-│   ├── client.ts                   # Browser client
-│   ├── server.ts                   # Server component client
-│   ├── middleware.ts               # Middleware-specific client ← KEY
-│   └── admin.ts                    # Service-role client
-├── middleware.ts                   # Route protection
-├── types/index.ts                  # Types + normalizeUnits()
-└── supabase/schema.sql             # Full DB schema + RLS
-```
-
----
-
-## 🔐 Security
-
-- RLS on all tables
-- `SUPABASE_SERVICE_ROLE_KEY` only used in API routes (never exposed to client)
-- Session enforced server-side via middleware on every request
-- Expired deck → max 10 cards (enforced in API, not just UI)
-
----
-
-## 🚀 Deploy to Vercel
+## Deploy lên Vercel
 
 ```bash
-vercel
-# Add env vars in Vercel Dashboard
+npx vercel
+```
+
+Thêm environment variables trong Vercel Dashboard (Settings > Environment Variables):
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+---
+
+## Cấu trúc project
+
+```
+flashcard-app/
+├── app/
+│   ├── (public)/          # Landing, Deck Explorer, Demo
+│   ├── (auth)/            # Login, Register
+│   ├── (dashboard)/       # Dashboard, Profile, Learning
+│   ├── (admin)/           # Admin Panel
+│   └── api/               # API Routes
+├── components/
+│   ├── ui/                # shadcn/ui components
+│   ├── common/            # Header, Footer, Providers
+│   └── flashcard/         # FlashcardPlayer, DeckCard
+├── features/auth/         # Zustand stores
+├── services/supabase/     # client / server / admin
+├── hooks/                 # useUser, use-toast
+├── lib/                   # utils, constants
+├── types/                 # TypeScript types
+├── middleware.ts           # Auth + role middleware
+└── supabase/schema.sql    # Full DB schema + RLS + seed
 ```
 
 ---
 
-© Huy Tutor — [www.huytutor.io.vn](https://www.huytutor.io.vn)
+## Tính năng
+
+### Public (không cần login)
+- Landing page với CTA
+- Xem danh sách bộ đề
+- Học thử demo (tối đa 10 từ)
+
+### User (đăng nhập)
+- Dashboard cá nhân với streak, tiến độ
+- Học đầy đủ bộ đề (nếu còn hạn)
+- Text-to-Speech (Web Speech API + Dictionary API)
+- Flip card animation
+- Đổi mật khẩu
+- UI Mode: Standard / Kid
+
+### Admin
+- Quản lý người dùng (tạo, reset password, giao bộ đề, xóa)
+- Quản lý bộ đề + flashcard (CRUD)
+- Bulk import: CSV (users) + JSON (flashcards)
+- Thống kê analytics
+
+---
+
+## Bảo mật
+
+- Row Level Security (RLS) trên tất cả bảng
+- Middleware kiểm tra auth + role
+- `SUPABASE_SERVICE_ROLE_KEY` chỉ dùng server-side
+- Session cookie 3 ngày
+
+---
+
+## Default Admin
+
+```
+Email:    admin@example.com
+Password: Admin@123
+```
+
+> Thay đổi mật khẩu ngay sau khi deploy!

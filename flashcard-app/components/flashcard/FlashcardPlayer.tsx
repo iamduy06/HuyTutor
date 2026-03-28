@@ -1,296 +1,369 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { FlashcardUnit, VocabWord, RawFlashcardContent, normalizeUnits } from "@/types";
-import { cn, cefrColor } from "@/lib/utils";
-import { useUIStore } from "@/features/auth/uiStore";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Volume2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn, getCefrColor, toArray } from "@/lib/utils";
+import type { Flashcard } from "@/types";
+import { useUIStore } from "@/features/auth/store";
 
-// ── TTS helpers ────────────────────────────────────────────────────────────
+interface FlashcardPlayerProps {
+  cards: Flashcard[];
+  deckTitle: string;
+  deckDesc?: string;
+  isDemo?: boolean;
+}
 
-async function fetchDictAudio(word: string): Promise<string | null> {
+function slugify(w: string) {
+  return w.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
+}
+
+async function fetchFreeDictAudio(word: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    const res = await fetch(
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.split("/")[0].trim())}`
+    );
     if (!res.ok) return null;
-    const data: Array<{ phonetics?: Array<{ audio?: string }> }> = await res.json();
+    const data = await res.json();
     for (const entry of data) {
-      for (const ph of entry.phonetics ?? []) {
-        if (ph.audio?.includes("us")) return ph.audio;
+      for (const ph of entry.phonetics || []) {
+        if (ph.audio && ph.audio.includes("us")) return ph.audio;
       }
-      for (const ph of entry.phonetics ?? []) {
-        if (ph.audio?.trim()) return ph.audio;
+      for (const ph of entry.phonetics || []) {
+        if (ph.audio && ph.audio.trim()) return ph.audio;
       }
     }
-  } catch { /* network error — fall through to TTS */ }
+  } catch {}
   return null;
 }
 
-function speakBrowser(word: string) {
-  if (!("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(word);
-  u.lang = "en-US";
-  u.rate = 0.85;
-  window.speechSynthesis.speak(u);
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
+  });
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
-}
-
-// ── Component ──────────────────────────────────────────────────────────────
-
-interface Props {
-  /** Raw JSONB content — can be object (1 unit) or array (many units) */
-  rawContent: RawFlashcardContent;
-  isLimited?: boolean;
-}
-
-export function FlashcardPlayer({ rawContent, isLimited = false }: Props) {
-  const { mode } = useUIStore();
-  const isKid = mode === "kid";
-
-  // Normalize JSONB once
-  const units: FlashcardUnit[] = normalizeUnits(rawContent);
-
-  const [unitIdx, setUnitIdx] = useState(0);
-  const [cardIdx, setCardIdx] = useState(0);
-  const [flipped, setFlipped] = useState(false);
+export function FlashcardPlayer({ cards, deckTitle, deckDesc, isDemo }: FlashcardPlayerProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
-
-  const tokenRef = useRef(0);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [jumpValue, setJumpValue] = useState("");
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const { mode } = useUIStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioTokenRef = useRef(0);
 
-  const vocab: VocabWord[] = units[unitIdx]?.vocabulary ?? [];
-  const word = vocab[cardIdx];
+  const card = cards[currentIndex];
+  const content = card?.content;
 
-  // Auto-speak on card change (skip first load)
-  const firstLoad = useRef(true);
-  useEffect(() => {
-    if (firstLoad.current) { firstLoad.current = false; return; }
+  const speakWord = useCallback(async (word: string) => {
     if (!word) return;
-    const t = setTimeout(() => speak(), 300);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardIdx, unitIdx]);
+    const rawWord = word.split("/")[0].replace(/[()]/g, "").trim();
 
-  const speak = useCallback(async () => {
-    if (!word) return;
-    const raw = word.word.split("/")[0].replace(/[()]/g, "").trim();
-
-    audioRef.current?.pause();
-    audioRef.current = null;
-    window.speechSynthesis?.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
 
     setAudioLoading(true);
-    const token = ++tokenRef.current;
+    const token = ++audioTokenRef.current;
+
+    const browserTTS = () => {
+      if (token !== audioTokenRef.current) return;
+      setAudioLoading(false);
+      if (!window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(rawWord);
+      u.lang = "en-US"; u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    };
 
     try {
-      const url = await withTimeout(fetchDictAudio(raw), 5000);
-      if (token !== tokenRef.current) return;
+      const apiUrl = await withTimeout(fetchFreeDictAudio(rawWord), 5000);
+      if (token !== audioTokenRef.current) return;
 
-      if (url) {
-        const audio = new Audio(url);
-        audioRef.current = audio;
-
-        const fallback = setTimeout(() => {
-          if (token !== tokenRef.current) return;
-          audio.pause();
-          setAudioLoading(false);
-          speakBrowser(raw);
-        }, 5000);
-
-        audio.oncanplaythrough = () => {
-          if (token !== tokenRef.current) { clearTimeout(fallback); return; }
-          clearTimeout(fallback);
-          setAudioLoading(false);
-          audio.play().catch(() => speakBrowser(raw));
-        };
-        audio.onerror = () => { clearTimeout(fallback); setAudioLoading(false); speakBrowser(raw); };
-        audio.load();
-        return;
+      let audioUrl = apiUrl;
+      if (!audioUrl) {
+        const slug = slugify(rawWord);
+        const mwUrl = `https://media.merriam-webster.com/audio/prons/en/us/mp3/${slug[0]}/${slug}.mp3`;
+        const works = await withTimeout(
+          new Promise<boolean>((res) => {
+            const a = new Audio();
+            a.oncanplaythrough = () => res(true);
+            a.onerror = () => res(false);
+            a.src = mwUrl;
+          }),
+          5000
+        );
+        if (token !== audioTokenRef.current) return;
+        if (works) audioUrl = mwUrl;
       }
-      throw new Error("no url");
+
+      if (!audioUrl) throw new Error("no_audio");
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      const fallback = setTimeout(() => { if (token === audioTokenRef.current) browserTTS(); }, 5000);
+
+      audio.oncanplaythrough = () => {
+        if (token !== audioTokenRef.current) { clearTimeout(fallback); audio.pause(); return; }
+        clearTimeout(fallback);
+        setAudioLoading(false);
+        audio.play().catch(() => { if (token === audioTokenRef.current) browserTTS(); });
+      };
+      audio.onerror = () => { clearTimeout(fallback); if (token === audioTokenRef.current) browserTTS(); };
+      audio.load();
     } catch {
-      if (token !== tokenRef.current) return;
-      setAudioLoading(false);
-      speakBrowser(raw);
+      if (token === audioTokenRef.current) browserTTS();
     }
-  }, [word]);
+  }, []);
 
-  function goNext() { setFlipped(false); setTimeout(() => setCardIdx(i => (i + 1) % vocab.length), 40); }
-  function goPrev() { setFlipped(false); setTimeout(() => setCardIdx(i => (i - 1 + vocab.length) % vocab.length), 40); }
-  function switchUnit(i: number) { setUnitIdx(i); setCardIdx(0); setFlipped(false); }
+  const goTo = useCallback((index: number) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    setIsFlipped(false);
+    setTimeout(() => {
+      setCurrentIndex(index);
+    }, 50);
+  }, []);
 
-  const synonyms = Array.isArray(word?.synonyms) ? word.synonyms.join(", ") : (word?.synonyms ?? "");
-  const antonyms = Array.isArray(word?.antonyms) ? word.antonyms.join(", ") : (word?.antonyms ?? "");
+  useEffect(() => {
+    if (isFirstLoad) { setIsFirstLoad(false); return; }
+    if (content?.word) {
+      const t = setTimeout(() => speakWord(content.word), 400);
+      return () => clearTimeout(t);
+    }
+  }, [currentIndex, content?.word, isFirstLoad, speakWord]);
 
-  if (!word) {
-    return (
-      <div className="flex flex-1 items-center justify-center flex-col gap-3 text-gray-400">
-        <div className="text-5xl">📭</div>
-        <p>Không có từ vựng trong unit này</p>
-      </div>
-    );
-  }
+  if (!card || !content) return <div className="p-8 text-center text-muted-foreground">Không có từ nào</div>;
+
+  const isKid = mode === "kid";
 
   return (
-    <div className={cn("flex flex-1 overflow-hidden", isKid && "kid-mode")}>
-      {/* ── Left sidebar: Units ── */}
-      <nav className={cn("flex flex-col flex-shrink-0 border-r-2 border-gray-100 bg-white transition-all duration-300", leftOpen ? "w-[220px]" : "w-[52px]")}>
-        <div className="flex flex-shrink-0 items-center justify-between border-b-2 border-gray-100 p-3">
-          {leftOpen && <span className="truncate text-sm font-bold text-brand-red">📚 Danh sách Unit</span>}
-          <button onClick={() => setLeftOpen(v => !v)} className="ml-auto flex-shrink-0 rounded-lg p-1 text-brand-red hover:bg-brand-red-light">
-            {leftOpen ? "◀" : "▶"}
+    <div className={cn("flex flex-1 min-h-0", isKid && "kid-mode")}>
+      {/* Left sidebar */}
+      <nav
+        className={cn(
+          "bg-white border-r-2 border-[#f0e0e7] flex flex-col flex-shrink-0 shadow-[2px_0_12px_rgba(0,0,0,0.06)] sticky top-[62px] h-[calc(100vh-62px)] transition-all duration-300 overflow-hidden",
+          leftCollapsed ? "w-[52px]" : "w-[230px]",
+          "hidden md:flex"
+        )}
+      >
+        <div className="flex items-center justify-between p-4 border-b-2 border-[#f0e0e7] flex-shrink-0">
+          {!leftCollapsed && <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📚 Danh sách Unit</span>}
+          <button
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className="bg-none border-none cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light ml-auto"
+          >
+            {leftCollapsed ? "▶" : "◀"}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto py-2">
-          {units.map((unit, i) => (
-            <button key={unit.id ?? i} onClick={() => switchUnit(i)} title={unit.label}
-              className={cn("flex w-full items-center gap-2 border-l-[3px] px-3 py-2.5 text-sm font-semibold transition-all",
-                i === unitIdx ? "border-brand-red bg-brand-red-light text-brand-red" : "border-transparent text-gray-600 hover:bg-pink-50 hover:text-brand-red"
-              )}>
-              <span className={cn("flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                i === unitIdx ? "bg-brand-red text-white" : "bg-gray-100 text-gray-500"
-              )}>{i + 1}</span>
-              {leftOpen && <span className="truncate">{unit.label}</span>}
-            </button>
-          ))}
+        <div className="overflow-y-auto flex-1 py-2">
+          <button
+            className={cn(
+              "flex items-center gap-2.5 w-full bg-none border-none py-3 px-3.5 text-left cursor-pointer font-semibold text-sm text-[#495057] transition-all border-l-4 border-brand bg-brand-light text-brand whitespace-nowrap overflow-hidden"
+            )}
+          >
+            <span className="bg-brand text-white w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+            {!leftCollapsed && <span className="truncate">{deckTitle}</span>}
+          </button>
         </div>
       </nav>
 
-      {/* ── Main ── */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex flex-1 flex-col items-center px-4 py-8">
-          <h1 className={cn("mb-1 text-center font-extrabold text-brand-red", isKid ? "text-4xl" : "text-3xl")}>
-            {units[unitIdx]?.label}
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <div className="flex-1 p-7 flex flex-col items-center px-4 md:px-[5%]">
+          <h1 className={cn(
+            "font-extrabold mb-1.5 text-center text-brand",
+            isKid ? "text-4xl" : "text-3xl"
+          )}>
+            {deckTitle}
           </h1>
-          <p className="mb-4 text-center text-sm italic text-gray-500">{units[unitIdx]?.desc}</p>
-
-          {isLimited && (
-            <div className="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-700">
-              ⚠️ Xem thử — chỉ hiển thị {vocab.length} thẻ đầu.{" "}
-              <a href="https://web.facebook.com/huytutor" target="_blank" rel="noopener noreferrer" className="font-bold underline">Liên hệ mở khoá</a>
+          {deckDesc && <p className="text-muted-foreground text-sm mb-5 text-center italic">{deckDesc}</p>}
+          {isDemo && (
+            <div className="mb-4 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700 text-center">
+              🎯 Đang xem <strong>demo</strong> — tối đa 10 từ. Đăng nhập để học đầy đủ.
             </div>
           )}
 
-          {/* Card */}
-          <div className="w-full max-w-2xl">
-            <div className="card-scene" style={{ height: isKid ? "520px" : "460px" }}>
-              <div className={cn("card-inner", flipped && "flipped")} onClick={() => setFlipped(v => !v)}>
+          <div className={cn("w-full", isKid ? "max-w-2xl" : "max-w-[860px]")}>
+            {/* Card */}
+            <div
+              className={cn("card-scene mb-6 cursor-pointer", isKid ? "h-[500px]" : "h-[460px]")}
+              onClick={() => setIsFlipped(!isFlipped)}
+            >
+              <div className={cn("card-inner w-full h-full", isFlipped && "flipped")}>
                 {/* Front */}
-                <div className="card-face flex flex-col items-center justify-center gap-3 border-2 border-gray-100 bg-white p-8 shadow-md">
-                  <div className={cn("fc-word text-center font-extrabold text-brand-red", isKid ? "text-5xl" : "text-4xl")}>
-                    {word.word}
+                <div className={cn(
+                  "card-face rounded-[20px] shadow-[0_5px_20px_rgba(0,0,0,0.1)] border-2 border-[#e9ecef] bg-white flex flex-col items-center justify-center p-8",
+                  isKid && "rounded-3xl"
+                )}>
+                  <div className={cn(
+                    "font-extrabold text-brand mb-1.5 text-center flashcard-word",
+                    isKid ? "text-6xl" : "text-5xl"
+                  )}>
+                    {content.word}
                   </div>
-                  <div className="text-lg text-gray-500">{word.phonetic}</div>
-                  {word.cefr && (
-                    <span className={cn("rounded-full px-3 py-0.5 text-xs font-bold", cefrColor(word.cefr))}>
-                      {word.cefr}
+                  <div className="text-muted-foreground text-xl mb-2">{content.phonetic}</div>
+                  {content.cefr && (
+                    <span className={cn("text-xs font-bold px-3 py-1 rounded-full mb-2", getCefrColor(content.cefr))}>
+                      {content.cefr}
                     </span>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); speak(); }}
+                    onClick={(e) => { e.stopPropagation(); speakWord(content.word); }}
+                    className="bg-none border-none text-4xl cursor-pointer p-2 transition-transform hover:scale-110 my-1"
                     disabled={audioLoading}
-                    className="mt-1 rounded-full p-2 text-3xl transition-transform hover:scale-110 disabled:opacity-50"
                   >
-                    {audioLoading ? <Loader2 className="h-7 w-7 animate-spin text-brand-red" /> : "🔊"}
+                    {audioLoading ? <Loader2 className="w-8 h-8 animate-spin text-brand" /> : "🔊"}
                   </button>
-                  <span className="text-sm italic text-gray-400">Nhấn để xem nghĩa</span>
+                  <div className="text-muted-foreground text-sm italic">Nhấn để xem nghĩa</div>
                 </div>
 
                 {/* Back */}
-                <div className="card-back card-face flex flex-col items-center justify-center gap-3 overflow-y-auto bg-brand-red p-8 text-white shadow-md">
-                  <div className={cn("fc-meaning text-center font-extrabold", isKid ? "text-3xl" : "text-2xl")}>
-                    {word.meaning}
+                <div className={cn(
+                  "card-face card-back rounded-[20px] bg-brand text-white flex flex-col items-center justify-center p-8 overflow-y-auto",
+                  isKid && "rounded-3xl"
+                )}>
+                  <div className="flex flex-col items-center gap-3 w-full text-center">
+                    <div className={cn("font-extrabold leading-tight flashcard-meaning", isKid ? "text-4xl" : "text-3xl")}>
+                      {content.meaning}
+                    </div>
+                    <div className="text-sm bg-white/25 px-4 py-1 rounded-full font-semibold">{content.type}</div>
+                    <div className="w-12 h-0.5 bg-white/40 rounded" />
+                    {content.example && (
+                      <div className="text-sm leading-relaxed max-w-[90%]">
+                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Ví dụ</span>
+                        {content.example}
+                      </div>
+                    )}
+                    {content.translation && (
+                      <div className="text-sm leading-relaxed max-w-[90%] opacity-90">
+                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Dịch</span>
+                        <em>{content.translation}</em>
+                      </div>
+                    )}
+                    <div className="w-12 h-0.5 bg-white/40 rounded" />
+                    {toArray(content.synonyms).length > 0 && (
+                      <div className="text-sm max-w-[90%]">
+                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Đồng nghĩa</span>
+                        {toArray(content.synonyms).join(", ")}
+                      </div>
+                    )}
+                    {toArray(content.antonyms).length > 0 && (
+                      <div className="text-sm max-w-[90%]">
+                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Trái nghĩa</span>
+                        {toArray(content.antonyms).join(", ")}
+                      </div>
+                    )}
                   </div>
-                  <span className="rounded-full bg-white/20 px-4 py-1 text-sm font-semibold">{word.type}</span>
-                  <div className="h-0.5 w-12 rounded-full bg-white/40" />
-                  {word.example && (
-                    <p className="max-w-[90%] text-center text-sm leading-relaxed">
-                      <span className="mr-1 rounded-lg bg-white/20 px-2 py-0.5 text-xs font-bold">Ví dụ</span>
-                      {word.example}
-                    </p>
-                  )}
-                  {word.translation && (
-                    <p className="max-w-[90%] text-center text-sm italic leading-relaxed opacity-90">
-                      <span className="mr-1 rounded-lg bg-white/20 px-2 py-0.5 text-xs font-bold not-italic">Dịch</span>
-                      {word.translation}
-                    </p>
-                  )}
-                  <div className="h-0.5 w-12 rounded-full bg-white/40" />
-                  {synonyms && (
-                    <p className="max-w-[90%] text-center text-sm">
-                      <span className="mr-1 rounded-lg bg-white/20 px-2 py-0.5 text-xs font-bold">Đồng nghĩa</span>
-                      {synonyms}
-                    </p>
-                  )}
-                  {antonyms && (
-                    <p className="max-w-[90%] text-center text-sm">
-                      <span className="mr-1 rounded-lg bg-white/20 px-2 py-0.5 text-xs font-bold">Trái nghĩa</span>
-                      {antonyms}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
 
             {/* Controls */}
-            <div className="mt-5 flex justify-center gap-4">
-              <Button onClick={goPrev} size="lg"><ChevronLeft className="mr-1 h-5 w-5" />Trước</Button>
-              <Button onClick={goNext} size="lg">Tiếp<ChevronRight className="ml-1 h-5 w-5" /></Button>
+            <div className="flex justify-center gap-4 mt-2">
+              <Button
+                variant="brand"
+                size="pill"
+                onClick={() => goTo((currentIndex - 1 + cards.length) % cards.length)}
+              >
+                <ChevronLeft className="w-5 h-5" /> Trước
+              </Button>
+              <Button
+                variant="brand"
+                size="pill"
+                onClick={() => goTo((currentIndex + 1) % cards.length)}
+              >
+                Tiếp <ChevronRight className="w-5 h-5" />
+              </Button>
             </div>
-            <p className="mt-3 text-center text-base font-semibold text-gray-600">
-              Thẻ {cardIdx + 1} / {vocab.length}
-            </p>
+
+            <div className="text-center text-[#495057] text-lg mt-4 font-semibold">
+              Thẻ {currentIndex + 1} / {cards.length}
+            </div>
 
             {/* Jump */}
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-sm font-semibold text-gray-600">Đi đến thẻ:</span>
+            <div className="flex items-center justify-center gap-2.5 mt-3 flex-wrap">
+              <label className="text-[#495057] font-semibold text-sm">Đi đến thẻ:</label>
               <input
-                type="number" min={1} max={vocab.length} placeholder="..."
-                className="w-20 rounded-xl border-2 border-brand-red px-2 py-1.5 text-center text-sm font-bold text-brand-red outline-none"
+                type="number"
+                value={jumpValue}
+                min={1}
+                max={cards.length}
+                onChange={(e) => setJumpValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  const n = parseInt((e.target as HTMLInputElement).value);
-                  if (n >= 1 && n <= vocab.length) { setFlipped(false); setTimeout(() => setCardIdx(n - 1), 40); }
-                  (e.target as HTMLInputElement).value = "";
+                  if (e.key === "Enter") {
+                    const n = parseInt(jumpValue);
+                    if (n >= 1 && n <= cards.length) { goTo(n - 1); setJumpValue(""); }
+                  }
                 }}
+                className="w-18 px-3 py-2 border-2 border-brand rounded-lg text-sm font-semibold text-center text-brand outline-none w-16"
+                placeholder="..."
               />
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={() => {
+                  const n = parseInt(jumpValue);
+                  if (n >= 1 && n <= cards.length) { goTo(n - 1); setJumpValue(""); }
+                }}
+              >
+                Đi
+              </Button>
             </div>
-            <p className="mt-2 text-center text-xs text-gray-400">💡 Nhấn vào thẻ để lật</p>
+            <div className="text-center text-muted-foreground mt-2 text-sm">💡 Nhấn vào thẻ để lật</div>
           </div>
         </div>
       </div>
 
-      {/* ── Right sidebar: Word list ── */}
-      <aside className={cn("flex flex-col flex-shrink-0 border-l-2 border-gray-100 bg-white transition-all duration-300", rightOpen ? "w-[260px]" : "w-[40px]")}>
-        <div className="flex flex-shrink-0 items-center gap-2 border-b-2 border-gray-100 p-3">
-          <button onClick={() => setRightOpen(v => !v)} className="flex-shrink-0 rounded-lg p-1 text-brand-red hover:bg-brand-red-light">
-            {rightOpen ? "▶" : "◀"}
+      {/* Right sidebar */}
+      <aside
+        className={cn(
+          "bg-white border-l-2 border-[#f0e0e7] shadow-[-2px_0_12px_rgba(0,0,0,0.06)] flex flex-col sticky top-[62px] h-[calc(100vh-62px)] transition-all duration-300 overflow-hidden",
+          rightCollapsed ? "w-10" : "w-[280px]",
+          "hidden md:flex"
+        )}
+      >
+        <div className="flex items-center justify-between p-4 border-b-2 border-[#f0e0e7] flex-shrink-0 gap-2">
+          <button
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            className="bg-none border-none cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light flex-shrink-0"
+          >
+            {rightCollapsed ? "◀" : "▶"}
           </button>
-          {rightOpen && <span className="truncate text-sm font-bold text-brand-red">📋 Danh sách từ</span>}
+          {!rightCollapsed && <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📋 Danh sách từ</span>}
         </div>
-        {rightOpen && (
-          <div className="flex-1 overflow-y-auto p-2">
-            {vocab.map((v, i) => (
-              <button key={i} onClick={() => { setFlipped(false); setTimeout(() => setCardIdx(i), 40); }}
-                className={cn("mb-1.5 flex w-full items-center gap-2 rounded-xl border-2 p-2.5 text-left transition-all",
-                  i === cardIdx ? "border-brand-red bg-brand-red text-white" : "border-transparent bg-gray-50 hover:border-brand-red hover:bg-pink-50"
-                )}>
-                <span className={cn("flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                  i === cardIdx ? "bg-white text-brand-red" : "bg-brand-red text-white"
-                )}>{i + 1}</span>
-                <span className="flex-1 truncate text-sm font-semibold">{v.word}</span>
-                {v.cefr && (
-                  <span className={cn("flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold",
-                    i === cardIdx ? "bg-white/20 text-white" : cefrColor(v.cefr)
-                  )}>{v.cefr}</span>
+        {!rightCollapsed && (
+          <div className="overflow-y-auto flex-1 p-3">
+            {cards.map((c, i) => (
+              <div
+                key={c.id}
+                onClick={() => goTo(i)}
+                className={cn(
+                  "p-2.5 rounded-xl cursor-pointer transition-all border-2 flex items-center gap-2.5 mb-2",
+                  i === currentIndex
+                    ? "bg-brand text-white border-brand"
+                    : "bg-[#f8f9fa] border-transparent hover:bg-[#ffe5ed] hover:border-brand"
                 )}
-              </button>
+              >
+                <div className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0",
+                  i === currentIndex ? "bg-white text-brand" : "bg-brand text-white"
+                )}>
+                  {i + 1}
+                </div>
+                <span className="font-semibold text-sm flex-1 truncate">{c.content.word}</span>
+                {c.content.cefr && (
+                  <span className={cn(
+                    "text-[0.7rem] px-1.5 py-0.5 rounded font-bold flex-shrink-0",
+                    i === currentIndex ? "bg-white/20 text-white" : getCefrColor(c.content.cefr)
+                  )}>
+                    {c.content.cefr}
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         )}

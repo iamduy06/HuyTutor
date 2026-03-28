@@ -1,57 +1,74 @@
 "use client";
+
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
-import { useUIStore } from "@/features/auth/uiStore";
-import { Switch } from "@/components/ui/Switch";
-import { Button } from "@/components/ui/Button";
-import { LogOut, LayoutDashboard, Shield } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@/hooks/useUser";
+import { createClient } from "@/services/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { UIModeToggle } from "@/components/common/UIModeToggle";
 
 export function SiteHeader() {
-  const { user, isAdmin, loading, signOut } = useAuth();
-  const { mode, toggle } = useUIStore();
+  const { user } = useUser();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    toast({ title: "Đã đăng xuất" });
+    router.push("/");
+    router.refresh();
+  }
 
   return (
-    <header className="sticky top-0 z-50 flex h-[62px] items-center justify-between border-b-2 border-gray-100 bg-white px-[5%]">
-      <Link href="/" className="flex items-center gap-2.5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red font-extrabold text-lg text-white">H</div>
-        <span className="hidden font-extrabold text-gray-900 sm:block">
-          Huy Tutor <span className="text-brand-red">Flashcard</span>
+    <header className="sticky top-0 z-50 flex items-center justify-between px-[5%] h-[62px] bg-white border-b-2 border-[#f0e0e7]">
+      <Link href="/" className="flex items-center gap-2.5 no-underline">
+        <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center text-white font-black text-lg">
+          H
+        </div>
+        <span className="font-extrabold text-[1.05em] text-[#1a1a2e]">
+          Huy Tutor <span className="text-brand">Flashcard</span>
         </span>
       </Link>
 
-      <div className="flex items-center gap-3">
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-gray-500">
-          🎓 <Switch checked={mode === "kid"} onCheckedChange={toggle} /> 🎈
-        </label>
+      <div className="flex items-center gap-2">
+        <UIModeToggle />
 
-        {!loading && (
+        {user ? (
           <>
-            {user ? (
-              <div className="flex items-center gap-2">
-                <Link href="/dashboard">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span className="hidden sm:inline">Dashboard</span>
-                  </Button>
+            {user.role === "ADMIN" && (
+              <Button variant="brand-outline" size="sm" asChild>
+                <Link href="/admin">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin</span>
                 </Link>
-                {isAdmin && (
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Shield className="h-4 w-4 text-brand-red" />
-                      <span className="hidden sm:inline">Admin</span>
-                    </Button>
-                  </Link>
-                )}
-                <Button variant="ghost" size="icon" onClick={signOut} title="Đăng xuất">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link href="/login"><Button variant="outline" size="sm">Đăng nhập</Button></Link>
-                <Link href="/register"><Button size="sm">Đăng ký</Button></Link>
-              </div>
+              </Button>
             )}
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard">
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/profile">
+                <User className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/login">Đăng nhập</Link>
+            </Button>
+            <Button variant="brand" size="sm" asChild>
+              <Link href="/register">Đăng ký</Link>
+            </Button>
           </>
         )}
       </div>

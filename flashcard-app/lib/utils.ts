@@ -6,20 +6,29 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function generatePassword(length = 8): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const charset =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
 }
 
-export function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
+export function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function isExpired(expiredAt: string | null): boolean {
   if (!expiredAt) return true;
-  return new Date(expiredAt) < new Date();
+  return new Date(expiredAt) <= new Date();
 }
 
-export function cefrColor(cefr: string): string {
+export function getCefrColor(cefr: string): string {
   const map: Record<string, string> = {
     A1: "bg-green-100 text-green-800",
     A2: "bg-blue-100 text-blue-800",
@@ -28,5 +37,15 @@ export function cefrColor(cefr: string): string {
     C1: "bg-purple-100 text-purple-800",
     C2: "bg-red-100 text-red-800",
   };
-  return map[cefr] ?? "bg-gray-100 text-gray-700";
+  return map[cefr] || "bg-gray-100 text-gray-800";
+}
+
+/** Normalise synonyms/antonyms: accepts string[] OR comma-separated string */
+export function toArray(value: string | string[] | undefined | null): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }

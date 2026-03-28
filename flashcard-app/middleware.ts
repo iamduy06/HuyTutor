@@ -1,57 +1,76 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { createMiddlewareClient } from "@/services/supabase/middleware";
-
-const PROTECTED = ["/dashboard", "/profile", "/learning"];
-const ADMIN_ONLY = ["/admin"];
-const AUTH_PAGES = ["/login", "/register"];
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  const { supabase, response } = createMiddlewareClient(request);
-  const pathname = request.nextUrl.pathname;
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
-  // getUser() is the ONLY reliable way to check session in middleware.
-  // It validates the JWT with Supabase and refreshes if needed, writing
-  // updated tokens back via setAll → cookies on `response`.
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
   const {
     data: { user },
-    error,
   } = await supabase.auth.getUser();
 
-  const isLoggedIn = !!user && !error;
+  const pathname = request.nextUrl.pathname;
 
-  // ── Redirect logged-in users away from auth pages ──
-  if (isLoggedIn && AUTH_PAGES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // ── Protect dashboard / learning / profile ──
-  if (!isLoggedIn && PROTECTED.some((p) => pathname.startsWith(p))) {
-    const url = new URL("/login", request.url);
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // ── Protect admin routes ──
-  if (ADMIN_ONLY.some((p) => pathname.startsWith(p))) {
-    if (!isLoggedIn) {
-      const url = new URL("/login", request.url);
-      url.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(url);
+  // Protected dashboard routes
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/learning")
+  ) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
-    // Role is stored in public.users; user_metadata is set at signup
-    const role = user?.user_metadata?.role as string | undefined;
-    if (role !== "ADMIN") {
+  }
+
+  // Protected admin routes
+  if (pathname.startsWith("/admin")) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Check admin role
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  // Always return `response` so refreshed session cookies are forwarded
-  return response;
+  // Redirect logged-in users away from auth pages
+  if ((pathname === "/login" || pathname === "/register") && user) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    // Run on everything except Next internals and static assets
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -1,33 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/services/supabase/server";
-import { normalizeUnits, RawFlashcardContent } from "@/types";
-import { DEMO_LIMIT } from "@/lib/constants";
+import { createAdminClient } from "@/services/supabase/admin";
+import { DEMO_CARD_LIMIT } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
-  const deckId = new URL(request.url).searchParams.get("deckId");
-  if (!deckId) return NextResponse.json({ error: "deckId required" }, { status: 400 });
+  const { searchParams } = new URL(request.url);
+  const deckId = searchParams.get("deckId");
 
-  const supabase = await createClient();
+  if (!deckId) {
+    return NextResponse.json({ error: "deckId required" }, { status: 400 });
+  }
 
-  const { data: deck } = await supabase
+  const supabase = createAdminClient();
+
+  const { data: deck, error: deckError } = await supabase
     .from("decks")
     .select("id, title, description, level")
     .eq("id", deckId)
     .single();
 
-  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (deckError || !deck) {
+    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+  }
 
-  // Dedicated demo query — never reuse full-deck endpoint
-  const { data: flashcards } = await supabase
+  // Dedicated demo query — never reuse full deck query
+  const { data: cards, error } = await supabase
     .from("flashcards")
-    .select("content")
+    .select("id, deck_id, content, order_index")
     .eq("deck_id", deckId)
-    .limit(1);
+    .order("order_index", { ascending: true })
+    .limit(DEMO_CARD_LIMIT);
 
-  const raw = flashcards?.[0]?.content as RawFlashcardContent | undefined;
-  const cards = raw
-    ? normalizeUnits(raw).flatMap((u) => u.vocabulary ?? []).slice(0, DEMO_LIMIT)
-    : [];
+  if (error) {
+    return NextResponse.json({ error: "Failed to fetch demo cards" }, { status: 500 });
+  }
 
-  return NextResponse.json({ deck, cards });
+  return NextResponse.json({
+    deck,
+    cards: cards ?? [],
+    isDemo: true,
+    total: cards?.length ?? 0,
+  });
 }

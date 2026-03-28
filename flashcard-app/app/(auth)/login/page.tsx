@@ -1,116 +1,94 @@
 "use client";
-import { Suspense, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/services/supabase/client";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "@/hooks/useToast";
 
-function LoginForm() {
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/services/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const supabase = createClient();
-
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  const { toast } = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    const supabase = createClient();
 
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (authError) {
-        const msg =
-          authError.message === "Invalid login credentials"
-            ? "Email hoặc mật khẩu không đúng"
-            : authError.message === "Email not confirmed"
-            ? "Email chưa được xác nhận. Kiểm tra hộp thư."
-            : authError.message;
-        setError(msg);
-        return;
-      }
-
-      if (!data.session) {
-        setError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
-        return;
-      }
-
-      // ✅ Correct order: refresh server state FIRST, then push
-      toast({ title: "Đăng nhập thành công!", description: `Xin chào ${data.user.email}` });
-      router.refresh();
-      router.push(redirectTo);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Lỗi không xác định");
-    } finally {
+    if (error) {
+      toast({ title: "Đăng nhập thất bại", description: error.message, variant: "destructive" });
       setLoading(false);
+      return;
     }
+
+    toast({ title: "Đăng nhập thành công! 🎉", variant: "default" });
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
+      <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Đăng nhập</h1>
+      <p className="text-muted-foreground text-sm mb-6">Chào mừng trở lại! Nhập thông tin của bạn.</p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            className="mt-1"
+          />
         </div>
-      )}
-      <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" placeholder="you@example.com" value={email}
-          onChange={(e) => setEmail(e.target.value)} required autoComplete="email" disabled={loading} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="password">Mật khẩu</Label>
-        <Input id="password" type="password" placeholder="••••••••" value={password}
-          onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" disabled={loading} />
-      </div>
-      <Button type="submit" className="w-full" size="lg" disabled={loading}>
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-      </Button>
-    </form>
-  );
-}
+        <div>
+          <Label htmlFor="password">Mật khẩu</Label>
+          <div className="relative mt-1">
+            <Input
+              id="password"
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(!showPw)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+        <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          Đăng nhập
+        </Button>
+      </form>
 
-export default function LoginPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-red-light via-white to-white px-4">
-      <div className="w-full max-w-md rounded-3xl border-2 border-gray-100 bg-white p-8 shadow-xl">
-        <Link href="/" className="mb-8 flex items-center justify-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-red font-extrabold text-xl text-white">H</div>
-          <span className="font-extrabold text-xl text-gray-900">Huy Tutor <span className="text-brand-red">Flashcard</span></span>
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        Chưa có tài khoản?{" "}
+        <Link href="/register" className="text-brand font-semibold hover:underline">
+          Đăng ký
         </Link>
-        <h1 className="mb-1 text-center text-2xl font-extrabold">Chào mừng trở lại!</h1>
-        <p className="mb-6 text-center text-sm text-gray-500">Đăng nhập để tiếp tục học</p>
-
-        {/* Suspense required — useSearchParams needs it in Next.js 14 */}
-        <Suspense fallback={<div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-brand-red" /></div>}>
-          <LoginForm />
-        </Suspense>
-
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Chưa có tài khoản?{" "}
-          <Link href="/register" className="font-bold text-brand-red hover:underline">Đăng ký</Link>
-        </p>
-        <p className="mt-2 text-center text-sm">
-          <a href="https://web.facebook.com/huytutor" target="_blank" rel="noopener noreferrer"
-            className="font-bold text-brand-red hover:underline">
-            💬 Liên hệ mua bộ đề
-          </a>
-        </p>
-      </div>
+      </p>
     </div>
   );
 }
