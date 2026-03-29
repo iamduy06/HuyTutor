@@ -2,13 +2,6 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  /**
-   * CRITICAL PATTERN (Supabase docs):
-   * 1. Create a mutable `response` variable.
-   * 2. Pass request headers — not the full request — so cookies are forwarded.
-   * 3. In setAll, write cookies to BOTH request AND a new response.
-   * 4. Always return `response` (never a fresh NextResponse.next()).
-   */
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -22,11 +15,8 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(list: { name: string; value: string; options?: CookieOptions }[]) {
-          // Mutate the request cookies so subsequent reads in this request see them
           list.forEach(({ name, value }) => request.cookies.set(name, value));
-          // Build a fresh response that carries the updated request headers
           response = NextResponse.next({ request: { headers: request.headers } });
-          // Write cookies to the response so the browser stores them
           list.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, {
               path: "/",
@@ -41,9 +31,7 @@ export async function middleware(request: NextRequest) {
   );
 
   // ALWAYS call getUser() to refresh the session token when needed
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  console.log("[mw]", request.nextUrl.pathname, "| user:", user?.id ?? "none", error?.message ?? "");
+  const { data: { user } } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
 
@@ -67,20 +55,20 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
-    // Inline admin check (avoid extra DB round-trip for non-admin pages)
     const { data: profile } = await supabase
       .from("users")
       .select("role")
       .eq("id", user.id)
       .single();
-
     if (profile?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  // ── Redirect already-logged-in users away from auth pages ─────────────
-  if ((path === "/login" || path === "/register") && user) {
+  // ── Redirect logged-in users away from login/register ─────────────────
+  // NOTE: /forgot-password và /reset-password vẫn accessible khi đã login
+  const authOnlyPaths = ["/login", "/register"];
+  if (authOnlyPaths.includes(path) && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

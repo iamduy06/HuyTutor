@@ -79,6 +79,9 @@ export function LoginForm() {
         Chưa có tài khoản?{" "}
         <Link href="/register" className="text-brand font-semibold hover:underline">Đăng ký</Link>
       </p>
+      <p className="text-center text-sm text-muted-foreground mt-2">
+        <Link href="/forgot-password" className="text-muted-foreground hover:text-brand hover:underline">Quên mật khẩu?</Link>
+      </p>
     </div>
   );
 }
