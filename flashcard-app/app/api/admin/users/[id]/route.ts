@@ -29,14 +29,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   // Assign deck
   if (body.action === "assign_deck") {
     const { deck_id, expired_at } = body;
+
+    // expired_at = "" hoặc không có → null = không hết hạn (học mãi mãi)
+    const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
+
     const { error } = await supabase.from("user_decks").upsert({
       user_id: params.id,
       deck_id,
-      expired_at,
+      expired_at: expiredAtValue,   // null = unlimited access
       progress_percent: 0,
       learned_count: 0,
       streak: 0,
     }, { onConflict: "user_id,deck_id" });
+
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ success: true });
   }

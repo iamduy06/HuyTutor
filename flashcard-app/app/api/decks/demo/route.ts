@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
-import { normaliseUnits } from "@/lib/utils";
+import { extractTabs } from "@/lib/utils";
 import { DEMO_LIMIT } from "@/lib/constants";
-import type { FlashcardRow, FlashcardUnit } from "@/types";
+import type { FlashcardRow, Tab } from "@/types";
 
 export async function GET(req: NextRequest) {
   const deckId = req.nextUrl.searchParams.get("deckId");
@@ -15,29 +15,27 @@ export async function GET(req: NextRequest) {
     .select("id, title, description, level")
     .eq("id", deckId)
     .single();
-
   if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { data: rows } = await supabase
     .from("flashcards")
     .select("id, deck_id, content, created_at")
     .eq("deck_id", deckId)
-    .order("created_at", { ascending: true })
-    .limit(1); // first row is enough for demo
+    .order("created_at", { ascending: true });
 
-  const allUnits: FlashcardUnit[] = (rows ?? []).flatMap((r) =>
-    normaliseUnits((r as unknown as FlashcardRow).content)
+  const allTabs: Tab[] = (rows ?? []).flatMap(r =>
+    extractTabs((r as unknown as FlashcardRow).content)
   );
 
-  // Limit total vocab to DEMO_LIMIT across all units
+  // Giới hạn DEMO_LIMIT từ
   let seen = 0;
-  const demoUnits = allUnits.map((unit) => {
+  const demoTabs = allTabs.map(tab => {
     const remaining = DEMO_LIMIT - seen;
     if (remaining <= 0) return null;
-    const vocab = (unit.vocabulary ?? []).slice(0, remaining);
+    const vocab = (tab.vocabulary ?? []).slice(0, remaining);
     seen += vocab.length;
-    return { ...unit, vocabulary: vocab };
-  }).filter(Boolean) as FlashcardUnit[];
+    return { ...tab, vocabulary: vocab };
+  }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
 
-  return NextResponse.json({ deck, units: demoUnits, isDemo: true });
+  return NextResponse.json({ deck, tabs: demoTabs, isDemo: true });
 }

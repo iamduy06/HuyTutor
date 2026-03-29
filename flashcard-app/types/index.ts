@@ -1,7 +1,7 @@
 // ─── Auth / Users ──────────────────────────────────────────────────────────
 
-export type UserRole = "USER" | "ADMIN";
-export type UIMode  = "standard" | "kid";
+export type UserRole  = "USER" | "ADMIN";
+export type UIMode    = "standard" | "kid";
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
 export interface UserProfile {
@@ -19,16 +19,21 @@ export interface Deck {
   description: string | null;
   level: string | null;
   created_at: string;
-  flashcard_count?: number;   // computed client-side
-  word_count?: number;        // computed from JSONB
+  word_count?: number;   // tổng số từ trong tất cả tabs
 }
 
-// ─── Flashcard JSONB ───────────────────────────────────────────────────────
-// The DB stores one row per "unit". content can be:
-//   CASE A  { id, label, desc, vocabulary: [...] }   ← single unit object
-//   CASE B  [{ id, label, desc, vocabulary: [...] }] ← array of units (legacy)
+// ─── JSONB Content Structure ───────────────────────────────────────────────
 //
-// Use normaliseContent() / normaliseUnits() to get always-array form.
+// Mỗi deck có 1 row trong bảng flashcards.
+// content = { tabs: Tab[] }
+//
+// Tab tương đương với const tabs trong file Embed Flashcard:
+//   { id, label, desc, vocabulary: VocabItem[] }
+//
+// Backward-compat: content có thể là:
+//   A) { tabs: [...] }          ← chuẩn mới
+//   B) { id, label, vocabulary } ← unit đơn (legacy)
+//   C) [{ id, label, vocabulary }, ...] ← mảng unit (legacy)
 
 export interface VocabItem {
   word: string;
@@ -37,25 +42,28 @@ export interface VocabItem {
   type?: string;
   example?: string;
   translation?: string;
-  /** comma-separated string OR array */
   synonyms?: string | string[];
-  /** comma-separated string OR array */
   antonyms?: string | string[];
-  cefr?: CefrLevel | string;
+  cefr?: string;
 }
 
-export interface FlashcardUnit {
+export interface Tab {
   id?: string;
   label?: string;
   desc?: string;
   vocabulary: VocabItem[];
 }
 
-/** Raw row from DB */
+/** Wrapper dạng chuẩn mới */
+export interface DeckContent {
+  tabs: Tab[];
+}
+
+/** Raw row từ DB */
 export interface FlashcardRow {
   id: string;
   deck_id: string;
-  content: FlashcardUnit | FlashcardUnit[];
+  content: DeckContent | Tab | Tab[];
   created_at: string;
 }
 
@@ -68,7 +76,9 @@ export interface UserDeck {
   progress_percent: number;
   learned_count: number;
   streak: number;
+  /** NULL = không hết hạn (có thể học mãi mãi) */
   expired_at: string | null;
+  last_studied_at?: string | null;
   deck?: Deck;
 }
 

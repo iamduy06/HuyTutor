@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { FlashcardUnit, FlashcardRow, VocabItem } from "@/types";
+import type { Tab, FlashcardRow, VocabItem, DeckContent } from "@/types";
 
 // ─── Tailwind ──────────────────────────────────────────────────────────────
 
@@ -12,20 +12,35 @@ export function cn(...inputs: ClassValue[]) {
 
 export function generatePassword(length = 8): string {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return Array.from({ length }, () =>
+    chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
 }
 
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("vi-VN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: "numeric", month: "long", day: "numeric",
   });
 }
 
+/**
+ * Hết hạn khi:
+ *   - expired_at có giá trị VÀ thời điểm đó ≤ now()
+ * KHÔNG hết hạn khi:
+ *   - expired_at là NULL → học mãi mãi
+ */
 export function isExpired(expiredAt: string | null): boolean {
-  if (!expiredAt) return true;
+  if (!expiredAt) return false;           // ← NULL = không hết hạn
   return new Date(expiredAt) <= new Date();
+}
+
+/**
+ * Có quyền học đầy đủ khi:
+ *   - Có record trong user_decks VÀ chưa hết hạn
+ */
+export function hasFullAccess(expiredAt: string | null | undefined): boolean {
+  if (expiredAt === undefined) return false;  // không có record user_decks
+  return !isExpired(expiredAt);               // null → false → !false = true ✓
 }
 
 export function getCefrColor(cefr: string): string {
@@ -40,39 +55,62 @@ export function getCefrColor(cefr: string): string {
   return map[cefr] ?? "bg-gray-100 text-gray-700";
 }
 
-// ─── JSONB normalisation ───────────────────────────────────────────────────
+// ─── JSONB Normalisation ───────────────────────────────────────────────────
+//
+// 3 format có thể có trong DB:
+//   Format A (mới): { tabs: [{ id, label, desc, vocabulary: [...] }, ...] }
+//   Format B (cũ) : { id, label, vocabulary: [...] }   ← single unit object
+//   Format C (cũ) : [{ id, label, vocabulary: [...] }] ← array of unit objects
+//   Format D (cũ) : { word, phonetic, ... }             ← flat word object (row per word)
+//
+// extractTabs() luôn trả về Tab[] bất kể format nào.
 
-/**
- * Normalise a raw JSONB content value to always-array of FlashcardUnit.
- * Handles:
- *   CASE A  { id, label, vocabulary: [...] }
- *   CASE B  [{ id, label, vocabulary: [...] }, ...]
- */
-export function normaliseUnits(raw: FlashcardUnit | FlashcardUnit[]): FlashcardUnit[] {
+export function extractTabs(raw: FlashcardRow["content"]): Tab[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  return [raw];
+
+  // Format A: { tabs: [...] }
+  if (!Array.isArray(raw) && "tabs" in raw && Array.isArray((raw as DeckContent).tabs)) {
+    return (raw as DeckContent).tabs;
+  }
+
+  // Format C: [{ id, label, vocabulary }, ...]
+  if (Array.isArray(raw)) {
+    // Mảng unit
+    if (raw.length > 0 && "vocabulary" in raw[0]) return raw as Tab[];
+    // Mảng flat word (rất hiếm)
+    return [{ vocabulary: raw as unknown as VocabItem[] }];
+  }
+
+  // Format B: { id, label, vocabulary }
+  if ("vocabulary" in raw) return [raw as Tab];
+
+  // Format D: { word, phonetic, meaning, ... } ← flat word row
+  if ("word" in raw) return [{ vocabulary: [raw as unknown as VocabItem] }];
+
+  return [];
 }
 
 /**
- * Extract all VocabItems from a single FlashcardRow.
+ * Lấy tất cả từ vựng flatten từ 1 row DB
  */
 export function extractVocab(row: FlashcardRow): VocabItem[] {
-  return normaliseUnits(row.content).flatMap((u) => u.vocabulary ?? []);
+  return extractTabs(row.content).flatMap(t => t.vocabulary ?? []);
 }
 
 /**
- * Count total vocabulary words across all units in a row.
+ * Đếm tổng số từ trong 1 row DB
  */
 export function countWords(row: FlashcardRow): number {
   return extractVocab(row).length;
 }
 
 /**
- * Normalise synonyms/antonyms: comma-string OR array → string[]
+ * Chuẩn hoá synonyms/antonyms:
+ *   "word1, word2" → ["word1", "word2"]
+ *   ["word1", "word2"] → ["word1", "word2"]
  */
 export function toArray(val: string | string[] | undefined | null): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);
-  return val.split(",").map((s) => s.trim()).filter(Boolean);
+  return val.split(",").map(s => s.trim()).filter(Boolean);
 }
