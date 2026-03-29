@@ -38,7 +38,7 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground font-medium">
-          📝 {deck.flashcard_count ?? 0} từ
+          📝 {deck.word_count ?? deck.flashcard_count ?? 0} từ
         </span>
         {showProgress && progressPercent !== undefined && (
           <span className="text-xs font-semibold text-brand">{progressPercent}%</span>

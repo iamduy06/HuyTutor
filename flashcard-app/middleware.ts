@@ -2,8 +2,15 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
+  /**
+   * CRITICAL PATTERN (Supabase docs):
+   * 1. Create a mutable `response` variable.
+   * 2. Pass request headers — not the full request — so cookies are forwarded.
+   * 3. In setAll, write cookies to BOTH request AND a new response.
+   * 4. Always return `response` (never a fresh NextResponse.next()).
+   */
+  let response = NextResponse.next({
+    request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
@@ -14,63 +21,74 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+        setAll(list: { name: string; value: string; options?: CookieOptions }[]) {
+          // Mutate the request cookies so subsequent reads in this request see them
+          list.forEach(({ name, value }) => request.cookies.set(name, value));
+          // Build a fresh response that carries the updated request headers
+          response = NextResponse.next({ request: { headers: request.headers } });
+          // Write cookies to the response so the browser stores them
+          list.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, {
+              path: "/",
+              sameSite: "lax",
+              httpOnly: true,
+              ...options,
+            })
           );
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // ALWAYS call getUser() to refresh the session token when needed
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+  console.log("[mw]", request.nextUrl.pathname, "| user:", user?.id ?? "none", error?.message ?? "");
 
-  // Protected dashboard routes
-  if (
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/learning")
-  ) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+  const path = request.nextUrl.pathname;
+
+  // ── Protected user routes ─────────────────────────────────────────────
+  const userProtected =
+    path.startsWith("/dashboard") ||
+    path.startsWith("/profile") ||
+    path.startsWith("/learning");
+
+  if (userProtected && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", path);
+    return NextResponse.redirect(url);
   }
 
-  // Protected admin routes
-  if (pathname.startsWith("/admin")) {
+  // ── Protected admin routes ────────────────────────────────────────────
+  if (path.startsWith("/admin")) {
     if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     }
-
-    // Check admin role
+    // Inline admin check (avoid extra DB round-trip for non-admin pages)
     const { data: profile } = await supabase
       .from("users")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    if (!profile || profile.role !== "ADMIN") {
+    if (profile?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  // Redirect logged-in users away from auth pages
-  if ((pathname === "/login" || pathname === "/register") && user) {
+  // ── Redirect already-logged-in users away from auth pages ─────────────
+  if ((path === "/login" || path === "/register") && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/services/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { LayoutDashboard, Users, BookOpen, BarChart3, ChevronRight } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 

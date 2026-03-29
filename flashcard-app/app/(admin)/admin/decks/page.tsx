@@ -77,7 +77,7 @@ export default function AdminDecksPage() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (_: unknown, vars: { deckId: string; cardId?: string }) => {
       loadDeckCards(vars.deckId);
       setShowCardDialog(null);
       setEditingCard(null);
@@ -90,7 +90,7 @@ export default function AdminDecksPage() {
     mutationFn: async ({ deckId, cardId }: { deckId: string; cardId: string }) => {
       await fetch(`/api/admin/decks/${deckId}/cards/${cardId}`, { method: "DELETE" });
     },
-    onSuccess: (_, vars) => { loadDeckCards(vars.deckId); toast({ title: "Đã xóa flashcard" }); },
+    onSuccess: (_: unknown, vars: { deckId: string; cardId?: string }) => { loadDeckCards(vars.deckId); toast({ title: "Đã xóa flashcard" }); },
   });
 
   async function loadDeckCards(deckId: string) {

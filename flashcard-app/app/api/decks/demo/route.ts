@@ -1,43 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
-import { DEMO_CARD_LIMIT } from "@/lib/constants";
+import { normaliseUnits } from "@/lib/utils";
+import { DEMO_LIMIT } from "@/lib/constants";
+import type { FlashcardRow, FlashcardUnit } from "@/types";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const deckId = searchParams.get("deckId");
-
-  if (!deckId) {
-    return NextResponse.json({ error: "deckId required" }, { status: 400 });
-  }
+export async function GET(req: NextRequest) {
+  const deckId = req.nextUrl.searchParams.get("deckId");
+  if (!deckId) return NextResponse.json({ error: "deckId required" }, { status: 400 });
 
   const supabase = createAdminClient();
 
-  const { data: deck, error: deckError } = await supabase
+  const { data: deck } = await supabase
     .from("decks")
     .select("id, title, description, level")
     .eq("id", deckId)
     .single();
 
-  if (deckError || !deck) {
-    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
-  }
+  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Dedicated demo query — never reuse full deck query
-  const { data: cards, error } = await supabase
+  const { data: rows } = await supabase
     .from("flashcards")
-    .select("id, deck_id, content, order_index")
+    .select("id, deck_id, content, created_at")
     .eq("deck_id", deckId)
-    .order("order_index", { ascending: true })
-    .limit(DEMO_CARD_LIMIT);
+    .order("created_at", { ascending: true })
+    .limit(1); // first row is enough for demo
 
-  if (error) {
-    return NextResponse.json({ error: "Failed to fetch demo cards" }, { status: 500 });
-  }
+  const allUnits: FlashcardUnit[] = (rows ?? []).flatMap((r) =>
+    normaliseUnits((r as unknown as FlashcardRow).content)
+  );
 
-  return NextResponse.json({
-    deck,
-    cards: cards ?? [],
-    isDemo: true,
-    total: cards?.length ?? 0,
-  });
+  // Limit total vocab to DEMO_LIMIT across all units
+  let seen = 0;
+  const demoUnits = allUnits.map((unit) => {
+    const remaining = DEMO_LIMIT - seen;
+    if (remaining <= 0) return null;
+    const vocab = (unit.vocabulary ?? []).slice(0, remaining);
+    seen += vocab.length;
+    return { ...unit, vocabulary: vocab };
+  }).filter(Boolean) as FlashcardUnit[];
+
+  return NextResponse.json({ deck, units: demoUnits, isDemo: true });
 }

@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/services/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
-import { DEMO_CARD_LIMIT } from "@/lib/constants";
-import { isExpired } from "@/lib/utils";
+import { normaliseUnits, isExpired } from "@/lib/utils";
+import { DEMO_LIMIT } from "@/lib/constants";
+import type { FlashcardRow, FlashcardUnit, VocabItem } from "@/types";
 
 export async function GET(
-  request: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
+  const supabase      = createClient();
   const adminSupabase = createAdminClient();
 
+  // Auth check
   const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: deck } = await adminSupabase
     .from("decks")
@@ -23,42 +22,45 @@ export async function GET(
     .eq("id", params.id)
     .single();
 
-  if (!deck) {
-    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
-  }
+  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Check user_decks for expiry
+  // Check user access
   const { data: userDeck } = await adminSupabase
     .from("user_decks")
-    .select("expired_at, progress_percent, learned_count, streak")
+    .select("expired_at")
     .eq("user_id", user.id)
     .eq("deck_id", params.id)
     .single();
 
-  const hasAccess = userDeck && !isExpired(userDeck.expired_at);
-  const limit = hasAccess ? undefined : DEMO_CARD_LIMIT;
+  const hasFullAccess = userDeck !== null && !isExpired(userDeck.expired_at);
 
-  let query = adminSupabase
+  const { data: rows } = await adminSupabase
     .from("flashcards")
-    .select("id, deck_id, content, order_index")
+    .select("id, deck_id, content, created_at")
     .eq("deck_id", params.id)
-    .order("order_index", { ascending: true });
+    .order("created_at", { ascending: true });
 
-  if (limit) {
-    query = query.limit(limit);
-  }
+  // Normalise JSONB → always array of units
+  let units: FlashcardUnit[] = (rows ?? []).flatMap((r) =>
+    normaliseUnits((r as unknown as FlashcardRow).content)
+  );
 
-  const { data: cards, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
+  // Enforce demo limit
+  if (!hasFullAccess) {
+    let seen = 0;
+    units = units.map((unit) => {
+      const remaining = DEMO_LIMIT - seen;
+      if (remaining <= 0) return { ...unit, vocabulary: [] };
+      const vocab = (unit.vocabulary ?? []).slice(0, remaining);
+      seen += vocab.length;
+      return { ...unit, vocabulary: vocab };
+    }).filter((u) => u.vocabulary.length > 0);
   }
 
   return NextResponse.json({
     deck,
-    cards: cards ?? [],
-    isDemo: !hasAccess,
-    userDeck: userDeck ?? null,
-    total: cards?.length ?? 0,
+    units,
+    isDemo: !hasFullAccess,
+    totalWords: units.reduce((s, u) => s + u.vocabulary.length, 0),
   });
 }

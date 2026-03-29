@@ -22,7 +22,7 @@ export default async function AdminAnalyticsPage() {
   ]);
 
   const avgProgress = progressData?.length
-    ? Math.round(progressData.reduce((s, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
+    ? Math.round(progressData.reduce((s: number, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
     : 0;
 
   const maxStreak = (streakData?.[0] as any)?.streak ?? 0;

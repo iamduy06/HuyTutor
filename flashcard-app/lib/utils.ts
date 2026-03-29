@@ -1,18 +1,18 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { FlashcardUnit, FlashcardRow, VocabItem } from "@/types";
+
+// ─── Tailwind ──────────────────────────────────────────────────────────────
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// ─── Misc ──────────────────────────────────────────────────────────────────
+
 export function generatePassword(length = 8): string {
-  const charset =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
 export function formatDate(dateStr: string): string {
@@ -37,15 +37,42 @@ export function getCefrColor(cefr: string): string {
     C1: "bg-purple-100 text-purple-800",
     C2: "bg-red-100 text-red-800",
   };
-  return map[cefr] || "bg-gray-100 text-gray-800";
+  return map[cefr] ?? "bg-gray-100 text-gray-700";
 }
 
-/** Normalise synonyms/antonyms: accepts string[] OR comma-separated string */
-export function toArray(value: string | string[] | undefined | null): string[] {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+// ─── JSONB normalisation ───────────────────────────────────────────────────
+
+/**
+ * Normalise a raw JSONB content value to always-array of FlashcardUnit.
+ * Handles:
+ *   CASE A  { id, label, vocabulary: [...] }
+ *   CASE B  [{ id, label, vocabulary: [...] }, ...]
+ */
+export function normaliseUnits(raw: FlashcardUnit | FlashcardUnit[]): FlashcardUnit[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  return [raw];
+}
+
+/**
+ * Extract all VocabItems from a single FlashcardRow.
+ */
+export function extractVocab(row: FlashcardRow): VocabItem[] {
+  return normaliseUnits(row.content).flatMap((u) => u.vocabulary ?? []);
+}
+
+/**
+ * Count total vocabulary words across all units in a row.
+ */
+export function countWords(row: FlashcardRow): number {
+  return extractVocab(row).length;
+}
+
+/**
+ * Normalise synonyms/antonyms: comma-string OR array → string[]
+ */
+export function toArray(val: string | string[] | undefined | null): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean);
+  return val.split(",").map((s) => s.trim()).filter(Boolean);
 }
