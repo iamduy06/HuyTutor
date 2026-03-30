@@ -64,6 +64,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
 
   return (
     <FlashcardPlayer
+      deckId={deckId}
       tabs={data.tabs}
       deckTitle={data.deck.title}
       deckDesc={data.deck.description ?? undefined}

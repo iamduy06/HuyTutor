@@ -1,14 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { LayoutDashboard, Users, BookOpen, BarChart3, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, BarChart3, ChevronRight, Import, ImportIcon } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
+import ImportExportPage from "./admin/import-export/page";
 
 const navItems = [
   { href: "/admin", label: "Tổng quan", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "Người dùng", icon: Users },
   { href: "/admin/decks", label: "Bộ đề", icon: BookOpen },
   { href: "/admin/analytics", label: "Thống kê", icon: BarChart3 },
+  { href: "/admin/import-export", label: "Nhập xuất Người dùng", icon: ImportIcon}
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

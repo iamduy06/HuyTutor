@@ -10,6 +10,7 @@ import { FACEBOOK_URL } from "@/lib/constants";
 import Link from "next/link";
 
 interface Props {
+  deckId?: string;   // undefined = demo mode, không save progress
   tabs: Tab[];
   deckTitle: string;
   deckDesc?: string;
@@ -47,7 +48,7 @@ function browserTTS(text: string) {
 
 // ── Component ────────────────────────────────────────────────────
 
-export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
+export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: Props) {
   const [currentTab,   setCurrentTab]   = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped,    setIsFlipped]    = useState(false);
@@ -58,12 +59,54 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
   const [jumpValue, setJumpValue] = useState("");
 
   const { mode } = useUIStore();
+  const seenCards = useRef<Set<string>>(new Set());
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track seen vocabulary items (word + tab combo)
+  const markSeen = useCallback((tabIdx: number, cardIdx: number) => {
+    const key = `${tabIdx}-${cardIdx}`;
+    seenCards.current.add(key);
+  }, []);
+
+  // Save progress to DB (debounced, every 3 card navigations or on unmount)
+  const saveProgress = useCallback(async () => {
+    if (!deckId || isDemo) return;
+    const totalCards = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+    if (totalCards === 0) return;
+
+    const learnedCount   = seenCards.current.size;
+    const progressPercent = Math.round((learnedCount / totalCards) * 100);
+
+    try {
+      await fetch("/api/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deck_id:          deckId,
+          learned_count:    learnedCount,
+          progress_percent: progressPercent,
+        }),
+      });
+    } catch { /* silent — non-critical */ }
+  }, [deckId, isDemo, tabs]);
+
+  // Save on unmount
+  useEffect(() => {
+    return () => { saveProgress(); };
+  }, [saveProgress]);
+
+
   const isKid = mode === "kid";
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tokenRef = useRef(0);
 
   const vocabulary: VocabItem[] = tabs[currentTab]?.vocabulary ?? [];
+
+  // Mark first card as seen on mount
+  useEffect(() => {
+    if (vocabulary.length > 0) markSeen(0, 0);
+  }, []); // eslint-disable-line
   const vocab = vocabulary[currentIndex];
 
   // ── TTS ──
@@ -109,23 +152,32 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
   }, [currentIndex, currentTab]); // eslint-disable-line
 
   function nextCard() {
+    const next = (currentIndex + 1) % vocabulary.length;
+    markSeen(currentTab, next);
     setIsFlipped(false);
-    setTimeout(() => setCurrentIndex(i => (i + 1) % vocabulary.length), 50);
+    setTimeout(() => setCurrentIndex(next), 50);
+    // Save every 5 navigations
+    if ((seenCards.current.size % 5) === 0) saveProgress();
   }
   function prevCard() {
+    const prev = (currentIndex - 1 + vocabulary.length) % vocabulary.length;
+    markSeen(currentTab, prev);
     setIsFlipped(false);
-    setTimeout(() => setCurrentIndex(i => (i - 1 + vocabulary.length) % vocabulary.length), 50);
+    setTimeout(() => setCurrentIndex(prev), 50);
   }
   function jumpToCard() {
     const n = parseInt(jumpValue);
     if (n >= 1 && n <= vocabulary.length) {
+      markSeen(currentTab, n - 1);
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex(n - 1), 50);
       setJumpValue("");
     }
   }
   function switchTab(idx: number) {
+    saveProgress(); // save khi đổi tab
     setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(true);
+    markSeen(idx, 0); // mark first card of new tab
   }
 
   if (!vocab) {
