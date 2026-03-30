@@ -1,17 +1,5 @@
 "use client";
 
-/**
- * FlashcardPlayer — port từ Embed Flashcard HTML sang React.
- *
- * Props nhận `tabs` (Tab[]) — cấu trúc giống hệt `const tabs` trong file gốc:
- *   [ { id, label, desc, vocabulary: [ { word, phonetic, ... } ] } ]
- *
- * State mapping:
- *   currentTab  ↔ currentTab (index unit đang chọn)
- *   currentIndex ↔ currentIndex (index từ trong unit đó)
- *   isFlipped   ↔ card.classList.toggle('flipped')
- */
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +16,7 @@ interface Props {
   isDemo?: boolean;
 }
 
-// ── TTS ────────────────────────────────────────────────────────────────────
+// ── TTS ─────────────────────────────────────────────────────────
 
 async function fetchDictAudio(word: string): Promise<string | null> {
   try {
@@ -57,10 +45,9 @@ function browserTTS(text: string) {
   window.speechSynthesis.speak(u);
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── Component ────────────────────────────────────────────────────
 
 export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
-  // Giống const state trong HTML gốc:
   const [currentTab,   setCurrentTab]   = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped,    setIsFlipped]    = useState(false);
@@ -73,14 +60,13 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
   const { mode } = useUIStore();
   const isKid = mode === "kid";
 
-  const audioRef  = useRef<HTMLAudioElement | null>(null);
-  const tokenRef  = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tokenRef = useRef(0);
 
-  // Vocabulary của tab đang chọn
   const vocabulary: VocabItem[] = tabs[currentTab]?.vocabulary ?? [];
   const vocab = vocabulary[currentIndex];
 
-  // ── speakWord (giống speakWord trong HTML) ──
+  // ── TTS ──
   const speakWord = useCallback(async (text?: string) => {
     const raw = (text ?? vocab?.word ?? "").split("/")[0].replace(/[()]/g, "").trim();
     if (!raw) return;
@@ -116,14 +102,12 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
     } catch { fallback(); }
   }, [vocab?.word]);
 
-  // Tự động phát sau khi chuyển card (giống HTML gốc: if (!isFirstLoad) setTimeout(speakWord, 300))
   useEffect(() => {
     if (isFirstLoad) { setIsFirstLoad(false); return; }
     const t = setTimeout(() => speakWord(), 300);
     return () => clearTimeout(t);
-  }, [currentIndex, currentTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentIndex, currentTab]); // eslint-disable-line
 
-  // ── nextCard / previousCard ──
   function nextCard() {
     setIsFlipped(false);
     setTimeout(() => setCurrentIndex(i => (i + 1) % vocabulary.length), 50);
@@ -132,8 +116,6 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
     setIsFlipped(false);
     setTimeout(() => setCurrentIndex(i => (i - 1 + vocabulary.length) % vocabulary.length), 50);
   }
-
-  // ── jumpToCard ──
   function jumpToCard() {
     const n = parseInt(jumpValue);
     if (n >= 1 && n <= vocabulary.length) {
@@ -142,18 +124,13 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
       setJumpValue("");
     }
   }
-
-  // ── switchTab (giống switchTab trong HTML) ──
   function switchTab(idx: number) {
-    setCurrentTab(idx);
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    setIsFirstLoad(true);   // không tự phát khi đổi tab
+    setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(true);
   }
 
   if (!vocab) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
+      <div className={cn("flex items-center justify-center py-20 text-muted-foreground", isKid && "kid-mode")}>
         Không có từ vựng nào trong bộ đề này.
       </div>
     );
@@ -163,38 +140,42 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
   const antonyms = toArray(vocab.antonyms);
 
   return (
-    <div className={cn("flex flex-1 min-h-0", isKid && "kid-mode")}>
+    <div className={cn("flex flex-1 min-h-0 relative", isKid && "kid-mode")}>
 
-      {/* ── LEFT SIDEBAR (danh sách unit) ── */}
+      {/* ── LEFT SIDEBAR ── */}
       <nav className={cn(
         "hidden md:flex flex-col bg-white border-r-2 border-[#f0e0e7] flex-shrink-0",
         "sticky top-0 h-[calc(100vh-62px)] overflow-hidden transition-all duration-300",
-        "shadow-[2px_0_12px_rgba(0,0,0,0.06)]",
         leftCollapsed ? "w-[52px]" : "w-[230px]"
       )}>
         <div className="flex items-center justify-between p-4 border-b-2 border-[#f0e0e7] flex-shrink-0">
           {!leftCollapsed && (
-            <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📚 Danh sách Unit</span>
+            <span className={cn("font-extrabold text-[1.05em] whitespace-nowrap",
+              isKid ? "text-purple-600 text-lg" : "text-brand")}>
+              {isKid ? "🎯 Chủ đề" : "📚 Danh sách Unit"}
+            </span>
           )}
           <button onClick={() => setLeftCollapsed(v => !v)}
-            className="bg-none border-none cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light ml-auto flex-shrink-0">
+            className="cursor-pointer text-brand text-xl p-1 rounded-lg hover:bg-brand-light ml-auto flex-shrink-0">
             {leftCollapsed ? "▶" : "◀"}
           </button>
         </div>
-
         <div className="overflow-y-auto flex-1 py-2">
           {tabs.map((tab, i) => (
             <button key={tab.id ?? i} onClick={() => switchTab(i)} title={tab.label}
               className={cn(
-                "flex items-center gap-2.5 w-full bg-none border-none py-3 px-3.5 text-left cursor-pointer",
-                "font-semibold text-sm text-[#495057] transition-all border-l-[3px] whitespace-nowrap overflow-hidden",
+                "flex items-center gap-2.5 w-full py-3 px-3.5 text-left cursor-pointer",
+                "font-semibold text-sm transition-all border-l-[3px] whitespace-nowrap overflow-hidden",
+                isKid ? "text-base" : "text-[#495057]",
                 i === currentTab
-                  ? "bg-brand-light text-brand border-brand"
-                  : "border-transparent hover:bg-pink-50 hover:text-brand"
+                  ? cn("border-brand", isKid ? "kid-word-item active" : "bg-brand-light text-brand")
+                  : cn("border-transparent", isKid ? "kid-word-item hover:text-purple-600" : "hover:bg-pink-50 hover:text-brand")
               )}>
               <span className={cn(
                 "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
-                i === currentTab ? "bg-brand text-white" : "bg-gray-100 text-gray-500"
+                i === currentTab
+                  ? isKid ? "bg-white text-purple-600 shadow" : "bg-brand text-white"
+                  : isKid ? "bg-purple-100 text-purple-600" : "bg-gray-100 text-gray-500"
               )}>{i + 1}</span>
               {!leftCollapsed && <span className="truncate">{tab.label ?? `Unit ${i + 1}`}</span>}
             </button>
@@ -207,117 +188,163 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
         <div className="flex-1 flex flex-col items-center px-4 md:px-[5%] py-8">
 
           {/* Title */}
-          <h1 className={cn("font-extrabold mb-1.5 text-center text-brand",
-            isKid ? "text-4xl" : "text-[2em]")}>
+          <h1 className={cn(
+            "font-extrabold mb-1.5 text-center",
+            isKid ? "text-5xl kid-header" : "text-[2em] text-brand"
+          )}>
             {tabs[currentTab]?.label ?? deckTitle}
           </h1>
           {(tabs[currentTab]?.desc ?? deckDesc) && (
-            <p className="text-muted-foreground text-sm mb-5 text-center italic">
+            <p className={cn("text-sm mb-5 text-center italic",
+              isKid ? "text-purple-500 text-base font-semibold" : "text-muted-foreground")}>
               {tabs[currentTab]?.desc ?? deckDesc}
             </p>
           )}
 
           {isDemo && (
-            <div className="mb-4 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700 text-center">
-              🎯 Bản demo — tối đa 10 từ.{" "}
-              <Link href="/login" className="font-bold text-brand underline">Đăng nhập</Link>
-              {" "}để học đầy đủ.
+            <div className={cn("mb-4 px-4 py-2 rounded-xl text-sm text-center",
+              isKid
+                ? "bg-yellow-50 border-2 border-yellow-300 text-yellow-700 font-bold text-base"
+                : "bg-yellow-50 border border-yellow-200 text-yellow-700")}>
+              {isKid ? "🎁 Bản thử — " : "🎯 Bản demo — "}
+              tối đa 10 từ.{" "}
+              <Link href="/login" className={cn("font-bold underline", isKid ? "text-purple-600" : "text-brand")}>
+                Đăng nhập
+              </Link>{" "}để học đầy đủ.
             </div>
           )}
 
           <div className="w-full max-w-[860px]">
 
-            {/* ── FLASHCARD (giống .card trong HTML) ── */}
-            <div className={cn("card-scene mb-6 cursor-pointer", isKid ? "h-[500px]" : "h-[460px]")}
+            {/* ── CARD ── */}
+            <div className={cn(
+                "card-scene mb-6 cursor-pointer relative",
+                isKid ? "h-[520px]" : "h-[460px]"
+              )}
               onClick={() => setIsFlipped(v => !v)}>
               <div className={cn("card-inner w-full h-full", isFlipped && "flipped")}>
 
                 {/* Front */}
                 <div className={cn(
-                  "card-face bg-white border-2 border-[#e9ecef]",
-                  "shadow-[0_5px_20px_rgba(0,0,0,0.1)]",
-                  "flex flex-col items-center justify-center p-8 gap-2",
-                  isKid ? "rounded-3xl" : "rounded-[20px]"
+                  "card-face flex flex-col items-center justify-center p-8 gap-3",
+                  isKid ? "rounded-[28px]" : "rounded-[20px] bg-white border-2 border-[#e9ecef] shadow-[0_5px_20px_rgba(0,0,0,0.1)]"
                 )}>
-                  {/* CEFR badge */}
                   {vocab.cefr && (
-                    <span className={cn("text-xs font-bold px-3 py-1 rounded-full mb-1",
-                      getCefrColor(vocab.cefr))}>
+                    <span className={cn(
+                      "font-bold px-3 py-1 rounded-full",
+                      isKid ? "kid-cefr text-base" : "text-xs",
+                      getCefrColor(vocab.cefr)
+                    )}>
                       {vocab.cefr}
                     </span>
                   )}
-                  {/* Word */}
-                  <div className={cn("font-extrabold text-brand text-center leading-tight",
-                    isKid ? "text-6xl" : "text-[2.8em]")}>
+
+                  <div className={cn(
+                    "font-extrabold text-center leading-tight",
+                    isKid ? "kid-word" : "text-[2.8em] text-brand"
+                  )}>
                     {vocab.word}
                   </div>
-                  {/* Phonetic */}
+
                   {vocab.phonetic && (
-                    <div className="text-muted-foreground text-xl">{vocab.phonetic}</div>
+                    <div className={cn(
+                      "text-center",
+                      isKid ? "kid-phonetic" : "text-muted-foreground text-xl"
+                    )}>
+                      {vocab.phonetic}
+                    </div>
                   )}
-                  {/* Audio button */}
+
                   <button onClick={e => { e.stopPropagation(); speakWord(); }}
-                    className="text-[2em] cursor-pointer p-2 transition-transform hover:scale-110"
-                    aria-label="Phát âm">
+                    className={cn(
+                      "cursor-pointer p-2 transition-transform hover:scale-110",
+                      isKid ? "text-5xl" : "text-[2em]"
+                    )}>
                     {audioLoading
-                      ? <Loader2 className="w-8 h-8 animate-spin text-brand" />
+                      ? <Loader2 className={cn("animate-spin text-brand", isKid ? "w-12 h-12" : "w-8 h-8")} />
                       : "🔊"}
                   </button>
-                  <div className="text-muted-foreground text-sm italic">Nhấn để xem nghĩa</div>
+
+                  <div className={cn(isKid ? "kid-hint" : "text-muted-foreground text-sm italic")}>
+                    {isKid ? "👆 Nhấn để lật thẻ!" : "Nhấn để xem nghĩa"}
+                  </div>
                 </div>
 
                 {/* Back */}
                 <div className={cn(
-                  "card-face card-back bg-brand text-white overflow-y-auto",
-                  "shadow-[0_5px_20px_rgba(0,0,0,0.1)]",
+                  "card-face card-back overflow-y-auto",
                   "flex flex-col items-center justify-center p-8",
-                  isKid ? "rounded-3xl" : "rounded-[20px]"
+                  isKid ? "rounded-[28px]" : "rounded-[20px] bg-brand text-white shadow-[0_5px_20px_rgba(0,0,0,0.1)]",
+                  "text-white"
                 )}>
                   <div className="flex flex-col items-center gap-3 w-full text-center">
-                    {/* Meaning */}
-                    <div className={cn("font-extrabold leading-tight",
-                      isKid ? "text-4xl" : "text-[1.8em]")}>
+                    <div className={cn(
+                      "font-extrabold leading-tight",
+                      isKid ? "kid-meaning" : "text-[1.8em]"
+                    )}>
                       {vocab.meaning}
                     </div>
-                    {/* Type */}
+
                     {vocab.type && (
-                      <div className="text-sm bg-white/25 px-4 py-1 rounded-full font-semibold">
+                      <div className={cn(
+                        "bg-white/25 px-4 py-1 rounded-full font-semibold",
+                        isKid ? "text-lg" : "text-sm"
+                      )}>
                         {vocab.type}
                       </div>
                     )}
+
                     <div className="w-12 h-0.5 bg-white/40 rounded" />
-                    {/* Example */}
+
                     {vocab.example && (
-                      <div className="flex items-start gap-2 max-w-[90%] text-sm leading-relaxed">
-                        <div className="flex-1 text-left">
-                          <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Ví dụ</span>
+                      <div className="flex items-start gap-2 max-w-[90%]">
+                        <div className={cn("flex-1 text-left leading-relaxed", isKid ? "text-lg" : "text-sm")}>
+                          <span className={cn(
+                            "font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5",
+                            isKid ? "text-sm" : "text-xs"
+                          )}>Ví dụ</span>
                           {vocab.example}
                         </div>
                         <button onClick={e => { e.stopPropagation(); speakWord(vocab.example); }}
                           className="flex-shrink-0 p-1 rounded-full hover:bg-white/20">
-                          <Volume2 className="w-4 h-4" />
+                          <Volume2 className={isKid ? "w-6 h-6" : "w-4 h-4"} />
                         </button>
                       </div>
                     )}
-                    {/* Translation */}
+
                     {vocab.translation && (
-                      <div className="max-w-[90%] text-sm italic opacity-90">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs not-italic">Dịch</span>
+                      <div className={cn(
+                        "max-w-[90%] italic opacity-90",
+                        isKid ? "text-lg" : "text-sm"
+                      )}>
+                        <span className={cn(
+                          "font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 not-italic",
+                          isKid ? "text-sm" : "text-xs"
+                        )}>Dịch</span>
                         {vocab.translation}
                       </div>
                     )}
-                    <div className="w-12 h-0.5 bg-white/40 rounded" />
-                    {/* Synonyms */}
+
+                    {(synonyms.length > 0 || antonyms.length > 0) && (
+                      <div className="w-12 h-0.5 bg-white/40 rounded" />
+                    )}
+
                     {synonyms.length > 0 && (
-                      <div className="max-w-[90%] text-sm">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Đồng nghĩa</span>
+                      <div className={cn("max-w-[90%]", isKid ? "text-lg" : "text-sm")}>
+                        <span className={cn(
+                          "font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5",
+                          isKid ? "text-sm" : "text-xs"
+                        )}>Đồng nghĩa</span>
                         {synonyms.join(", ")}
                       </div>
                     )}
-                    {/* Antonyms */}
+
                     {antonyms.length > 0 && (
-                      <div className="max-w-[90%] text-sm">
-                        <span className="font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5 text-xs">Trái nghĩa</span>
+                      <div className={cn("max-w-[90%]", isKid ? "text-lg" : "text-sm")}>
+                        <span className={cn(
+                          "font-bold bg-white/20 px-2 py-0.5 rounded-lg mr-1.5",
+                          isKid ? "text-sm" : "text-xs"
+                        )}>Trái nghĩa</span>
                         {antonyms.join(", ")}
                       </div>
                     )}
@@ -326,42 +353,74 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
               </div>
             </div>
 
-            {/* ── Controls (← Trước / Tiếp →) ── */}
+            {/* ── Controls ── */}
             <div className="flex justify-center gap-4 mt-2">
-              <Button variant="brand" size="pill" onClick={prevCard}>
-                <ChevronLeft className="w-5 h-5" /> Trước
+              <Button
+                onClick={prevCard}
+                className={cn(isKid ? "kid-btn bg-brand hover:bg-brand-dark text-white" : "")}
+                variant={isKid ? undefined : "brand"} size={isKid ? undefined : "pill"}
+              >
+                <ChevronLeft className={isKid ? "w-6 h-6" : "w-5 h-5"} />
+                {isKid ? "◀ Trước" : "Trước"}
               </Button>
-              <Button variant="brand" size="pill" onClick={nextCard}>
-                Tiếp <ChevronRight className="w-5 h-5" />
+              <Button
+                onClick={nextCard}
+                className={cn(isKid ? "kid-btn bg-brand hover:bg-brand-dark text-white" : "")}
+                variant={isKid ? undefined : "brand"} size={isKid ? undefined : "pill"}
+              >
+                {isKid ? "Tiếp ▶" : "Tiếp"}
+                <ChevronRight className={isKid ? "w-6 h-6" : "w-5 h-5"} />
               </Button>
             </div>
 
             {/* Counter */}
-            <div className="text-center text-[#495057] font-semibold text-lg mt-4">
-              Thẻ {currentIndex + 1} / {vocabulary.length}
+            <div className={cn(
+              "text-center font-semibold mt-4",
+              isKid ? "kid-counter" : "text-lg text-[#495057]"
+            )}>
+              {isKid ? `🃏 Thẻ ${currentIndex + 1} / ${vocabulary.length}` : `Thẻ ${currentIndex + 1} / ${vocabulary.length}`}
             </div>
 
-            {/* Jump to card */}
+            {/* Jump */}
             <div className="flex items-center justify-center gap-2.5 mt-3 flex-wrap">
-              <label className="text-[#495057] font-semibold text-sm">Đi đến thẻ:</label>
+              <label className={cn(
+                "font-semibold",
+                isKid ? "text-purple-600 text-base" : "text-[#495057] text-sm"
+              )}>
+                {isKid ? "🔢 Đến thẻ số:" : "Đi đến thẻ:"}
+              </label>
               <input
                 type="number" min={1} max={vocabulary.length}
-                value={jumpValue}
-                placeholder="..."
+                value={jumpValue} placeholder="..."
                 onChange={e => setJumpValue(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") jumpToCard(); }}
-                className="w-16 px-3 py-2 border-2 border-brand rounded-lg text-sm font-semibold text-center text-brand outline-none focus:ring-2 focus:ring-brand/30"
+                className={cn(
+                  "px-3 py-2 border-2 rounded-xl font-bold text-center outline-none",
+                  isKid
+                    ? "w-20 text-lg border-purple-400 text-purple-600 focus:ring-2 focus:ring-purple-300"
+                    : "w-16 text-sm border-brand text-brand focus:ring-2 focus:ring-brand/30"
+                )}
               />
-              <Button variant="brand" size="sm" onClick={jumpToCard}>Đi</Button>
+              <Button
+                onClick={jumpToCard}
+                className={cn(isKid ? "kid-btn bg-brand hover:bg-brand-dark text-white h-auto py-2 px-6" : "")}
+                variant={isKid ? undefined : "brand"} size={isKid ? undefined : "sm"}
+              >
+                Đi
+              </Button>
             </div>
-            <div className="text-center text-muted-foreground text-sm mt-2">
-              💡 Nhấn vào thẻ để lật
+
+            <div className={cn(
+              "text-center mt-2",
+              isKid ? "kid-hint" : "text-muted-foreground text-sm"
+            )}>
+              {isKid ? "✨ Chạm vào thẻ để lật!" : "💡 Nhấn vào thẻ để lật"}
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="text-center py-4 px-4 text-[#adb5bd] text-xs border-t-2 border-[#f0e0e7] bg-white">
+        <footer className="text-center py-4 px-4 text-[#adb5bd] text-xs border-t-2 border-[#f0e0e7] bg-white/80">
           © Bản quyền thuộc về <strong className="text-[#1a1a2e]">Huy Tutor</strong>
           &nbsp;|&nbsp;
           <a href="https://www.huytutor.io.vn/" target="_blank" rel="noreferrer"
@@ -371,11 +430,10 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
         </footer>
       </div>
 
-      {/* ── RIGHT SIDEBAR (danh sách từ) ── */}
+      {/* ── RIGHT SIDEBAR ── */}
       <aside className={cn(
         "hidden md:flex flex-col bg-white border-l-2 border-[#f0e0e7] flex-shrink-0",
         "sticky top-0 h-[calc(100vh-62px)] overflow-hidden transition-all duration-300",
-        "shadow-[-2px_0_12px_rgba(0,0,0,0.06)]",
         rightCollapsed ? "w-10" : "w-[280px]"
       )}>
         <div className="flex items-center gap-2 p-4 border-b-2 border-[#f0e0e7] flex-shrink-0">
@@ -384,7 +442,10 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
             {rightCollapsed ? "◀" : "▶"}
           </button>
           {!rightCollapsed && (
-            <span className="text-brand font-extrabold text-[1.05em] whitespace-nowrap">📋 Danh sách từ</span>
+            <span className={cn("font-extrabold whitespace-nowrap",
+              isKid ? "text-purple-600 text-base" : "text-brand text-[1.05em]")}>
+              {isKid ? "📝 Từ trong bài" : "📋 Danh sách từ"}
+            </span>
           )}
         </div>
 
@@ -395,19 +456,27 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo }: Props) {
                 onClick={() => { setIsFlipped(false); setTimeout(() => setCurrentIndex(i), 50); }}
                 className={cn(
                   "p-2.5 rounded-xl cursor-pointer transition-all border-2 flex items-center gap-2.5 mb-2",
+                  isKid ? "kid-word-item" : "",
                   i === currentIndex
-                    ? "bg-brand text-white border-brand"
-                    : "bg-[#f8f9fa] border-transparent hover:bg-[#ffe5ed] hover:border-brand"
+                    ? cn("border-brand", isKid ? "kid-word-item active" : "bg-brand text-white")
+                    : "bg-[#f8f9fa] border-transparent"
                 )}>
                 <div className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0",
-                  i === currentIndex ? "bg-white text-brand" : "bg-brand text-white"
+                  i === currentIndex
+                    ? isKid ? "bg-white text-purple-600 shadow" : "bg-white text-brand"
+                    : isKid ? "bg-purple-100 text-purple-600" : "bg-brand text-white"
                 )}>{i + 1}</div>
-                <span className="font-semibold text-sm flex-1 truncate">{v.word}</span>
+                <span className={cn(
+                  "font-semibold flex-1 truncate",
+                  isKid ? "text-base" : "text-sm",
+                  i === currentIndex && !isKid ? "text-white" : ""
+                )}>{v.word}</span>
                 {v.cefr && (
                   <span className={cn(
-                    "text-[0.7rem] px-1.5 py-0.5 rounded font-bold flex-shrink-0",
-                    i === currentIndex ? "bg-white/20 text-white" : getCefrColor(v.cefr)
+                    "font-bold flex-shrink-0 px-1.5 py-0.5 rounded",
+                    isKid ? "text-xs" : "text-[0.7rem]",
+                    i === currentIndex && !isKid ? "bg-white/20 text-white" : getCefrColor(v.cefr)
                   )}>{v.cefr}</span>
                 )}
               </div>

@@ -1,16 +1,13 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-let _client: ReturnType<typeof createBrowserClient> | null = null;
-
 /**
- * Singleton browser Supabase client.
- * Uses document.cookie automatically via @supabase/ssr.
+ * Tạo Supabase browser client.
+ * KHÔNG dùng singleton module-level — gây stale state khi navigate giữa layouts.
+ * createBrowserClient() tự deduplicate internal connections nên gọi nhiều lần vẫn OK.
  */
 export function createClient() {
-  if (_client) return _client;
-  _client = createBrowserClient(
+  return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  return _client;
 }
