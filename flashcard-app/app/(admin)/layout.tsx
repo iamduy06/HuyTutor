@@ -1,16 +1,18 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { LayoutDashboard, Users, BookOpen, BarChart3, ChevronRight, Import, ImportIcon } from "lucide-react";
+import {
+  LayoutDashboard, Users, BookOpen,
+  BarChart3, ChevronRight, ArrowLeftRight
+} from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
-import ImportExportPage from "./admin/import-export/page";
 
 const navItems = [
-  { href: "/admin", label: "Tổng quan", icon: LayoutDashboard, exact: true },
-  { href: "/admin/users", label: "Người dùng", icon: Users },
-  { href: "/admin/decks", label: "Bộ đề", icon: BookOpen },
-  { href: "/admin/analytics", label: "Thống kê", icon: BarChart3 },
-  { href: "/admin/import-export", label: "Nhập xuất Người dùng", icon: ImportIcon}
+  { href: "/admin",               label: "Tổng quan",     icon: LayoutDashboard },
+  { href: "/admin/users",         label: "Người dùng",    icon: Users           },
+  { href: "/admin/decks",         label: "Bộ đề",         icon: BookOpen        },
+  { href: "/admin/analytics",     label: "Thống kê",      icon: BarChart3       },
+  { href: "/admin/import-export", label: "Import/Export", icon: ArrowLeftRight  },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -18,14 +20,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase
+    .from("users").select("role").eq("id", user.id).single();
   if (profile?.role !== "ADMIN") redirect("/dashboard");
 
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
       <div className="flex flex-1">
-        {/* Admin sidebar */}
+        {/* Desktop sidebar */}
         <aside className="w-56 bg-white border-r-2 border-[#f0e0e7] flex-shrink-0 sticky top-[62px] h-[calc(100vh-62px)] hidden md:flex flex-col py-4">
           <div className="px-4 pb-3 border-b border-[#f0e0e7] mb-3">
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Admin Panel</span>
@@ -45,13 +48,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </nav>
         </aside>
 
-        {/* Mobile nav */}
+        {/* Mobile bottom nav */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-[#f0e0e7] flex">
           {navItems.map((item) => (
             <Link key={item.href} href={item.href}
               className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-semibold text-muted-foreground hover:text-brand transition-colors">
               <item.icon className="w-5 h-5" />
-              {item.label}
+              <span className="truncate text-[10px]">{item.label}</span>
             </Link>
           ))}
         </div>

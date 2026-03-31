@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { extractTabs } from "@/lib/utils";
-import type { FlashcardRow } from "@/types";
+import type { FlashcardRow, Tab } from "@/types";
 
 async function checkAdmin() {
   const supabase = createClient();
@@ -22,20 +22,22 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .from("flashcards").select("*").eq("deck_id", params.id)
     .order("created_at", { ascending: true });
 
-  // Flatten mọi format thành mảng flat words để hiển thị trong admin
-  const cards = (rows ?? []).flatMap(r => {
-    const tabs = extractTabs((r as unknown as FlashcardRow).content);
-    return tabs.flatMap(tab =>
-      (tab.vocabulary ?? []).map(v => ({
-        id: r.id,                 // row id (dùng để edit/delete)
-        deck_id: r.deck_id,
-        _tabLabel: tab.label,
-        content: v,               // flat VocabItem
-      }))
-    );
-  });
+  // Build normalized tabs from ALL rows
+  const tabs: Tab[] = (rows ?? []).flatMap(r =>
+    extractTabs((r as unknown as FlashcardRow).content)
+  );
 
-  return NextResponse.json({ deck, cards });
+  // Flat cards for display (with tabIndex tracking)
+  const cards = tabs.flatMap((tab, tabIdx) =>
+    (tab.vocabulary ?? []).map(v => ({
+      _rowId:    rows?.[0]?.id ?? "",   // for now point to first row
+      _tabIndex: tabIdx,
+      _tabLabel: tab.label ?? `Unit ${tabIdx + 1}`,
+      content:   v,
+    }))
+  );
+
+  return NextResponse.json({ deck, tabs, cards });
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {

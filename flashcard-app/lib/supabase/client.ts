@@ -1,9 +1,9 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 /**
- * Tạo Supabase browser client.
- * KHÔNG dùng singleton module-level — gây stale state khi navigate giữa layouts.
- * createBrowserClient() tự deduplicate internal connections nên gọi nhiều lần vẫn OK.
+ * Browser Supabase client cho login/logout/profile pages.
+ * UserContext dùng instance riêng trong useRef để không share state.
+ * Đây là instance độc lập, chỉ dùng cho 1-shot operations (signIn, signOut, updateUser).
  */
 export function createClient() {
   return createBrowserClient(
