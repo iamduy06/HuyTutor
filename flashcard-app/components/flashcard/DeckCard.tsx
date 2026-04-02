@@ -28,7 +28,7 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
       </div>
 
       <div className="flex-1">
-        <h3 className="font-extrabold text-[#1a1a2e] text-lg leading-tight mb-1 group-hover:text-brand transition-colors">
+        <h3 className="font-extrabold text-[#1a1a2e] text-lg leading-snug mb-1 group-hover:text-brand transition-colors" title={deck.title}>
           {deck.title}
         </h3>
         {deck.description && (

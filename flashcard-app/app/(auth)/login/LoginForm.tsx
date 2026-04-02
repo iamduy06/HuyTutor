@@ -3,18 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getDeviceId, getDeviceName } from "@/lib/device";
 
 export function LoginForm() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
+  const [blocked,  setBlocked]  = useState<{ message: string; contactUrl: string } | null>(null);
 
   const router       = useRouter();
   const searchParams = useSearchParams();
@@ -22,7 +24,7 @@ export function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setLoading(true); setBlocked(null);
 
     const supabase = createClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -33,8 +35,25 @@ export function LoginForm() {
         description: error?.message ?? "Không tạo được phiên.",
         variant: "destructive",
       });
-      setLoading(false);
-      return;
+      setLoading(false); return;
+    }
+
+    // Kiểm tra giới hạn thiết bị
+    const deviceCheck = await fetch("/api/auth/register-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_id:   getDeviceId(),
+        device_name: getDeviceName(),
+      }),
+    });
+    const deviceResult = await deviceCheck.json();
+
+    if (!deviceResult.allowed) {
+      // Sign out ngay, không cho vào
+      await supabase.auth.signOut();
+      setBlocked({ message: deviceResult.message, contactUrl: deviceResult.contactUrl });
+      setLoading(false); return;
     }
 
     toast({ title: "Đăng nhập thành công 🎉" });
@@ -47,6 +66,24 @@ export function LoginForm() {
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Đăng nhập</h1>
       <p className="text-muted-foreground text-sm mb-6">Chào mừng trở lại!</p>
+
+      {/* Device blocked message */}
+      {blocked && (
+        <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700 mb-1">Không thể đăng nhập</p>
+              <p className="text-xs text-red-600 mb-3">{blocked.message}</p>
+              <a href={blocked.contactUrl} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" />
+                Liên hệ hỗ trợ
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
@@ -75,13 +112,17 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground mt-6">
-        Chưa có tài khoản?{" "}
-        <Link href="/register" className="text-brand font-semibold hover:underline">Đăng ký</Link>
-      </p>
-      <p className="text-center text-sm text-muted-foreground mt-2">
-        <Link href="/forgot-password" className="text-muted-foreground hover:text-brand hover:underline">Quên mật khẩu?</Link>
-      </p>
+      <div className="mt-6 space-y-2 text-center text-sm">
+        <p className="text-muted-foreground">
+          Chưa có tài khoản?{" "}
+          <Link href="/register" className="text-brand font-semibold hover:underline">Đăng ký</Link>
+        </p>
+        <p>
+          <Link href="/forgot-password" className="text-muted-foreground hover:text-brand hover:underline text-xs">
+            Quên mật khẩu?
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

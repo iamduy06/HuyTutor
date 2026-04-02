@@ -3,19 +3,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { UserProvider } from "@/components/common/UserContext";
+import type { UserProfile } from "@/types";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+interface ProvidersProps {
+  children: React.ReactNode;
+  initialUser?: UserProfile | null;  // từ server-side read
+}
+
+export function Providers({ children, initialUser }: ProvidersProps) {
   const [queryClient] = useState(
     () => new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 60 * 1000, retry: 1 },
-      },
+      defaultOptions: { queries: { staleTime: 60 * 1000, retry: 1 } },
     })
   );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <UserProvider>
+      <UserProvider initialUser={initialUser ?? null}>
         {children}
       </UserProvider>
     </QueryClientProvider>

@@ -10,15 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
 
 export function SiteHeader() {
-  // user/loading từ Context — không bao giờ reset khi navigate
-  const { user, loading } = useUser();
-  const router  = useRouter();
+  const { user } = useUser(); // loading luôn false → không cần check
+  const router    = useRouter();
   const { toast } = useToast();
 
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    // Context sẽ tự reset user về null qua onAuthStateChange
     toast({ title: "Đã đăng xuất" });
     router.push("/");
     router.refresh();
@@ -36,10 +34,7 @@ export function SiteHeader() {
       <div className="flex items-center gap-2">
         <UIModeToggle />
 
-        {/* Chỉ ẩn hoàn toàn khi đang load lần đầu (< 300ms thường) */}
-        {loading ? (
-          <div className="w-24 h-8 rounded-full bg-gray-100 animate-pulse" />
-        ) : user ? (
+        {user ? (
           <>
             {user.role === "ADMIN" && (
               <Button variant="brand-outline" size="sm" asChild>

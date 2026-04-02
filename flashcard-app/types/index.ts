@@ -4,11 +4,31 @@ export type UserRole  = "USER" | "ADMIN";
 export type UIMode    = "standard" | "kid";
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
+export const CEFR_LEVELS: CefrLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+export const WORD_TYPES = [
+  "Noun",
+  "Verb",
+  "Adjective",
+  "Adverb",
+  "Phrase",
+  "Phrasal verb",
+  "Idiom",
+  "Pronoun",
+  "Preposition",
+  "Conjunction",
+  "Interjection",
+  "Determiners",
+] as const;
+
+export type WordType = typeof WORD_TYPES[number];
+
 export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
   created_at: string;
+  max_devices?: number | null;
 }
 
 // ─── Decks ─────────────────────────────────────────────────────────────────
@@ -17,23 +37,17 @@ export interface Deck {
   id: string;
   title: string;
   description: string | null;
+  /** Cefr range: "B1-C2", "A1-A2", "B2" etc — computed from level_min+level_max */
   level: string | null;
+  /** Min CEFR level (e.g. "B1") */
+  level_min?: string | null;
+  /** Max CEFR level (e.g. "C2") */
+  level_max?: string | null;
   created_at: string;
-  word_count?: number;   // tổng số từ trong tất cả tabs
+  word_count?: number;
 }
 
-// ─── JSONB Content Structure ───────────────────────────────────────────────
-//
-// Mỗi deck có 1 row trong bảng flashcards.
-// content = { tabs: Tab[] }
-//
-// Tab tương đương với const tabs trong file Embed Flashcard:
-//   { id, label, desc, vocabulary: VocabItem[] }
-//
-// Backward-compat: content có thể là:
-//   A) { tabs: [...] }          ← chuẩn mới
-//   B) { id, label, vocabulary } ← unit đơn (legacy)
-//   C) [{ id, label, vocabulary }, ...] ← mảng unit (legacy)
+// ─── JSONB Content ─────────────────────────────────────────────────────────
 
 export interface VocabItem {
   word: string;
@@ -54,12 +68,10 @@ export interface Tab {
   vocabulary: VocabItem[];
 }
 
-/** Wrapper dạng chuẩn mới */
 export interface DeckContent {
   tabs: Tab[];
 }
 
-/** Raw row từ DB */
 export interface FlashcardRow {
   id: string;
   deck_id: string;
@@ -67,7 +79,7 @@ export interface FlashcardRow {
   created_at: string;
 }
 
-// ─── User ↔ Deck ───────────────────────────────────────────────────────────
+// ─── User-Deck progress ────────────────────────────────────────────────────
 
 export interface UserDeck {
   id: string;
@@ -76,18 +88,32 @@ export interface UserDeck {
   progress_percent: number;
   learned_count: number;
   streak: number;
-  /** NULL = không hết hạn (có thể học mãi mãi) */
   expired_at: string | null;
-  last_studied_at?: string | null;
+  last_studied_at: string | null;
   deck?: Deck;
 }
 
-// ─── Admin ─────────────────────────────────────────────────────────────────
+// ─── Devices ───────────────────────────────────────────────────────────────
 
-export interface AdminUser {
+export interface UserDevice {
   id: string;
-  email: string;
-  role: UserRole;
+  user_id: string;
+  device_id: string;
+  device_name: string | null;
+  ip_address: string | null;
+  last_seen: string;
   created_at: string;
-  user_decks?: UserDeck[];
+}
+
+export interface AppSettings {
+  global_max_devices: number;
+}
+
+// ─── Flashcard learning state ──────────────────────────────────────────────
+
+export interface Flashcard {
+  id: string;
+  deck_id: string;
+  content: VocabItem;
+  order_index?: number;
 }

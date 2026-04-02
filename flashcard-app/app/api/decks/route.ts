@@ -8,12 +8,11 @@ export async function GET() {
 
   const { data: decks, error } = await supabase
     .from("decks")
-    .select("id, title, description, level, created_at")
+    .select("id, title, description, level, level_min, level_max, created_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Lấy word count cho mỗi deck
   const { data: cards } = await supabase
     .from("flashcards")
     .select("deck_id, content");
@@ -25,10 +24,18 @@ export async function GET() {
     wordCountMap[c.deck_id] = (wordCountMap[c.deck_id] ?? 0) + count;
   });
 
-  const result = (decks ?? []).map(d => ({
+  const result = (decks ?? []).map((d: any) => ({
     ...d,
     word_count: wordCountMap[d.id] ?? 0,
+    // Compute display level string
+    level: computeLevelStr(d.level_min, d.level_max) ?? d.level,
   }));
 
   return NextResponse.json({ decks: result });
+}
+
+function computeLevelStr(min: string | null, max: string | null): string | null {
+  if (!min && !max) return null;
+  if (min && max && min !== max) return `${min} - ${max}`;
+  return min ?? max;
 }

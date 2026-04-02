@@ -2,50 +2,83 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, RefreshCw, Trash2, UserPlus, BookOpen, Loader2, Copy, Check } from "lucide-react";
+import {
+  Plus, RefreshCw, Trash2, BookOpen, Loader2,
+  Copy, Check, ChevronDown, X, Calendar
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { formatDate } from "@/lib/utils";
 
-interface UserData {
-  id: string; email: string; role: string; created_at: string;
-  user_decks?: { id: string; deck_id: string; expired_at: string | null; deck?: { title: string } }[];
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface UserDeckItem {
+  id: string;
+  deck_id: string;
+  expired_at: string | null;
+  deck?: { title: string };
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+  user_decks?: UserDeckItem[];
+}
+
+interface DeckItem {
+  id: string;
+  title: string;
+  level?: string | null;
+  word_count?: number;
+}
+
+// ─── API helpers ─────────────────────────────────────────────────────────────
 async function fetchUsers(): Promise<UserData[]> {
   const res = await fetch("/api/admin/users");
   if (!res.ok) throw new Error("Failed");
-  const data = await res.json();
-  return data.users ?? [];
+  return (await res.json()).users ?? [];
 }
 
-async function fetchDecks() {
-  const res = await fetch("/api/decks");
-  const data = await res.json();
-  return data.decks ?? [];
+// Dùng admin route để lấy TẤT CẢ decks kể cả mới thêm
+async function fetchDecks(): Promise<DeckItem[]> {
+  const res = await fetch("/api/admin/decks");
+  if (!res.ok) throw new Error("Failed");
+  return (await res.json()).decks ?? [];
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
-  const [showAssign, setShowAssign] = useState<string | null>(null);
-  const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState("USER");
-  const [tempPw, setTempPw] = useState("");
-  const [copied, setCopied] = useState(false);
+
+  const [search,       setSearch]       = useState("");
+  const [showCreate,   setShowCreate]   = useState(false);
+  const [showAssign,   setShowAssign]   = useState<string | null>(null);  // userId
+  const [showDecks,    setShowDecks]    = useState<UserData | null>(null); // user detail
+  const [newEmail,     setNewEmail]     = useState("");
+  const [newRole,      setNewRole]      = useState("USER");
+  const [tempPw,       setTempPw]       = useState("");
+  const [copied,       setCopied]       = useState(false);
   const [assignDeckId, setAssignDeckId] = useState("");
   const [assignExpiry, setAssignExpiry] = useState("");
-  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvFile,      setCsvFile]      = useState<File | null>(null);
 
-  const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: fetchUsers });
-  const { data: decks = [] } = useQuery({ queryKey: ["decks"], queryFn: fetchDecks });
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["admin-users"], queryFn: fetchUsers,
+  });
+  const { data: decks = [] } = useQuery({
+    queryKey: ["admin-decks-list"], queryFn: fetchDecks,
+  });
 
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const createUser = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: string }) => {
       const res = await fetch("/api/admin/users", {
@@ -73,7 +106,7 @@ export default function AdminUsersPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: `Mật khẩu mới: ${data.tempPassword}`, description: "Hãy copy và gửi cho người dùng" });
+      toast({ title: `Mật khẩu mới: ${data.tempPassword}`, description: "Copy và gửi cho người dùng" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -83,12 +116,15 @@ export default function AdminUsersPage() {
       const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast({ title: "Đã xóa người dùng" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã xóa người dùng" });
+    },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
   const assignDeck = useMutation({
-    mutationFn: async ({ userId, deckId, expiredAt }: any) => {
+    mutationFn: async ({ userId, deckId, expiredAt }: { userId: string; deckId: string; expiredAt: string }) => {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
@@ -99,6 +135,26 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       setShowAssign(null); setAssignDeckId(""); setAssignExpiry("");
       toast({ title: "Giao bộ đề thành công!" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+  const revokeDeck = useMutation({
+    mutationFn: async ({ userId, deckId }: { userId: string; deckId: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke_deck", deck_id: deckId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      // Update the showDecks state to reflect removal
+      setShowDecks(prev => prev ? {
+        ...prev,
+        user_decks: prev.user_decks?.filter(ud => ud.deck_id !== revokeDeck.variables?.deckId)
+      } : prev);
+      toast({ title: "Đã thu hồi bộ đề" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -119,14 +175,27 @@ export default function AdminUsersPage() {
           }
         }
         qc.invalidateQueries({ queryKey: ["admin-users"] });
-        toast({ title: `Đã import ${rows.length} người dùng` });
+        toast({ title: `Đã import ${rows.filter((r: any) => r.email).length} người dùng` });
         setCsvFile(null);
       },
     });
   };
 
-  const filtered = users.filter((u) => u.email.toLowerCase().includes(search.toLowerCase()));
+  const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
 
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString("vi-VN");
+  }
+
+  function openAssign(userId: string) {
+    setAssignDeckId(""); setAssignExpiry("");
+    setShowAssign(userId);
+  }
+
+  // Decks đã gán cho user đang xem
+  const assignedUser = users.find(u => u.id === showAssign);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -134,7 +203,7 @@ export default function AdminUsersPage() {
         <div className="flex gap-2 flex-wrap">
           <label className="cursor-pointer">
             <input type="file" accept=".csv" className="hidden"
-              onChange={(e) => { setCsvFile(e.target.files?.[0] || null); }} />
+              onChange={e => setCsvFile(e.target.files?.[0] ?? null)} />
             <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-[#f0e0e7] text-sm font-semibold hover:border-brand hover:text-brand transition-all cursor-pointer">
               📂 Import CSV
             </span>
@@ -150,7 +219,8 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <Input placeholder="🔍 Tìm theo email..." value={search} onChange={(e) => setSearch(e.target.value)} className="mb-4 max-w-sm" />
+      <Input placeholder="🔍 Tìm theo email..." value={search}
+        onChange={e => setSearch(e.target.value)} className="mb-4 max-w-sm" />
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
@@ -168,43 +238,53 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => (
-                  <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
-                    <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px] truncate">{u.email}</td>
-                    <td className="p-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-brand-light text-brand"
-                      }`}>{u.role}</span>
-                    </td>
-                    <td className="p-3 text-muted-foreground text-xs">{new Date(u.created_at).toLocaleDateString("vi-VN")}</td>
-                    <td className="p-3 text-xs text-muted-foreground">
-                      {(u.user_decks ?? []).length > 0
-                        ? (u.user_decks ?? []).map((ud) => (
-                          <span key={ud.id} className="inline-block bg-brand-light text-brand rounded px-1.5 py-0.5 mr-1 mb-1 text-xs font-semibold">
-                            {ud.deck?.title ?? "?"}
-                            {ud.expired_at && <span className="text-[10px] ml-1 opacity-70">({new Date(ud.expired_at).toLocaleDateString("vi-VN")})</span>}
-                          </span>
-                        ))
-                        : <span className="text-muted-foreground">Chưa có</span>
-                      }
-                    </td>
-                    <td className="p-3">
-                      <div className="flex gap-1.5 flex-wrap">
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setShowAssign(u.id)}>
-                          <BookOpen className="w-3 h-3" /> Giao đề
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => resetPw.mutate(u.id)}
-                          disabled={resetPw.isPending}>
-                          <RefreshCw className="w-3 h-3" /> Reset PW
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500 hover:text-red-600"
-                          onClick={() => { if (confirm("Xóa user này?")) deleteUser.mutate(u.id); }}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(u => {
+                  const deckCount = u.user_decks?.length ?? 0;
+                  return (
+                    <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
+                      <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px] truncate">{u.email}</td>
+                      <td className="p-3">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-brand-light text-brand"
+                        }`}>{u.role}</span>
+                      </td>
+                      <td className="p-3 text-muted-foreground text-xs">{fmtDate(u.created_at)}</td>
+
+                      {/* Bộ đề: chỉ hiện số, click để xem chi tiết */}
+                      <td className="p-3">
+                        {deckCount === 0 ? (
+                          <span className="text-xs text-muted-foreground">Chưa có</span>
+                        ) : (
+                          <button
+                            onClick={() => setShowDecks(u)}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand bg-brand-light px-2.5 py-1 rounded-full hover:bg-brand hover:text-white transition-all"
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            {deckCount} bộ đề
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="p-3">
+                        <div className="flex gap-1.5 flex-wrap">
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                            onClick={() => openAssign(u.id)}>
+                            <BookOpen className="w-3 h-3" /> Giao đề
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                            onClick={() => resetPw.mutate(u.id)} disabled={resetPw.isPending}>
+                            <RefreshCw className="w-3 h-3" /> Reset PW
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
+                            onClick={() => { if (confirm("Xóa user này?")) deleteUser.mutate(u.id); }}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filtered.length === 0 && (
                   <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Không tìm thấy người dùng</td></tr>
                 )}
@@ -214,7 +294,7 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Create user dialog */}
+      {/* ════ Dialog: Tạo user ════ */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader><DialogTitle>Tạo người dùng mới</DialogTitle></DialogHeader>
@@ -222,8 +302,11 @@ export default function AdminUsersPage() {
             <div className="space-y-3">
               <p className="text-sm text-green-700 font-semibold">✅ Tạo thành công! Mật khẩu tạm thời:</p>
               <div className="flex items-center gap-2 bg-[#f8f9fa] border rounded-lg p-3">
-                <code className="flex-1 font-mono text-brand font-bold">{tempPw}</code>
-                <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(tempPw); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                <code className="flex-1 font-mono text-brand font-bold text-lg">{tempPw}</code>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  navigator.clipboard.writeText(tempPw);
+                  setCopied(true); setTimeout(() => setCopied(false), 2000);
+                }}>
                   {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                 </Button>
               </div>
@@ -232,17 +315,24 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div><Label>Email</Label><Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1" /></div>
+              <div>
+                <Label>Email</Label>
+                <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1" />
+              </div>
               <div>
                 <Label>Role</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="USER">USER</SelectItem><SelectItem value="ADMIN">ADMIN</SelectItem></SelectContent>
+                  <SelectContent>
+                    <SelectItem value="USER">USER</SelectItem>
+                    <SelectItem value="ADMIN">ADMIN</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
-                <Button variant="brand" onClick={() => createUser.mutate({ email: newEmail, role: newRole })} disabled={createUser.isPending || !newEmail}>
+                <Button variant="brand" disabled={createUser.isPending || !newEmail}
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole })}>
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
                 </Button>
               </DialogFooter>
@@ -251,29 +341,107 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign deck dialog */}
+      {/* ════ Dialog: Chi tiết bộ đề của user ════ */}
+      <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>📚 Bộ đề của {showDecks?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {(showDecks?.user_decks ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Chưa có bộ đề nào</p>
+            ) : (showDecks?.user_decks ?? []).map(ud => {
+              const expired = ud.expired_at && new Date(ud.expired_at) <= new Date();
+              return (
+                <div key={ud.id} className="flex items-center gap-2 p-2.5 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-[#1a1a2e] truncate">
+                      {ud.deck?.title ?? "?"}
+                    </div>
+                    {ud.expired_at ? (
+                      <div className={`flex items-center gap-1 text-xs mt-0.5 ${expired ? "text-red-500" : "text-green-600"}`}>
+                        <Calendar className="w-3 h-3" />
+                        {expired ? "Hết hạn" : "Hạn"}: {fmtDate(ud.expired_at)}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-green-600 mt-0.5">♾️ Không hết hạn</div>
+                    )}
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600 flex-shrink-0"
+                    title="Thu hồi bộ đề"
+                    onClick={() => {
+                      if (confirm(`Thu hồi bộ đề "${ud.deck?.title}"?`))
+                        revokeDeck.mutate({ userId: showDecks!.id, deckId: ud.deck_id });
+                    }}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDecks(null)}>Đóng</Button>
+            <Button variant="brand" onClick={() => { setShowDecks(null); openAssign(showDecks!.id); }}>
+              <BookOpen className="w-4 h-4" /> Giao thêm bộ đề
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ Dialog: Giao bộ đề ════ */}
       <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Giao bộ đề</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>📚 Giao bộ đề — {assignedUser?.email}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
+            {/* Bộ đề đã có */}
+            {(assignedUser?.user_decks ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Đã có:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(assignedUser?.user_decks ?? []).map(ud => (
+                    <span key={ud.id} className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
+                      {ud.deck?.title ?? "?"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
-              <Label>Bộ đề</Label>
+              <Label>Chọn bộ đề *</Label>
               <Select value={assignDeckId} onValueChange={setAssignDeckId}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn bộ đề" /></SelectTrigger>
                 <SelectContent>
-                  {decks.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
+                  {decks.map((d: DeckItem) => {
+                    const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+                    return (
+                      <SelectItem key={d.id} value={d.id}>
+                        <span className={alreadyHas ? "text-muted-foreground" : ""}>
+                          {alreadyHas ? "✓ " : ""}{d.title}
+                          {d.level ? ` (${d.level})` : ""}
+                          {d.word_count ? ` — ${d.word_count} từ` : ""}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              {decks.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Chưa có bộ đề nào trong hệ thống.</p>
+              )}
             </div>
             <div>
-              <Label>Ngày hết hạn (để trống = không hết hạn)</Label>
-              <Input type="datetime-local" value={assignExpiry} onChange={(e) => setAssignExpiry(e.target.value)} className="mt-1" />
+              <Label>Ngày hết hạn</Label>
+              <Input type="datetime-local" value={assignExpiry}
+                onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
+              <p className="text-xs text-muted-foreground mt-1">Để trống = không giới hạn thời gian</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssign(null)}>Hủy</Button>
             <Button variant="brand" disabled={!assignDeckId || assignDeck.isPending}
-              onClick={() => assignDeck.mutate({ userId: showAssign, deckId: assignDeckId, expiredAt: assignExpiry })}>
+              onClick={() => assignDeck.mutate({ userId: showAssign!, deckId: assignDeckId, expiredAt: assignExpiry })}>
               {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Giao
             </Button>
           </DialogFooter>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
   LayoutDashboard, Users, BookOpen,
-  BarChart3, ChevronRight, ArrowLeftRight
+  BarChart3, ChevronRight, ArrowLeftRight, Monitor
 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin",               label: "Tổng quan",     icon: LayoutDashboard },
   { href: "/admin/users",         label: "Người dùng",    icon: Users           },
   { href: "/admin/decks",         label: "Bộ đề",         icon: BookOpen        },
+  { href: "/admin/devices",       label: "Thiết bị",      icon: Monitor         },
   { href: "/admin/analytics",     label: "Thống kê",      icon: BarChart3       },
   { href: "/admin/import-export", label: "Import/Export", icon: ArrowLeftRight  },
 ];
@@ -52,9 +53,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-[#f0e0e7] flex">
           {navItems.map((item) => (
             <Link key={item.href} href={item.href}
-              className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-semibold text-muted-foreground hover:text-brand transition-colors">
+              className="flex-1 flex flex-col items-center gap-0.5 py-2 text-muted-foreground hover:text-brand transition-colors">
               <item.icon className="w-5 h-5" />
-              <span className="truncate text-[10px]">{item.label}</span>
+              <span className="text-[9px] font-semibold truncate w-full text-center px-0.5">{item.label}</span>
             </Link>
           ))}
         </div>

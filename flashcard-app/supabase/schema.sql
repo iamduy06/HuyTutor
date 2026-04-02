@@ -159,3 +159,57 @@ BEGIN
   RAISE NOTICE 'Deck created: %', v_deck_id;
 END;
 $$;
+
+-- ============================================================
+-- DEVICE TRACKING (Session management)
+-- ============================================================
+
+-- Bảng theo dõi thiết bị đã đăng nhập
+CREATE TABLE IF NOT EXISTS public.user_devices (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  -- fingerprint: hash của user-agent + ip (tạo client-side)
+  device_id   TEXT NOT NULL,
+  device_name TEXT,            -- "Chrome on Windows", "Safari on iPhone", ...
+  ip_address  TEXT,
+  last_seen   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON public.user_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_devices_last_seen ON public.user_devices(last_seen);
+
+ALTER TABLE public.user_devices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "devices_own" ON public.user_devices;
+CREATE POLICY "devices_own" ON public.user_devices
+  FOR ALL USING (auth.uid() = user_id OR public.is_admin());
+
+-- Bảng cấu hình giới hạn thiết bị
+-- global_max_devices: giới hạn mặc định cho tất cả USER
+-- users.max_devices:  override cho từng user cụ thể (NULL = dùng global)
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+INSERT INTO public.app_settings (key, value)
+VALUES ('global_max_devices', '3')
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "settings_public_read" ON public.app_settings;
+DROP POLICY IF EXISTS "settings_admin_write" ON public.app_settings;
+CREATE POLICY "settings_public_read" ON public.app_settings FOR SELECT USING (true);
+CREATE POLICY "settings_admin_write" ON public.app_settings FOR ALL USING (public.is_admin());
+
+-- Thêm cột max_devices vào users (NULL = dùng global setting)
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS max_devices INTEGER DEFAULT NULL;
+
+-- ============================================================
+-- MIGRATION: Add CEFR range columns to decks
+-- ============================================================
+ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS level_min TEXT DEFAULT NULL;
+ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS level_max TEXT DEFAULT NULL;
+-- Note: level field kept for backward compat, will display as "level_min - level_max"

@@ -40,15 +40,28 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ deck, tabs, cards });
 }
 
+function computeLevelStr(min: string | null, max: string | null): string | null {
+  if (!min && !max) return null;
+  if (min && max && min !== max) return `${min} - ${max}`;
+  return min ?? max;
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await checkAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
+  const levelStr = computeLevelStr(body.level_min ?? null, body.level_max ?? null);
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("decks")
-    .update({ title: body.title, description: body.description, level: body.level })
+    .update({
+      title: body.title,
+      description: body.description,
+      level: levelStr,
+      level_min: body.level_min ?? null,
+      level_max: body.level_max ?? null,
+    })
     .eq("id", params.id).select().single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

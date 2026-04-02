@@ -94,7 +94,7 @@ export default async function DashboardPage() {
                 <div key={ud.id as string} className={`bg-white rounded-2xl border-2 p-5 flex flex-col gap-3 transition-all hover:shadow-md ${active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[#1a1a2e] truncate">{deck.title}</h3>
+                      <h3 className="font-bold text-[#1a1a2e] leading-snug" title={deck.title}>{deck.title}</h3>
                       {deck.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{deck.description}</p>}
                     </div>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
