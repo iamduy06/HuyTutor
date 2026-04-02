@@ -69,6 +69,8 @@ export default function AdminDecksPage() {
   const [showTabDlg,      setShowTabDlg]       = useState<string | null>(null);   // deckId
   const [showWordDlg,     setShowWordDlg]      = useState<{ deckId: string; tabIndex: number } | null>(null);
   const [showBulkTabsDlg, setShowBulkTabsDlg] = useState<string | null>(null);   // deckId
+  const [showEditTabDlg,  setShowEditTabDlg]  = useState<{ deckId: string; tabIndex: number } | null>(null);
+  const [editTabForm,     setEditTabForm]     = useState({ id: "", label: "", desc: "" });
 
   // ── Editing targets ──
   const [editingDeck,  setEditingDeck]  = useState<Deck | null>(null);
@@ -144,6 +146,21 @@ export default function AdminDecksPage() {
     onSuccess: (_: unknown, deckId: string) => {
       loadDetail(deckId); setShowTabDlg(null);
       toast({ title: "Đã thêm tab mới" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const saveTabEdit = useMutation({
+    mutationFn: async ({ deckId, tabIndex }: { deckId: string; tabIndex: number }) => {
+      const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editTabForm),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+    },
+    onSuccess: (_: unknown, { deckId }: { deckId: string }) => {
+      loadDetail(deckId); setShowEditTabDlg(null);
+      toast({ title: "Đã cập nhật tab" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -385,6 +402,14 @@ export default function AdminDecksPage() {
                                         onClick={() => openCreateWord(deck.id, tabIdx)}>
                                         <ListPlus className="w-3.5 h-3.5" /> Thêm từ
                                       </Button>
+                                      <Button size="sm" variant="outline" className="h-7 w-7 p-0"
+                                        title="Sửa tab"
+                                        onClick={() => {
+                                          setEditTabForm({ id: tab.id ?? "", label: tab.label ?? "", desc: tab.desc ?? "" });
+                                          setShowEditTabDlg({ deckId: deck.id, tabIndex: tabIdx });
+                                        }}>
+                                        <Pencil className="w-3 h-3" />
+                                      </Button>
                                       <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500"
                                         onClick={() => {
                                           if (confirm(`Xóa tab "${tab.label ?? `Unit ${tabIdx + 1}`}"?`))
@@ -591,6 +616,32 @@ export default function AdminDecksPage() {
               disabled={bulkTabsMode === "file" ? !bulkTabsFile : !bulkTabsText.trim()}
               onClick={() => showBulkTabsDlg && handleBulkTabsImport(showBulkTabsDlg)}>
               <Upload className="w-4 h-4" /> Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ Dialog: Sửa Tab ════ */}
+      <Dialog open={!!showEditTabDlg} onOpenChange={() => setShowEditTabDlg(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>✏️ Sửa Tab / Unit</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>ID</Label>
+              <Input value={editTabForm.id} onChange={e => setEditTabForm({ ...editTabForm, id: e.target.value })} className="mt-1" placeholder="de1" />
+            </div>
+            <div><Label>Tên Tab *</Label>
+              <Input value={editTabForm.label} onChange={e => setEditTabForm({ ...editTabForm, label: e.target.value })} className="mt-1" placeholder="Đề 1" />
+            </div>
+            <div><Label>Mô tả</Label>
+              <Textarea value={editTabForm.desc} onChange={e => setEditTabForm({ ...editTabForm, desc: e.target.value })} className="mt-1" rows={3} placeholder="Mô tả nội dung tab này..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditTabDlg(null)}>Hủy</Button>
+            <Button variant="brand"
+              disabled={saveTabEdit.isPending || !editTabForm.label}
+              onClick={() => showEditTabDlg && saveTabEdit.mutate(showEditTabDlg)}>
+              {saveTabEdit.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Lưu
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -46,6 +46,27 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ success: true });
   }
 
+  // Change role
+  if (body.action === "change_role") {
+    const { role } = body;
+    if (!["USER", "ADMIN"].includes(role))
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    // Update public.users table
+    const { error: dbErr } = await supabase.from("users")
+      .update({ role }).eq("id", params.id);
+    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    return NextResponse.json({ success: true, role });
+  }
+
+  // Revoke deck
+  if (body.action === "revoke_deck") {
+    const { deck_id } = body;
+    const { error } = await supabase.from("user_decks")
+      .delete().eq("user_id", params.id).eq("deck_id", deck_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
 

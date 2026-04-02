@@ -1,6 +1,6 @@
 /**
- * DELETE /api/admin/decks/[id]/tabs/[tabIndex]
- * Xóa 1 tab (và tất cả vocabulary trong đó).
+ * PUT    /api/admin/decks/[id]/tabs/[tabIndex]  — Sửa tab (label, id, desc)
+ * DELETE /api/admin/decks/[id]/tabs/[tabIndex]  — Xóa tab
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +18,51 @@ async function checkAdmin() {
 
 interface Params { params: { id: string; tabIndex: string } }
 
+async function loadAndSave(
+  supabase: ReturnType<typeof createAdminClient>,
+  deckId: string,
+  mutateFn: (tabs: Tab[]) => void
+) {
+  const { data: rows } = await supabase
+    .from("flashcards").select("id, content").eq("deck_id", deckId)
+    .order("created_at", { ascending: true });
+
+  const allTabs: Tab[] = (rows ?? []).flatMap(r =>
+    extractTabs((r as unknown as FlashcardRow).content)
+  );
+  mutateFn(allTabs);
+
+  const rowId = rows?.[0]?.id as string ?? null;
+  const extraIds = (rows ?? []).slice(1).map(r => r.id as string);
+
+  if (rowId) await supabase.from("flashcards").update({ content: { tabs: allTabs } }).eq("id", rowId);
+  else       await supabase.from("flashcards").insert({ deck_id: deckId, content: { tabs: allTabs } });
+
+  if (extraIds.length) await supabase.from("flashcards").delete().in("id", extraIds);
+}
+
+export async function PUT(request: NextRequest, { params }: Params) {
+  const admin = await checkAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const tabIdx = parseInt(params.tabIndex);
+  if (isNaN(tabIdx)) return NextResponse.json({ error: "Invalid tabIndex" }, { status: 400 });
+
+  const body = await request.json();
+  const supabase = createAdminClient();
+
+  let notFound = false;
+  await loadAndSave(supabase, params.id, (tabs) => {
+    if (!tabs[tabIdx]) { notFound = true; return; }
+    if (body.label !== undefined) tabs[tabIdx].label = body.label;
+    if (body.id    !== undefined) tabs[tabIdx].id    = body.id;
+    if (body.desc  !== undefined) tabs[tabIdx].desc  = body.desc;
+  });
+
+  if (notFound) return NextResponse.json({ error: "Tab not found" }, { status: 404 });
+  return NextResponse.json({ success: true });
+}
+
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const admin = await checkAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -26,27 +71,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (isNaN(tabIdx)) return NextResponse.json({ error: "Invalid tabIndex" }, { status: 400 });
 
   const supabase = createAdminClient();
-  const { data: rows } = await supabase
-    .from("flashcards").select("id, content").eq("deck_id", params.id)
-    .order("created_at", { ascending: true });
-
-  if (!rows?.length) return NextResponse.json({ error: "No flashcard row" }, { status: 404 });
-
-  const allTabs: Tab[] = rows.flatMap(r =>
-    extractTabs((r as unknown as FlashcardRow).content)
-  );
-  if (tabIdx < 0 || tabIdx >= allTabs.length)
-    return NextResponse.json({ error: "Tab not found" }, { status: 404 });
-
-  allTabs.splice(tabIdx, 1);
-
-  await supabase.from("flashcards")
-    .update({ content: { tabs: allTabs } }).eq("id", rows[0].id);
-
-  // Delete extra rows if any (cleanup)
-  if (rows.length > 1) {
-    await supabase.from("flashcards").delete().in("id", rows.slice(1).map(r => r.id));
-  }
+  await loadAndSave(supabase, params.id, (tabs) => {
+    tabs.splice(tabIdx, 1);
+  });
 
   return NextResponse.json({ success: true });
 }

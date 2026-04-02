@@ -66,9 +66,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Redirect logged-in users away from login/register ─────────────────
-  // NOTE: /forgot-password và /reset-password vẫn accessible khi đã login
   const authOnlyPaths = ["/login", "/register"];
   if (authOnlyPaths.includes(path) && user) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // ── Redirect /decks to /dashboard if logged in ───────────────────────────
+  // /decks là trang demo công khai, người đã đăng nhập nên vào dashboard
+  if ((path === "/decks" || path.startsWith("/decks/")) && user) {
+    // /decks → /dashboard; /decks/[id] → /learning/[id]
+    if (path.startsWith("/decks/") && path.split("/").length === 3) {
+      const deckId = path.split("/")[2];
+      return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
+    }
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

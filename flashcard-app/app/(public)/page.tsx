@@ -36,7 +36,7 @@ export default function HomePage() {
                 Xem bộ đề
               </Link>
             </Button>
-            <Button variant="outline" size="lg" asChild className="rounded-full px-8 text-base font-bold border-2">
+            <Button variant="brand-outline" size="lg" asChild className="rounded-full px-8 text-base font-bold border-2">
               <Link href={FACEBOOK_URL} target="_blank">
                 💬 Liên hệ đăng ký mua bộ đề
               </Link>
@@ -100,7 +100,7 @@ export default function HomePage() {
             <Button size="lg" className="bg-white text-brand hover:bg-brand-light rounded-full px-8 font-bold" asChild>
               <Link href="/decks">Xem bộ đề ngay</Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 rounded-full px-8 font-bold" asChild>
+            <Button size="lg" className="bg-white text-brand hover:bg-brand-light border-2 border-white rounded-full px-8 font-bold" asChild>
               <Link href={FACEBOOK_URL} target="_blank">Mua bộ đề đầy đủ</Link>
             </Button>
           </div>

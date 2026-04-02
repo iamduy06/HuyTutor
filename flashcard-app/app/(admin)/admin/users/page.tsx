@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, ChevronDown, X, Calendar, Shuffle
+  Copy, Check, ChevronDown, X, Calendar, Shuffle, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +72,9 @@ export default function AdminUsersPage() {
   const [assignDeckId, setAssignDeckId] = useState("");
   const [assignExpiry, setAssignExpiry] = useState("");
   const [csvFile,      setCsvFile]      = useState<File | null>(null);
+  const [showResetDlg, setShowResetDlg] = useState(false);
+  const [resetResult,  setResetResult]  = useState<{ email: string; pw: string } | null>(null);
+  const [resetCopied,  setResetCopied]  = useState(false);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"], queryFn: fetchUsers,
@@ -99,16 +102,34 @@ export default function AdminUsersPage() {
   });
 
   const resetPw = useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_password" }),
       });
       if (!res.ok) throw new Error("Failed");
-      return res.json();
+      const data = await res.json();
+      return { pw: data.tempPassword, email };
     },
     onSuccess: (data) => {
-      toast({ title: `Mật khẩu mới: ${data.tempPassword}`, description: "Copy và gửi cho người dùng" });
+      setResetResult({ email: data.email, pw: data.pw });
+      setResetCopied(false);
+      setShowResetDlg(true);
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+  const changeRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "change_role", role }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã thay đổi role" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -275,8 +296,17 @@ export default function AdminUsersPage() {
                             <BookOpen className="w-3 h-3" /> Giao đề
                           </Button>
                           <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                            onClick={() => resetPw.mutate(u.id)} disabled={resetPw.isPending}>
+                            onClick={() => resetPw.mutate({ userId: u.id, email: u.email })} disabled={resetPw.isPending}>
                             <RefreshCw className="w-3 h-3" /> Reset PW
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                            title={u.role === "ADMIN" ? "Hạ xuống USER" : "Nâng lên ADMIN"}
+                            onClick={() => {
+                              const newRole = u.role === "ADMIN" ? "USER" : "ADMIN";
+                              if (confirm(`Đổi role của ${u.email} thành ${newRole}?`))
+                                changeRole.mutate({ userId: u.id, role: newRole });
+                            }}>
+                            <Shield className="w-3 h-3" /> {u.role === "ADMIN" ? "→USER" : "→ADM"}
                           </Button>
                           <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
                             onClick={() => { if (confirm("Xóa user này?")) deleteUser.mutate(u.id); }}>
@@ -462,6 +492,50 @@ export default function AdminUsersPage() {
             <Button variant="brand" disabled={!assignDeckId || assignDeck.isPending}
               onClick={() => assignDeck.mutate({ userId: showAssign!, deckId: assignDeckId, expiredAt: assignExpiry })}>
               {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Giao
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ════ Dialog: Reset PW result ════ */}
+      <Dialog open={showResetDlg} onOpenChange={v => { setShowResetDlg(v); if (!v) setResetResult(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>🔑 Mật khẩu đã reset</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Mật khẩu mới cho <strong>{resetResult?.email}</strong>:
+            </p>
+            <div className="bg-[#f8f9fa] border-2 border-[#f0e0e7] rounded-xl p-4 flex items-center gap-3">
+              <code
+                className="flex-1 font-mono text-brand font-bold text-xl tracking-wider select-all cursor-text"
+                title="Bấm để chọn tất cả"
+                onClick={e => {
+                  const range = document.createRange();
+                  range.selectNodeContents(e.currentTarget);
+                  window.getSelection()?.removeAllRanges();
+                  window.getSelection()?.addRange(range);
+                }}
+              >
+                {resetResult?.pw}
+              </code>
+              <Button variant="outline" size="sm" className="flex-shrink-0 gap-1"
+                onClick={() => {
+                  if (resetResult) {
+                    navigator.clipboard.writeText(resetResult.pw);
+                    setResetCopied(true);
+                    setTimeout(() => setResetCopied(false), 2000);
+                  }
+                }}>
+                {resetCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                {resetCopied ? "Đã copy!" : "Copy"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              💡 Bấm vào mật khẩu để chọn, hoặc dùng nút Copy.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="brand" className="w-full" onClick={() => { setShowResetDlg(false); setResetResult(null); }}>
+              Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
