@@ -91,16 +91,23 @@ export default async function DashboardPage() {
               if (!deck) return null;
 
               return (
-                <div key={ud.id as string} className={`bg-white rounded-2xl border-2 p-5 flex flex-col gap-3 transition-all hover:shadow-md ${active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[#1a1a2e] leading-snug" title={deck.title}>{deck.title}</h3>
-                      {deck.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{deck.description}</p>}
+                <div key={ud.id as string} className={`bg-white rounded-2xl border-2 p-5 flex flex-col transition-all hover:shadow-md ${active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"}`}>
+                  {/* Title area: cố định 2 dòng, hover tooltip đầy đủ */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex-1 min-w-0 group relative">
+                      <h3
+                        className="font-bold text-[#1a1a2e] text-sm leading-snug line-clamp-2 cursor-default"
+                        title={deck.title}
+                      >
+                        {deck.title}
+                      </h3>
                     </div>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                       {active ? "Còn hạn" : "Hết hạn"}
                     </span>
                   </div>
+                  {/* Content area chiếm phần còn lại */}
+                  <div className="flex flex-col gap-3 flex-1">
 
                   <div className="text-xs text-muted-foreground flex gap-3">
                     <span>📝 {words} từ</span>
@@ -126,10 +133,14 @@ export default async function DashboardPage() {
                     <div className="text-xs text-green-600 font-medium">♾️ Không giới hạn thời gian</div>
                   )}
 
-                  {active
-                    ? <Button variant="brand" size="sm" asChild className="w-full"><Link href={`/learning/${deck.id}`}>Học ngay →</Link></Button>
-                    : <Button variant="outline" size="sm" asChild className="w-full"><Link href={FACEBOOK_URL} target="_blank">💬 Gia hạn</Link></Button>
-                  }
+                  </div>
+                  {/* Nút luôn ở cuối card */}
+                  <div className="mt-3">
+                    {active
+                      ? <Button variant="brand" size="sm" asChild className="w-full"><Link href={`/learning/${deck.id}`}>Học ngay →</Link></Button>
+                      : <Button variant="outline" size="sm" asChild className="w-full"><Link href={FACEBOOK_URL} target="_blank">💬 Gia hạn</Link></Button>
+                    }
+                  </div>
                 </div>
               );
             })}

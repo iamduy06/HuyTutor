@@ -461,20 +461,20 @@ export default function AdminDecksPage() {
               <div className="grid grid-cols-2 gap-2 mt-1">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Từ</p>
-                  <Select value={deckForm.level_min} onValueChange={v => setDeckForm({ ...deckForm, level_min: v })}>
+                  <Select value={deckForm.level_min || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, level_min: v === "__none__" ? "" : v })}>
                     <SelectTrigger><SelectValue placeholder="Không chọn" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Không</SelectItem>
+                      <SelectItem value="__none__">Không</SelectItem>
                       {CEFR_LEVELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Đến</p>
-                  <Select value={deckForm.level_max} onValueChange={v => setDeckForm({ ...deckForm, level_max: v })}>
+                  <Select value={deckForm.level_max || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, level_max: v === "__none__" ? "" : v })}>
                     <SelectTrigger><SelectValue placeholder="Không chọn" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Không</SelectItem>
+                      <SelectItem value="__none__">Không</SelectItem>
                       {CEFR_LEVELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -484,7 +484,7 @@ export default function AdminDecksPage() {
                 <p className="text-xs text-brand font-semibold mt-1">
                   Hiển thị: {deckForm.level_min && deckForm.level_max && deckForm.level_min !== deckForm.level_max
                     ? `${deckForm.level_min} - ${deckForm.level_max}`
-                    : deckForm.level_min || deckForm.level_max}
+                    : (deckForm.level_min || deckForm.level_max)}
                 </p>
               )}
             </div>

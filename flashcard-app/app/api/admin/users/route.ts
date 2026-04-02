@@ -30,10 +30,12 @@ export async function POST(request: NextRequest) {
   const admin = await checkAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { email, role = "USER" } = await request.json();
+  const body = await request.json();
+  const { email, role = "USER" } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  const password = generatePassword(8);
+  // Dùng mật khẩu do admin nhập, hoặc tự tạo nếu không nhập
+  const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({

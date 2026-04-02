@@ -289,3 +289,8 @@
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-6px); }
 }
+
+/* Navigation progress bar smooth transition */
+.nav-progress-bar {
+  transition: width 0.2s ease-out, opacity 0.3s ease;
+}

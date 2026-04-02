@@ -4,19 +4,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/components/common/UserContext";
-import { createClient } from "@/lib/supabase/client";
+import { useUser, getSupabaseClient } from "@/components/common/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
 
 export function SiteHeader() {
-  const { user } = useUser(); // loading luôn false → không cần check
+  const { user } = useUser();
   const router    = useRouter();
   const { toast } = useToast();
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    // Dùng CÙNG singleton client với UserContext
+    // → SIGNED_OUT event sẽ được UserContext nhận → setUser(null)
+    await getSupabaseClient().auth.signOut();
     toast({ title: "Đã đăng xuất" });
     router.push("/");
     router.refresh();

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, ChevronDown, X, Calendar
+  Copy, Check, ChevronDown, X, Calendar, Shuffle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { generatePassword } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface UserDeckItem {
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
   const [showAssign,   setShowAssign]   = useState<string | null>(null);  // userId
   const [showDecks,    setShowDecks]    = useState<UserData | null>(null); // user detail
   const [newEmail,     setNewEmail]     = useState("");
+  const [newPassword,  setNewPassword]  = useState("");
   const [newRole,      setNewRole]      = useState("USER");
   const [tempPw,       setTempPw]       = useState("");
   const [copied,       setCopied]       = useState(false);
@@ -80,10 +82,10 @@ export default function AdminUsersPage() {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const createUser = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+    mutationFn: async ({ email, role, password }: { email: string; role: string; password: string }) => {
       const res = await fetch("/api/admin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, password }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       return res.json();
@@ -213,7 +215,7 @@ export default function AdminUsersPage() {
               Upload {csvFile.name}
             </Button>
           )}
-          <Button variant="brand" onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); }}>
+          <Button variant="brand" onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); }}>
             <Plus className="w-4 h-4" /> Tạo user
           </Button>
         </div>
@@ -320,6 +322,23 @@ export default function AdminUsersPage() {
                 <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1" />
               </div>
               <div>
+                <Label>Mật khẩu</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Để trống = tạo ngẫu nhiên"
+                    className="flex-1 font-mono"
+                  />
+                  <Button type="button" variant="outline" size="sm" className="px-3 flex-shrink-0"
+                    title="Tạo mật khẩu ngẫu nhiên"
+                    onClick={() => setNewPassword(generatePassword(10))}>
+                    <Shuffle className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Để trống = hệ thống tự tạo 10 ký tự ngẫu nhiên</p>
+              </div>
+              <div>
                 <Label>Role</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -332,7 +351,7 @@ export default function AdminUsersPage() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={createUser.isPending || !newEmail}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole })}>
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword })}>
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
                 </Button>
               </DialogFooter>
