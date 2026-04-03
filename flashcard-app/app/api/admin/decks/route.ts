@@ -25,7 +25,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("decks")
-    .select("id, title, description, level, level_min, level_max, created_at")
+    .select("id, title, description, level, level_min, level_max, is_public, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { title, description, level_min, level_max } = body;
+  const { title, description, level_min, level_max, is_public = false } = body;
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
   const supabase = createAdminClient();
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("decks")
-    .insert({ title, description, level: levelStr, level_min: level_min ?? null, level_max: level_max ?? null })
+    .insert({ title, description, level: levelStr, level_min: level_min ?? null, level_max: level_max ?? null, is_public: Boolean(is_public) })
     .select()
     .single();
 

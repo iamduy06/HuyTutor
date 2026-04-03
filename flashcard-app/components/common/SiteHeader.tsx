@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useUser, getSupabaseClient } from "@/components/common/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
+import { Logo } from "@/components/common/Logo";
 
 export function SiteHeader() {
   const { user, refresh } = useUser();
@@ -14,41 +15,21 @@ export function SiteHeader() {
   const { toast } = useToast();
 
   async function handleLogout() {
-    // 1. Gọi signOut trên singleton (cùng instance với UserContext subscription)
     const { error } = await getSupabaseClient().auth.signOut();
     if (error) {
       toast({ title: "Lỗi đăng xuất", description: error.message, variant: "destructive" });
       return;
     }
-    // 2. Manually clear user ngay lập tức (không chờ event)
-    await refresh(); // refresh() sẽ getUser() → null → setUser(null)
+    await refresh();
     toast({ title: "Đã đăng xuất" });
-    // 3. Redirect + revalidate server cache
     router.push("/");
     router.refresh();
   }
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-[5%] h-[62px] bg-white border-b-2 border-[#f0e0e7]">
-      <Link href="/" className="flex items-center gap-2.5">
-        {/* Logo image */}
-        <img
-          src="https://drive.google.com/thumbnail?id=1chYG_qCghZCS2li7fgixW8rHcBAL8rPC&sz=w200"
-          alt="Huy Tutor"
-          className="h-9 w-auto object-contain"
-          onError={e => {
-            // Fallback nếu image không load được
-            (e.target as HTMLImageElement).style.display = "none";
-            const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-            if (fallback) fallback.style.display = "flex";
-          }}
-        />
-        <div className="w-9 h-9 rounded-xl bg-brand items-center justify-center text-white font-black text-lg hidden" aria-hidden>
-          H
-        </div>
-        <span className="font-extrabold text-[1.05em] text-[#1a1a2e]">
-          Huy Tutor <span className="text-brand">Flashcard</span>
-        </span>
+      <Link href="/" className="flex items-center">
+        <Logo height={40} />
       </Link>
 
       <div className="flex items-center gap-2">

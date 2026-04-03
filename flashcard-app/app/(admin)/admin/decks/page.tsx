@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DECK_LEVELS } from "@/lib/constants";
+import { Switch } from "@/components/ui/switch";
 import { CEFR_LEVELS, WORD_TYPES } from "@/types";
 import type { Deck, Tab, VocabItem } from "@/types";
 
@@ -77,7 +78,7 @@ export default function AdminDecksPage() {
   const [editingWord,  setEditingWord]  = useState<FlatCard | null>(null);
 
   // ── Forms ──
-  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "" });
+  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", is_public: false });
   const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
   const [wordForm, setWordForm] = useState(EMPTY_WORD);
 
@@ -113,6 +114,7 @@ export default function AdminDecksPage() {
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
+        is_public: deckForm.is_public,
       };
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -266,11 +268,11 @@ export default function AdminDecksPage() {
 
   // ── Open helpers ──────────────────────────────────────────────────────────
   function openCreateDeck() {
-    setEditingDeck(null); setDeckForm({ title: "", description: "", level_min: "", level_max: "" }); setShowDeckDlg(true);
+    setEditingDeck(null); setDeckForm({ title: "", description: "", level_min: "", level_max: "", is_public: false }); setShowDeckDlg(true);
   }
   function openEditDeck(deck: Deck) {
     setEditingDeck(deck);
-    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "" });
+    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", is_public: Boolean((deck as any).is_public) });
     setShowDeckDlg(true);
   }
   function openCreateTab(deckId: string) {
@@ -324,6 +326,10 @@ export default function AdminDecksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-[#1a1a2e]">{deck.title}</span>
                       {deck.level && <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">{deck.level}</span>}
+                      {(deck as any).is_public
+                        ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">🌐 Public</span>
+                        : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">🔒 Private</span>
+                      }
                       <span className="text-xs text-muted-foreground">({(deck as any).word_count ?? 0} từ)</span>
                     </div>
                     {deck.description && <p className="text-sm text-muted-foreground mt-0.5 truncate">{deck.description}</p>}
@@ -480,6 +486,18 @@ export default function AdminDecksPage() {
             </div>
             <div><Label>Mô tả</Label>
               <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
+              <div>
+                <p className="font-semibold text-sm text-[#1a1a2e]">Công khai (Public)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {deckForm.is_public ? "✅ Mọi user đã đăng nhập đều học được full" : "🔒 Chỉ user được cấp quyền mới học được"}
+                </p>
+              </div>
+              <Switch
+                checked={deckForm.is_public}
+                onCheckedChange={v => setDeckForm({ ...deckForm, is_public: v })}
+              />
             </div>
             <div>
               <Label>Cấp độ CEFR (0–2 mức)</Label>

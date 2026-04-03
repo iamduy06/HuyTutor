@@ -61,6 +61,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       level: levelStr,
       level_min: body.level_min ?? null,
       level_max: body.level_max ?? null,
+      is_public: Boolean(body.is_public),
     })
     .eq("id", params.id).select().single();
 

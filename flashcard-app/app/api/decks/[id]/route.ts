@@ -16,42 +16,45 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Deck info
+  // Deck info — bao gồm is_public
   const { data: deck } = await adminSupabase
     .from("decks")
-    .select("id, title, description, level")
+    .select("id, title, description, level, is_public")
     .eq("id", params.id)
     .single();
   if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Check user_decks record
-  const { data: userDeck } = await adminSupabase
-    .from("user_decks")
-    .select("expired_at")
-    .eq("user_id", user.id)
-    .eq("deck_id", params.id)
-    .maybeSingle();  // maybeSingle không throw khi không có row
+  // Kiểm tra quyền truy cập:
+  // 1. is_public = true → mọi user đã đăng nhập đều có full access
+  // 2. is_public = false → kiểm tra user_decks
+  let fullAccess = Boolean(deck.is_public);
 
-  // hasFullAccess: có record user_decks VÀ không hết hạn (null = không hết hạn)
-  const fullAccess = userDeck !== null && userDeck !== undefined
-    ? hasFullAccess(userDeck.expired_at)
-    : false;
+  if (!fullAccess) {
+    const { data: userDeck } = await adminSupabase
+      .from("user_decks")
+      .select("expired_at")
+      .eq("user_id", user.id)
+      .eq("deck_id", params.id)
+      .maybeSingle();
 
-  // Lấy content từ DB
+    fullAccess = userDeck !== null && userDeck !== undefined
+      ? hasFullAccess(userDeck.expired_at)
+      : false;
+  }
+
+  // Lấy content
   const { data: rows } = await adminSupabase
     .from("flashcards")
     .select("id, deck_id, content, created_at")
     .eq("deck_id", params.id)
     .order("created_at", { ascending: true });
 
-  // Normalize: gộp tất cả rows thành mảng Tab[]
   const allTabs: Tab[] = (rows ?? []).flatMap(r =>
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
   let tabs = allTabs;
 
-  // Demo: giới hạn DEMO_LIMIT từ đầu tiên
   if (!fullAccess) {
     let seen = 0;
     tabs = allTabs.map(tab => {
@@ -63,12 +66,10 @@ export async function GET(
     }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
   }
 
-  const totalWords = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
-
   return NextResponse.json({
     deck,
-    tabs,          // ← dạng Tab[] giống const tabs trong Embed Flashcard
+    tabs,
     isDemo: !fullAccess,
-    totalWords,
+    isPublic: Boolean(deck.is_public),
   });
 }

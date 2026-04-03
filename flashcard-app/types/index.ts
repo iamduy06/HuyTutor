@@ -43,6 +43,8 @@ export interface Deck {
   level_min?: string | null;
   /** Max CEFR level (e.g. "C2") */
   level_max?: string | null;
+  /** true = mọi user đã login đều xem được full; false = chỉ user được cấp quyền */
+  is_public?: boolean;
   created_at: string;
   word_count?: number;
 }

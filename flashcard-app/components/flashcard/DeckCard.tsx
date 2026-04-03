@@ -20,11 +20,17 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
         <div className="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
           <BookOpen className="w-5 h-5 text-brand" />
         </div>
-        {deck.level && (
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-brand-light text-brand border border-brand-mid">
-            {deck.level}
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {deck.level && (
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-brand-light text-brand border border-brand-mid">
+              {deck.level}
+            </span>
+          )}
+          {deck.is_public
+            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>
+            : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
+          }
+        </div>
       </div>
 
       <div className="flex-1">

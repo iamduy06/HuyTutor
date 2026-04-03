@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data: decks, error } = await supabase
     .from("decks")
-    .select("id, title, description, level, level_min, level_max, created_at")
+    .select("id, title, description, level, level_min, level_max, is_public, created_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

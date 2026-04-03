@@ -213,3 +213,10 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS max_devices INTEGER DEFAULT NU
 ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS level_min TEXT DEFAULT NULL;
 ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS level_max TEXT DEFAULT NULL;
 -- Note: level field kept for backward compat, will display as "level_min - level_max"
+
+-- ============================================================
+-- MIGRATION: Add is_public column to decks
+-- ============================================================
+ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
+-- Index for filtering public decks
+CREATE INDEX IF NOT EXISTS idx_decks_is_public ON public.decks(is_public);
