@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
         if (!res.ok) throw new Error("Failed");
       }
     },
-    onSuccess: (_: unknown, vars: { deckIds: string[] }) => {
+    onSuccess: (_: unknown, vars: { userId: string; deckIds: string[]; expiredAt: string }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
       toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
@@ -530,7 +530,6 @@ export default function AdminUsersPage() {
                       </label>
                     );
                   })}
-                </div>
                 </div>
                 </>
               )}
