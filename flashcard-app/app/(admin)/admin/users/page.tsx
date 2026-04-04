@@ -442,11 +442,11 @@ export default function AdminUsersPage() {
 
       {/* ════ Dialog: Giao bộ đề ════ */}
       <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>📚 Giao bộ đề — {assignedUser?.email}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
             {/* Bộ đề đã có */}
             {(assignedUser?.user_decks ?? []).length > 0 && (
               <div>
@@ -465,7 +465,40 @@ export default function AdminUsersPage() {
               {decks.length === 0 ? (
                 <p className="text-xs text-muted-foreground mt-2">Chưa có bộ đề nào trong hệ thống.</p>
               ) : (
-                <div className="mt-2 max-h-56 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
+                <>
+                  {/* Chọn tất cả */}
+                  <div className="flex items-center justify-between mt-2 mb-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const assignable = decks.filter((d: DeckItem) =>
+                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
+                        );
+                        const allSelected = assignable.every((d: DeckItem) => assignDeckIds.has(d.id));
+                        const next = new Set(assignDeckIds);
+                        if (allSelected) {
+                          assignable.forEach((d: DeckItem) => next.delete(d.id));
+                        } else {
+                          assignable.forEach((d: DeckItem) => next.add(d.id));
+                        }
+                        setAssignDeckIds(next);
+                      }}
+                      className="text-xs font-semibold text-brand hover:underline"
+                    >
+                      {(() => {
+                        const assignable = decks.filter((d: DeckItem) =>
+                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
+                        );
+                        return assignable.length > 0 && assignable.every((d: DeckItem) => assignDeckIds.has(d.id))
+                          ? "✕ Bỏ chọn tất cả"
+                          : "✓ Chọn tất cả";
+                      })()}
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      {decks.filter((d: DeckItem) => !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)).length} bộ đề có thể giao
+                    </span>
+                  </div>
+                <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
                   {decks.map((d: DeckItem) => {
                     const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
                     const checked    = assignDeckIds.has(d.id);
@@ -498,6 +531,8 @@ export default function AdminUsersPage() {
                     );
                   })}
                 </div>
+                </div>
+                </>
               )}
               {assignDeckIds.size > 0 && (
                 <p className="text-xs text-brand font-semibold mt-1.5">

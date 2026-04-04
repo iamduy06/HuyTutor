@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,12 +10,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm,  setConfirm]  = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const router    = useRouter();
+  const [email,       setEmail]       = useState("");
+  const [password,    setPassword]    = useState("");
+  const [confirm,     setConfirm]     = useState("");
+  const [showPw,      setShowPw]      = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [registered,  setRegistered]  = useState(false); // show confirm screen
   const { toast } = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,21 +28,69 @@ export default function RegisterPage() {
     }
     setLoading(true);
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
 
-    if (error || !data.user) {
-      toast({ title: "Đăng ký thất bại", description: error?.message, variant: "destructive" });
-      setLoading(false); return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        // Sau khi click link xác nhận → về /login
+        emailRedirectTo: `${origin}/login`,
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Đăng ký thất bại", description: error.message, variant: "destructive" });
+      return;
     }
 
-    // Insert public profile (trigger also does this, belt-and-suspenders)
-    await supabase.from("users").upsert({ id: data.user.id, email, role: "USER" });
+    // Supabase trả session=null khi email confirm bắt buộc
+    // Nếu có session ngay → auto-confirmed (dev mode) → vào dashboard
+    if (data.session) {
+      await supabase.from("users").upsert({ id: data.user!.id, email, role: "USER" });
+      window.location.href = "/dashboard";
+      return;
+    }
 
-    toast({ title: "Đăng ký thành công 🎉" });
-    router.refresh();
-    setTimeout(() => router.push("/dashboard"), 50);
+    // Email confirm required → hiện màn xác nhận
+    setRegistered(true);
   }
 
+  // ── Màn xác nhận email ──────────────────────────────────────────
+  if (registered) {
+    return (
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center">
+        <div className="w-16 h-16 bg-brand-light rounded-full flex items-center justify-center mx-auto mb-5">
+          <Mail className="w-8 h-8 text-brand" />
+        </div>
+        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">Kiểm tra email!</h1>
+        <p className="text-muted-foreground text-sm mb-1">
+          Chúng tôi đã gửi email xác nhận tới:
+        </p>
+        <p className="font-bold text-brand text-base mb-5">{email}</p>
+        <div className="bg-[#f8f9fa] border border-[#f0e0e7] rounded-xl p-4 text-sm text-[#495057] text-left mb-6 space-y-2">
+          <p>📬 Mở email và nhấn <strong>Confirm your email</strong></p>
+          <p>🔗 Link xác nhận sẽ đưa bạn tới trang đăng nhập</p>
+          <p>⚠️ Nếu không thấy, hãy kiểm tra thư mục <strong>Spam/Junk</strong></p>
+        </div>
+        <Button variant="brand" className="w-full rounded-full" asChild>
+          <Link href="/login">Đi đến trang đăng nhập →</Link>
+        </Button>
+        <p className="text-xs text-muted-foreground mt-4">
+          Nhập sai email?{" "}
+          <button onClick={() => setRegistered(false)}
+            className="text-brand font-semibold hover:underline">
+            Đăng ký lại
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  // ── Form đăng ký ────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Đăng ký</h1>

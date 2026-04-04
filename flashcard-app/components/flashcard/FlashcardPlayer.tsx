@@ -192,7 +192,49 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
   const antonyms = toArray(vocab.antonyms);
 
   return (
-    <div className={cn("flex flex-1 min-h-0 relative", isKid && "kid-mode")}>
+    <div className={cn("flex flex-col flex-1 min-h-0 relative", isKid && "kid-mode")}>
+
+      {/* ══ MOBILE: vertical layout (< md) ══════════════════════════════ */}
+      {/* Unit list accordion - mobile only */}
+      <details className="md:hidden bg-white border-b-2 border-[#f0e0e7]">
+        <summary className={cn(
+          "flex items-center gap-2 px-4 py-3 cursor-pointer font-extrabold select-none list-none",
+          isKid ? "text-purple-600 text-base" : "text-brand text-sm"
+        )}>
+          <span>{isKid ? "🎯 Chủ đề" : "📚 Danh sách Unit"}</span>
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            {tabs[currentTab]?.label ?? `Unit ${currentTab + 1}`}
+          </span>
+          <span className="text-brand text-xs">▼</span>
+        </summary>
+        <div className="border-t border-[#f0e0e7] divide-y divide-[#f0e0e7] max-h-48 overflow-y-auto">
+          {tabs.map((tab, i) => (
+            <button key={tab.id ?? i} onClick={() => switchTab(i)}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors",
+                i === currentTab
+                  ? isKid ? "bg-purple-50 text-purple-600" : "bg-brand-light text-brand"
+                  : "hover:bg-gray-50 text-[#495057]"
+              )}>
+              <span className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                i === currentTab
+                  ? isKid ? "bg-purple-200 text-purple-700" : "bg-brand text-white"
+                  : "bg-gray-200 text-gray-600"
+              )}>{i + 1}</span>
+              <span className="truncate">{tab.label ?? `Unit ${i + 1}`}</span>
+              {tab.vocabulary && (
+                <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
+                  {tab.vocabulary.length} từ
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </details>
+
+      {/* ══ DESKTOP: horizontal 3-column layout (md+) ═════════════════════ */}
+      <div className="flex flex-1 min-h-0">
 
       {/* ── LEFT SIDEBAR ── */}
       <nav className={cn(
@@ -235,7 +277,9 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
         </div>
       </nav>
 
-      {/* ── MAIN ── */}
+      </nav>
+
+      {/* ── MAIN (desktop) ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <div className="flex-1 flex flex-col items-center px-4 md:px-[5%] py-8">
 
@@ -536,6 +580,48 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
           </div>
         )}
       </aside>
+      </div>{/* end desktop 3-col */}
+
+      {/* ══ MOBILE: word list at bottom (< md) ══════════════════════════════ */}
+      <details className="md:hidden bg-white border-t-2 border-[#f0e0e7]">
+        <summary className={cn(
+          "flex items-center gap-2 px-4 py-3 cursor-pointer font-extrabold select-none list-none",
+          isKid ? "text-purple-600 text-base" : "text-brand text-sm"
+        )}>
+          <span>{isKid ? "📝 Từ trong bài" : "📋 Danh sách từ"}</span>
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            {currentIndex + 1} / {vocabulary.length}
+          </span>
+          <span className="text-brand text-xs">▼</span>
+        </summary>
+        <div className="border-t border-[#f0e0e7] max-h-52 overflow-y-auto divide-y divide-[#f0e0e7]">
+          {vocabulary.map((v, i) => (
+            <button key={i}
+              onClick={() => { setIsFlipped(false); setTimeout(() => setCurrentIndex(i), 50); }}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors",
+                i === currentIndex
+                  ? isKid ? "bg-purple-50 text-purple-600" : "bg-brand-light text-brand"
+                  : "hover:bg-gray-50 text-[#495057]"
+              )}>
+              <span className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                i === currentIndex
+                  ? isKid ? "bg-purple-200 text-purple-700" : "bg-brand text-white"
+                  : "bg-gray-200 text-gray-600"
+              )}>{i + 1}</span>
+              <span className="flex-1 truncate">{v.word}</span>
+              {v.cefr && (
+                <span className={cn(
+                  "text-[0.65rem] font-bold px-1.5 py-0.5 rounded flex-shrink-0",
+                  i === currentIndex && !isKid ? "bg-brand text-white" : getCefrColor(v.cefr)
+                )}>{v.cefr}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </details>
+
     </div>
   );
 }

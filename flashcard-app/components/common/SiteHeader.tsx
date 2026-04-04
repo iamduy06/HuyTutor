@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser, getSupabaseClient } from "@/components/common/UserContext";
@@ -10,20 +9,35 @@ import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 
 export function SiteHeader() {
-  const { user, refresh } = useUser();
-  const router    = useRouter();
+  const { user } = useUser();
   const { toast } = useToast();
 
   async function handleLogout() {
-    const { error } = await getSupabaseClient().auth.signOut();
-    if (error) {
-      toast({ title: "Lỗi đăng xuất", description: error.message, variant: "destructive" });
-      return;
+    try {
+      // 1. Gọi signOut → Supabase server revoke token
+      await getSupabaseClient().auth.signOut();
+    } catch {
+      // ignore – vẫn tiếp tục xóa cookie client-side
     }
-    await refresh();
-    toast({ title: "Đã đăng xuất" });
-    router.push("/");
-    router.refresh();
+
+    // 2. Xóa tất cả cookie liên quan đến Supabase session
+    //    (tên cookie mặc định của @supabase/ssr dạng sb-<ref>-auth-token*)
+    try {
+      document.cookie.split(";").forEach(cookie => {
+        const name = cookie.split("=")[0].trim();
+        if (name.startsWith("sb-") || name.includes("supabase")) {
+          // Xóa ở nhiều path/domain để chắc chắn
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+        }
+      });
+    } catch {
+      // ignore cookie manipulation errors
+    }
+
+    // 3. Hard reload về trang chủ → server render lại với session mới (null)
+    //    Dùng window.location.href thay vì router.push để đảm bảo reset hoàn toàn
+    window.location.href = "/";
   }
 
   return (
