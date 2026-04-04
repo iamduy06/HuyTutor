@@ -10,7 +10,7 @@ export default async function DecksPage() {
 
   const { data: decks } = await supabase
     .from("decks")
-    .select("id, title, description, level, created_at")
+    .select("id, title, description, level, is_public, created_at")
     .order("created_at", { ascending: true });
 
   const { data: cards } = await supabase

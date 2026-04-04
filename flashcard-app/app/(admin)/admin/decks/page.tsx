@@ -335,9 +335,10 @@ export default function AdminDecksPage() {
                     {deck.description && <p className="text-sm text-muted-foreground mt-0.5 truncate">{deck.description}</p>}
                   </div>
                   <div className="flex gap-1.5 flex-wrap items-center">
-                    <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"
+                    <Button size="sm" variant="outline" className="h-8 w-8 p-0"
+                      title="Import JSON nhiều tabs"
                       onClick={() => openBulkImport(deck.id)}>
-                      <FileJson className="w-3.5 h-3.5" /> Import JSON (nhiều tabs)
+                      <FileJson className="w-4 h-4" />
                     </Button>
                     <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => openEditDeck(deck)}>
                       <Pencil className="w-3.5 h-3.5" />

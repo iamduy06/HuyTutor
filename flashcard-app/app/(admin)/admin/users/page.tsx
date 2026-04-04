@@ -69,7 +69,7 @@ export default function AdminUsersPage() {
   const [newRole,      setNewRole]      = useState("USER");
   const [tempPw,       setTempPw]       = useState("");
   const [copied,       setCopied]       = useState(false);
-  const [assignDeckId, setAssignDeckId] = useState("");
+  const [assignDeckIds, setAssignDeckIds] = useState<Set<string>>(new Set());
   const [assignExpiry, setAssignExpiry] = useState("");
   const [csvFile,      setCsvFile]      = useState<File | null>(null);
   const [showResetDlg, setShowResetDlg] = useState(false);
@@ -147,17 +147,20 @@ export default function AdminUsersPage() {
   });
 
   const assignDeck = useMutation({
-    mutationFn: async ({ userId, deckId, expiredAt }: { userId: string; deckId: string; expiredAt: string }) => {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
-      });
-      if (!res.ok) throw new Error("Failed");
+    mutationFn: async ({ userId, deckIds, expiredAt }: { userId: string; deckIds: string[]; expiredAt: string }) => {
+      // Giao từng deck một (sequential để tránh race condition)
+      for (const deckId of deckIds) {
+        const res = await fetch(`/api/admin/users/${userId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_: unknown, vars: { deckIds: string[] }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      setShowAssign(null); setAssignDeckId(""); setAssignExpiry("");
-      toast({ title: "Giao bộ đề thành công!" });
+      setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
+      toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -211,7 +214,7 @@ export default function AdminUsersPage() {
   }
 
   function openAssign(userId: string) {
-    setAssignDeckId(""); setAssignExpiry("");
+    setAssignDeckIds(new Set()); setAssignExpiry("");
     setShowAssign(userId);
   }
 
@@ -430,7 +433,7 @@ export default function AdminUsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDecks(null)}>Đóng</Button>
-            <Button variant="brand" onClick={() => { setShowDecks(null); openAssign(showDecks!.id); }}>
+            <Button variant="brand" onClick={() => { setShowDecks(null); openAssign(showDecks!.id); setAssignDeckIds(new Set()); }}>
               <BookOpen className="w-4 h-4" /> Giao thêm bộ đề
             </Button>
           </DialogFooter>
@@ -458,26 +461,48 @@ export default function AdminUsersPage() {
               </div>
             )}
             <div>
-              <Label>Chọn bộ đề *</Label>
-              <Select value={assignDeckId} onValueChange={setAssignDeckId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn bộ đề" /></SelectTrigger>
-                <SelectContent>
+              <Label>Chọn bộ đề * <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span></Label>
+              {decks.length === 0 ? (
+                <p className="text-xs text-muted-foreground mt-2">Chưa có bộ đề nào trong hệ thống.</p>
+              ) : (
+                <div className="mt-2 max-h-56 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
                   {decks.map((d: DeckItem) => {
                     const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+                    const checked    = assignDeckIds.has(d.id);
                     return (
-                      <SelectItem key={d.id} value={d.id}>
-                        <span className={alreadyHas ? "text-muted-foreground" : ""}>
-                          {alreadyHas ? "✓ " : ""}{d.title}
-                          {d.level ? ` (${d.level})` : ""}
-                          {d.word_count ? ` — ${d.word_count} từ` : ""}
-                        </span>
-                      </SelectItem>
+                      <label key={d.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                          alreadyHas ? "opacity-50 cursor-not-allowed" : "hover:bg-brand-light"
+                        } ${checked ? "bg-brand-light" : ""}`}>
+                        <input
+                          type="checkbox"
+                          disabled={alreadyHas}
+                          checked={checked}
+                          onChange={e => {
+                            const next = new Set(assignDeckIds);
+                            if (e.target.checked) next.add(d.id);
+                            else next.delete(d.id);
+                            setAssignDeckIds(next);
+                          }}
+                          className="w-4 h-4 accent-brand flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
+                            {alreadyHas ? "✓ " : ""}{d.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                      </label>
                     );
                   })}
-                </SelectContent>
-              </Select>
-              {decks.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">Chưa có bộ đề nào trong hệ thống.</p>
+                </div>
+              )}
+              {assignDeckIds.size > 0 && (
+                <p className="text-xs text-brand font-semibold mt-1.5">
+                  Đã chọn {assignDeckIds.size} bộ đề
+                </p>
               )}
             </div>
             <div>
@@ -489,9 +514,10 @@ export default function AdminUsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssign(null)}>Hủy</Button>
-            <Button variant="brand" disabled={!assignDeckId || assignDeck.isPending}
-              onClick={() => assignDeck.mutate({ userId: showAssign!, deckId: assignDeckId, expiredAt: assignExpiry })}>
-              {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Giao
+            <Button variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
+              onClick={() => assignDeck.mutate({ userId: showAssign!, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
+              {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Giao {assignDeckIds.size > 0 ? `${assignDeckIds.size} đề` : ""}
             </Button>
           </DialogFooter>
         </DialogContent>

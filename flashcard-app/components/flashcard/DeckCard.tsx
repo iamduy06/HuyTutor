@@ -11,9 +11,10 @@ interface DeckCardProps {
   ctaLabel?: string;
   showProgress?: boolean;
   progressPercent?: number;
+  showPublicBadge?: boolean;  // chỉ hiện ở admin context
 }
 
-export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, progressPercent }: DeckCardProps) {
+export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, progressPercent, showPublicBadge = false }: DeckCardProps) {
   return (
     <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5 flex flex-col gap-3 hover:border-brand hover:shadow-lg transition-all group">
       <div className="flex items-start justify-between gap-2">
@@ -26,10 +27,11 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
               {deck.level}
             </span>
           )}
-          {deck.is_public
-            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>
-            : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
-          }
+          {showPublicBadge && (
+            deck.is_public
+              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>
+              : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
+          )}
         </div>
       </div>
 
