@@ -59,6 +59,14 @@ export function SiteHeader() {
                 </Link>
               </Button>
             )}
+            {user.role === "SUBADMIN" && (
+              <Button variant="brand-outline" size="sm" asChild>
+                <Link href="/subadmin">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">SubAdmin</span>
+                </Link>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard">
                 <LayoutDashboard className="w-4 h-4" />

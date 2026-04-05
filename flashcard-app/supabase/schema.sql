@@ -220,3 +220,55 @@ ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS level_max TEXT DEFAULT NULL;
 ALTER TABLE public.decks ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
 -- Index for filtering public decks
 CREATE INDEX IF NOT EXISTS idx_decks_is_public ON public.decks(is_public);
+
+-- ============================================================
+-- SUBADMIN FEATURE (Migration)
+-- ============================================================
+
+-- Add SUBADMIN role support
+ALTER TABLE public.users
+  DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE public.users
+  ADD CONSTRAINT users_role_check CHECK (role IN ('USER', 'SUBADMIN', 'ADMIN'));
+
+-- Track which admin/subadmin created a user
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+-- Max users a subadmin can manage (NULL = ADMIN default unlimited)
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS max_managed_users INTEGER DEFAULT 10;
+
+-- Index
+CREATE INDEX IF NOT EXISTS idx_users_created_by ON public.users(created_by);
+
+-- ── RLS: SUBADMIN can see users they created ──────────────────
+-- Update users policy to include subadmin scope
+DROP POLICY IF EXISTS "Users: view own profile" ON public.users;
+CREATE POLICY "Users: view own profile"
+  ON public.users FOR SELECT
+  USING (
+    id = auth.uid()
+    OR public.is_admin()
+    OR (
+      -- subadmin can see users they created
+      EXISTS (
+        SELECT 1 FROM public.users me
+        WHERE me.id = auth.uid() AND me.role = 'SUBADMIN'
+        AND public.users.created_by = auth.uid()
+      )
+    )
+  );
+
+-- Subadmin helper function
+CREATE OR REPLACE FUNCTION public.is_subadmin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid() AND role = 'SUBADMIN'
+  );
+$$;
