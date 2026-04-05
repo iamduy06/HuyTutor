@@ -8,8 +8,7 @@
 
 import { useState } from "react";
 
-const LOGO_URL =
-  "https://drive.google.com/thumbnail?id=1chYG_qCghZCS2li7fgixW8rHcBAL8rPC&sz=w200";
+const LOGO_URL = "https://drive.google.com/thumbnail?id=1chYG_qCghZCS2li7fgixW8rHcBAL8rPC&sz=w200";
 
 interface LogoProps {
   height?: number;

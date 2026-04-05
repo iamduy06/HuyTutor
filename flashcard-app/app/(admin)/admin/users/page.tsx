@@ -251,83 +251,75 @@ export default function AdminUsersPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa]">
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Email</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Role</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Ngày tạo</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Bộ đề</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(u => {
-                  const deckCount = u.user_decks?.length ?? 0;
-                  return (
-                    <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
-                      <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px] truncate">{u.email}</td>
-                      <td className="p-3">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-brand-light text-brand"
-                        }`}>{u.role}</span>
-                      </td>
-                      <td className="p-3 text-muted-foreground text-xs">{fmtDate(u.created_at)}</td>
+        <div className="flex flex-col gap-4">
+          {/* ── ADMIN direct users ── */}
+          {adminDirectUsers.length > 0 && (
+            <UserGroupTable
+              title="👑 Quản lý trực tiếp bởi Admin"
+              titleColor="text-purple-700"
+              bgColor="bg-purple-50"
+              users={adminDirectUsers}
+              decks={decks}
+              onAssign={openAssign}
+              onViewDecks={setShowDecks}
+              onResetPw={u => resetPw.mutate({ userId: u.id, email: u.email })}
+              onDelete={u => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}
+              onChangeRole={(u, role) => { if (confirm(`Đổi quyền ${u.email} → ${role}?`)) changeRole.mutate({ userId: u.id, role }); }}
+            />
+          )}
 
-                      {/* Bộ đề: chỉ hiện số, click để xem chi tiết */}
-                      <td className="p-3">
-                        {deckCount === 0 ? (
-                          <span className="text-xs text-muted-foreground">Chưa có</span>
-                        ) : (
-                          <button
-                            onClick={() => setShowDecks(u)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand bg-brand-light px-2.5 py-1 rounded-full hover:bg-brand hover:text-white transition-all"
-                          >
-                            <BookOpen className="w-3 h-3" />
-                            {deckCount} bộ đề
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                        )}
-                      </td>
+          {/* ── SubAdmin groups ── */}
+          {Array.from(subadminMap.values()).map(({ subadmin, managed }) => (
+            <div key={subadmin.id} className="bg-white rounded-2xl border-2 border-orange-200 overflow-hidden">
+              {/* SubAdmin header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-orange-50 border-b border-orange-200 flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">SUBADMIN</span>
+                  <span className="font-bold text-[#1a1a2e] text-sm">{subadmin.email}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({managed.length} / {subadmin.max_managed_users ?? 10} users)
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                    onClick={() => { openAssign(subadmin.id); }}>
+                    <BookOpen className="w-3 h-3" /> Giao đề
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                    onClick={() => { if (confirm(`Reset PW ${subadmin.email}?`)) resetPw.mutate({ userId: subadmin.id, email: subadmin.email }); }}>
+                    <RefreshCw className="w-3 h-3" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
+                    onClick={() => { if (confirm(`Xóa SubAdmin ${subadmin.email}?`)) deleteUser.mutate(subadmin.id); }}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              {/* SubAdmin's managed users */}
+              {managed.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-muted-foreground italic">Chưa có người dùng nào trong nhóm này.</div>
+              ) : (
+                <UserGroupTable
+                  title=""
+                  users={managed}
+                  decks={decks}
+                  onAssign={openAssign}
+                  onViewDecks={setShowDecks}
+                  onResetPw={u => resetPw.mutate({ userId: u.id, email: u.email })}
+                  onDelete={u => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}
+                  onChangeRole={(u, role) => { if (confirm(`Đổi quyền ${u.email} → ${role}?`)) changeRole.mutate({ userId: u.id, role }); }}
+                  compact
+                />
+              )}
+            </div>
+          ))}
 
-                      <td className="p-3">
-                        <div className="flex gap-1.5 flex-wrap">
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                            onClick={() => openAssign(u.id)}>
-                            <BookOpen className="w-3 h-3" /> Giao đề
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                            onClick={() => resetPw.mutate({ userId: u.id, email: u.email })} disabled={resetPw.isPending}>
-                            <RefreshCw className="w-3 h-3" /> Reset PW
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                            title={u.role === "ADMIN" ? "Hạ xuống USER" : "Nâng lên ADMIN"}
-                            onClick={() => {
-                              const newRole = u.role === "ADMIN" ? "USER" : "ADMIN";
-                              if (confirm(`Đổi role của ${u.email} thành ${newRole}?`))
-                                changeRole.mutate({ userId: u.id, role: newRole });
-                            }}>
-                            <Shield className="w-3 h-3" /> {u.role === "ADMIN" ? "→USER" : "→ADM"}
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
-                            onClick={() => { if (confirm("Xóa user này?")) deleteUser.mutate(u.id); }}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Không tìm thấy người dùng</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {filtered.length === 0 && (
+            <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 text-center text-muted-foreground">
+              Không tìm thấy người dùng nào
+            </div>
+          )}
         </div>
-      )}
 
       {/* ════ Dialog: Tạo user ════ */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -460,85 +452,12 @@ export default function AdminUsersPage() {
                 </div>
               </div>
             )}
-            <div>
-              <Label>Chọn bộ đề * <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span></Label>
-              {decks.length === 0 ? (
-                <p className="text-xs text-muted-foreground mt-2">Chưa có bộ đề nào trong hệ thống.</p>
-              ) : (
-                <>
-                  {/* Chọn tất cả */}
-                  <div className="flex items-center justify-between mt-2 mb-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const assignable = decks.filter((d: DeckItem) =>
-                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
-                        );
-                        const allSelected = assignable.every((d: DeckItem) => assignDeckIds.has(d.id));
-                        const next = new Set(assignDeckIds);
-                        if (allSelected) {
-                          assignable.forEach((d: DeckItem) => next.delete(d.id));
-                        } else {
-                          assignable.forEach((d: DeckItem) => next.add(d.id));
-                        }
-                        setAssignDeckIds(next);
-                      }}
-                      className="text-xs font-semibold text-brand hover:underline"
-                    >
-                      {(() => {
-                        const assignable = decks.filter((d: DeckItem) =>
-                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
-                        );
-                        return assignable.length > 0 && assignable.every((d: DeckItem) => assignDeckIds.has(d.id))
-                          ? "✕ Bỏ chọn tất cả"
-                          : "✓ Chọn tất cả";
-                      })()}
-                    </button>
-                    <span className="text-xs text-muted-foreground">
-                      {decks.filter((d: DeckItem) => !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)).length} bộ đề có thể giao
-                    </span>
-                  </div>
-                <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
-                  {decks.map((d: DeckItem) => {
-                    const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
-                    const checked    = assignDeckIds.has(d.id);
-                    return (
-                      <label key={d.id}
-                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                          alreadyHas ? "opacity-50 cursor-not-allowed" : "hover:bg-brand-light"
-                        } ${checked ? "bg-brand-light" : ""}`}>
-                        <input
-                          type="checkbox"
-                          disabled={alreadyHas}
-                          checked={checked}
-                          onChange={e => {
-                            const next = new Set(assignDeckIds);
-                            if (e.target.checked) next.add(d.id);
-                            else next.delete(d.id);
-                            setAssignDeckIds(next);
-                          }}
-                          className="w-4 h-4 accent-brand flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
-                            {alreadyHas ? "✓ " : ""}{d.title}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-                </>
-              )}
-              {assignDeckIds.size > 0 && (
-                <p className="text-xs text-brand font-semibold mt-1.5">
-                  Đã chọn {assignDeckIds.size} bộ đề
-                </p>
-              )}
-            </div>
+            <AssignDeckList
+              decks={decks}
+              assignedUser={assignedUser}
+              assignDeckIds={assignDeckIds}
+              setAssignDeckIds={setAssignDeckIds}
+            />
             <div>
               <Label>Ngày hết hạn</Label>
               <Input type="datetime-local" value={assignExpiry}
@@ -600,6 +519,208 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+
+// ── Helper component: Deck assign multi-select ──────────────────────────────
+interface AssignDeckListProps {
+  decks: DeckItem[];
+  assignedUser: UserData | undefined;
+  assignDeckIds: Set<string>;
+  setAssignDeckIds: (s: Set<string>) => void;
+}
+
+function AssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckIds }: AssignDeckListProps) {
+  const assignable = decks.filter(d =>
+    !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
+  );
+  const allSelected = assignable.length > 0 && assignable.every(d => assignDeckIds.has(d.id));
+
+  function toggleAll() {
+    const next = new Set(assignDeckIds);
+    if (allSelected) {
+      assignable.forEach(d => next.delete(d.id));
+    } else {
+      assignable.forEach(d => next.add(d.id));
+    }
+    setAssignDeckIds(next);
+  }
+
+  function toggleOne(id: string, checked: boolean) {
+    const next = new Set(assignDeckIds);
+    if (checked) next.add(id);
+    else next.delete(id);
+    setAssignDeckIds(next);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <Label>
+          Chọn bộ đề{" "}
+          <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span>
+        </Label>
+        {assignable.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="text-xs font-semibold text-brand hover:underline flex-shrink-0"
+          >
+            {allSelected ? "✕ Bỏ chọn tất cả" : "✓ Chọn tất cả"}
+          </button>
+        )}
+      </div>
+      {decks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Chưa có bộ đề nào trong hệ thống.</p>
+      ) : (
+        <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
+          {decks.map(d => {
+            const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+            const checked = assignDeckIds.has(d.id);
+            return (
+              <label
+                key={d.id}
+                className={[
+                  "flex items-center gap-3 px-3 py-2.5 transition-colors",
+                  alreadyHas ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
+                  checked && !alreadyHas ? "bg-brand-light" : "",
+                ].join(" ")}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!!alreadyHas}
+                  checked={checked}
+                  onChange={e => toggleOne(d.id, e.target.checked)}
+                  className="w-4 h-4 accent-brand flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
+                    {alreadyHas ? "✓ " : ""}{d.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {assignDeckIds.size > 0 && (
+        <p className="text-xs text-brand font-semibold mt-1.5">
+          Đã chọn {assignDeckIds.size} bộ đề
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── UserGroupTable: renders a table of users in a group ──────────────────────
+interface UserGroupTableProps {
+  title: string;
+  titleColor?: string;
+  bgColor?: string;
+  users: UserData[];
+  decks: DeckItem[];
+  compact?: boolean;
+  onAssign: (userId: string) => void;
+  onViewDecks: (u: UserData) => void;
+  onResetPw: (u: UserData) => void;
+  onDelete: (u: UserData) => void;
+  onChangeRole: (u: UserData, role: string) => void;
+}
+
+function UserGroupTable({
+  title, titleColor = "text-[#1a1a2e]", bgColor = "",
+  users, compact, onAssign, onViewDecks, onResetPw, onDelete, onChangeRole
+}: UserGroupTableProps) {
+  if (users.length === 0 && !title) return null;
+
+  return (
+    <div className={`bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden ${compact ? "rounded-t-none border-t-0" : ""}`}>
+      {title && (
+        <div className={`px-4 py-2.5 border-b border-[#f0e0e7] ${bgColor}`}>
+          <h3 className={`text-sm font-bold ${titleColor}`}>{title}</h3>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          {!compact && (
+            <thead>
+              <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa]">
+                <th className="text-left p-3 font-bold text-[#1a1a2e]">Email</th>
+                <th className="text-left p-3 font-bold text-[#1a1a2e]">Role</th>
+                <th className="text-left p-3 font-bold text-[#1a1a2e]">Ngày tạo</th>
+                <th className="text-left p-3 font-bold text-[#1a1a2e]">Bộ đề</th>
+                <th className="text-left p-3 font-bold text-[#1a1a2e]">Thao tác</th>
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {users.map(u => {
+              const deckCount = u.user_decks?.length ?? 0;
+              return (
+                <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
+                  <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px]">
+                    <div className="truncate">{u.email}</div>
+                  </td>
+                  <td className="p-3">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      u.role === "ADMIN"    ? "bg-purple-100 text-purple-700" :
+                      u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
+                                             "bg-brand-light text-brand"
+                    }`}>{u.role}</span>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(u.created_at).toLocaleDateString("vi-VN")}
+                  </td>
+                  <td className="p-3">
+                    {deckCount === 0 ? (
+                      <span className="text-xs text-muted-foreground">Chưa có</span>
+                    ) : (
+                      <button
+                        onClick={() => onViewDecks(u)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand bg-brand-light px-2.5 py-1 rounded-full hover:bg-brand hover:text-white transition-all">
+                        <BookOpen className="w-3 h-3" />
+                        {deckCount} bộ đề
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-1 flex-wrap">
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                        onClick={() => onAssign(u.id)}>
+                        <BookOpen className="w-3 h-3" /> Giao đề
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                        onClick={() => onResetPw(u)}>
+                        <RefreshCw className="w-3 h-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                        title={`Đổi role (hiện: ${u.role})`}
+                        onClick={() => {
+                          const roles = ["USER", "SUBADMIN", "ADMIN"];
+                          const next = roles[(roles.indexOf(u.role) + 1) % roles.length];
+                          onChangeRole(u, next);
+                        }}>
+                        <Shield className="w-3 h-3" /> {u.role === "USER" ? "→Sub" : u.role === "SUBADMIN" ? "→Adm" : "→User"}
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
+                        onClick={() => onDelete(u)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {users.length === 0 && (
+              <tr><td colSpan={5} className="p-4 text-center text-xs text-muted-foreground">Trống</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

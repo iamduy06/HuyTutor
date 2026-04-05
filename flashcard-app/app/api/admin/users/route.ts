@@ -19,7 +19,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data: users, error } = await supabase
     .from("users")
-    .select(`*, user_decks(*, deck:decks(title))`)
+    .select(`*, user_decks(id, deck_id, expired_at, deck:decks(title)), creator:users!created_by(id, email, role)`)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
