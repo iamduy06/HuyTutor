@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
         if (!res.ok) throw new Error("Failed");
       }
     },
-    onSuccess: (_: unknown, vars: { deckIds: string[] }) => {
+    onSuccess: (_: unknown, vars: { userId: string; deckIds: string[]; expiredAt: string }) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
       toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
@@ -460,12 +460,85 @@ export default function AdminUsersPage() {
                 </div>
               </div>
             )}
-            <AssignDeckList
-              decks={decks}
-              assignedUser={assignedUser}
-              assignDeckIds={assignDeckIds}
-              setAssignDeckIds={setAssignDeckIds}
-            />
+            <div>
+              <Label>Chọn bộ đề * <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span></Label>
+              {decks.length === 0 ? (
+                <p className="text-xs text-muted-foreground mt-2">Chưa có bộ đề nào trong hệ thống.</p>
+              ) : (
+                <>
+                  {/* Chọn tất cả */}
+                  <div className="flex items-center justify-between mt-2 mb-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const assignable = decks.filter((d: DeckItem) =>
+                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
+                        );
+                        const allSelected = assignable.every((d: DeckItem) => assignDeckIds.has(d.id));
+                        const next = new Set(assignDeckIds);
+                        if (allSelected) {
+                          assignable.forEach((d: DeckItem) => next.delete(d.id));
+                        } else {
+                          assignable.forEach((d: DeckItem) => next.add(d.id));
+                        }
+                        setAssignDeckIds(next);
+                      }}
+                      className="text-xs font-semibold text-brand hover:underline"
+                    >
+                      {(() => {
+                        const assignable = decks.filter((d: DeckItem) =>
+                          !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
+                        );
+                        return assignable.length > 0 && assignable.every((d: DeckItem) => assignDeckIds.has(d.id))
+                          ? "✕ Bỏ chọn tất cả"
+                          : "✓ Chọn tất cả";
+                      })()}
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      {decks.filter((d: DeckItem) => !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)).length} bộ đề có thể giao
+                    </span>
+                  </div>
+                <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
+                  {decks.map((d: DeckItem) => {
+                    const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+                    const checked    = assignDeckIds.has(d.id);
+                    return (
+                      <label key={d.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                          alreadyHas ? "opacity-50 cursor-not-allowed" : "hover:bg-brand-light"
+                        } ${checked ? "bg-brand-light" : ""}`}>
+                        <input
+                          type="checkbox"
+                          disabled={alreadyHas}
+                          checked={checked}
+                          onChange={e => {
+                            const next = new Set(assignDeckIds);
+                            if (e.target.checked) next.add(d.id);
+                            else next.delete(d.id);
+                            setAssignDeckIds(next);
+                          }}
+                          className="w-4 h-4 accent-brand flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
+                            {alreadyHas ? "✓ " : ""}{d.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                </>
+              )}
+              {assignDeckIds.size > 0 && (
+                <p className="text-xs text-brand font-semibold mt-1.5">
+                  Đã chọn {assignDeckIds.size} bộ đề
+                </p>
+              )}
+            </div>
             <div>
               <Label>Ngày hết hạn</Label>
               <Input type="datetime-local" value={assignExpiry}
@@ -529,97 +602,4 @@ export default function AdminUsersPage() {
       </Dialog>
     </div>
   );
-
-// ── Helper component: Deck assign multi-select ──────────────────────────────
-interface AssignDeckListProps {
-  decks: DeckItem[];
-  assignedUser: UserData | undefined;
-  assignDeckIds: Set<string>;
-  setAssignDeckIds: (s: Set<string>) => void;
-}
-
-function AssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckIds }: AssignDeckListProps) {
-  const assignable = decks.filter(d =>
-    !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
-  );
-  const allSelected = assignable.length > 0 && assignable.every(d => assignDeckIds.has(d.id));
-
-  function toggleAll() {
-    const next = new Set(assignDeckIds);
-    if (allSelected) {
-      assignable.forEach(d => next.delete(d.id));
-    } else {
-      assignable.forEach(d => next.add(d.id));
-    }
-    setAssignDeckIds(next);
-  }
-
-  function toggleOne(id: string, checked: boolean) {
-    const next = new Set(assignDeckIds);
-    if (checked) next.add(id);
-    else next.delete(id);
-    setAssignDeckIds(next);
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <Label>
-          Chọn bộ đề{" "}
-          <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span>
-        </Label>
-        {assignable.length > 0 && (
-          <button
-            type="button"
-            onClick={toggleAll}
-            className="text-xs font-semibold text-brand hover:underline flex-shrink-0"
-          >
-            {allSelected ? "✕ Bỏ chọn tất cả" : "✓ Chọn tất cả"}
-          </button>
-        )}
-      </div>
-      {decks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Chưa có bộ đề nào trong hệ thống.</p>
-      ) : (
-        <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
-          {decks.map(d => {
-            const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
-            const checked = assignDeckIds.has(d.id);
-            return (
-              <label
-                key={d.id}
-                className={[
-                  "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                  alreadyHas ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
-                  checked && !alreadyHas ? "bg-brand-light" : "",
-                ].join(" ")}
-              >
-                <input
-                  type="checkbox"
-                  disabled={!!alreadyHas}
-                  checked={checked}
-                  onChange={e => toggleOne(d.id, e.target.checked)}
-                  className="w-4 h-4 accent-brand flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
-                    {alreadyHas ? "✓ " : ""}{d.title}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      )}
-      {assignDeckIds.size > 0 && (
-        <p className="text-xs text-brand font-semibold mt-1.5">
-          Đã chọn {assignDeckIds.size} bộ đề
-        </p>
-      )}
-    </div>
-  );
-}
 }

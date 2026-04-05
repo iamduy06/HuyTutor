@@ -124,7 +124,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
     };
 
     try {
-      const url = await Promise.race<string | null>([
+        const url = await Promise.race<string | null>([
         fetchDictAudio(raw),
         new Promise<string | null>(r => setTimeout(() => r(null), 4000)),
       ]);
