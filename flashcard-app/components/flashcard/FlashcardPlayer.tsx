@@ -124,9 +124,9 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
     };
 
     try {
-        const url = await Promise.race<string | null>([
+      const url = await Promise.race<string | null>([
         fetchDictAudio(raw),
-        new Promise<string | null>(r => setTimeout(() => r(null), 4000)),
+        new Promise(r => setTimeout(() => r(null), 4000)),
       ]);
       if (token !== tokenRef.current) return;
       if (!url) { fallback(); return; }
@@ -275,6 +275,8 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
             </button>
           ))}
         </div>
+      </nav>
+
       </nav>
 
       {/* ── MAIN (desktop) ── */}
