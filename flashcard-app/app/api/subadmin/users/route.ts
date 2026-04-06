@@ -12,17 +12,16 @@ async function checkSubAdmin() {
   return data;
 }
 
-// GET: List users created by this subadmin
+// GET: List users created by this subadmin (or all if ADMIN)
 export async function GET() {
   const me = await checkSubAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const admin = createAdminClient();
 
-  // If ADMIN → all users; if SUBADMIN → only users they created
   let query = admin
     .from("users")
-    .select("id, email, role, created_at, created_by, user_decks(id, deck_id, expired_at, deck:decks(title))")
+    .select("id, email, role, created_at, created_by, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
     .order("created_at", { ascending: false });
 
   if (me.role === "SUBADMIN") {
@@ -49,17 +48,18 @@ export async function POST(request: NextRequest) {
   const me = await checkSubAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { email, role = "USER" } = await request.json();
+  const { email, role = "USER", password: customPw } = await request.json();
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  // SubADMIN can only create USER or SUBADMIN (not ADMIN)
+  // SubADMIN chỉ tạo được USER hoặc SUBADMIN
   if (!["USER", "SUBADMIN"].includes(role)) {
-    return NextResponse.json({ error: "SubAdmin cannot create ADMIN" }, { status: 403 });
+    return NextResponse.json({ error: "SubAdmin không thể tạo ADMIN" }, { status: 403 });
   }
 
-  // Check max_managed_users limit (only for SUBADMIN)
+  const admin = createAdminClient();
+
+  // Kiểm tra giới hạn tài khoản (chỉ áp dụng cho SUBADMIN)
   if (me.role === "SUBADMIN") {
-    const admin = createAdminClient();
     const { count } = await admin
       .from("users")
       .select("*", { count: "exact", head: true })
@@ -74,23 +74,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const password = generatePassword(8);
-  const admin = createAdminClient();
+  const password = customPw?.trim() || generatePassword(10);
 
+  // Truyền role và created_by qua user_metadata → trigger sẽ đọc và set đúng
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
+    user_metadata: {
+      role,
+      created_by: me.id,  // subadmin's id
+    },
   });
+
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
-  const { error: profileError } = await admin.from("users").insert({
+  // Upsert để đảm bảo role và created_by đúng (phòng trigger chậm)
+  const { error: upsertError } = await admin.from("users").upsert({
     id: authUser.user.id,
     email,
     role,
     created_by: me.id,
-  });
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+  }, { onConflict: "id" });
+
+  if (upsertError) {
+    console.error("Profile upsert error:", upsertError.message);
+  }
 
   return NextResponse.json({ user: authUser.user, tempPassword: password });
 }

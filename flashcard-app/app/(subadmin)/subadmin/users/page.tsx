@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, Shield, UserMinus
+  Copy, Check, Shield, UserMinus, Shuffle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ export default function SubAdminUsersPage() {
   const [showCreate,   setShowCreate]   = useState(false);
   const [newEmail,     setNewEmail]     = useState("");
   const [newRole,      setNewRole]      = useState("USER");
+  const [newPassword,  setNewPassword]  = useState("");
   const [tempPw,       setTempPw]       = useState("");
   const [copied,       setCopied]       = useState(false);
 
@@ -75,10 +76,10 @@ export default function SubAdminUsersPage() {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createUser = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+    mutationFn: async ({ email, role, password }: { email: string; role: string; password?: string }) => {
       const res = await fetch("/api/subadmin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, password: password?.trim() || undefined }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
@@ -336,6 +337,28 @@ export default function SubAdminUsersPage() {
                   placeholder="user@example.com" className="mt-1" />
               </div>
               <div>
+                <Label>Mật khẩu (để trống = tự tạo ngẫu nhiên)</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    type="text"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Để trống hoặc nhập mật khẩu"
+                    className="flex-1 font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    title="Tạo mật khẩu ngẫu nhiên"
+                    onClick={() => setNewPassword(generatePassword(10))}
+                    className="flex-shrink-0"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div>
                 <Label>Quyền</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -348,7 +371,7 @@ export default function SubAdminUsersPage() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={!newEmail || createUser.isPending}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole })}>
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword })}>
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
                 </Button>
               </DialogFooter>

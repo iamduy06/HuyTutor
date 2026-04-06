@@ -246,14 +246,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_role       TEXT;
+  v_created_by UUID;
 BEGIN
-  INSERT INTO public.users (id, email, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'USER')
-  )
-  ON CONFLICT (id) DO NOTHING;
+  -- Read role and created_by from metadata passed by the API
+  v_role       := COALESCE(NEW.raw_user_meta_data->>'role', 'USER');
+  v_created_by := NULLIF(NEW.raw_user_meta_data->>'created_by', '')::UUID;
+
+  INSERT INTO public.users (id, email, role, created_by)
+  VALUES (NEW.id, NEW.email, v_role, v_created_by)
+  ON CONFLICT (id) DO UPDATE
+    SET role       = EXCLUDED.role,
+        created_by = COALESCE(EXCLUDED.created_by, public.users.created_by);
   RETURN NEW;
 END;
 $$;

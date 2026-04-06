@@ -34,25 +34,34 @@ export async function POST(request: NextRequest) {
   const { email, role = "USER" } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  // Dùng mật khẩu do admin nhập, hoặc tự tạo nếu không nhập
+  // Dùng mật khẩu do admin nhập, hoặc tự tạo ngẫu nhiên nếu không nhập
   const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
+  // Truyền role qua user_metadata → trigger handle_new_user sẽ đọc và set đúng
+  // Admin tạo user → created_by = null (không cần set)
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
+    user_metadata: { role },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
-  const { error: profileError } = await supabase.from("users").insert({
+  // Trigger đã insert vào public.users với đúng role
+  // Nếu cần ensure (phòng trigger chưa chạy kịp), upsert thêm
+  const { error: upsertError } = await supabase.from("users").upsert({
     id: authUser.user.id,
     email,
     role,
-  });
+    // created_by để null → admin tạo trực tiếp
+  }, { onConflict: "id" });
 
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+  if (upsertError) {
+    console.error("Profile upsert error:", upsertError.message);
+    // Không return lỗi vì trigger đã tạo row cơ bản
+  }
 
   return NextResponse.json({ user: authUser.user, tempPassword: password });
 }
