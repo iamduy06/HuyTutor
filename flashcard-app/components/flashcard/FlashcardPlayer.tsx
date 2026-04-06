@@ -277,7 +277,6 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
         </div>
       </nav>
 
-      </nav>
 
       {/* ── MAIN (desktop) ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
