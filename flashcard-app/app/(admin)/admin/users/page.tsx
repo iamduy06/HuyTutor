@@ -159,6 +159,21 @@ export default function AdminUsersPage() {
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
+  const updateExpiry = useMutation({
+    mutationFn: async ({ userId, deckId, expiredAt }: { userId: string; deckId: string; expiredAt: string | null }) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã cập nhật thời hạn" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
   const revokeDeck = useMutation({
     mutationFn: async ({ userId, deckId }: { userId: string; deckId: string }) => {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -633,6 +648,84 @@ function UserGroupTable({
             })}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+
+// ── DeckExpiryRow: Inline editable expiry per deck ────────────────────────────
+interface DeckExpiryRowProps {
+  ud: UserDeckItem;
+  userId: string;
+  onUpdate: (expiredAt: string | null) => void;
+  onRevoke: () => void;
+}
+
+function DeckExpiryRow({ ud, onUpdate, onRevoke }: DeckExpiryRowProps) {
+  const [editing,    setEditing]    = useState(false);
+  // Convert stored UTC ISO string to local datetime-local input value
+  const toLocalInput = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [expiryVal, setExpiryVal] = useState(() => toLocalInput(ud.expired_at));
+  const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
+
+  return (
+    <div className="p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm text-[#1a1a2e] truncate">{ud.deck?.title ?? "?"}</div>
+          {!editing && (
+            ud.expired_at
+              ? <div className={`text-xs mt-0.5 ${isExp ? "text-red-500" : "text-green-600"}`}>
+                  {isExp ? "⛔" : "✅"} Hạn: {new Date(ud.expired_at).toLocaleDateString("vi-VN")}
+                </div>
+              : <div className="text-xs text-green-600 mt-0.5">♾️ Không giới hạn</div>
+          )}
+          {editing && (
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <input
+                type="datetime-local"
+                value={expiryVal}
+                onChange={e => setExpiryVal(e.target.value)}
+                className="text-xs border border-[#f0e0e7] rounded-lg px-2 py-1 outline-none focus:border-brand"
+              />
+              <button
+                className="text-xs text-muted-foreground hover:text-[#1a1a2e]"
+                onClick={() => setExpiryVal("")}
+              >Xóa hạn</button>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1 flex-shrink-0">
+          {!editing ? (
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs text-brand hover:underline font-semibold px-1.5"
+              title="Sửa thời hạn"
+            >✏️</button>
+          ) : (
+            <>
+              <button
+                onClick={() => { onUpdate(expiryVal || null); setEditing(false); }}
+                className="text-xs bg-brand text-white px-2 py-0.5 rounded-lg font-semibold hover:bg-[#c0003a]"
+              >Lưu</button>
+              <button
+                onClick={() => { setExpiryVal(toLocalInput(ud.expired_at)); setEditing(false); }}
+                className="text-xs border border-[#f0e0e7] px-2 py-0.5 rounded-lg hover:bg-gray-50"
+              >Hủy</button>
+            </>
+          )}
+          <button
+            onClick={onRevoke}
+            className="text-xs text-red-500 hover:text-red-700 px-1.5 font-semibold"
+            title="Thu hồi"
+          >✕</button>
+        </div>
       </div>
     </div>
   );

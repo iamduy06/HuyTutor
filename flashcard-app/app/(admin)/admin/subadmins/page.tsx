@@ -42,6 +42,39 @@ export default function AdminSubAdminsPage() {
   const [deckIds,      setDeckIds]      = useState<Set<string>>(new Set());
   const [expiry,       setExpiry]       = useState("");
   const [search,       setSearch]       = useState("");
+  const [showDelete,   setShowDelete]   = useState<SubAdminUser | null>(null);
+  const [deleteUserIds, setDeleteUserIds] = useState<Set<string>>(new Set());
+  const [managedUsers, setManagedUsers]  = useState<{ id: string; email: string; role: string }[]>([]);
+
+  // Fetch managed users when delete dialog opens
+  async function openDeleteDialog(sa: SubAdminUser) {
+    const res = await fetch(`/api/admin/subadmins/${sa.id}/managed`);
+    let managed: { id: string; email: string; role: string }[] = [];
+    if (res.ok) {
+      const d = await res.json();
+      managed = d.users ?? [];
+    }
+    setManagedUsers(managed);
+    setDeleteUserIds(new Set());
+    setShowDelete(sa);
+  }
+
+  const deleteSubAdmin = useMutation({
+    mutationFn: async ({ saId, deleteIds }: { saId: string; deleteIds: string[] }) => {
+      const res = await fetch(`/api/admin/subadmins/${saId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteUserIds: deleteIds }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-subadmins"] });
+      setShowDelete(null);
+      toast({ title: "Đã xóa SubAdmin" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-subadmins"],
@@ -190,6 +223,10 @@ export default function AdminSubAdminsPage() {
                     onClick={() => { setShowSettings(sa); setMaxUsers(String(sa.max_managed_users ?? 10)); }}>
                     <Settings className="w-3.5 h-3.5" /> Giới hạn
                   </Button>
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-700"
+                    onClick={() => openDeleteDialog(sa)}>
+                    <UserMinus className="w-3.5 h-3.5" /> Xóa
+                  </Button>
                 </div>
               </div>
             </div>
@@ -271,6 +308,83 @@ export default function AdminSubAdminsPage() {
         </DialogContent>
       </Dialog>
     </div>
+
+      {/* ════ Dialog: Xóa SubAdmin ════ */}
+      <Dialog open={!!showDelete} onOpenChange={() => setShowDelete(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>🗑️ Xóa SubAdmin — {showDelete?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+            <p className="text-sm text-muted-foreground">
+              SubAdmin này đang quản lý <strong>{managedUsers.length}</strong> người dùng.
+              Chọn những tài khoản sẽ bị <strong className="text-red-500">xóa theo</strong>.
+              Các tài khoản không được chọn sẽ được chuyển về quản lý trực tiếp bởi Admin.
+            </p>
+            {managedUsers.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Tài khoản do SubAdmin quản lý</Label>
+                  <button type="button"
+                    className="text-xs font-semibold text-red-500 hover:underline"
+                    onClick={() => {
+                      if (deleteUserIds.size === managedUsers.length) {
+                        setDeleteUserIds(new Set());
+                      } else {
+                        setDeleteUserIds(new Set(managedUsers.map(u => u.id)));
+                      }
+                    }}>
+                    {deleteUserIds.size === managedUsers.length ? "☐ Bỏ chọn tất cả" : "☑ Xóa tất cả"}
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
+                  {managedUsers.map(u => (
+                    <label key={u.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-red-50 ${
+                        deleteUserIds.has(u.id) ? "bg-red-50" : ""
+                      }`}>
+                      <input type="checkbox"
+                        checked={deleteUserIds.has(u.id)}
+                        onChange={e => {
+                          const next = new Set(deleteUserIds);
+                          if (e.target.checked) next.add(u.id);
+                          else next.delete(u.id);
+                          setDeleteUserIds(next);
+                        }}
+                        className="w-4 h-4 accent-red-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-semibold truncate ${deleteUserIds.has(u.id) ? "text-red-600" : "text-[#1a1a2e]"}`}>
+                          {u.email}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{u.role}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {deleteUserIds.size > 0 && (
+                  <p className="text-xs text-red-500 font-semibold mt-1.5">
+                    ⚠️ Sẽ xóa vĩnh viễn {deleteUserIds.size} tài khoản
+                  </p>
+                )}
+                {deleteUserIds.size < managedUsers.length && managedUsers.length > 0 && (
+                  <p className="text-xs text-green-600 font-semibold mt-1">
+                    ✓ {managedUsers.length - deleteUserIds.size} tài khoản sẽ được giữ lại (chuyển về Admin)
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-3">
+            <Button variant="outline" onClick={() => setShowDelete(null)}>Hủy</Button>
+            <Button variant="destructive"
+              disabled={deleteSubAdmin.isPending}
+              onClick={() => deleteSubAdmin.mutate({ saId: showDelete!.id, deleteIds: Array.from(deleteUserIds) })}>
+              {deleteSubAdmin.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Xóa SubAdmin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
   );
 }
 

@@ -61,9 +61,10 @@ export function ResetPasswordForm() {
       return;
     }
 
+    // Sign out để user đăng nhập lại với mật khẩu mới
+    await supabase.auth.signOut();
     setDone(true);
     toast({ title: "Mật khẩu đã được cập nhật 🎉" });
-    setTimeout(() => router.push("/dashboard"), 2000);
   }
 
   // Đang kiểm tra token
@@ -102,7 +103,12 @@ export function ResetPasswordForm() {
           <CheckCircle className="w-14 h-14 text-green-500" />
         </div>
         <h1 className="text-xl font-extrabold text-[#1a1a2e] mb-2">Mật khẩu đã được cập nhật!</h1>
-        <p className="text-muted-foreground text-sm">Đang chuyển hướng về Dashboard…</p>
+        <p className="text-muted-foreground text-sm mb-6">
+          Vui lòng đăng nhập lại với mật khẩu mới của bạn.
+        </p>
+        <Button variant="brand" className="w-full rounded-full" asChild>
+          <Link href="/login">Đăng nhập →</Link>
+        </Button>
       </div>
     );
   }

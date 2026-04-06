@@ -49,9 +49,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   // Change role
   if (body.action === "change_role") {
     const { role } = body;
-    if (!["USER", "ADMIN"].includes(role))
+    if (!["USER", "SUBADMIN", "ADMIN"].includes(role))
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-    // Update public.users table
     const { error: dbErr } = await supabase.from("users")
       .update({ role }).eq("id", params.id);
     if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
