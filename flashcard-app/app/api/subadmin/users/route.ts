@@ -21,11 +21,13 @@ export async function GET() {
 
   let query = admin
     .from("users")
-    .select("id, email, role, created_at, created_by, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
+    .select("id, email, role, created_at, created_by, group_id, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
     .order("created_at", { ascending: false });
 
   if (me.role === "SUBADMIN") {
-    query = query.eq("created_by", me.id);
+    // Với Shared Group, Subadmin lấy tất cả user trong cùng group (do admin cấp hoặc do các subadmin con tạo ra)
+    const rootGroupId = me.group_id || me.id;
+    query = query.eq("group_id", rootGroupId);
   }
 
   const { data, error } = await query;
@@ -57,13 +59,14 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+  const rootGroupId = me.group_id || me.id;
 
   // Kiểm tra giới hạn tài khoản (chỉ áp dụng cho SUBADMIN)
   if (me.role === "SUBADMIN") {
     const { count } = await admin
       .from("users")
       .select("*", { count: "exact", head: true })
-      .eq("created_by", me.id);
+      .eq("group_id", rootGroupId);
 
     const max = me.max_managed_users ?? 10;
     if ((count ?? 0) >= max) {
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
 
   const password = customPw?.trim() || generatePassword(10);
 
-  // Truyền role và created_by qua user_metadata → trigger sẽ đọc và set đúng
+  // Truyền role, created_by và group_id qua user_metadata → trigger sẽ đọc và set đúng
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
@@ -84,17 +87,19 @@ export async function POST(request: NextRequest) {
     user_metadata: {
       role,
       created_by: me.id,  // subadmin's id
+      group_id: rootGroupId, // shared group_id
     },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
-  // Upsert để đảm bảo role và created_by đúng (phòng trigger chậm)
+  // Upsert để đảm bảo role, created_by và group_id đúng (phòng trigger chậm)
   const { error: upsertError } = await admin.from("users").upsert({
     id: authUser.user.id,
     email,
     role,
     created_by: me.id,
+    group_id: rootGroupId,
   }, { onConflict: "id" });
 
   if (upsertError) {

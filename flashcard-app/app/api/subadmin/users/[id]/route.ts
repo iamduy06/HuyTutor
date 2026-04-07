@@ -14,14 +14,15 @@ async function checkSubAdmin() {
 
 async function canManage(me: any, targetId: string) {
   if (me.role === "ADMIN") return true;
-  // SubAdmin can only manage users they created
+  // SubAdmin can manage users in the same group_id
   const admin = createAdminClient();
   const { data } = await admin
     .from("users")
-    .select("created_by")
+    .select("group_id")
     .eq("id", targetId)
     .single();
-  return data?.created_by === me.id;
+  const rootGroupId = me.group_id || me.id;
+  return data?.group_id === rootGroupId;
 }
 
 // PATCH: reset_password | assign_deck | revoke_deck | change_role

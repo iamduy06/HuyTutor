@@ -35,7 +35,7 @@ export default function ProfilePage() {
     const { error } = await supabase.auth.updateUser({ password: newPw });
     setSaving(false);
     if (error) { toast({ title: "Thất bại", description: error.message, variant: "destructive" }); }
-    else       { toast({ title: "Đổi mật khẩu thành công 🎉" }); setNewPw(""); setConfirmPw(""); }
+    else       { toast({ title: "Mật khẩu đã được thay đổi thành công" }); setNewPw(""); setConfirmPw(""); }
   }
 
   return (

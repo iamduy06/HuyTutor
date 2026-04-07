@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   max_managed_users INTEGER NOT NULL DEFAULT 10,
   -- max devices per user (NULL = use global app_settings)
   max_devices       INTEGER DEFAULT NULL,
+  -- Group ID for Subadmin hierarchical shared grouping
+  group_id          UUID REFERENCES public.users(id) ON DELETE SET NULL DEFAULT NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -249,16 +251,19 @@ AS $$
 DECLARE
   v_role       TEXT;
   v_created_by UUID;
+  v_group_id   UUID;
 BEGIN
   -- Read role and created_by from metadata passed by the API
   v_role       := COALESCE(NEW.raw_user_meta_data->>'role', 'USER');
   v_created_by := NULLIF(NEW.raw_user_meta_data->>'created_by', '')::UUID;
+  v_group_id   := NULLIF(NEW.raw_user_meta_data->>'group_id', '')::UUID;
 
-  INSERT INTO public.users (id, email, role, created_by)
-  VALUES (NEW.id, NEW.email, v_role, v_created_by)
+  INSERT INTO public.users (id, email, role, created_by, group_id)
+  VALUES (NEW.id, NEW.email, v_role, v_created_by, v_group_id)
   ON CONFLICT (id) DO UPDATE
     SET role       = EXCLUDED.role,
-        created_by = COALESCE(EXCLUDED.created_by, public.users.created_by);
+        created_by = COALESCE(EXCLUDED.created_by, public.users.created_by),
+        group_id   = COALESCE(EXCLUDED.group_id, public.users.group_id);
   RETURN NEW;
 END;
 $$;

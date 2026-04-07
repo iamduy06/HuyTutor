@@ -10,11 +10,26 @@ export function cn(...inputs: ClassValue[]) {
 
 // ─── Misc ──────────────────────────────────────────────────────────────────
 
-export function generatePassword(length = 8): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
-  return Array.from({ length }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
+export function generatePassword(length = 10): string {
+  const uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // removed I, O
+  const lowers = "abcdefghjkmnpqrstuvwxyz"; // removed i, l, o
+  const numbers = "23456789"; // removed 0, 1
+  const symbols = "!@#$%^&*()_+~`|}{[]:;?><,./-=";
+
+  const allChars = uppers + lowers + numbers + symbols;
+
+  let password = "";
+  password += uppers[Math.floor(Math.random() * uppers.length)];
+  password += lowers[Math.floor(Math.random() * lowers.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  password += symbols[Math.floor(Math.random() * symbols.length)];
+
+  for (let i = password.length; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+
+  // Shuffle the password
+  return password.split('').sort(() => 0.5 - Math.random()).join('');
 }
 
 export function formatDate(dateStr: string): string {
