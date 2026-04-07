@@ -3,6 +3,8 @@
 /.pnp
 .pnp.js
 
+/prompt
+
 # testing
 /coverage
 

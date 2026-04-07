@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DECK_LEVELS } from "@/lib/constants";
-import { Switch } from "@/components/ui/switch";
 import { CEFR_LEVELS, WORD_TYPES } from "@/types";
 import type { Deck, Tab, VocabItem } from "@/types";
 
@@ -78,7 +77,7 @@ export default function AdminDecksPage() {
   const [editingWord,  setEditingWord]  = useState<FlatCard | null>(null);
 
   // ── Forms ──
-  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", is_public: false });
+  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", access_mode: "assigned_only" as string });
   const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
   const [wordForm, setWordForm] = useState(EMPTY_WORD);
 
@@ -114,7 +113,9 @@ export default function AdminDecksPage() {
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
-        is_public: deckForm.is_public,
+        access_mode: deckForm.access_mode,
+        // backward compat: set is_public based on mode
+        is_public: deckForm.access_mode === "login_full" || deckForm.access_mode === "public_full",
       };
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -268,11 +269,11 @@ export default function AdminDecksPage() {
 
   // ── Open helpers ──────────────────────────────────────────────────────────
   function openCreateDeck() {
-    setEditingDeck(null); setDeckForm({ title: "", description: "", level_min: "", level_max: "", is_public: false }); setShowDeckDlg(true);
+    setDeckForm({ title: "", description: "", level_min: "", level_max: "", access_mode: "assigned_only" }); setShowDeckDlg(true);
   }
   function openEditDeck(deck: Deck) {
     setEditingDeck(deck);
-    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", is_public: Boolean((deck as any).is_public) });
+    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", access_mode: (deck as any).access_mode ?? "assigned_only" });
     setShowDeckDlg(true);
   }
   function openCreateTab(deckId: string) {
@@ -488,17 +489,23 @@ export default function AdminDecksPage() {
             <div><Label>Mô tả</Label>
               <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
             </div>
-            <div className="flex items-center justify-between p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
-              <div>
-                <p className="font-semibold text-sm text-[#1a1a2e]">Công khai (Public)</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {deckForm.is_public ? "✅ Mọi user đã đăng nhập đều học được full" : "🔒 Chỉ user được cấp quyền mới học được"}
-                </p>
-              </div>
-              <Switch
-                checked={deckForm.is_public}
-                onCheckedChange={v => setDeckForm({ ...deckForm, is_public: v })}
-              />
+            <div className="space-y-2">
+              <Label>Chế độ truy cập</Label>
+              <Select value={deckForm.access_mode} onValueChange={v => setDeckForm({ ...deckForm, access_mode: v })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assigned_only">🔒 Chỉ user được cấp quyền (mặc định)</SelectItem>
+                  <SelectItem value="login_full">🔑 Mọi user đã đăng nhập</SelectItem>
+                  <SelectItem value="public_full">🌐 Tất cả (không cần đăng nhập) — xem full</SelectItem>
+                  <SelectItem value="public_demo">👁️ Tất cả (không cần đăng nhập) — chỉ 10 từ demo</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {deckForm.access_mode === "assigned_only" && "Chỉ học viên được Admin/SubAdmin giao mới học được full."}
+                {deckForm.access_mode === "login_full" && "Bất kỳ user nào đã đăng nhập đều học được full, không cần cấp quyền."}
+                {deckForm.access_mode === "public_full" && "Tất cả mọi người (kể cả chưa đăng nhập) đều xem được full tại trang /decks."}
+                {deckForm.access_mode === "public_demo" && "Mọi người chỉ thấy 10 từ demo, kể cả khi đã đăng nhập."}
+              </p>
             </div>
             <div>
               <Label>Cấp độ CEFR (0–2 mức)</Label>

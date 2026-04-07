@@ -235,7 +235,7 @@ export default function AdminSubAdminsPage() {
           </div>
         )}
 
-        {/* ════ Dialog: Set limit ════ */}
+        {/* Dialog: Set limit */}
         <Dialog open={!!showSettings} onOpenChange={() => setShowSettings(null)}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -265,7 +265,7 @@ export default function AdminSubAdminsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ════ Dialog: Assign Decks to SubAdmin ════ */}
+        {/* Dialog: Assign Decks to SubAdmin */}
         <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
           <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
@@ -310,7 +310,7 @@ export default function AdminSubAdminsPage() {
         </Dialog>
       </div>
 
-      {/* ════ Dialog: Xóa SubAdmin ════ */}
+      {/* Dialog: Delete SubAdmin */}
       <Dialog open={!!showDelete} onOpenChange={() => setShowDelete(null)}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>

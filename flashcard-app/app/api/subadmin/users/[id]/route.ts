@@ -44,24 +44,41 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (body.action === "assign_deck") {
     const { deck_id, expired_at } = body;
+    let finalExpiredAt: string | null = expired_at || null;
 
     // SubAdmin can only assign decks they have access to
     if (me.role === "SUBADMIN") {
       const { data: myDeck } = await admin
         .from("user_decks")
-        .select("id")
+        .select("id, expired_at")
         .eq("user_id", me.id)
         .eq("deck_id", deck_id)
         .single();
       if (!myDeck) {
         return NextResponse.json({ error: "Bạn không có quyền giao bộ đề này" }, { status: 403 });
       }
+
+      // Req 2: Cap user expiry to subadmin's own deck expiry (expiry inheritance)
+      if (myDeck.expired_at) {
+        const saExpiry = new Date(myDeck.expired_at);
+        if (!finalExpiredAt) {
+          // SubAdmin's access expires → user must also expire at same time
+          finalExpiredAt = myDeck.expired_at;
+        } else {
+          const userExpiry = new Date(finalExpiredAt);
+          // Take the earlier of the two dates
+          if (userExpiry > saExpiry) {
+            finalExpiredAt = myDeck.expired_at;
+          }
+        }
+      }
+      // If myDeck.expired_at is null → SubAdmin has unlimited, use user's value as-is
     }
 
     const { error } = await admin.from("user_decks").upsert({
       user_id: params.id,
       deck_id,
-      expired_at: expired_at || null,
+      expired_at: finalExpiredAt,
       progress_percent: 0,
       learned_count: 0,
       streak: 0,
