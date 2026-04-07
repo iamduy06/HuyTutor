@@ -28,6 +28,8 @@ interface UserDeckItem {
 interface UserData {
   id: string; email: string; role: string; created_at: string;
   created_by?: string | null;
+  group_id?: string | null;
+  ui_group?: string | null;
   max_managed_users?: number;
   user_decks?: UserDeckItem[];
   creator?: { id: string; email: string; role: string } | null;
@@ -243,18 +245,38 @@ export default function AdminUsersPage() {
   const assignedUser = users.find(u => u.id === showAssign);
   const filtered     = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
 
-  // ── Group users by subadmin ───────────────────────────────────────────────
-  // Admin-managed: no created_by (or created by admin directly), not a subadmin
-  const adminDirectUsers = filtered.filter(u => !u.created_by && u.role !== "SUBADMIN");
+  // ── Group users ─────────────────────────────────────────────────────────
 
-  // All subadmins
-  const allSubadmins = users.filter(u => u.role === "SUBADMIN");
+  // Identify all distinct group_ids among SUBADMINs
+  const subadminGroupIds = Array.from(new Set(
+    users.filter(u => u.role === "SUBADMIN").map(u => u.group_id || u.id)
+  ));
 
-  // Build map: subadmin_id → { subadmin, managed users }
-  const subadminGroups: Array<{ subadmin: UserData; managed: UserData[] }> = allSubadmins.map(sa => ({
-    subadmin: sa,
-    managed: filtered.filter(u => u.created_by === sa.id),
-  }));
+  // Find the Root Subadmin for each group
+  const rootSubadmins = subadminGroupIds.map(gid => {
+    const groupSubAdmins = users.filter(u => u.role === "SUBADMIN" && (u.group_id === gid || (!u.group_id && u.id === gid)));
+    return groupSubAdmins.find(u => u.id === gid) || groupSubAdmins[0];
+  }).filter(Boolean);
+
+  const subadminGroups = rootSubadmins.map(sa => {
+    const gid = sa.group_id || sa.id;
+    return {
+      subadmin: sa,
+      // Everyone who belongs to this group (except the root subadmin themselves)
+      managed: filtered.filter(u => u.id !== sa.id && (u.group_id === gid || (!u.group_id && u.created_by === sa.id)))
+    };
+  });
+
+  // Admin-managed users are those who do not belong to any Subadmin group
+  const adminManaged = filtered.filter(u => !subadminGroupIds.includes(u.group_id || u.id) && u.role !== "SUBADMIN");
+
+  // Group Admin-managed users by `ui_group`
+  const adminUIGroups = adminManaged.reduce((acc, u) => {
+    const groupName = u.ui_group || "CHƯA PHÂN NHÓM";
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(u);
+    return acc;
+  }, {} as Record<string, UserData[]>);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -291,13 +313,14 @@ export default function AdminUsersPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {/* ── Admin-managed users ── */}
-          {adminDirectUsers.length > 0 && (
+          {/* ── Admin-managed users by UI Group ── */}
+          {Object.entries(adminUIGroups).map(([groupName, groupUsers]) => (
             <UserGroupTable
-              title="👑 Quản lý trực tiếp bởi Admin"
+              key={groupName}
+              title={`👑 ${groupName}`}
               titleColor="text-purple-700"
               bgColor="bg-purple-50 border-b border-purple-100"
-              users={adminDirectUsers}
+              users={groupUsers}
               decks={decks}
               onAssign={openAssign}
               onViewDecks={setShowDecks}
@@ -305,7 +328,7 @@ export default function AdminUsersPage() {
               onDelete={u => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}
               onChangeRole={(u, role) => { if (confirm(`Đổi quyền ${u.email} → ${role}?`)) changeRole.mutate({ userId: u.id, role }); }}
             />
-          )}
+          ))}
 
           {/* ── SubAdmin groups ── */}
           {subadminGroups.map(({ subadmin, managed }) => (
