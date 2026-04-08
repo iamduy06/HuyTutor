@@ -1,6 +1,6 @@
 // ─── Auth / Users ──────────────────────────────────────────────────────────
 
-export type UserRole  = "USER" | "ADMIN";
+export type UserRole  = "USER" | "SUBADMIN" | "ADMIN";
 export type UIMode    = "standard" | "kid";
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
@@ -29,6 +29,8 @@ export interface UserProfile {
   role: UserRole;
   created_at: string;
   max_devices?: number | null;
+  /** True nếu là subadmin của ít nhất 1 group */
+  is_subadmin?: boolean;
 }
 
 // ─── Decks ─────────────────────────────────────────────────────────────────

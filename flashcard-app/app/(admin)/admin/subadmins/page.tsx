@@ -33,7 +33,7 @@ interface GroupMember {
   decks: { id: string, title: string }[];
 }
 interface GroupData {
-  id: string; name: string; max_users: number;
+  id: string; name: string; max_users: number; max_device_per_user: number;
   user_count: number;
   group_decks: GroupDeck[];
   group_users: GroupMember[];
@@ -98,14 +98,14 @@ export default function AdminSubAdminsPage() {
 
   // Mutations
   const updateGroup = useMutation({
-    mutationFn: async ({ id, name, max_users }: { id: string, name: string, max_users: number }) => {
+    mutationFn: async ({ id, name, max_users, max_device_per_user }: { id: string, name: string, max_users: number, max_device_per_user: number }) => {
       const res = await fetch(`/api/admin/subadmins/groups/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, max_users }),
+        body: JSON.stringify({ name, max_users, max_device_per_user }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); setEditGroup(null); toast({ title: "Đã cập nhật nhóm" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); setEditGroup(null); toast({ title: "Đã cập nhật cấu hình nhóm" }); },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
@@ -402,14 +402,14 @@ export default function AdminSubAdminsPage() {
               <Input value={editGroup?.name} onChange={e => setEditGroup(prev => prev ? {...prev, name: e.target.value} : null)} className="mt-1" />
             </div>
             <div>
-              <Label>Số lượng thành viên tối đa</Label>
-              <Input type="number" min={editGroup?.user_count || 1} value={editGroup?.max_users} 
-                onChange={e => setEditGroup(prev => prev ? {...prev, max_users: parseInt(e.target.value)} : null)} className="mt-1" />
-              <p className="text-[10px] text-muted-foreground mt-1 text-red-500">Không được nhỏ hơn số user hiện tại là {editGroup?.user_count}.</p>
+              <Label>Số thiết bị tối đa mỗi User</Label>
+              <Input type="number" min={1} value={editGroup?.max_device_per_user} 
+                onChange={e => setEditGroup(prev => prev ? {...prev, max_device_per_user: parseInt(e.target.value)} : null)} className="mt-1" />
+              <p className="text-[10px] text-muted-foreground mt-1">Giới hạn số thiết bị tối đa cho mỗi thành viên trong nhóm này.</p>
             </div>
             <DialogFooter>
               <Button variant="brand" className="w-full" disabled={updateGroup.isPending}
-                onClick={()=>updateGroup.mutate({id: editGroup!.id, name: editGroup!.name, max_users: editGroup!.max_users})}>Cập nhật nhóm</Button>
+                onClick={()=>updateGroup.mutate({id: editGroup!.id, name: editGroup!.name, max_users: editGroup!.max_users, max_device_per_user: editGroup!.max_device_per_user})}>Xác nhận cập nhật</Button>
             </DialogFooter>
           </div>
         </DialogContent>

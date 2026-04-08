@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { name, max_users } = body;
+  const { name, max_users, max_device_per_user } = body;
   const supabase = createAdminClient();
 
   // Validate max_users >= current user count
@@ -26,7 +26,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  const { error } = await supabase.from("groups").update({ name, max_users }).eq("id", params.id);
+  const { error } = await supabase.from("groups").update({ 
+    name, 
+    max_users,
+    max_device_per_user
+  }).eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });

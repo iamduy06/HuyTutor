@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, Shield, UserMinus, Shuffle
+  Copy, Check, Shield, Shuffle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,11 +18,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface DeckItem { id: string; title: string; level?: string; word_count?: number }
+interface UserDevice { id: string; device_id: string; device_name: string | null; ip_address: string | null; last_seen: string; }
+interface ManagedGroup { group_id: string; groups: { id: string; name: string; max_users: number; max_device_per_user: number; } }
+interface DeckItem { id: string; title: string; level?: string; word_count?: number; group_expired_at?: string | null; }
 interface UserDeckItem { id: string; deck_id: string; expired_at: string | null; deck?: { title: string } }
 interface UserData {
-  id: string; email: string; role: string; created_at: string;
+  id: string; email: string; role: string; created_at: string; max_devices?: number;
   user_decks?: UserDeckItem[];
+  user_devices?: UserDevice[];
 }
 interface MeInfo {
   id: string; email: string; role: string;
@@ -39,6 +42,7 @@ async function fetchData() {
   const decksJson = await decksRes.json();
   return {
     users: (usersJson.users ?? []) as UserData[],
+    managedGroups: (usersJson.managed_groups ?? []) as ManagedGroup[],
     me:    usersJson.me    as MeInfo,
     decks: (decksJson.decks ?? []) as DeckItem[],
   };
@@ -54,6 +58,7 @@ export default function SubAdminUsersPage() {
   const [newEmail,     setNewEmail]     = useState("");
   const [newRole,      setNewRole]      = useState("USER");
   const [newPassword,  setNewPassword]  = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [tempPw,       setTempPw]       = useState("");
   const [copied,       setCopied]       = useState(false);
 
@@ -65,6 +70,10 @@ export default function SubAdminUsersPage() {
   const [resetResult,    setResetResult]   = useState<{ email: string; pw: string } | null>(null);
   const [resetCopied,    setResetCopied]   = useState(false);
 
+  // Device Management State
+  const [showDevices, setShowDevices] = useState<UserData | null>(null);
+  const [editMaxDevicesLocal, setEditMaxDevicesLocal] = useState("");
+
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: ["subadmin-data"],
@@ -72,14 +81,15 @@ export default function SubAdminUsersPage() {
   });
   const users = data?.users ?? [];
   const decks = data?.decks ?? [];
+  const managedGroups = data?.managedGroups ?? [];
   const me    = data?.me;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createUser = useMutation({
-    mutationFn: async ({ email, role, password }: { email: string; role: string; password?: string }) => {
+    mutationFn: async ({ email, role, password, groupId }: { email: string; role: string; password?: string, groupId?: string }) => {
       const res = await fetch("/api/subadmin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role, password: password?.trim() || undefined }),
+        body: JSON.stringify({ email, role, password: password?.trim() || undefined, group_id: groupId }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
@@ -116,13 +126,13 @@ export default function SubAdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "change_role", role }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
       toast({ title: "Đã cập nhật quyền" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const deleteUser = useMutation({
@@ -132,7 +142,7 @@ export default function SubAdminUsersPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
-      toast({ title: "Đã xóa người dùng" });
+      toast({ title: "Đã xóa tài khoản vĩnh viễn" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -140,6 +150,15 @@ export default function SubAdminUsersPage() {
   const assignDeck = useMutation({
     mutationFn: async ({ userId, deckIds, expiredAt }: { userId: string; deckIds: string[]; expiredAt: string }) => {
       for (const deckId of deckIds) {
+        const deckInfo = decks.find(d => d.id === deckId);
+        if (deckInfo?.group_expired_at && expiredAt) {
+          const groupExp = new Date(deckInfo.group_expired_at);
+          const userExp = new Date(expiredAt);
+          if (userExp > groupExp) {
+            throw new Error(`Bộ đề "${deckInfo.title}" hết hạn vào ${groupExp.toLocaleString()}. Bạn không thể gán quá hạn này.`);
+          }
+        }
+
         const res = await fetch(`/api/subadmin/users/${userId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
@@ -170,6 +189,25 @@ export default function SubAdminUsersPage() {
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
+  const updateDeviceInfo = useMutation({
+    mutationFn: async ({ userId, action, deviceId, maxDevices }: { userId: string, action: string, deviceId?: string, maxDevices?: number | null }) => {
+      const res = await fetch(`/api/subadmin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, device_id: deviceId, max_devices: maxDevices })
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["subadmin-data"] });
+      if (vars.action === "change_max_devices") {
+        toast({ title: "Đã cập nhật giới hạn thiết bị" });
+      } else {
+        toast({ title: "Thao tác thành công" });
+      }
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const filtered     = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
   const assignedUser = users.find(u => u.id === showAssign);
@@ -194,7 +232,13 @@ export default function SubAdminUsersPage() {
         <Button variant="brand"
           disabled={atLimit}
           title={atLimit ? `Đã đạt giới hạn ${maxUsers} tài khoản` : ""}
-          onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewRole("USER"); }}>
+          onClick={() => { 
+            setShowCreate(true); 
+            setTempPw(""); 
+            setNewEmail(""); 
+            setNewRole("USER");
+            setSelectedGroup(managedGroups[0]?.group_id || "");
+          }}>
           <Plus className="w-4 h-4" /> Tạo user
         </Button>
       </div>
@@ -203,7 +247,7 @@ export default function SubAdminUsersPage() {
       {!isAdmin && me && (
         <div className="mb-5 bg-white rounded-xl border-2 border-[#f0e0e7] p-4">
           <div className="flex justify-between text-sm mb-2">
-            <span className="font-semibold text-[#1a1a2e]">Hạn mức tài khoản</span>
+            <span className="font-semibold text-[#1a1a2e]">Hạn mức tài khoản (Tổng các nhóm)</span>
             <span className="text-muted-foreground">{me.current_managed} / {maxUsers}</span>
           </div>
           <div className="h-2 bg-[#f0e0e7] rounded-full overflow-hidden">
@@ -269,27 +313,32 @@ export default function SubAdminUsersPage() {
                           onClick={() => { setShowAssign(u.id); setAssignDeckIds(new Set()); setAssignExpiry(""); }}>
                           <BookOpen className="w-3 h-3" /> Giao đề
                         </Button>
+                        {/* Thiết bị */}
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-purple-700 hover:bg-purple-50"
+                          onClick={() => { setEditMaxDevicesLocal(u.max_devices?.toString()||""); setShowDevices(u); }}>
+                          <Shield className="w-3 h-3" /> Thiết bị
+                        </Button>
                         {/* Toggle role USER ↔ SUBADMIN */}
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                          title={u.role === "SUBADMIN" ? "Hạ xuống USER" : "Nâng lên SubAdmin"}
+                          title={u.role === "SUBADMIN" ? "Hạ xuống USER" : "Nâng lên SubAdmin (Nội bộ nhóm)"}
                           disabled={changeRole.isPending}
                           onClick={() => {
                             const newR = u.role === "SUBADMIN" ? "USER" : "SUBADMIN";
-                            if (confirm(`Đổi quyền ${u.email} → ${newR}?`))
+                            if (confirm(`Đổi quyền ${u.email} → ${newR}? (Quyền Subadmin mới chỉ có tác dụng trong nhóm của họ)`))
                               changeRole.mutate({ userId: u.id, role: newR });
                           }}>
-                          <Shield className="w-3 h-3" />
+                          <RefreshCw className="w-3 h-3" />
                           {u.role === "SUBADMIN" ? "→ User" : "→ Sub"}
                         </Button>
                         {/* Reset PW */}
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
                           disabled={resetPw.isPending}
                           onClick={() => resetPw.mutate({ userId: u.id, email: u.email })}>
-                          <RefreshCw className="w-3 h-3" />
+                          <Copy className="w-3 h-3" />
                         </Button>
                         {/* Delete */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500 hover:text-red-600"
-                          onClick={() => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500 hover:text-red-600 font-bold"
+                          onClick={() => { if (confirm(`CẢNH BÁO: Bạn chắc chắn muốn XÓA HOÀN TOÀN tài khoản ${u.email} khỏi hệ thống? \nThao tác này KHÔNG THỂ khôi phục.`)) deleteUser.mutate(u.id); }}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
@@ -351,27 +400,40 @@ export default function SubAdminUsersPage() {
                     variant="outline"
                     size="sm"
                     title="Tạo mật khẩu ngẫu nhiên"
-                    onClick={() => setNewPassword(generatePassword(10))}
+                    onClick={() => setNewPassword(Math.random().toString(36).slice(-8))}
                     className="flex-shrink-0"
                   >
                     <Shuffle className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
+              {managedGroups.length > 1 && (
+                <div>
+                  <Label>Nhóm quản lý</Label>
+                  <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {managedGroups.map(mg => (
+                        <SelectItem key={mg.group_id} value={mg.group_id}>{mg.groups.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
-                <Label>Quyền</Label>
+                <Label>Quyền Phẩn Mềm</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USER">USER — Học viên</SelectItem>
-                    <SelectItem value="SUBADMIN">SUBADMIN — Quản lý nhóm nhỏ</SelectItem>
+                    <SelectItem value="SUBADMIN">SUBADMIN — Quản lý nhóm</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={!newEmail || createUser.isPending}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword })}>
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, groupId: selectedGroup })}>
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
                 </Button>
               </DialogFooter>
@@ -409,7 +471,7 @@ export default function SubAdminUsersPage() {
               <Label>Ngày hết hạn</Label>
               <Input type="datetime-local" value={assignExpiry}
                 onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
-              <p className="text-xs text-muted-foreground mt-1">Để trống = không giới hạn</p>
+              <p className="text-xs text-muted-foreground mt-1 text-red-500 font-semibold italic">Không được vượt quá hạn của nhóm (nếu có)</p>
             </div>
           </div>
           <DialogFooter className="mt-3">
@@ -421,6 +483,41 @@ export default function SubAdminUsersPage() {
               Giao {assignDeckIds.size > 0 ? `${assignDeckIds.size} đề` : ""}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ Dialog: Device Management ════ */}
+      <Dialog open={!!showDevices} onOpenChange={() => setShowDevices(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="text-purple-700">📱 Quản lý thiết bị: {showDevices?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <Label className="text-purple-800 text-xs font-bold uppercase">Giới hạn Max Devices</Label>
+              <div className="flex gap-2 mt-1">
+                <Input type="number" min="1" value={editMaxDevicesLocal} placeholder="Theo hạn của nhóm" className="h-8 text-sm" onChange={e => setEditMaxDevicesLocal(e.target.value)} />
+                <Button variant="brand" size="sm" className="h-8" onClick={() => updateDeviceInfo.mutate({ userId: showDevices!.id, action: "change_max_devices", maxDevices: editMaxDevicesLocal ? parseInt(editMaxDevicesLocal) : null })}>Lưu</Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {!showDevices?.user_devices?.length ? <p className="text-sm italic text-gray-400 text-center py-4">Chưa có thiết bị nào.</p> : (
+                showDevices.user_devices.map(dev => (
+                  <div key={dev.device_id} className="p-3 border rounded-lg bg-gray-50 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-sm">{dev.device_name || "Thiết bị không tên"}</p>
+                      <p className="text-[10px] text-gray-500">Last seen: {new Date(dev.last_seen).toLocaleString()}</p>
+                    </div>
+                    <Button variant="destructive" size="sm" className="h-7 text-[10px]" onClick={() => updateDeviceInfo.mutate({ userId: showDevices.id, action: "remove_device", deviceId: dev.device_id })}>Khai trừ</Button>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <Button variant="destructive" className="w-full" disabled={!showDevices?.user_devices?.length}
+              onClick={() => { if(confirm("Đăng xuất user khỏi tất cả thiết bị?")) updateDeviceInfo.mutate({ userId: showDevices!.id, action: "reset_devices" }); }}>
+              Reset & Đăng xuất mọi nơi
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -493,7 +590,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
         )}
       </div>
       {decks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Bạn chưa được phân quyền bộ đề nào.</p>
+        <p className="text-xs text-muted-foreground">Bạn chưa được phân quyền bộ đề nào cho nhóm.</p>
       ) : (
         <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
           {decks.map(d => {
@@ -502,7 +599,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
             return (
               <label key={d.id} className={[
                 "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                alreadyHas ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
+                alreadyHas ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
                 checked && !alreadyHas ? "bg-brand-light" : "",
               ].join(" ")}>
                 <input type="checkbox" disabled={!!alreadyHas} checked={checked}

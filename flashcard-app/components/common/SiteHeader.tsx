@@ -59,7 +59,7 @@ export function SiteHeader() {
                 </Link>
               </Button>
             )}
-            {user.role === "SUBADMIN" && (
+            {user.role === "SUBADMIN" && user.is_subadmin && (
               <Button variant="brand-outline" size="sm" asChild>
                 <Link href="/subadmin">
                   <Shield className="w-4 h-4" />

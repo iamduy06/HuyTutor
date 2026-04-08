@@ -13,26 +13,41 @@ export default async function SubAdminPage() {
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
-
+ 
+  // 1. Kiểm tra profile và role
   const { data: me } = await admin
     .from("users")
-    .select("id, email, role, max_managed_users")
+    .select("id, email, role")
     .eq("id", user.id)
     .single();
-
+ 
   if (!me || (me.role !== "SUBADMIN" && me.role !== "ADMIN")) redirect("/dashboard");
 
-  // My managed users count
+  // 2. Lấy danh sách nhóm mà user này là subadmin
+  const { data: managedGroups } = await admin
+    .from("group_users")
+    .select("group_id, groups(id, name, max_users)")
+    .eq("user_id", user.id)
+    .eq("is_subadmin", true);
+
+  const groupIds = (managedGroups ?? []).map(g => g.group_id);
+
+  if (me.role !== "ADMIN" && groupIds.length === 0) redirect("/dashboard");
+
+  // 3. Đếm số lượng user trong các nhóm quản lý
   const { count: managedCount } = me.role === "SUBADMIN"
-    ? await admin.from("users").select("*", { count: "exact", head: true }).eq("created_by", user.id)
+    ? await admin.from("group_users").select("*", { count: "exact", head: true }).in("group_id", groupIds)
     : await admin.from("users").select("*", { count: "exact", head: true });
-
-  // My assigned decks
+ 
+  // 4. Lấy danh sách bộ đề được gán cho nhóm (group_decks)
   const { data: myDecks } = me.role === "SUBADMIN"
-    ? await admin.from("user_decks").select("deck:decks(id, title)").eq("user_id", user.id)
+    ? await admin.from("group_decks").select("deck:decks(id, title)").in("group_id", groupIds)
     : await admin.from("decks").select("id, title");
+ 
+  const totalMaxUsers = me.role === "SUBADMIN"
+    ? (managedGroups ?? []).reduce((acc, g: any) => acc + (g.groups?.max_users ?? 0), 0)
+    : 0;
 
-  const maxUsers = me.max_managed_users ?? 10;
   const isAdmin = me.role === "ADMIN";
 
   return (
@@ -54,16 +69,16 @@ export default async function SubAdminPage() {
           </div>
           <div className="text-2xl font-extrabold text-[#1a1a2e]">
             {managedCount ?? 0}
-            {!isAdmin && <span className="text-base font-medium text-muted-foreground"> / {maxUsers}</span>}
+            {!isAdmin && <span className="text-base font-medium text-muted-foreground"> / {totalMaxUsers}</span>}
           </div>
           <div className="text-xs text-muted-foreground font-medium mt-1">
-            {isAdmin ? "Tổng người dùng" : "Người dùng đã tạo"}
+            {isAdmin ? "Tổng người dùng" : "Người dùng trong nhóm"}
           </div>
           {!isAdmin && (
             <div className="mt-2 h-1.5 bg-[#f0e0e7] rounded-full overflow-hidden">
               <div
                 className="h-full bg-brand rounded-full"
-                style={{ width: `${Math.min(100, ((managedCount ?? 0) / maxUsers) * 100)}%` }}
+                style={{ width: `${Math.min(100, ((managedCount ?? 0) / totalMaxUsers) * 100)}%` }}
               />
             </div>
           )}
@@ -74,10 +89,10 @@ export default async function SubAdminPage() {
             <BookOpen className="w-5 h-5" />
           </div>
           <div className="text-2xl font-extrabold text-[#1a1a2e]">
-            {isAdmin ? (myDecks as any[])?.length ?? 0 : (myDecks as any[])?.length ?? 0}
+            {(myDecks as any[])?.length ?? 0}
           </div>
           <div className="text-xs text-muted-foreground font-medium mt-1">
-            Bộ đề {isAdmin ? "trong hệ thống" : "được phân quyền"}
+            Bộ đề {isAdmin ? "trong hệ thống" : "của các nhóm"}
           </div>
         </div>
 
@@ -87,7 +102,7 @@ export default async function SubAdminPage() {
               <UserPlus className="w-5 h-5" />
             </div>
             <div className="text-2xl font-extrabold text-[#1a1a2e]">
-              {Math.max(0, maxUsers - (managedCount ?? 0))}
+              {Math.max(0, totalMaxUsers - (managedCount ?? 0))}
             </div>
             <div className="text-xs text-muted-foreground font-medium mt-1">Slot còn lại</div>
           </div>

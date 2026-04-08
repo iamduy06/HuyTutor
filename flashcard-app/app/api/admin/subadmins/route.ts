@@ -22,7 +22,7 @@ export async function GET() {
   const { data: groups, error } = await supabase
     .from("groups")
     .select(`
-      *,
+      id, name, max_users, max_device_per_user, created_at,
       group_decks(
         deck_id, expired_at, 
         deck:decks(title)

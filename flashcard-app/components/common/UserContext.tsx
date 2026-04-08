@@ -44,9 +44,27 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
   const [loading, setLoading] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    const { data } = await getSupabaseClient()
+    const supabase = getSupabaseClient();
+    
+    // Fetch profile chính
+    const { data: profile } = await supabase
       .from("users").select("*").eq("id", userId).single();
-    return (data as UserProfile) ?? null;
+      
+    if (!profile) return null;
+
+    // Kiểm tra xem có là subadmin của bất kỳ nhóm nào không
+    const { data: groupSub } = await supabase
+      .from("group_users")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_subadmin", true)
+      .limit(1)
+      .maybeSingle();
+
+    return {
+      ...(profile as UserProfile),
+      is_subadmin: !!groupSub
+    };
   }, []);
 
   const refresh = useCallback(async () => {

@@ -63,6 +63,37 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // ── Protected subadmin routes ──────────────────────────────────────────
+  if (path.startsWith("/subadmin")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    
+    // Check role SUBADMIN/ADMIN và is_subadmin trong group_users
+    const { data: profile } = await supabase
+      .from("users").select("role").eq("id", user.id).single();
+
+    if (profile?.role === "ADMIN") {
+      // Admin bypass subadmin check
+    } else if (profile?.role === "SUBADMIN") {
+      const { data: groupSub } = await supabase
+        .from("group_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_subadmin", true)
+        .limit(1)
+        .maybeSingle();
+      
+      if (!groupSub) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    } else {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
   // ── Redirect logged-in users away from login/register ─────────────────
   if (["/login", "/register"].includes(path) && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
