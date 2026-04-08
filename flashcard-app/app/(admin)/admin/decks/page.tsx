@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DECK_LEVELS } from "@/lib/constants";
-import { Switch } from "@/components/ui/switch";
 import { CEFR_LEVELS, WORD_TYPES } from "@/types";
 import type { Deck, Tab, VocabItem } from "@/types";
 
@@ -78,7 +77,14 @@ export default function AdminDecksPage() {
   const [editingWord,  setEditingWord]  = useState<FlatCard | null>(null);
 
   // ── Forms ──
-  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", is_public: false });
+  const [deckForm, setDeckForm] = useState({ 
+    title: "", 
+    description: "", 
+    level_min: "", 
+    level_max: "", 
+    access_level: "authenticated" as "public" | "authenticated" | "authorized" | "preview",
+    preview_word_limit: 10
+  });
   const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
   const [wordForm, setWordForm] = useState(EMPTY_WORD);
 
@@ -114,7 +120,8 @@ export default function AdminDecksPage() {
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
-        is_public: deckForm.is_public,
+        access_level: deckForm.access_level,
+        preview_word_limit: deckForm.access_level === "preview" ? deckForm.preview_word_limit : null,
       };
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -268,11 +275,34 @@ export default function AdminDecksPage() {
 
   // ── Open helpers ──────────────────────────────────────────────────────────
   function openCreateDeck() {
-    setEditingDeck(null); setDeckForm({ title: "", description: "", level_min: "", level_max: "", is_public: false }); setShowDeckDlg(true);
+    setEditingDeck(null); 
+    setDeckForm({ 
+      title: "", 
+      description: "", 
+      level_min: "", 
+      level_max: "", 
+      access_level: "authenticated",
+      preview_word_limit: 10
+    }); 
+    setShowDeckDlg(true);
   }
   function openEditDeck(deck: Deck) {
     setEditingDeck(deck);
-    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", is_public: Boolean((deck as any).is_public) });
+    
+    // Mapping legacy is_public to access_level if access_level is null/undefined
+    let al = deck.access_level;
+    if (!al) {
+      al = (deck as any).is_public ? "public" : "authenticated";
+    }
+
+    setDeckForm({ 
+      title: deck.title, 
+      description: deck.description ?? "", 
+      level_min: deck.level_min ?? "", 
+      level_max: deck.level_max ?? "", 
+      access_level: al,
+      preview_word_limit: deck.preview_word_limit ?? 10
+    });
     setShowDeckDlg(true);
   }
   function openCreateTab(deckId: string) {
@@ -326,10 +356,15 @@ export default function AdminDecksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-[#1a1a2e]">{deck.title}</span>
                       {deck.level && <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">{deck.level}</span>}
-                      {(deck as any).is_public
-                        ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">🌐 Public</span>
-                        : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">🔒 Private</span>
-                      }
+                      {deck.access_level === "public" ? (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">🌐 Công khai</span>
+                      ) : deck.access_level === "authenticated" ? (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">🔑 Đăng nhập</span>
+                      ) : deck.access_level === "preview" ? (
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">👁️ Xem trước ({deck.preview_word_limit} từ)</span>
+                      ) : (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">🔒 Cần quyền</span>
+                      )}
                       <span className="text-xs text-muted-foreground">({(deck as any).word_count ?? 0} từ)</span>
                     </div>
                     {deck.description && <p className="text-sm text-muted-foreground mt-0.5 truncate">{deck.description}</p>}
@@ -488,17 +523,44 @@ export default function AdminDecksPage() {
             <div><Label>Mô tả</Label>
               <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
             </div>
-            <div className="flex items-center justify-between p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
+            <div className="space-y-4 p-4 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
               <div>
-                <p className="font-semibold text-sm text-[#1a1a2e]">Công khai (Public)</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {deckForm.is_public ? "✅ Mọi user đã đăng nhập đều học được full" : "🔒 Chỉ user được cấp quyền mới học được"}
-                </p>
+                <Label className="text-[#1a1a2e] font-bold">Quyền truy cập</Label>
+                <div className="mt-2 text-xs text-muted-foreground mb-3">
+                  {deckForm.access_level === "public" && "🌐 Công khai: Ai cũng xem được, không cần đăng nhập."}
+                  {deckForm.access_level === "authenticated" && "🔑 Đăng nhập: Phải đăng nhập mới xem được toàn bộ."}
+                  {deckForm.access_level === "authorized" && "🔒 Cần quyền: Phải có quyền trong user_decks mới xem được."}
+                  {deckForm.access_level === "preview" && "👁️ Xem trước: Xem thử một số từ, muốn xem hết cần đăng nhập/quyền."}
+                </div>
+                <Select
+                  value={deckForm.access_level}
+                  onValueChange={(v: any) => setDeckForm({ ...deckForm, access_level: v })}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Chọn quyền truy cập" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Công khai (Public)</SelectItem>
+                    <SelectItem value="authenticated">Cần đăng nhập (Authenticated)</SelectItem>
+                    <SelectItem value="authorized">Cần quyền (Authorized)</SelectItem>
+                    <SelectItem value="preview">Xem trước (Preview)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Switch
-                checked={deckForm.is_public}
-                onCheckedChange={v => setDeckForm({ ...deckForm, is_public: v })}
-              />
+
+              {deckForm.access_level === "preview" && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Label className="text-orange-700 font-bold">Giới hạn từ xem trước *</Label>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    value={deckForm.preview_word_limit} 
+                    onChange={e => setDeckForm({ ...deckForm, preview_word_limit: Math.max(1, parseInt(e.target.value) || 0) })} 
+                    className="mt-1 bg-white"
+                  />
+                  <p className="text-[10px] text-orange-600 mt-1">Lưu ý: Chỉ cho phép học X từ đầu tiên nếu chưa có quyền.</p>
+                </div>
+              )}
             </div>
             <div>
               <Label>Cấp độ CEFR (0–2 mức)</Label>
