@@ -68,12 +68,20 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
-    if (authUser) {
-      const profile = await fetchProfile(authUser.id);
-      setUser(profile);
-    } else {
-      setUser(null);
+    setLoading(true);
+    try {
+      const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
+      if (authUser) {
+        const profile = await fetchProfile(authUser.id);
+        console.log("[USER_CONTEXT] Profile refreshed:", profile);
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error("[USER_CONTEXT] Refresh error:", err);
+    } finally {
+      setLoading(false);
     }
   }, [fetchProfile]);
 
@@ -82,28 +90,43 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("[USER_CONTEXT] Auth event:", event);
+        
         switch (event) {
           case "SIGNED_IN":
           case "TOKEN_REFRESHED":
           case "USER_UPDATED":
             if (session?.user) {
-              const profile = await fetchProfile(session.user.id);
-              setUser(profile);
+              setLoading(true);
+              try {
+                const profile = await fetchProfile(session.user.id);
+                console.log("[USER_CONTEXT] Fetch success:", profile);
+                setUser(profile);
+              } finally {
+                setLoading(false);
+              }
             }
             break;
 
           case "SIGNED_OUT":
             setUser(null);
+            setLoading(false);
             break;
 
           case "INITIAL_SESSION":
             if (session?.user) {
-              if (!user || user.id !== session.user.id) {
+              // Ngay cả khi đã có initialUser, ta vẫn fetch lại để đảm bảo 
+              // data mới nhất và đồng bộ flag is_subadmin chính xác
+              setLoading(true);
+              try {
                 const profile = await fetchProfile(session.user.id);
+                console.log("[USER_CONTEXT] Initial sync complete:", profile);
                 setUser(profile);
+              } finally {
+                setLoading(false);
               }
-            } else if (!session) {
-              setUser(null);
+            } else {
+              setLoading(false);
             }
             break;
         }

@@ -32,9 +32,23 @@ export default async function RootLayout({
 
   let initialUser = null;
   if (authUser) {
-    const { data } = await supabase
+    const { data: profile } = await supabase
       .from("users").select("*").eq("id", authUser.id).single();
-    initialUser = data ?? null;
+    
+    if (profile) {
+      const { data: groupSub } = await supabase
+        .from("group_users")
+        .select("id")
+        .eq("user_id", authUser.id)
+        .eq("is_subadmin", true)
+        .limit(1)
+        .maybeSingle();
+
+      initialUser = {
+        ...profile,
+        is_subadmin: !!groupSub
+      };
+    }
   }
 
   return (
