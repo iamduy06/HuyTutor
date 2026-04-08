@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, ChevronDown, Shield, Shuffle
+  Copy, Check, ChevronDown, Shield, Shuffle,
+  UserCog, Users, Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -19,18 +20,27 @@ import { useToast } from "@/hooks/use-toast";
 import { generatePassword } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface DeckItem {
-  id: string; title: string; level?: string; word_count?: number;
-}
+interface DeckItem { id: string; title: string; level?: string; word_count?: number; }
+interface GroupItem { id: string; name: string; }
 interface UserDeckItem {
-  id: string; deck_id: string; expired_at: string | null; deck?: { title: string };
+  id: string; deck_id: string; expired_at: string | null;
+  progress_percent: number; learned_count: number;
+  deck?: { title: string };
 }
+interface UserDeviceItem {
+  id: string; device_id: string; device_name?: string; ip_address?: string; last_seen: string;
+}
+interface GroupUserItem {
+  group_id: string; is_subadmin: boolean;
+  group?: { name: string };
+}
+
 interface UserData {
   id: string; email: string; role: string; created_at: string;
-  created_by?: string | null;
-  max_managed_users?: number;
+  max_devices?: number;
   user_decks?: UserDeckItem[];
-  creator?: { id: string; email: string; role: string } | null;
+  group_users?: GroupUserItem[];
+  user_devices?: UserDeviceItem[];
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -40,43 +50,58 @@ async function fetchUsers(): Promise<UserData[]> {
   const data = await res.json();
   return data.users ?? [];
 }
-
 async function fetchDecks(): Promise<DeckItem[]> {
   const res = await fetch("/api/admin/decks");
+  if (!res.ok) return [];
   const data = await res.json();
   return data.decks ?? [];
+}
+async function fetchGroups(): Promise<GroupItem[]> {
+  const res = await fetch("/api/admin/groups");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.groups ?? [];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
-  const qc      = useQueryClient();
+  const qc = useQueryClient();
   const { toast } = useToast();
 
-  const [search,       setSearch]       = useState("");
-  const [showCreate,   setShowCreate]   = useState(false);
-  const [newEmail,     setNewEmail]     = useState("");
-  const [newPassword,  setNewPassword]  = useState("");
-  const [newRole,      setNewRole]      = useState("USER");
-  const [tempPw,       setTempPw]       = useState("");
-  const [copied,       setCopied]       = useState(false);
+  const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const [showDecks,    setShowDecks]    = useState<UserData | null>(null);
-  const [showAssign,   setShowAssign]   = useState<string | null>(null);
+  // Modals state
+  const [showCreate, setShowCreate] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("USER");
+  const [tempPw, setTempPw] = useState("");
+
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+
+  // Edit Modals State
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
+  const [activeDialog, setActiveDialog] = useState<"INFO" | "GROUP" | "DECKS" | "DEVICES" | null>(null);
+
+  // Info Dialog State
+  const [editRole, setEditRole] = useState("USER");
+  const [editMaxDevices, setEditMaxDevices] = useState("");
+  const [resetResult, setResetResult] = useState<{ email: string; pw: string } | null>(null);
+  const [resetCopied, setResetCopied] = useState(false);
+
+  // Group Dialog State
+  const [editGroupId, setEditGroupId] = useState<string>("none");
+
+  // Decks Dialog State
   const [assignDeckIds, setAssignDeckIds] = useState<Set<string>>(new Set());
   const [assignExpiry, setAssignExpiry] = useState("");
 
-  const [showResetDlg, setShowResetDlg] = useState(false);
-  const [resetResult,  setResetResult]  = useState<{ email: string; pw: string } | null>(null);
-  const [resetCopied,  setResetCopied]  = useState(false);
-  const [csvFile,      setCsvFile]      = useState<File | null>(null);
-
   // ── Queries ───────────────────────────────────────────────────────────────
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ["admin-users"], queryFn: fetchUsers,
-  });
-  const { data: decks = [] } = useQuery({
-    queryKey: ["admin-decks-list"], queryFn: fetchDecks,
-  });
+  const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: fetchUsers });
+  const { data: decks = [] } = useQuery({ queryKey: ["admin-decks-list"], queryFn: fetchDecks });
+  const { data: groups = [] } = useQuery({ queryKey: ["admin-groups-list"], queryFn: fetchGroups });
+
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createUser = useMutation({
@@ -97,6 +122,34 @@ export default function AdminUsersPage() {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã xóa người dùng" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+  // Action Mutations
+  const updateInfo = useMutation({
+    mutationFn: async ({ id, role, max_devices }: { id: string, role: string, max_devices: number | null }) => {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "change_info", role, max_devices })
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã cập nhật thông tin" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const resetPw = useMutation({
     mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -109,34 +162,22 @@ export default function AdminUsersPage() {
     },
     onSuccess: ({ pw, email }) => {
       setResetResult({ pw, email });
-      setShowResetDlg(true);
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
-  const changeRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+  const assignGroup = useMutation({
+    mutationFn: async ({ id, group_id }: { id: string, group_id: string | null }) => {
+      const res = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "change_role", role }),
+        body: JSON.stringify({ action: "assign_group", group_id })
       });
       if (!res.ok) throw new Error("Failed");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Đã cập nhật quyền" });
-    },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
-  });
-
-  const deleteUser = useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Đã xóa người dùng" });
+      toast({ title: "Đã cập nhật nhóm" });
+      closeDialogs();
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -153,23 +194,23 @@ export default function AdminUsersPage() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
+      setAssignDeckIds(new Set()); setAssignExpiry("");
       toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
-  const updateExpiry = useMutation({
-    mutationFn: async ({ userId, deckId, expiredAt }: { userId: string; deckId: string; expiredAt: string | null }) => {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+  const updateDeckProgress = useMutation({
+    mutationFn: async (args: { userId: string, deckId: string, progress_percent?: number, learned_count?: number, expiredAt?: string | null }) => {
+      const res = await fetch(`/api/admin/users/${args.userId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt }),
+        body: JSON.stringify({ action: "update_deck_progress", deck_id: args.deckId, progress_percent: args.progress_percent, learned_count: args.learned_count, expired_at: args.expiredAt })
       });
       if (!res.ok) throw new Error("Failed");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Đã cập nhật thời hạn" });
+      toast({ title: "Đã cập nhật bản ghi" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -184,14 +225,43 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      setShowDecks(prev =>
-        prev ? { ...prev, user_decks: prev.user_decks?.filter(ud => ud.deck_id !== revokeDeck.variables?.deckId) } : prev
-      );
       toast({ title: "Đã thu hồi bộ đề" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
+  const removeDevice = useMutation({
+    mutationFn: async ({ userId, device_id }: { userId: string, device_id: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove_device", device_id })
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã xoá thiết bị (Người dùng sẽ bị văng ra)" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+  const resetDevices = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_devices" })
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã reset toàn bộ thiết bị và đăng xuất" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+
+  // ── CSV Upload ─────────────
   const handleCsvUpload = async () => {
     if (!csvFile) return;
     const Papa = (await import("papaparse")).default;
@@ -214,136 +284,149 @@ export default function AdminUsersPage() {
     });
   };
 
-  function openAssign(userId: string) {
-    setAssignDeckIds(new Set());
-    setAssignExpiry("");
-    setShowAssign(userId);
-  }
+  // ── Handlers ─────────────────
+  const openDialog = (type: typeof activeDialog, user: UserData) => {
+    setEditingUser(user);
+    setActiveDialog(type);
+    
+    // Prep states
+    if (type === "INFO") {
+      setEditRole(user.role);
+      setEditMaxDevices(user.max_devices?.toString() || "");
+      setResetResult(null);
+    }
+    if (type === "GROUP") {
+      setEditGroupId(user.group_users?.[0]?.group_id || "none");
+    }
+    if (type === "DECKS") {
+      setAssignDeckIds(new Set());
+      setAssignExpiry("");
+    }
+  };
 
-  const assignedUser = users.find(u => u.id === showAssign);
-  const filtered     = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  const closeDialogs = () => {
+    setActiveDialog(null);
+    setEditingUser(null);
+    setResetResult(null);
+  };
 
-  // ── Group users by subadmin ───────────────────────────────────────────────
-  // Admin-managed: no created_by (or created by admin directly), not a subadmin
-  const adminDirectUsers = filtered.filter(u => !u.created_by && u.role !== "SUBADMIN");
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  }, [users, search]);
 
-  // All subadmins
-  const allSubadmins = users.filter(u => u.role === "SUBADMIN");
+  const getFreshEditingUser = () => {
+    if (!editingUser) return null;
+    return users.find(u => u.id === editingUser.id) || editingUser;
+  };
 
-  // Build map: subadmin_id → { subadmin, managed users }
-  const subadminGroups: Array<{ subadmin: UserData; managed: UserData[] }> = allSubadmins.map(sa => ({
-    subadmin: sa,
-    managed: filtered.filter(u => u.created_by === sa.id),
-  }));
+  const currentUserData = getFreshEditingUser();
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-6xl">
+    <div className="p-6 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl font-extrabold text-[#1a1a2e]">👥 Quản lý người dùng</h1>
-        <div className="flex gap-2 flex-wrap">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+        <h1 className="text-3xl font-extrabold text-[#1a1a2e]">👥 Hệ Thống Người Dùng</h1>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Input placeholder="🔍 Tìm theo email..." value={search}
+            onChange={e => setSearch(e.target.value)} className="w-64" />
           <label className="cursor-pointer">
             <input type="file" accept=".csv" className="hidden"
               onChange={e => setCsvFile(e.target.files?.[0] ?? null)} />
-            <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-[#f0e0e7] text-sm font-semibold hover:border-brand hover:text-brand transition-all cursor-pointer">
+            <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-[#f0e0e7] text-sm font-semibold hover:border-brand hover:text-brand transition-all">
               📂 Import CSV
             </span>
           </label>
           {csvFile && (
-            <Button variant="brand" size="sm" onClick={handleCsvUpload}>
-              Upload {csvFile.name}
-            </Button>
+            <Button variant="brand" size="sm" onClick={handleCsvUpload}>Upload {csvFile.name}</Button>
           )}
           <Button variant="brand"
             onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); setNewRole("USER"); }}>
-            <Plus className="w-4 h-4" /> Tạo user
+            <Plus className="w-4 h-4 mr-1.5" /> Tạo user
           </Button>
         </div>
       </div>
 
-      <Input placeholder="🔍 Tìm theo email..." value={search}
-        onChange={e => setSearch(e.target.value)} className="mb-5 max-w-sm" />
-
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-brand" />
-        </div>
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {/* ── Admin-managed users ── */}
-          {adminDirectUsers.length > 0 && (
-            <UserGroupTable
-              title="👑 Quản lý trực tiếp bởi Admin"
-              titleColor="text-purple-700"
-              bgColor="bg-purple-50 border-b border-purple-100"
-              users={adminDirectUsers}
-              decks={decks}
-              onAssign={openAssign}
-              onViewDecks={setShowDecks}
-              onResetPw={u => resetPw.mutate({ userId: u.id, email: u.email })}
-              onDelete={u => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}
-              onChangeRole={(u, role) => { if (confirm(`Đổi quyền ${u.email} → ${role}?`)) changeRole.mutate({ userId: u.id, role }); }}
-            />
-          )}
-
-          {/* ── SubAdmin groups ── */}
-          {subadminGroups.map(({ subadmin, managed }) => (
-            <div key={subadmin.id}
-              className="bg-white rounded-2xl border-2 border-orange-200 overflow-hidden">
-              {/* SubAdmin header bar */}
-              <div className="flex items-center justify-between px-4 py-3 bg-orange-50 border-b border-orange-100 flex-wrap gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">
-                    SUBADMIN
-                  </span>
-                  <span className="font-bold text-[#1a1a2e] text-sm">{subadmin.email}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({managed.length} / {subadmin.max_managed_users ?? 10} users)
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                    onClick={() => openAssign(subadmin.id)}>
-                    <BookOpen className="w-3 h-3" /> Giao đề
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                    disabled={resetPw.isPending}
-                    onClick={() => resetPw.mutate({ userId: subadmin.id, email: subadmin.email })}>
-                    <RefreshCw className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
-                    onClick={() => { if (confirm(`Xóa SubAdmin ${subadmin.email}?`)) deleteUser.mutate(subadmin.id); }}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-              {/* Managed users */}
-              {managed.length === 0 ? (
-                <div className="px-4 py-3 text-xs text-muted-foreground italic">
-                  Chưa có người dùng nào trong nhóm này.
-                </div>
-              ) : (
-                <UserGroupTable
-                  title=""
-                  users={managed}
-                  decks={decks}
-                  compact
-                  onAssign={openAssign}
-                  onViewDecks={setShowDecks}
-                  onResetPw={u => resetPw.mutate({ userId: u.id, email: u.email })}
-                  onDelete={u => { if (confirm(`Xóa ${u.email}?`)) deleteUser.mutate(u.id); }}
-                  onChangeRole={(u, role) => { if (confirm(`Đổi quyền ${u.email} → ${role}?`)) changeRole.mutate({ userId: u.id, role }); }}
-                />
-              )}
-            </div>
-          ))}
-
-          {filtered.length === 0 && (
-            <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 text-center text-muted-foreground">
-              Không tìm thấy người dùng nào
-            </div>
-          )}
+        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa] text-left">
+                  <th className="p-3 font-bold text-[#1a1a2e]">Email</th>
+                  <th className="p-3 font-bold text-[#1a1a2e]">Role</th>
+                  <th className="p-3 font-bold text-[#1a1a2e]">Group</th>
+                  <th className="p-3 font-bold text-[#1a1a2e]">Thiết bị</th>
+                  <th className="p-3 font-bold text-[#1a1a2e]">Đề được giao</th>
+                  <th className="p-3 font-bold text-[#1a1a2e] text-center w-56">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không tìm thấy người dùng nào.</td></tr>
+                ) : filteredUsers.map(u => {
+                  const devCount = u.user_devices?.length || 0;
+                  const deckCount = u.user_decks?.length || 0;
+                  const groupName = u.group_users?.[0]?.group?.name || "Chưa có";
+                  return (
+                    <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
+                      <td className="p-3 font-medium text-[#1a1a2e]">
+                        <div className="truncate max-w-[200px]" title={u.email}>{u.email}</div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          u.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
+                          u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
+                          "bg-brand-light text-brand"
+                        }`}>{u.role}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-xs font-semibold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                          {groupName}
+                        </span>
+                      </td>
+                      <td className="p-3 text-xs">
+                        <span className="font-semibold text-gray-800">{devCount}</span>
+                        {u.max_devices ? ` / ${u.max_devices}` : " / ♾️"}
+                      </td>
+                      <td className="p-3 text-xs">
+                         <span className="font-semibold text-brand bg-brand-light px-2.5 py-0.5 rounded-full">
+                           {deckCount}
+                         </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex gap-1.5 justify-center">
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                            onClick={() => openDialog("INFO", u)} title="Thông tin chung & Mật khẩu">
+                            <UserCog className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 hover:bg-orange-50"
+                            onClick={() => openDialog("GROUP", u)} title="Quản lý Nhóm">
+                            <Users className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 hover:bg-green-50"
+                            onClick={() => openDialog("DECKS", u)} title="Quản lý Bộ Đề">
+                            <BookOpen className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-purple-600 hover:bg-purple-50"
+                            onClick={() => openDialog("DEVICES", u)} title="Quản lý Thiết bị">
+                            <Smartphone className="w-4 h-4" />
+                          </Button>
+                          <div className="w-px bg-gray-200 mx-1"></div>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 border-red-200"
+                            onClick={() => { if(confirm(`Xóa hoàn toàn tài khoản ${u.email}? Hành động không thể hoàn tác.`)) deleteUser.mutate(u.id); }} title="Xóa tài khoản">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -357,51 +440,25 @@ export default function AdminUsersPage() {
               <div className="bg-[#f8f9fa] border-2 border-[#f0e0e7] rounded-xl p-4 flex items-center gap-3">
                 <code className="flex-1 font-mono text-brand font-bold text-xl tracking-wider select-all cursor-text"
                   onClick={e => {
-                    const r = document.createRange();
-                    r.selectNodeContents(e.currentTarget);
-                    window.getSelection()?.removeAllRanges();
-                    window.getSelection()?.addRange(r);
+                    const r = document.createRange(); r.selectNodeContents(e.currentTarget);
+                    window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(r);
                   }}>{tempPw}</code>
                 <Button variant="outline" size="sm"
                   onClick={() => { navigator.clipboard.writeText(tempPw); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
                   {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">💡 Bấm vào mật khẩu để chọn, hoặc dùng nút Copy.</p>
-              <Button className="w-full" variant="brand"
-                onClick={() => { setShowCreate(false); setTempPw(""); }}>Đóng</Button>
+              <Button className="w-full" variant="brand" onClick={() => { setShowCreate(false); setTempPw(""); }}>Đóng</Button>
             </div>
           ) : (
             <div className="space-y-4">
+              <div><Label>Email</Label><Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1" /></div>
               <div>
-                <Label>Email</Label>
-                <Input value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                  placeholder="user@example.com" className="mt-1" />
-              </div>
-              <div>
-                <Label>Mật khẩu (để trống = tự tạo ngẫu nhiên)</Label>
+                <Label>Mật khẩu</Label>
                 <div className="flex gap-2 mt-1">
-                  <Input
-                    type="text"
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    placeholder="Để trống hoặc nhập mật khẩu"
-                    className="flex-1 font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    title="Tạo mật khẩu ngẫu nhiên"
-                    onClick={() => setNewPassword(generatePassword(10))}
-                    className="flex-shrink-0 gap-1.5"
-                  >
-                    <Shuffle className="w-4 h-4" />
-                  </Button>
+                  <Input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Để trống tự tạo ngẫu nhiên" className="flex-1 font-mono" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewPassword(generatePassword(10))}><Shuffle className="w-4 h-4" /></Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Mật khẩu sẽ hiển thị sau khi tạo xong
-                </p>
               </div>
               <div>
                 <Label>Quyền</Label>
@@ -409,17 +466,16 @@ export default function AdminUsersPage() {
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USER">USER — Học viên</SelectItem>
-                    <SelectItem value="SUBADMIN">SUBADMIN — Quản lý nhóm</SelectItem>
-                    <SelectItem value="ADMIN">ADMIN — Quản trị viên</SelectItem>
+                    <SelectItem value="SUBADMIN">SUBADMIN — Quản lý</SelectItem>
+                    <SelectItem value="ADMIN">ADMIN — Quản trị</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
-                <Button variant="brand"
-                  disabled={!newEmail || createUser.isPending}
+                <Button variant="brand" disabled={!newEmail || createUser.isPending}
                   onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword })}>
-                  {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
+                  {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tạo"}
                 </Button>
               </DialogFooter>
             </div>
@@ -427,122 +483,175 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ════ Dialog: Chi tiết bộ đề user ════ */}
-      <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>📚 Bộ đề — {showDecks?.email}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            {(showDecks?.user_decks ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">Chưa có bộ đề nào.</p>
-            ) : (
-              (showDecks?.user_decks ?? []).map(ud => {
-                const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
-                return (
-                  <div key={ud.id}
-                    className="flex items-center justify-between p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
-                    <div>
-                      <div className="font-semibold text-sm text-[#1a1a2e]">{ud.deck?.title ?? "?"}</div>
-                      {ud.expired_at && (
-                        <div className={`text-xs mt-0.5 ${isExp ? "text-red-500" : "text-green-600"}`}>
-                          {isExp ? "⛔" : "✅"} Hạn: {new Date(ud.expired_at).toLocaleDateString("vi-VN")}
-                        </div>
-                      )}
-                      {!ud.expired_at && <div className="text-xs text-green-600 mt-0.5">♾️ Không giới hạn</div>}
-                    </div>
-                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
-                      onClick={() => revokeDeck.mutate({ userId: showDecks!.id, deckId: ud.deck_id })}>
-                      <Trash2 className="w-3 h-3" /> Thu hồi
+      {/* ════ EDIT DIALOG 1: INFO ════ */}
+      <Dialog open={activeDialog === "INFO"} onOpenChange={closeDialogs}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Chỉnh sửa Thông tin: {editingUser?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Quyền (Role)</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USER">USER — Học viên</SelectItem>
+                  <SelectItem value="SUBADMIN">SUBADMIN — Quản lý</SelectItem>
+                  <SelectItem value="ADMIN">ADMIN — Quản trị</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Max Devices (Thiết bị tối đa)</Label>
+              <Input type="number" min="1" value={editMaxDevices} onChange={e => setEditMaxDevices(e.target.value)} placeholder="Bỏ trống để dùng mặc định toàn hệ thống" className="mt-1" />
+            </div>
+            
+            <div className="pt-4 border-t border-[#f0e0e7] mt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-red-600">Đổi mật khẩu người dùng này?</Label>
+                <Button variant="destructive" size="sm" onClick={() => editingUser && resetPw.mutate({ userId: editingUser.id, email: editingUser.email })} disabled={resetPw.isPending}>
+                  {resetPw.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />} Reset Password
+                </Button>
+              </div>
+              {resetResult && (
+                <div className="mt-3 bg-[#f8f9fa] border-2 border-red-100 rounded-xl p-3 flex flex-col gap-2">
+                  <span className="text-sm">Đã khởi tạo mật khẩu mới. Vui lòng copy gửi cho người dùng:</span>
+                  <div className="flex gap-2">
+                    <code className="flex-1 font-mono font-bold text-red-600 bg-red-50 px-3 py-2 rounded text-lg text-center select-all cursor-text">{resetResult.pw}</code>
+                    <Button variant="outline" onClick={() => { navigator.clipboard.writeText(resetResult.pw); setResetCopied(true); setTimeout(() => setResetCopied(false), 2000); }}>
+                      {resetCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>
-                );
-              })
-            )}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="brand" onClick={() => { setShowDecks(null); openAssign(showDecks!.id); }}>
-              + Giao thêm bộ đề
-            </Button>
+            <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
+            <Button variant="brand" onClick={() => {
+              updateInfo.mutate({ id: editingUser!.id, role: editRole, max_devices: editMaxDevices ? parseInt(editMaxDevices) : null });
+            }} disabled={updateInfo.isPending}>Lưu thay đổi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ════ Dialog: Giao bộ đề ════ */}
-      <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+      {/* ════ EDIT DIALOG 2: GROUP ════ */}
+      <Dialog open={activeDialog === "GROUP"} onOpenChange={closeDialogs}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>📚 Giao bộ đề — {assignedUser?.email}</DialogTitle>
+            <DialogTitle>Gán Nhóm: {editingUser?.email}</DialogTitle>
+            <DialogDescription>Một người dùng chỉ thuộc tối đa 1 nhóm.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-            {(assignedUser?.user_decks ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Đã có:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(assignedUser?.user_decks ?? []).map(ud => (
-                    <span key={ud.id}
-                      className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
-                      {ud.deck?.title ?? "?"}
-                    </span>
+          <div className="mt-4">
+            <Label>Chọn nhóm</Label>
+            <Select value={editGroupId} onValueChange={setEditGroupId}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn nhóm" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">-- Không thuộc nhóm nào --</SelectItem>
+                {groups.map(g => (
+                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
+            <Button variant="brand" onClick={() => assignGroup.mutate({ id: editingUser!.id, group_id: editGroupId === "none" ? null : editGroupId })} disabled={assignGroup.isPending}>Lưu thay đổi</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ EDIT DIALOG 3: DECKS ════ */}
+      <Dialog open={activeDialog === "DECKS"} onOpenChange={closeDialogs}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Quản lý Bộ đề: {editingUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            
+            {/* List existing decks */}
+            <div>
+              <h3 className="font-semibold mb-3 border-b pb-2 text-[#1a1a2e]">Bộ đề đã được giao</h3>
+              {!currentUserData?.user_decks?.length ? (
+                <p className="text-sm text-muted-foreground italic">Chưa giao bộ đề nào.</p>
+              ) : (
+                <div className="space-y-3">
+                  {currentUserData.user_decks.map(ud => (
+                    <DeckProgressEditor key={ud.id} ud={ud}
+                      onUpdate={(args) => updateDeckProgress.mutate({ userId: currentUserData.id, deckId: ud.deck_id, ...args })}
+                      onRevoke={() => { if(confirm("Thu hồi bộ đề này? Tiền trình học sẽ mất.")) revokeDeck.mutate({ userId: currentUserData.id, deckId: ud.deck_id }) }}
+                    />
                   ))}
                 </div>
-              </div>
-            )}
-            <AssignDeckList
-              decks={decks}
-              assignedUser={assignedUser}
-              assignDeckIds={assignDeckIds}
-              setAssignDeckIds={setAssignDeckIds}
-            />
-            <div>
-              <Label>Ngày hết hạn</Label>
-              <Input type="datetime-local" value={assignExpiry}
-                onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
-              <p className="text-xs text-muted-foreground mt-1">Để trống = không giới hạn thời gian</p>
+              )}
+            </div>
+
+            {/* Assign new deck */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+               <h3 className="font-semibold mb-3">Giao bộ đề mới</h3>
+               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-3 divide-y">
+                 {decks.map(d => {
+                    const alreadyHas = currentUserData?.user_decks?.some(ud => ud.deck_id === d.id);
+                    if (alreadyHas) return null;
+                    const checked = assignDeckIds.has(d.id);
+                    return (
+                      <label key={d.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-brand-light transition">
+                         <input type="checkbox" checked={checked} onChange={e => {
+                           const next = new Set(assignDeckIds);
+                           if (e.target.checked) next.add(d.id); else next.delete(d.id);
+                           setAssignDeckIds(next);
+                         }} className="accent-brand flex-shrink-0" />
+                         <div className="flex-1 min-w-0">
+                           <div className={`text-sm ${checked ? "font-bold text-brand" : ""}`}>{d.title}</div>
+                         </div>
+                      </label>
+                    )
+                 })}
+               </div>
+               <div>
+                 <Label>Ngày hết hạn (Tuỳ chọn)</Label>
+                 <Input type="datetime-local" value={assignExpiry} onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
+               </div>
+               <Button className="mt-3 w-full" variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
+                 onClick={() => assignDeck.mutate({ userId: currentUserData!.id, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
+                 Giao {assignDeckIds.size} bộ đề đã chọn
+               </Button>
             </div>
           </div>
-          <DialogFooter className="mt-3">
-            <Button variant="outline" onClick={() => setShowAssign(null)}>Hủy</Button>
-            <Button variant="brand"
-              disabled={assignDeckIds.size === 0 || assignDeck.isPending}
-              onClick={() => assignDeck.mutate({ userId: showAssign!, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
-              {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Giao {assignDeckIds.size > 0 ? `${assignDeckIds.size} đề` : ""}
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ EDIT DIALOG 4: DEVICES ════ */}
+      <Dialog open={activeDialog === "DEVICES"} onOpenChange={closeDialogs}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quản lý Thiết bị: {editingUser?.email}</DialogTitle>
+            <DialogDescription>
+              Người dùng đang đăng nhập trên {(currentUserData?.user_devices || []).length} / {currentUserData?.max_devices || "không giới hạn"} thiết bị.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-3">
+             {currentUserData?.user_devices?.length === 0 ? (
+               <p className="text-sm italic text-gray-500 text-center py-4">Chưa có thiết bị nào đăng nhập.</p>
+             ) : (
+               currentUserData?.user_devices?.map(dev => (
+                 <div key={dev.id} className="p-3 border rounded-xl flex items-center justify-between bg-gray-50">
+                   <div>
+                     <p className="font-semibold text-sm">{dev.device_name || "Thiết bị Không tên"}</p>
+                     <p className="text-xs text-gray-500">IP: {dev.ip_address || "N/A"}</p>
+                     <p className="text-xs text-brand mt-1">Lần cuối: {new Date(dev.last_seen).toLocaleString()}</p>
+                   </div>
+                   <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50"
+                     onClick={() => { if(confirm("Xoá thiết bị này?")) removeDevice.mutate({ userId: currentUserData.id, device_id: dev.device_id })}}>
+                     Xoá
+                   </Button>
+                 </div>
+               ))
+             )}
+          </div>
+          <div className="mt-6 pt-4 border-t flex flex-col gap-2">
+            <Button variant="destructive" onClick={() => { if(confirm("Bạn có chắc muốn đăng xuất người dùng khỏi toàn bộ các thiết bị?")) resetDevices.mutate(currentUserData!.id) }} disabled={!currentUserData?.user_devices?.length}>
+               Reset Toàn Bộ & Đăng Xuất
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ════ Dialog: Reset PW result ════ */}
-      <Dialog open={showResetDlg} onOpenChange={v => { setShowResetDlg(v); if (!v) setResetResult(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>🔑 Mật khẩu đã reset</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Mật khẩu mới cho <strong>{resetResult?.email}</strong>:
-            </p>
-            <div className="bg-[#f8f9fa] border-2 border-[#f0e0e7] rounded-xl p-4 flex items-center gap-3">
-              <code className="flex-1 font-mono text-brand font-bold text-xl tracking-wider select-all cursor-text"
-                onClick={e => {
-                  const r = document.createRange();
-                  r.selectNodeContents(e.currentTarget);
-                  window.getSelection()?.removeAllRanges();
-                  window.getSelection()?.addRange(r);
-                }}>{resetResult?.pw}</code>
-              <Button variant="outline" size="sm"
-                onClick={() => {
-                  if (resetResult) {
-                    navigator.clipboard.writeText(resetResult.pw);
-                    setResetCopied(true);
-                    setTimeout(() => setResetCopied(false), 2000);
-                  }
-                }}>
-                {resetCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">💡 Bấm vào mật khẩu để chọn.</p>
-            <Button className="w-full" variant="brand"
-              onClick={() => { setShowResetDlg(false); setResetResult(null); }}>Đóng</Button>
+            <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
           </div>
         </DialogContent>
       </Dialog>
@@ -550,262 +659,68 @@ export default function AdminUsersPage() {
   );
 }
 
-// ── UserGroupTable ─────────────────────────────────────────────────────────────
-interface UserGroupTableProps {
-  title: string;
-  titleColor?: string;
-  bgColor?: string;
-  users: UserData[];
-  decks: DeckItem[];
-  compact?: boolean;
-  onAssign: (userId: string) => void;
-  onViewDecks: (u: UserData) => void;
-  onResetPw: (u: UserData) => void;
-  onDelete: (u: UserData) => void;
-  onChangeRole: (u: UserData, role: string) => void;
-}
-
-function UserGroupTable({
-  title, titleColor = "text-[#1a1a2e]", bgColor = "",
-  users, compact,
-  onAssign, onViewDecks, onResetPw, onDelete, onChangeRole,
-}: UserGroupTableProps) {
-  return (
-    <div className={`bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden ${compact ? "rounded-t-none border-t-0" : ""}`}>
-      {title && (
-        <div className={`px-4 py-2.5 ${bgColor}`}>
-          <h3 className={`text-sm font-bold ${titleColor}`}>{title}</h3>
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          {!compact && (
-            <thead>
-              <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa]">
-                <th className="text-left p-3 font-bold text-[#1a1a2e]">Email</th>
-                <th className="text-left p-3 font-bold text-[#1a1a2e]">Role</th>
-                <th className="text-left p-3 font-bold text-[#1a1a2e]">Ngày tạo</th>
-                <th className="text-left p-3 font-bold text-[#1a1a2e]">Bộ đề</th>
-                <th className="text-left p-3 font-bold text-[#1a1a2e]">Thao tác</th>
-              </tr>
-            </thead>
-          )}
-          <tbody>
-            {users.map(u => {
-              const deckCount = u.user_decks?.length ?? 0;
-              const nextRole  = u.role === "USER" ? "SUBADMIN" : u.role === "SUBADMIN" ? "ADMIN" : "USER";
-              const roleLabel = u.role === "USER" ? "→Sub" : u.role === "SUBADMIN" ? "→Adm" : "→User";
-              return (
-                <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
-                  <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px]">
-                    <div className="truncate" title={u.email}>{u.email}</div>
-                  </td>
-                  <td className="p-3">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      u.role === "ADMIN"    ? "bg-purple-100 text-purple-700" :
-                      u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
-                                             "bg-brand-light text-brand"
-                    }`}>{u.role}</span>
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(u.created_at).toLocaleDateString("vi-VN")}
-                  </td>
-                  <td className="p-3">
-                    {deckCount === 0 ? (
-                      <span className="text-xs text-muted-foreground">Chưa có</span>
-                    ) : (
-                      <button onClick={() => onViewDecks(u)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand bg-brand-light px-2.5 py-1 rounded-full hover:bg-brand hover:text-white transition-all">
-                        <BookOpen className="w-3 h-3" />
-                        {deckCount} bộ đề
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-1 flex-wrap">
-                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                        onClick={() => onAssign(u.id)}>
-                        <BookOpen className="w-3 h-3" /> Giao đề
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                        onClick={() => onResetPw(u)}>
-                        <RefreshCw className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                        title={`Đổi → ${nextRole}`}
-                        onClick={() => onChangeRole(u, nextRole)}>
-                        <Shield className="w-3 h-3" /> {roleLabel}
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500"
-                        onClick={() => onDelete(u)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-
-// ── DeckExpiryRow: Inline editable expiry per deck ────────────────────────────
-interface DeckExpiryRowProps {
-  ud: UserDeckItem;
-  userId: string;
-  onUpdate: (expiredAt: string | null) => void;
-  onRevoke: () => void;
-}
-
-function DeckExpiryRow({ ud, onUpdate, onRevoke }: DeckExpiryRowProps) {
-  const [editing,    setEditing]    = useState(false);
-  // Convert stored UTC ISO string to local datetime-local input value
+// ── Helper Component for Deck Progress Editor ─────────────────────────────
+function DeckProgressEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUpdate: (a: any) => void, onRevoke: () => void }) {
+  const [editing, setEditing] = useState(false);
+  
   const toLocalInput = (iso: string | null) => {
     if (!iso) return "";
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
-  const [expiryVal, setExpiryVal] = useState(() => toLocalInput(ud.expired_at));
+
+  const [exp, setExp] = useState(toLocalInput(ud.expired_at));
+  const [prog, setProg] = useState(ud.progress_percent.toString());
+  const [learn, setLearn] = useState(ud.learned_count.toString());
+
   const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
 
-  return (
-    <div className="p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-[#1a1a2e] truncate">{ud.deck?.title ?? "?"}</div>
-          {!editing && (
-            ud.expired_at
-              ? <div className={`text-xs mt-0.5 ${isExp ? "text-red-500" : "text-green-600"}`}>
-                  {isExp ? "⛔" : "✅"} Hạn: {new Date(ud.expired_at).toLocaleDateString("vi-VN")}
-                </div>
-              : <div className="text-xs text-green-600 mt-0.5">♾️ Không giới hạn</div>
-          )}
-          {editing && (
-            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-              <input
-                type="datetime-local"
-                value={expiryVal}
-                onChange={e => setExpiryVal(e.target.value)}
-                className="text-xs border border-[#f0e0e7] rounded-lg px-2 py-1 outline-none focus:border-brand"
-              />
-              <button
-                className="text-xs text-muted-foreground hover:text-[#1a1a2e]"
-                onClick={() => setExpiryVal("")}
-              >Xóa hạn</button>
-            </div>
-          )}
-        </div>
-        <div className="flex gap-1 flex-shrink-0">
-          {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="text-xs text-brand hover:underline font-semibold px-1.5"
-              title="Sửa thời hạn"
-            >✏️</button>
-          ) : (
-            <>
-              <button
-                onClick={() => { onUpdate(expiryVal || null); setEditing(false); }}
-                className="text-xs bg-brand text-white px-2 py-0.5 rounded-lg font-semibold hover:bg-[#c0003a]"
-              >Lưu</button>
-              <button
-                onClick={() => { setExpiryVal(toLocalInput(ud.expired_at)); setEditing(false); }}
-                className="text-xs border border-[#f0e0e7] px-2 py-0.5 rounded-lg hover:bg-gray-50"
-              >Hủy</button>
-            </>
-          )}
-          <button
-            onClick={onRevoke}
-            className="text-xs text-red-500 hover:text-red-700 px-1.5 font-semibold"
-            title="Thu hồi"
-          >✕</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── AssignDeckList ─────────────────────────────────────────────────────────────
-interface AssignDeckListProps {
-  decks: DeckItem[];
-  assignedUser: UserData | undefined;
-  assignDeckIds: Set<string>;
-  setAssignDeckIds: (s: Set<string>) => void;
-}
-
-function AssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckIds }: AssignDeckListProps) {
-  const assignable = decks.filter(d =>
-    !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
-  );
-  const allSelected = assignable.length > 0 && assignable.every(d => assignDeckIds.has(d.id));
-
-  function toggleAll() {
-    const next = new Set(assignDeckIds);
-    if (allSelected) { assignable.forEach(d => next.delete(d.id)); }
-    else             { assignable.forEach(d => next.add(d.id)); }
-    setAssignDeckIds(next);
-  }
-
-  function toggleOne(id: string, checked: boolean) {
-    const next = new Set(assignDeckIds);
-    if (checked) next.add(id); else next.delete(id);
-    setAssignDeckIds(next);
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <Label>
-          Chọn bộ đề{" "}
-          <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span>
-        </Label>
-        {assignable.length > 0 && (
-          <button type="button" onClick={toggleAll}
-            className="text-xs font-semibold text-brand hover:underline flex-shrink-0">
-            {allSelected ? "✕ Bỏ chọn tất cả" : "✓ Chọn tất cả"}
-          </button>
-        )}
-      </div>
-      {decks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Chưa có bộ đề nào trong hệ thống.</p>
-      ) : (
-        <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
-          {decks.map(d => {
-            const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
-            const checked    = assignDeckIds.has(d.id);
-            return (
-              <label key={d.id} className={[
-                "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                alreadyHas ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
-                checked && !alreadyHas ? "bg-brand-light" : "",
-              ].join(" ")}>
-                <input type="checkbox" disabled={!!alreadyHas} checked={checked}
-                  onChange={e => toggleOne(d.id, e.target.checked)}
-                  className="w-4 h-4 accent-brand flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
-                    {alreadyHas ? "✓ " : ""}{d.title}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      )}
-      {assignDeckIds.size > 0 && (
-        <p className="text-xs text-brand font-semibold mt-1.5">
-          Đã chọn {assignDeckIds.size} bộ đề
+  if (!editing) return (
+    <div className="p-3 border border-gray-200 rounded-xl bg-white flex justify-between items-center group">
+      <div>
+        <p className="font-semibold text-[#1a1a2e]">{ud.deck?.title}</p>
+        <p className="text-xs text-gray-500 mt-1">
+          Tiến độ: <span className="font-bold text-brand">{ud.progress_percent}%</span> ({ud.learned_count} từ)
         </p>
-      )}
+        <p className={`text-xs mt-1 ${isExp ? "text-red-500" : "text-green-600"}`}>
+          {ud.expired_at ? `Hạn: ${new Date(ud.expired_at).toLocaleString()}` : "Không giới hạn thời gian"}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>Sửa</Button>
+        <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={onRevoke} title="Thu hồi"><Trash2 className="w-4 h-4"/></Button>
+      </div>
     </div>
   );
+
+  return (
+    <div className="p-4 border-2 border-brand-light rounded-xl bg-blue-50/50 space-y-3">
+      <p className="font-bold text-brand">{ud.deck?.title}</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label className="text-xs">Tiến độ (%)</Label>
+          <Input type="number" min="0" max="100" value={prog} onChange={e=>setProg(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Số từ đã học</Label>
+          <Input type="number" min="0" value={learn} onChange={e=>setLearn(e.target.value)} />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs">Thời hạn truy cập</Label>
+        <div className="flex items-center gap-2">
+          <Input type="datetime-local" value={exp} onChange={e=>setExp(e.target.value)} className="flex-1"/>
+          <Button variant="outline" size="sm" onClick={()=>setExp("")}>Bỏ hạn</Button>
+        </div>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button size="sm" variant="brand" className="flex-1" onClick={() => {
+          onUpdate({ progress_percent: parseInt(prog)||0, learned_count: parseInt(learn)||0, expiredAt: exp||null });
+          setEditing(false);
+        }}>Lưu thay đổi</Button>
+        <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Hủy</Button>
+      </div>
+    </div>
+  )
 }

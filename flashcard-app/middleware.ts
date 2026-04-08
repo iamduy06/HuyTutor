@@ -49,8 +49,15 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from("users").select("role").eq("id", user.id).single();
+      
+    console.log("[MIDDLEWARE DEBUG] Admin access request:", {
+      userId: user.id,
+      profile,
+      error
+    });
+
     if (profile?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }

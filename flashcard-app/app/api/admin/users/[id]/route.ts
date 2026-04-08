@@ -26,19 +26,52 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ tempPassword: newPassword });
   }
 
-  // Assign deck
-  if (body.action === "assign_deck") {
-    const { deck_id, expired_at } = body;
+  // Change info (role, max_devices)
+  if (body.action === "change_info") {
+    const { role, max_devices } = body;
+    // Prevent self-demotion
+    if (params.id === admin.id && role && role !== "ADMIN") {
+      return NextResponse.json({ error: "Không thể tự xoá quyền Admin của chính mình" }, { status: 400 });
+    }
+    const updateData: any = {};
+    if (role) {
+      if (!["USER", "SUBADMIN", "ADMIN"].includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      updateData.role = role;
+    }
+    if (max_devices !== undefined) updateData.max_devices = max_devices;
 
-    // expired_at = "" hoặc không có → null = không hết hạn (học mãi mãi)
+    const { error: dbErr } = await supabase.from("users").update(updateData).eq("id", params.id);
+    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    return NextResponse.json({ success: true, updateData });
+  }
+
+  // Assign Group
+  if (body.action === "assign_group") {
+    const { group_id } = body;
+    // First remove existing group(because a user belongs to 1 group max based on requirements)
+    await supabase.from("group_users").delete().eq("user_id", params.id);
+    if (group_id) {
+      const { error } = await supabase.from("group_users").insert({
+        group_id,
+        user_id: params.id,
+        is_subadmin: false // Default to false when assigned
+      });
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
+  }
+
+  // Assign deck (with optional progress_percent, learned_count)
+  if (body.action === "assign_deck") {
+    const { deck_id, expired_at, progress_percent = 0, learned_count = 0 } = body;
     const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
 
     const { error } = await supabase.from("user_decks").upsert({
       user_id: params.id,
       deck_id,
-      expired_at: expiredAtValue,   // null = unlimited access
-      progress_percent: 0,
-      learned_count: 0,
+      expired_at: expiredAtValue,
+      progress_percent,
+      learned_count,
       streak: 0,
     }, { onConflict: "user_id,deck_id" });
 
@@ -46,15 +79,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ success: true });
   }
 
-  // Change role
-  if (body.action === "change_role") {
-    const { role } = body;
-    if (!["USER", "SUBADMIN", "ADMIN"].includes(role))
-      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-    const { error: dbErr } = await supabase.from("users")
-      .update({ role }).eq("id", params.id);
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
-    return NextResponse.json({ success: true, role });
+  // Update deck progress / expiry
+  if (body.action === "update_deck_progress") {
+    const { deck_id, progress_percent, learned_count, expired_at } = body;
+    const updateData: any = {};
+    if (progress_percent !== undefined) updateData.progress_percent = progress_percent;
+    if (learned_count !== undefined) updateData.learned_count = learned_count;
+    if (expired_at !== undefined) updateData.expired_at = expired_at?.trim() ? expired_at : null;
+
+    const { error } = await supabase.from("user_decks")
+      .update(updateData).eq("user_id", params.id).eq("deck_id", deck_id);
+    
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
   }
 
   // Revoke deck
@@ -63,6 +100,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { error } = await supabase.from("user_decks")
       .delete().eq("user_id", params.id).eq("deck_id", deck_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  }
+
+  // Manage Devices
+  if (body.action === "remove_device") {
+    const { device_id } = body;
+    await supabase.from("user_devices").delete().eq("user_id", params.id).eq("device_id", device_id);
+    // Ideally we could invalidate the specific token, but Supabase doesn't support that easily via Admin api. 
+    // We invalidate all sessions to force re-auth
+    await supabase.auth.admin.signOut(params.id);
+    return NextResponse.json({ success: true });
+  }
+
+  if (body.action === "reset_devices") {
+    await supabase.from("user_devices").delete().eq("user_id", params.id);
+    await supabase.auth.admin.signOut(params.id);
     return NextResponse.json({ success: true });
   }
 
