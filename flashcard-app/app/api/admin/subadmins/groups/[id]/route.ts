@@ -16,6 +16,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json();
   const { name, max_users, max_device_per_user } = body;
+  
+  if (name !== undefined && (!name || name.trim() === "")) {
+    return NextResponse.json({ error: "Tên nhóm không được để trống" }, { status: 400 });
+  }
+
   const supabase = createAdminClient();
 
   // Validate max_users >= current user count
