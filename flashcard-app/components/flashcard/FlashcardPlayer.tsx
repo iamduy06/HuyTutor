@@ -194,7 +194,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
   return (
     <div className={cn("flex flex-col flex-1 min-h-0 relative", isKid && "kid-mode")}>
 
-      {/* MOBILE: vertical layout (accordion, hidden on md+) */}
+      {/* ══ MOBILE: vertical layout (< md) ══════════════════════════════ */}
       {/* Unit list accordion - mobile only */}
       <details className="md:hidden bg-white border-b-2 border-[#f0e0e7]">
         <summary className={cn(
@@ -233,7 +233,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
         </div>
       </details>
 
-      {/* DESKTOP: horizontal 3-column layout (md+) */}
+      {/* ══ DESKTOP: horizontal 3-column layout (md+) ═════════════════════ */}
       <div className="flex flex-1 min-h-0">
 
       {/* ── LEFT SIDEBAR ── */}
@@ -275,6 +275,8 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
             </button>
           ))}
         </div>
+      </nav>
+
       </nav>
 
       {/* ── MAIN (desktop) ── */}
@@ -580,7 +582,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
       </aside>
       </div>{/* end desktop 3-col */}
 
-      {/* MOBILE: word list at bottom (hidden on md+) */}
+      {/* ══ MOBILE: word list at bottom (< md) ══════════════════════════════ */}
       <details className="md:hidden bg-white border-t-2 border-[#f0e0e7]">
         <summary className={cn(
           "flex items-center gap-2 px-4 py-3 cursor-pointer font-extrabold select-none list-none",

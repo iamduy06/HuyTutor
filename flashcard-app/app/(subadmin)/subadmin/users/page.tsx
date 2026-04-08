@@ -16,7 +16,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { generatePassword } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeckItem { id: string; title: string; level?: string; word_count?: number }

@@ -12,7 +12,7 @@ async function checkSubAdmin() {
   return data;
 }
 
-// GET: List users in the same group
+// GET: List users created by this subadmin (or all if ADMIN)
 export async function GET() {
   const me = await checkSubAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -21,39 +21,29 @@ export async function GET() {
 
   let query = admin
     .from("users")
-    .select("id, email, role, created_at, created_by, group_id, user_decks(id, deck_id, expired_at, deck:decks(title))")
+    .select("id, email, role, created_at, created_by, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
     .order("created_at", { ascending: false });
 
   if (me.role === "SUBADMIN") {
-    const groupId = me.group_id;
-    if (!groupId) return NextResponse.json({ error: "SubAdmin không thuộc nhóm nào. Vui lòng liên hệ Admin." }, { status: 403 });
-    query = query.eq("group_id", groupId);
+    query = query.eq("created_by", me.id);
   }
 
-  const { data: users, error } = await query;
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Get Group Info (Quota)
-  let maxUsers = 10;
-  if (me.role === "SUBADMIN" && me.group_id) {
-    const { data: group } = await admin.from("groups").select("max_users").eq("id", me.group_id).single();
-    if (group) maxUsers = group.max_users;
-  }
-
   return NextResponse.json({
-    users: users ?? [],
+    users: data ?? [],
     me: {
       id: me.id,
       email: me.email,
       role: me.role,
-      group_id: me.group_id,
-      max_users: maxUsers,
-      current_count: (users ?? []).length,
+      max_managed_users: me.max_managed_users ?? 10,
+      current_managed: (data ?? []).length,
     },
   });
 }
 
-// POST: Create user under this group quota
+// POST: Create user under this subadmin
 export async function POST(request: NextRequest) {
   const me = await checkSubAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -61,31 +51,24 @@ export async function POST(request: NextRequest) {
   const { email, role = "USER", password: customPw } = await request.json();
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
+  // SubADMIN chỉ tạo được USER hoặc SUBADMIN
   if (!["USER", "SUBADMIN"].includes(role)) {
     return NextResponse.json({ error: "SubAdmin không thể tạo ADMIN" }, { status: 403 });
   }
 
   const admin = createAdminClient();
-  const rootGroupId = me.group_id;
-  if (!rootGroupId && me.role === "SUBADMIN") {
-    return NextResponse.json({ error: "SubAdmin không thuộc nhóm nào" }, { status: 403 });
-  }
 
-  // 1. Quota Check (Group Level)
+  // Kiểm tra giới hạn tài khoản (chỉ áp dụng cho SUBADMIN)
   if (me.role === "SUBADMIN") {
-    // Total users in group
     const { count } = await admin
       .from("users")
       .select("*", { count: "exact", head: true })
-      .eq("group_id", rootGroupId);
+      .eq("created_by", me.id);
 
-    // Get group max_users
-    const { data: group } = await admin.from("groups").select("max_users").eq("id", rootGroupId).single();
-    const max = group?.max_users ?? 10;
-
+    const max = me.max_managed_users ?? 10;
     if ((count ?? 0) >= max) {
       return NextResponse.json(
-        { error: `Nhóm đã đạt giới hạn ${max} tài khoản. Liên hệ Admin để nâng cấp gói.` },
+        { error: `Đã đạt giới hạn ${max} tài khoản. Liên hệ Admin để tăng giới hạn.` },
         { status: 403 }
       );
     }
@@ -93,25 +76,25 @@ export async function POST(request: NextRequest) {
 
   const password = customPw?.trim() || generatePassword(10);
 
+  // Truyền role và created_by qua user_metadata → trigger sẽ đọc và set đúng
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: {
       role,
-      created_by: me.id,
-      group_id: rootGroupId,
+      created_by: me.id,  // subadmin's id
     },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
+  // Upsert để đảm bảo role và created_by đúng (phòng trigger chậm)
   const { error: upsertError } = await admin.from("users").upsert({
     id: authUser.user.id,
     email,
     role,
     created_by: me.id,
-    group_id: rootGroupId,
   }, { onConflict: "id" });
 
   if (upsertError) {

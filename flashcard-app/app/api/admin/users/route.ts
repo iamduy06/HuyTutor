@@ -17,48 +17,13 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const supabase = createAdminClient();
-
-  // 1. Get all users with their decks and group info
-  const { data: users, error: usersError } = await supabase
+  const { data: users, error } = await supabase
     .from("users")
-    .select(`
-      *, 
-      user_decks(id, deck_id, expired_at, deck:decks(title)), 
-      group:groups!group_id(id, name, owner_id)
-    `)
+    .select(`*, user_decks(id, deck_id, expired_at, deck:decks(title)), creator:users!created_by(id, email, role)`)
     .order("created_at", { ascending: false });
 
-  if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
-
-  // 2. Get all groups with their max_users limit
-  const { data: groups, error: groupsError } = await supabase
-    .from("groups")
-    .select("id, name, owner_id, max_users")
-    .order("created_at", { ascending: true });
-
-  if (groupsError) return NextResponse.json({ error: groupsError.message }, { status: 500 });
-
-  // 3. For each group, calculate current user count
-  const groupStats = await Promise.all(
-    (groups ?? []).map(async (g: any) => {
-      const { count } = await supabase
-        .from("users")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", g.id);
-
-      return {
-        id: g.id,
-        name: g.name,
-        current_count: count ?? 0,
-        max_limit: g.max_users ?? 10
-      };
-    })
-  );
-
-  return NextResponse.json({ 
-    users, 
-    groupStats 
-  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ users });
 }
 
 export async function POST(request: NextRequest) {
@@ -66,63 +31,37 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { email, role = "USER", group_id, group_name } = body;
+  const { email, role = "USER" } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
+  // Dùng mật khẩu do admin nhập, hoặc tự tạo ngẫu nhiên nếu không nhập
   const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
-  // 1. Quota Check
-  if (group_id && group_id !== "NONE") {
-    const { data: group } = await supabase.from("groups").select("max_users").eq("id", group_id).single();
-    const { count } = await supabase.from("users").select("*", { count: "exact", head: true }).eq("group_id", group_id);
-    
-    if ((count ?? 0) >= (group?.max_users ?? 10)) {
-       return NextResponse.json({ error: "Nhóm đã đạt hạn mức tài khoản (Quota Full)" }, { status: 403 });
-    }
-  }
-
-  // 2. Create user in Auth
+  // Truyền role qua user_metadata → trigger handle_new_user sẽ đọc và set đúng
+  // Admin tạo user → created_by = null (không cần set)
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { role, group_id },
+    user_metadata: { role },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
-  const newUserId = authUser.user.id;
-  let finalGroupId = group_id === "NONE" ? null : group_id;
-
-  // 3. Special logic for SUBADMIN Root creation
-  if (role === "SUBADMIN" && !finalGroupId) {
-    const { data: newGroup, error: groupErr } = await supabase
-      .from("groups")
-      .insert({
-        name: group_name || `Nhóm của ${email}`,
-        owner_id: newUserId,
-        max_users: 10 // Default
-      })
-      .select()
-      .single();
-    
-    if (!groupErr) {
-      finalGroupId = newGroup.id;
-    }
-  }
-
-  // 4. Update profile
+  // Trigger đã insert vào public.users với đúng role
+  // Nếu cần ensure (phòng trigger chưa chạy kịp), upsert thêm
   const { error: upsertError } = await supabase.from("users").upsert({
-    id: newUserId,
+    id: authUser.user.id,
     email,
     role,
-    group_id: finalGroupId
+    // created_by để null → admin tạo trực tiếp
   }, { onConflict: "id" });
 
   if (upsertError) {
     console.error("Profile upsert error:", upsertError.message);
+    // Không return lỗi vì trigger đã tạo row cơ bản
   }
 
-  return NextResponse.json({ user: authUser.user, tempPassword: password, group_id: finalGroupId });
+  return NextResponse.json({ user: authUser.user, tempPassword: password });
 }

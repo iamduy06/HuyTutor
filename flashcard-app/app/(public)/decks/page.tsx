@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/services/supabase/admin";
-import { countWords } from "@/lib/utils";
+import { normaliseUnits, countWords } from "@/lib/utils";
 import { DeckCard } from "@/components/flashcard/DeckCard";
-import type { FlashcardRow, AccessMode } from "@/types";
+import type { FlashcardRow } from "@/types";
 
 export const revalidate = 60;
 
@@ -10,7 +10,7 @@ export default async function DecksPage() {
 
   const { data: decks } = await supabase
     .from("decks")
-    .select("id, title, description, level, is_public, access_mode, created_at")
+    .select("id, title, description, level, is_public, created_at")
     .order("created_at", { ascending: true });
 
   const { data: cards } = await supabase
@@ -22,11 +22,7 @@ export default async function DecksPage() {
     wordMap[r.deck_id] = (wordMap[r.deck_id] ?? 0) + countWords(r as unknown as FlashcardRow);
   });
 
-  const formatted = (decks ?? []).map(d => ({
-    ...d,
-    word_count: wordMap[d.id] ?? 0,
-    access_mode: (d.access_mode as AccessMode) ?? "assigned_only",
-  }));
+  const formatted = (decks ?? []).map(d => ({ ...d, word_count: wordMap[d.id] ?? 0 }));
 
   return (
     <div className="py-12 px-[5%] max-w-6xl mx-auto">
@@ -42,11 +38,7 @@ export default async function DecksPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {formatted.map(d => (
-            <DeckCard key={d.id} deck={d} href={`/decks/${d.id}`} ctaLabel={
-              d.access_mode === "public_full" ? "Học ngay (miễn phí)" :
-              d.access_mode === "public_demo" ? "Xem 10 từ demo" :
-              "Học thử"
-            } />
+            <DeckCard key={d.id} deck={d} href={`/decks/${d.id}`} ctaLabel="Học thử" />
           ))}
         </div>
       )}

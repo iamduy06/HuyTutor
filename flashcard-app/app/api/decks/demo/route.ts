@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { extractTabs } from "@/lib/utils";
 import { DEMO_LIMIT } from "@/lib/constants";
-import type { FlashcardRow, Tab, AccessMode } from "@/types";
+import type { FlashcardRow, Tab } from "@/types";
 
 export async function GET(req: NextRequest) {
   const deckId = req.nextUrl.searchParams.get("deckId");
@@ -12,12 +12,10 @@ export async function GET(req: NextRequest) {
 
   const { data: deck } = await supabase
     .from("decks")
-    .select("id, title, description, level, access_mode")
+    .select("id, title, description, level")
     .eq("id", deckId)
     .single();
   if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const accessMode: AccessMode = (deck.access_mode as AccessMode) ?? "assigned_only";
 
   const { data: rows } = await supabase
     .from("flashcards")
@@ -29,12 +27,7 @@ export async function GET(req: NextRequest) {
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
-  // public_full: everyone gets full access even without login
-  if (accessMode === "public_full") {
-    return NextResponse.json({ deck, tabs: allTabs, isDemo: false });
-  }
-
-  // All other modes: show demo (10 words) on public page
+  // Giới hạn DEMO_LIMIT từ
   let seen = 0;
   const demoTabs = allTabs.map(tab => {
     const remaining = DEMO_LIMIT - seen;

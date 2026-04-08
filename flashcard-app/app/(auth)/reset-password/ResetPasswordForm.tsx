@@ -28,16 +28,16 @@ export function ResetPasswordForm() {
   const router    = useRouter();
   const { toast } = useToast();
 
-  // Kiểm tra xem user đã có session hợp lệ chưa
+  // Kiểm tra xem Supabase đã exchange token từ URL hash chưa
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       setTokenOk(!!data.session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Sau khi verify callback PKCE, state sẽ là SIGNED_IN hoặc USER_UPDATED
-      if (session) setTokenOk(true);
+    // Lắng nghe sự kiện PASSWORD_RECOVERY từ Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setTokenOk(true);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -60,15 +60,11 @@ export function ResetPasswordForm() {
       toast({ title: "Đặt lại mật khẩu thất bại", description: error.message, variant: "destructive" });
       return;
     }
-    // Đổi mật khẩu thành công
+
+    // Sign out để user đăng nhập lại với mật khẩu mới
+    await supabase.auth.signOut();
     setDone(true);
     toast({ title: "Mật khẩu đã được cập nhật 🎉" });
-    
-    // Đăng xuất ngay lập tức để người dùng phải sử dụng password mới để login
-    setTimeout(async () => {
-      await supabase.auth.signOut();
-      router.push("/login?reset=success");
-    }, 2000);
   }
 
   // Đang kiểm tra token
@@ -108,10 +104,10 @@ export function ResetPasswordForm() {
         </div>
         <h1 className="text-xl font-extrabold text-[#1a1a2e] mb-2">Mật khẩu đã được cập nhật!</h1>
         <p className="text-muted-foreground text-sm mb-6">
-          Đang chuyển hướng bạn về trang Đăng nhập...
+          Vui lòng đăng nhập lại với mật khẩu mới của bạn.
         </p>
-        <Button variant="brand" className="w-full rounded-full" disabled>
-          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Đang chuyển hướng...
+        <Button variant="brand" className="w-full rounded-full" asChild>
+          <Link href="/login">Đăng nhập →</Link>
         </Button>
       </div>
     );

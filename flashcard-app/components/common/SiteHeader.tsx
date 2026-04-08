@@ -42,14 +42,9 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-[5%] h-[62px] bg-white border-b-2 border-[#f0e0e7]">
-      <div className="flex items-center gap-6">
-        <Link href="/" className="flex items-center">
-          <Logo height={40} />
-        </Link>
-        <nav className="hidden md:flex items-center gap-4 text-sm font-semibold text-muted-foreground">
-          <Link href="/pricing" className="hover:text-brand transition-colors">Báo giá</Link>
-        </nav>
-      </div>
+      <Link href="/" className="flex items-center">
+        <Logo height={40} />
+      </Link>
 
       <div className="flex items-center gap-2">
         <UIModeToggle />
