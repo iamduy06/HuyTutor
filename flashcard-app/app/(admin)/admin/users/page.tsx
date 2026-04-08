@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
   Copy, Check, ChevronDown, Shield, Shuffle,
-  UserCog, Users, Smartphone
+  UserCog, Users, Smartphone, Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,12 @@ async function fetchGroups(): Promise<GroupItem[]> {
   const data = await res.json();
   return data.groups ?? [];
 }
+async function fetchGlobalSettings(): Promise<string> {
+  const res = await fetch("/api/admin/app-settings");
+  if (!res.ok) return "3";
+  const data = await res.json();
+  return data.global_max_devices ?? "3";
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
@@ -71,12 +77,21 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Modals state
+  // Global Settings Modal
+  const [showSettings, setShowSettings] = useState(false);
+  const [globalMaxDevices, setGlobalMaxDevices] = useState("");
+
+  // Create User Modal State
   const [showCreate, setShowCreate] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("USER");
+  const [newGroupId, setNewGroupId] = useState("none");
+  const [newMaxDevices, setNewMaxDevices] = useState("");
   const [tempPw, setTempPw] = useState("");
+
+  // Create Group Input State
+  const [newGroupName, setNewGroupName] = useState("");
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
 
@@ -101,14 +116,56 @@ export default function AdminUsersPage() {
   const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: fetchUsers });
   const { data: decks = [] } = useQuery({ queryKey: ["admin-decks-list"], queryFn: fetchDecks });
   const { data: groups = [] } = useQuery({ queryKey: ["admin-groups-list"], queryFn: fetchGroups });
+  const { data: globalSettingsValue = "3" } = useQuery({ queryKey: ["admin-global-settings"], queryFn: fetchGlobalSettings });
 
 
   // ── Mutations ─────────────────────────────────────────────────────────────
+  const updateSettings = useMutation({
+    mutationFn: async (val: string) => {
+      const res = await fetch("/api/admin/app-settings", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ global_max_devices: val }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-global-settings"] });
+      toast({ title: "Đã cập nhật cấu hình hệ thống" });
+      setShowSettings(false);
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
+
+  const createGroup = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/admin/groups", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: "" }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Failed");
+      return d.group;
+    },
+    onSuccess: (newGroup) => {
+      qc.invalidateQueries({ queryKey: ["admin-groups-list"] });
+      setNewGroupName("");
+      // Support assigning new group to either Create User or Assign Group dialog
+      if (showCreate) setNewGroupId(newGroup.id);
+      if (activeDialog === "GROUP") setEditGroupId(newGroup.id);
+      toast({ title: "Đã tạo nhóm mới!" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const createUser = useMutation({
-    mutationFn: async ({ email, role, password }: { email: string; role: string; password: string }) => {
+    mutationFn: async (params: { email: string; role: string; password: string; group_id: string; max_devices: string }) => {
+      const payload: any = { email: params.email, role: params.role, password: params.password };
+      if (params.group_id !== "none") payload.group_id = params.group_id;
+      if (params.max_devices) payload.max_devices = params.max_devices;
+
       const res = await fetch("/api/admin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role, password }),
+        body: JSON.stringify(payload),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
@@ -297,10 +354,14 @@ export default function AdminUsersPage() {
     }
     if (type === "GROUP") {
       setEditGroupId(user.group_users?.[0]?.group_id || "none");
+      setNewGroupName("");
     }
     if (type === "DECKS") {
       setAssignDeckIds(new Set());
       setAssignExpiry("");
+    }
+    if (type === "DEVICES") {
+      setEditMaxDevices(user.max_devices?.toString() || "");
     }
   };
 
@@ -340,8 +401,13 @@ export default function AdminUsersPage() {
           {csvFile && (
             <Button variant="brand" size="sm" onClick={handleCsvUpload}>Upload {csvFile.name}</Button>
           )}
+
+          <Button variant="outline" className="text-gray-600 hover:text-brand px-3" onClick={() => { setGlobalMaxDevices(globalSettingsValue); setShowSettings(true); }} title="Cấu hình hệ thống">
+            <Settings className="w-4 h-4" />
+          </Button>
+
           <Button variant="brand"
-            onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); setNewRole("USER"); }}>
+            onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); setNewRole("USER"); setNewGroupId("none"); setNewMaxDevices(""); setNewGroupName(""); }}>
             <Plus className="w-4 h-4 mr-1.5" /> Tạo user
           </Button>
         </div>
@@ -389,7 +455,7 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="p-3 text-xs">
                         <span className="font-semibold text-gray-800">{devCount}</span>
-                        {u.max_devices ? ` / ${u.max_devices}` : " / ♾️"}
+                        {u.max_devices ? ` / ${u.max_devices}` : ` / ${globalSettingsValue} (Hệ thống)`}
                       </td>
                       <td className="p-3 text-xs">
                          <span className="font-semibold text-brand bg-brand-light px-2.5 py-0.5 rounded-full">
@@ -430,9 +496,26 @@ export default function AdminUsersPage() {
         </div>
       )}
 
+      {/* ════ Dialog: Global Settings ════ */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Cấu Hình Toàn Hệ Thống</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Max Devices Mặc Định (Cho mọi user không set rỗng)</Label>
+              <Input type="number" min="1" value={globalMaxDevices} onChange={e => setGlobalMaxDevices(e.target.value)} className="mt-1" />
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button variant="outline">Huỷ</Button></DialogClose>
+              <Button variant="brand" onClick={() => updateSettings.mutate(globalMaxDevices)} disabled={updateSettings.isPending || !globalMaxDevices}>Lưu cấu hình</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ════ Dialog: Tạo user ════ */}
-      <Dialog open={showCreate} onOpenChange={v => { setShowCreate(v); if (!v) { setTempPw(""); setNewPassword(""); } }}>
-        <DialogContent>
+      <Dialog open={showCreate} onOpenChange={v => { setShowCreate(v); if (!v) { setTempPw(""); setNewPassword(""); setNewGroupName(""); } }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Tạo người dùng mới</DialogTitle></DialogHeader>
           {tempPw ? (
             <div className="space-y-3">
@@ -471,11 +554,37 @@ export default function AdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <DialogFooter>
+
+              <div className="pt-3 border-t">
+                <Label>Nhóm (Group)</Label>
+                <Select value={newGroupId} onValueChange={setNewGroupId}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn nhóm" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">-- Không thuộc nhóm nào --</SelectItem>
+                    {groups.map(g => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
+                   <div className="flex-1">
+                     <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Chọn ngay</Label>
+                     <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
+                   </div>
+                   <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
+                </div>
+              </div>
+
+              <div>
+                <Label>Max Devices (Thiết bị tối đa)</Label>
+                <Input type="number" min="1" value={newMaxDevices} onChange={e => setNewMaxDevices(e.target.value)} placeholder={`Bỏ trống để dùng mặc định (${globalSettingsValue})`} className="mt-1" />
+              </div>
+
+              <DialogFooter className="pt-2 border-t">
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={!newEmail || createUser.isPending}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword })}>
-                  {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tạo"}
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, group_id: newGroupId, max_devices: newMaxDevices })}>
+                  {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tạo Tài Khoản"}
                 </Button>
               </DialogFooter>
             </div>
@@ -501,7 +610,7 @@ export default function AdminUsersPage() {
             </div>
             <div>
               <Label>Max Devices (Thiết bị tối đa)</Label>
-              <Input type="number" min="1" value={editMaxDevices} onChange={e => setEditMaxDevices(e.target.value)} placeholder="Bỏ trống để dùng mặc định toàn hệ thống" className="mt-1" />
+              <Input type="number" min="1" value={editMaxDevices} onChange={e => setEditMaxDevices(e.target.value)} placeholder={`Bỏ trống để dùng mặc định toàn HT (${globalSettingsValue})`} className="mt-1" />
             </div>
             
             <div className="pt-4 border-t border-[#f0e0e7] mt-4">
@@ -540,21 +649,31 @@ export default function AdminUsersPage() {
             <DialogTitle>Gán Nhóm: {editingUser?.email}</DialogTitle>
             <DialogDescription>Một người dùng chỉ thuộc tối đa 1 nhóm.</DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <Label>Chọn nhóm</Label>
-            <Select value={editGroupId} onValueChange={setEditGroupId}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn nhóm" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">-- Không thuộc nhóm nào --</SelectItem>
-                {groups.map(g => (
-                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="mt-4 space-y-4">
+            <div>
+               <Label>Chọn nhóm hiện có</Label>
+               <Select value={editGroupId} onValueChange={setEditGroupId}>
+                 <SelectTrigger className="mt-1"><SelectValue placeholder="Chọn nhóm" /></SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="none">-- Không thuộc nhóm nào --</SelectItem>
+                   {groups.map(g => (
+                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+            </div>
+            
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
+               <div className="flex-1">
+                 <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Gán ngay</Label>
+                 <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
+               </div>
+               <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
+            </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
-            <Button variant="brand" onClick={() => assignGroup.mutate({ id: editingUser!.id, group_id: editGroupId === "none" ? null : editGroupId })} disabled={assignGroup.isPending}>Lưu thay đổi</Button>
+          <DialogFooter className="mt-4 border-t pt-4">
+            <DialogClose asChild><Button variant="outline">Hủy</Button></DialogClose>
+            <Button variant="brand" onClick={() => assignGroup.mutate({ id: editingUser!.id, group_id: editGroupId === "none" ? null : editGroupId })} disabled={assignGroup.isPending}>Cập Nhật Nhóm (Lưu)</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -625,12 +744,23 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>Quản lý Thiết bị: {editingUser?.email}</DialogTitle>
             <DialogDescription>
-              Người dùng đang đăng nhập trên {(currentUserData?.user_devices || []).length} / {currentUserData?.max_devices || "không giới hạn"} thiết bị.
+              Người dùng đang đăng nhập trên {(currentUserData?.user_devices || []).length} / {currentUserData?.max_devices || `${globalSettingsValue} (Hệ thống)`} thiết bị.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 space-y-3">
+          
+          <div className="flex flex-col gap-2 pt-2 pb-4 border-b border-gray-100">
+             <Label>Giới hạn Thiết Bị Riêng (Max Devices)</Label>
+             <div className="flex gap-2">
+                 <Input type="number" min="1" value={editMaxDevices} onChange={e => setEditMaxDevices(e.target.value)} placeholder={`Mặc định HT là ${globalSettingsValue}`} className="flex-1" />
+                 <Button variant="outline" disabled={updateInfo.isPending} onClick={() => updateInfo.mutate({ id: currentUserData!.id, role: currentUserData!.role, max_devices: editMaxDevices ? parseInt(editMaxDevices) : null })}>
+                   Lưu Max Devices
+                 </Button>
+             </div>
+          </div>
+
+          <div className="mt-2 space-y-3 max-h-[40vh] overflow-y-auto">
              {currentUserData?.user_devices?.length === 0 ? (
-               <p className="text-sm italic text-gray-500 text-center py-4">Chưa có thiết bị nào đăng nhập.</p>
+               <p className="text-sm italic text-gray-500 text-center py-4">Chưa có thiết bị nào đang hoạt động.</p>
              ) : (
                currentUserData?.user_devices?.map(dev => (
                  <div key={dev.id} className="p-3 border rounded-xl flex items-center justify-between bg-gray-50">
@@ -640,16 +770,16 @@ export default function AdminUsersPage() {
                      <p className="text-xs text-brand mt-1">Lần cuối: {new Date(dev.last_seen).toLocaleString()}</p>
                    </div>
                    <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50"
-                     onClick={() => { if(confirm("Xoá thiết bị này?")) removeDevice.mutate({ userId: currentUserData.id, device_id: dev.device_id })}}>
-                     Xoá
+                     onClick={() => { if(confirm("Xoá thiết bị này? Người dùng sẽ văng ra trang Login.")) removeDevice.mutate({ userId: currentUserData!.id, device_id: dev.device_id })}}>
+                     Xoá (Logout)
                    </Button>
                  </div>
                ))
              )}
           </div>
-          <div className="mt-6 pt-4 border-t flex flex-col gap-2">
+          <div className="mt-4 pt-4 border-t flex flex-col gap-2">
             <Button variant="destructive" onClick={() => { if(confirm("Bạn có chắc muốn đăng xuất người dùng khỏi toàn bộ các thiết bị?")) resetDevices.mutate(currentUserData!.id) }} disabled={!currentUserData?.user_devices?.length}>
-               Reset Toàn Bộ & Đăng Xuất
+               Reset Toàn Bộ & Đăng Xuất Mọi Nơi
             </Button>
             <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
           </div>
