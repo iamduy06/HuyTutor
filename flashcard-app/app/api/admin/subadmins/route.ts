@@ -16,10 +16,13 @@ export async function GET() {
 
   const db = createAdminClient();
 
-  // Get all SUBADMIN users with their assigned decks
   const { data: subadmins } = await db
     .from("users")
-    .select("id, email, role, created_at, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
+    .select(`
+      id, email, role, created_at, max_managed_users, group_id,
+      group:groups!group_id(name),
+      user_decks(id, deck_id, expired_at, deck:decks(title))
+    `)
     .eq("role", "SUBADMIN")
     .order("created_at", { ascending: false });
 

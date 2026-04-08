@@ -97,37 +97,53 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const db = createAdminClient();
+  const body = await request.json().catch(() => ({}));
+  
+  const { 
+    new_owner_id, 
+    keep_user_ids = [], 
+    delete_user_ids = [] 
+  } = body;
 
-  // Body contains { deleteUserIds: string[] } - user IDs to delete along with the subadmin
-  let deleteUserIds: string[] = [];
-  try {
-    const body = await request.json();
-    deleteUserIds = body.deleteUserIds ?? [];
-  } catch { /* no body = delete subadmin only */ }
-
-  // 1. Delete selected managed users
-  for (const uid of deleteUserIds) {
-    await db.auth.admin.deleteUser(uid);
-  }
-
-  // 2. Unset created_by for remaining managed users (they become orphaned → admin-managed)
-  const { data: remainingUsers } = await db
-    .from("users")
+  // 1. Handle Group Ownership Transfer
+  // Check if this subadmin owns any groups
+  const { data: ownedGroups } = await db
+    .from("groups")
     .select("id")
-    .eq("created_by", params.id);
+    .eq("owner_id", params.id);
 
-  if (remainingUsers && remainingUsers.length > 0) {
-    const remainingIds = remainingUsers
-      .map((u: { id: string }) => u.id)
-      .filter((id: string) => !deleteUserIds.includes(id));
-    if (remainingIds.length > 0) {
-      await db.from("users")
-        .update({ created_by: null })
-        .in("id", remainingIds);
+  if (ownedGroups && ownedGroups.length > 0) {
+    for (const group of ownedGroups) {
+      if (new_owner_id) {
+        // Transfer group ownership to another subadmin
+        await db.from("groups")
+          .update({ owner_id: new_owner_id })
+          .eq("id", group.id);
+      } else {
+        // No new owner -> Group becomes a "Virtual Group" managed by Admin
+        await db.from("groups")
+          .update({ owner_id: null })
+          .eq("id", group.id);
+      }
     }
   }
 
-  // 3. Delete the subadmin from auth (triggers cascade delete from public.users)
+  // 2. Handle Managed Users
+  // Users to delete
+  if (delete_user_ids.length > 0) {
+    for (const uid of delete_user_ids) {
+      await db.auth.admin.deleteUser(uid);
+    }
+  }
+
+  // Users to keep (convert to Admin-managed)
+  if (keep_user_ids.length > 0) {
+    await db.from("users")
+      .update({ group_id: null })
+      .in("id", keep_user_ids);
+  }
+
+  // 3. Delete the subadmin
   const { error } = await db.auth.admin.deleteUser(params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 

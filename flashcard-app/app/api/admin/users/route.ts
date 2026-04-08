@@ -19,7 +19,12 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data: users, error } = await supabase
     .from("users")
-    .select(`*, user_decks(id, deck_id, expired_at, deck:decks(title)), creator:users!created_by(id, email, role)`)
+    .select(`
+      *, 
+      user_decks(id, deck_id, expired_at, deck:decks(title)), 
+      creator:users!created_by(id, email, role),
+      group:groups!group_id(id, name)
+    `)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -31,37 +36,53 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { email, role = "USER" } = body;
+  const { email, role = "USER", group_id, group_name } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  // Dùng mật khẩu do admin nhập, hoặc tự tạo ngẫu nhiên nếu không nhập
   const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
-  // Truyền role qua user_metadata → trigger handle_new_user sẽ đọc và set đúng
-  // Admin tạo user → created_by = null (không cần set)
+  // 1. Create user in Auth
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { role },
+    user_metadata: { role, group_id },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
-  // Trigger đã insert vào public.users với đúng role
-  // Nếu cần ensure (phòng trigger chưa chạy kịp), upsert thêm
+  const newUserId = authUser.user.id;
+  let finalGroupId = group_id;
+
+  // 2. Special logic for SUBADMIN Root creation
+  // If role is SUBADMIN and no group_id is provided, create a new group
+  if (role === "SUBADMIN" && !finalGroupId) {
+    const { data: newGroup, error: groupErr } = await supabase
+      .from("groups")
+      .insert({
+        name: group_name || `Nhóm của ${email}`,
+        owner_id: newUserId
+      })
+      .select()
+      .single();
+    
+    if (!groupErr) {
+      finalGroupId = newGroup.id;
+    }
+  }
+
+  // 3. Update profile (ensure metadata and group_id are synced)
   const { error: upsertError } = await supabase.from("users").upsert({
-    id: authUser.user.id,
+    id: newUserId,
     email,
     role,
-    // created_by để null → admin tạo trực tiếp
+    group_id: finalGroupId,
   }, { onConflict: "id" });
 
   if (upsertError) {
     console.error("Profile upsert error:", upsertError.message);
-    // Không return lỗi vì trigger đã tạo row cơ bản
   }
 
-  return NextResponse.json({ user: authUser.user, tempPassword: password });
+  return NextResponse.json({ user: authUser.user, tempPassword: password, group_id: finalGroupId });
 }

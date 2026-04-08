@@ -25,9 +25,9 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (me.role === "SUBADMIN") {
-    // Với Shared Group, Subadmin lấy tất cả user trong cùng group (do admin cấp hoặc do các subadmin con tạo ra)
-    const rootGroupId = me.group_id || me.id;
-    query = query.eq("group_id", rootGroupId);
+    const groupId = me.group_id;
+    if (!groupId) return NextResponse.json({ error: "SubAdmin không thuộc nhóm nào. Vui lòng liên hệ Admin." }, { status: 403 });
+    query = query.eq("group_id", groupId);
   }
 
   const { data, error } = await query;
@@ -59,7 +59,10 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const rootGroupId = me.group_id || me.id;
+  const rootGroupId = me.group_id;
+  if (!rootGroupId && me.role === "SUBADMIN") {
+    return NextResponse.json({ error: "SubAdmin không thuộc nhóm nào" }, { status: 403 });
+  }
 
   // Kiểm tra giới hạn tài khoản (chỉ áp dụng cho SUBADMIN)
   if (me.role === "SUBADMIN") {
