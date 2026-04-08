@@ -51,17 +51,29 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
+  const { title, description, level_min, level_max, access_level, preview_word_limit } = body;
   const levelStr = computeLevelStr(body.level_min ?? null, body.level_max ?? null);
+
+  if (access_level && !["public", "authenticated", "authorized", "preview"].includes(access_level)) {
+    return NextResponse.json({ error: "Invalid access_level" }, { status: 400 });
+  }
+
+  const limitNum = parseInt(preview_word_limit);
+  if (access_level === 'preview' && (isNaN(limitNum) || limitNum <= 0)) {
+    return NextResponse.json({ error: "preview_word_limit must be > 0 when access_level is preview" }, { status: 400 });
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("decks")
     .update({
-      title: body.title,
-      description: body.description,
+      title: title,
+      description: description,
       level: levelStr,
-      level_min: body.level_min ?? null,
-      level_max: body.level_max ?? null,
-      is_public: Boolean(body.is_public),
+      level_min: level_min ?? null,
+      level_max: level_max ?? null,
+      ...(access_level ? { access_level } : {}),
+      ...(access_level === 'preview' ? { preview_word_limit: limitNum } : {}),
     })
     .eq("id", params.id).select().single();
 
