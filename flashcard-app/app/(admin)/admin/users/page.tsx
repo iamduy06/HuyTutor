@@ -217,7 +217,11 @@ export default function AdminUsersPage() {
                 <Label>Quyền</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="USER">USER</SelectItem><SelectItem value="SUBADMIN">SUBADMIN</SelectItem></SelectContent>
+                  <SelectContent>
+                    <SelectItem value="USER">USER</SelectItem>
+                    <SelectItem value="SUBADMIN">SUBADMIN</SelectItem>
+                    <SelectItem value="ADMIN">ADMIN</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
@@ -342,9 +346,11 @@ function UserGroupTable({ title, titleColor, bgColor, users, compact, onAssign, 
             {users.map((u: UserData) => (
               <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
                 <td className="p-3 font-medium text-[#1a1a2e]">{u.email}</td>
-                <td className="p-3">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" : "bg-brand-light text-brand"}`}>{u.role}</span>
-                </td>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    u.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
+                    u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" : 
+                    "bg-brand-light text-brand"
+                  }`}>{u.role}</span>
                 <td className="p-3 text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString("vi-VN")}</td>
                 <td className="p-3">
                   <div className="flex gap-1">
