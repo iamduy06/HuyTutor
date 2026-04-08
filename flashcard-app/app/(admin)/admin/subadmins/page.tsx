@@ -394,39 +394,22 @@ export default function AdminSubAdminsPage() {
       {/* ════ MODALS: GROUP ACTIONS ════ */}
       
       <Dialog open={!!editGroup} onOpenChange={() => setEditGroup(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2 text-brand"><Settings className="w-5 h-5"/> Cài đặt Nhóm: {editGroup?.name}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Cài đặt Nhóm: {editGroup?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label className="text-xs font-bold uppercase text-gray-500">Tên nhóm</Label>
+              <Label>Tên nhóm</Label>
               <Input value={editGroup?.name} onChange={e => setEditGroup(prev => prev ? {...prev, name: e.target.value} : null)} className="mt-1" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-bold uppercase text-gray-500">Số thành viên tối đa</Label>
-                <Input type="number" min={editGroup?.user_count || 1} value={editGroup?.max_users} 
-                  onChange={e => setEditGroup(prev => prev ? {...prev, max_users: parseInt(e.target.value)} : null)} className="mt-1" />
-                <p className="text-[10px] text-muted-foreground mt-1">Hiện có: {editGroup?.user_count} user</p>
-              </div>
-              <div>
-                <Label className="text-xs font-bold uppercase text-gray-500">Thiết bị / User</Label>
-                <Input type="number" min={1} value={editGroup?.max_device_per_user} 
-                  onChange={e => setEditGroup(prev => prev ? {...prev, max_device_per_user: parseInt(e.target.value)} : null)} className="mt-1" />
-                <p className="text-[10px] text-muted-foreground mt-1">Mặc định: 3</p>
-              </div>
+            <div>
+              <Label>Số thiết bị tối đa mỗi User</Label>
+              <Input type="number" min={1} value={editGroup?.max_device_per_user} 
+                onChange={e => setEditGroup(prev => prev ? {...prev, max_device_per_user: parseInt(e.target.value)} : null)} className="mt-1" />
+              <p className="text-[10px] text-muted-foreground mt-1">Giới hạn số thiết bị tối đa cho mỗi thành viên trong nhóm này.</p>
             </div>
-            
-            {(editGroup?.max_users || 0) < (editGroup?.user_count || 0) && (
-              <p className="text-xs text-red-500 font-semibold italic">⚠️ Số lượng tối đa không được nhỏ hơn số user hiện tại ({editGroup?.user_count}).</p>
-            )}
-
-            <DialogFooter className="pt-2">
-              <Button variant="brand" className="w-full h-11 text-base font-bold" 
-                disabled={updateGroup.isPending || (editGroup?.max_users || 0) < (editGroup?.user_count || 0) || !editGroup?.name}
-                onClick={()=>updateGroup.mutate({id: editGroup!.id, name: editGroup!.name, max_users: editGroup!.max_users, max_device_per_user: editGroup!.max_device_per_user})}>
-                {updateGroup.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Lưu cấu hình nhóm
-              </Button>
+            <DialogFooter>
+              <Button variant="brand" className="w-full" disabled={updateGroup.isPending}
+                onClick={()=>updateGroup.mutate({id: editGroup!.id, name: editGroup!.name, max_users: editGroup!.max_users, max_device_per_user: editGroup!.max_device_per_user})}>Xác nhận cập nhật</Button>
             </DialogFooter>
           </div>
         </DialogContent>
