@@ -18,7 +18,7 @@ export async function GET() {
 
   const supabase = createAdminClient();
 
-  // 1. Get all users
+  // 1. Get all users with their decks and group info
   const { data: users, error: usersError } = await supabase
     .from("users")
     .select(`
@@ -30,37 +30,27 @@ export async function GET() {
 
   if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
 
-  // 2. Get all groups to calculate capacity
+  // 2. Get all groups with their max_users limit
   const { data: groups, error: groupsError } = await supabase
     .from("groups")
-    .select("*");
+    .select("id, name, owner_id, max_users")
+    .order("created_at", { ascending: true });
 
   if (groupsError) return NextResponse.json({ error: groupsError.message }, { status: 500 });
 
-  // 3. For each group, calculate current users and find the owner's limit
+  // 3. For each group, calculate current user count
   const groupStats = await Promise.all(
     (groups ?? []).map(async (g: any) => {
-      // Current count (all users in this group)
       const { count } = await supabase
         .from("users")
         .select("*", { count: "exact", head: true })
         .eq("group_id", g.id);
 
-      // Max limit (from the owner subadmin)
-      let maxLimit = 10;
-      if (g.owner_id) {
-        const { data: owner } = await supabase
-          .from("users")
-          .select("max_managed_users")
-          .eq("id", g.owner_id)
-          .single();
-        if (owner) maxLimit = owner.max_managed_users;
-      }
-
       return {
         id: g.id,
+        name: g.name,
         current_count: count ?? 0,
-        max_limit: maxLimit
+        max_limit: g.max_users ?? 10
       };
     })
   );
@@ -82,7 +72,17 @@ export async function POST(request: NextRequest) {
   const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
-  // 1. Create user in Auth
+  // 1. Quota Check
+  if (group_id && group_id !== "NONE") {
+    const { data: group } = await supabase.from("groups").select("max_users").eq("id", group_id).single();
+    const { count } = await supabase.from("users").select("*", { count: "exact", head: true }).eq("group_id", group_id);
+    
+    if ((count ?? 0) >= (group?.max_users ?? 10)) {
+       return NextResponse.json({ error: "Nhóm đã đạt hạn mức tài khoản (Quota Full)" }, { status: 403 });
+    }
+  }
+
+  // 2. Create user in Auth
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -93,15 +93,16 @@ export async function POST(request: NextRequest) {
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
   const newUserId = authUser.user.id;
-  let finalGroupId = group_id;
+  let finalGroupId = group_id === "NONE" ? null : group_id;
 
-  // 2. Special logic for SUBADMIN Root creation
+  // 3. Special logic for SUBADMIN Root creation
   if (role === "SUBADMIN" && !finalGroupId) {
     const { data: newGroup, error: groupErr } = await supabase
       .from("groups")
       .insert({
         name: group_name || `Nhóm của ${email}`,
-        owner_id: newUserId
+        owner_id: newUserId,
+        max_users: 10 // Default
       })
       .select()
       .single();
@@ -111,13 +112,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. Update profile
+  // 4. Update profile
   const { error: upsertError } = await supabase.from("users").upsert({
     id: newUserId,
     email,
     role,
-    group_id: finalGroupId,
-    max_managed_users: role === "SUBADMIN" ? 10 : null // Default limit
+    group_id: finalGroupId
   }, { onConflict: "id" });
 
   if (upsertError) {

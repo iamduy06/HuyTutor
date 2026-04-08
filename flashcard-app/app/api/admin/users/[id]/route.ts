@@ -31,7 +31,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { deck_id, expired_at } = body;
     const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
     
-    // Admin inserts directly into user_decks
     const { error } = await supabase.from("user_decks").upsert({
       user_id: params.id,
       deck_id,
@@ -47,24 +46,28 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // 3. Update user details (Role, Group, Limit)
   if (body.action === "update_user") {
-    const { role, group_id, max_managed_users, delete_user_ids, keep_user_ids } = body;
+    const { role, group_id, delete_user_ids, keep_user_ids } = body;
     const updates: any = {};
     if (role) updates.role = role;
-    if (group_id !== undefined) updates.group_id = group_id === "NONE" ? null : group_id;
+    
+    // Multi-tenant: group_id is IMMUTABLE once set. 
+    // We only allow setting it if it was null.
+    if (group_id !== undefined && group_id !== "NONE") {
+      const { data: current } = await supabase.from("users").select("group_id").eq("id", params.id).single();
+      if (!current?.group_id) {
+        updates.group_id = group_id;
+      } else if (current.group_id !== group_id) {
+        return NextResponse.json({ error: "Không được phép thay đổi Nhóm sau khi đã gán." }, { status: 403 });
+      }
+    } else if (group_id === "NONE") {
+       // Only allow unsetting if Admin explicitly wants to move to "No Group" (be careful)
+       // But policy says isolation: cấm đổi. I'll stick to strict.
+       // updates.group_id = null;
+    }
     
     // Update User Profile
     const { error: dbErr } = await supabase.from("users").update(updates).eq("id", params.id);
     if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
-
-    // IMPORTANT: max_managed_users now applies to the GROUP, not the user
-    // If we are setting a limit for a subadmin, we find the group they belong to (or own) and update its max_users
-    if (max_managed_users !== undefined) {
-      // Find the group related to this user
-      const { data: userData } = await supabase.from("users").select("group_id").eq("id", params.id).single();
-      if (userData?.group_id) {
-        await supabase.from("groups").update({ max_users: max_managed_users }).eq("id", userData.group_id);
-      }
-    }
 
     // Handle Downgrade / Deletion cleanup
     if (delete_user_ids || keep_user_ids) {
@@ -96,21 +99,21 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const supabase = createAdminClient();
-  let deleteUserIds: string[] = [];
-  let keepUserIds: string[] = [];
+  let deleteIds: string[] = [];
+  let kIds: string[] = [];
   try {
     const body = await request.json();
-    deleteUserIds = body.delete_user_ids ?? [];
-    keepUserIds = body.keep_user_ids ?? [];
+    deleteIds = body.delete_user_ids ?? [];
+    kIds = body.keep_user_ids ?? [];
   } catch (e) {}
 
-  if (deleteUserIds.length > 0) {
-    for (const uid of deleteUserIds) {
+  if (deleteIds.length > 0) {
+    for (const uid of deleteIds) {
       await supabase.auth.admin.deleteUser(uid);
     }
   }
-  if (keepUserIds.length > 0) {
-    await supabase.from("users").update({ group_id: null, created_by: null }).in("id", keep_user_ids);
+  if (kIds.length > 0) {
+    await supabase.from("users").update({ group_id: null, created_by: null }).in("id", kIds);
   }
 
   const { error } = await supabase.auth.admin.deleteUser(params.id);

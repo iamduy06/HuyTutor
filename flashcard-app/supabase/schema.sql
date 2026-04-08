@@ -251,6 +251,19 @@ $$;
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- ── 6.1 TRIGGER: Prevent group_id change ───────────────────────
+CREATE OR REPLACE FUNCTION public.prevent_group_change() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.group_id IS NOT NULL AND NEW.group_id IS DISTINCT FROM OLD.group_id THEN
+    RAISE EXCEPTION 'Không được phép thay đổi Nhóm (group_id) sau khi tài khoản đã được tạo.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_prevent_group_change ON public.users;
+CREATE TRIGGER tg_prevent_group_change BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.prevent_group_change();
+
 -- ── 7. DATA MIGRATION & SAMPLE DATA ───────────────────────────────────────────
 
 DO $$
