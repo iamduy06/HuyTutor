@@ -1,0 +1,296 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 344 100% 46%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 344 100% 46%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+
+/* ── Flashcard flip animation ─────────────────────────────────── */
+
+.card-scene {
+  perspective: 1200px;
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-back {
+  transform: rotateY(180deg);
+}
+
+/* ── Custom scrollbar ─────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ed0046; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #c0003a; }
+
+/* ══════════════════════════════════════════════════════════════
+   KID MODE
+   ══════════════════════════════════════════════════════════════ */
+
+/* Background gradient vui mắt phủ toàn trang */
+.kid-mode {
+  --radius: 1.25rem;
+  --kid-pink:   #ff6b9d;
+  --kid-purple: #c77dff;
+  --kid-blue:   #48cae4;
+  --kid-yellow: #ffd166;
+  --kid-green:  #06d6a0;
+  --kid-orange: #ff9f1c;
+
+  background: linear-gradient(135deg,
+    #fff0fb 0%,
+    #f0f4ff 25%,
+    #f0fff8 50%,
+    #fffbf0 75%,
+    #fff0fb 100%
+  );
+  min-height: 100vh;
+  font-family: 'Bricolage Grotesque', 'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif;
+}
+
+/* ── Kid sidebar: rainbow border ── */
+.kid-mode nav,
+.kid-mode aside {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(8px);
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
+  box-shadow:
+    2px 0 0 0 rgba(255, 107, 157, 0.3),
+    4px 0 12px rgba(199, 125, 255, 0.15) !important;
+}
+
+/* ── Kid nav buttons: colorful active state ── */
+.kid-mode nav button.border-brand {
+  background: linear-gradient(135deg, #fff0fb, #f0f4ff) !important;
+  border-color: var(--kid-purple) !important;
+  color: #7c3aed !important;
+}
+
+/* ── Kid header strip ── */
+.kid-mode .kid-header {
+  background: linear-gradient(90deg,
+    #ff6b9d, #c77dff, #48cae4, #06d6a0, #ffd166
+  );
+  background-size: 300% 100%;
+  animation: kidRainbow 6s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes kidRainbow {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* ── Kid FRONT card ── */
+.kid-mode .card-face:not(.card-back) {
+  background: linear-gradient(145deg, #ffffff 0%, #fff5fd 100%) !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  box-shadow:
+    0 0 0 3px rgba(199, 125, 255, 0.4),
+    0 8px 32px rgba(255, 107, 157, 0.2),
+    0 2px 8px rgba(0,0,0,0.08) !important;
+  border-radius: 28px !important;
+}
+
+/* Bounce khi hover card */
+.kid-mode .card-scene:hover .card-inner:not(.flipped) {
+  transform: scale(1.01) rotate(0.3deg);
+  transition: transform 0.2s ease;
+}
+
+/* ── Kid BACK card: gradient rực rỡ ── */
+.kid-mode .card-back {
+  background: linear-gradient(135deg,
+    #ff6b9d 0%,
+    #c77dff 35%,
+    #48cae4 70%,
+    #06d6a0 100%
+  ) !important;
+  border-radius: 28px !important;
+  box-shadow:
+    0 8px 32px rgba(199, 125, 255, 0.4),
+    0 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+/* ── Kid word: to + drop shadow đẹp ── */
+.kid-mode .kid-word {
+  font-size: 3.8rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -1px;
+  text-shadow: 3px 3px 0px rgba(237, 0, 70, 0.15);
+  background: linear-gradient(135deg, #ed0046, #c77dff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Kid meaning: to + trắng ── */
+.kid-mode .kid-meaning {
+  font-size: 2.4rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.5px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Kid phonetic ── */
+.kid-mode .kid-phonetic {
+  font-size: 1.3rem !important;
+  color: #7c3aed !important;
+  font-weight: 600;
+}
+
+/* ── Kid CEFR badges: to hơn + màu sắc ── */
+.kid-mode .kid-cefr {
+  font-size: 1rem !important;
+  padding: 0.35rem 1rem !important;
+  border-radius: 99px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  letter-spacing: 1px;
+}
+
+/* ── Kid controls: to + tròn + bóng ── */
+.kid-mode .kid-btn {
+  height: 52px !important;
+  padding: 0 32px !important;
+  font-size: 1.1rem !important;
+  font-weight: 800 !important;
+  border-radius: 99px !important;
+  box-shadow: 0 4px 14px rgba(237, 0, 70, 0.3) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.kid-mode .kid-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.04) !important;
+  box-shadow: 0 7px 20px rgba(237, 0, 70, 0.4) !important;
+}
+
+.kid-mode .kid-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97) !important;
+}
+
+/* ── Kid counter text ── */
+.kid-mode .kid-counter {
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  color: #7c3aed !important;
+}
+
+/* ── Kid sidebar word items: rainbow hover ── */
+.kid-mode .kid-word-item:hover {
+  background: linear-gradient(135deg, #fff0fb, #f0f4ff) !important;
+  border-color: var(--kid-purple) !important;
+  transform: translateX(-3px) scale(1.01);
+  transition: all 0.2s ease;
+}
+
+.kid-mode .kid-word-item.active {
+  background: linear-gradient(135deg, #ff6b9d, #c77dff) !important;
+  border-color: transparent !important;
+  box-shadow: 0 3px 12px rgba(199, 125, 255, 0.4);
+}
+
+/* ── Kid instruction text ── */
+.kid-mode .kid-hint {
+  font-size: 1.05rem !important;
+  color: #7c3aed !important;
+  font-weight: 600 !important;
+}
+
+/* ── Kid mode toggle button: nổi bật hơn ── */
+.kid-mode-btn {
+  background: linear-gradient(135deg, #ffd166, #ff9f1c) !important;
+  border-color: transparent !important;
+  color: #7c2d12 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(255, 159, 28, 0.4) !important;
+}
+
+/* Floating star decoration (dùng ::before trên wrapper) */
+.kid-mode .card-scene::before {
+  content: '⭐';
+  position: absolute;
+  top: -16px;
+  right: -8px;
+  font-size: 1.8rem;
+  animation: kidSpin 4s linear infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kid-mode .card-scene::after {
+  content: '🌈';
+  position: absolute;
+  bottom: -16px;
+  left: -8px;
+  font-size: 1.8rem;
+  animation: kidBounce 2s ease-in-out infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes kidSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes kidBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* Navigation progress bar smooth transition */
+.nav-progress-bar {
+  transition: width 0.2s ease-out, opacity 0.3s ease;
+}
