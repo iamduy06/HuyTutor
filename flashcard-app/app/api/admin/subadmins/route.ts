@@ -14,25 +14,66 @@ export async function GET() {
   const admin = await checkAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const db = createAdminClient();
+  const supabase = createAdminClient();
 
-  // Get all SUBADMIN users with their assigned decks
-  const { data: subadmins } = await db
-    .from("users")
-    .select("id, email, role, created_at, max_managed_users, user_decks(id, deck_id, expired_at, deck:decks(title))")
-    .eq("role", "SUBADMIN")
+  // Load groups with:
+  // 1. Group members (users + device count + personal decks count)
+  // 2. Group decks (decks shared with the whole group)
+  const { data: groups, error } = await supabase
+    .from("groups")
+    .select(`
+      *,
+      group_decks(
+        deck_id, expired_at, 
+        deck:decks(title)
+      ),
+      group_users(
+        is_subadmin,
+        user:users(
+          id, email, role, created_at, max_devices,
+          user_devices!user_devices_user_id_fkey(id, device_id, device_name, ip_address, last_seen),
+          user_decks(deck_id, expired_at, progress_percent, learned_count, deck:decks(title))
+        )
+      )
+    `)
     .order("created_at", { ascending: false });
 
-  // For each subadmin, get count of users they manage
-  const result = await Promise.all(
-    (subadmins ?? []).map(async (sa: any) => {
-      const { count } = await db
-        .from("users")
-        .select("*", { count: "exact", head: true })
-        .eq("created_by", sa.id);
-      return { ...sa, managed_count: count ?? 0 };
-    })
-  );
+  if (error) {
+    console.error("Subadmins fetch error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ subadmins: result });
+  // Post-process to add counts easily for the UI
+  const processed = (groups ?? []).map(g => ({
+    ...g,
+    user_count: g.group_users?.length || 0,
+    group_users: (g.group_users ?? [])
+      // Sort so SUBADMIN comes first
+      .sort((a: any, b: any) => {
+         if (a.is_subadmin && !b.is_subadmin) return -1;
+         if (!a.is_subadmin && b.is_subadmin) return 1;
+         return 0;
+      })
+      .map((gu: any) => {
+        const u = gu.user;
+        return {
+          id: u.id,
+          email: u.email,
+          role: u.role,
+          created_at: u.created_at,
+          max_devices: u.max_devices,
+          is_group_subadmin: gu.is_subadmin,
+          device_count: u.user_devices?.length || 0,
+          deck_count: u.user_decks?.length || 0,
+          user_devices: u.user_devices || [],
+          user_decks: u.user_decks || [],
+          decks: (u.user_decks ?? []).map((ud: any) => ({
+            id: ud.deck_id,
+            title: ud.deck?.title
+          }))
+        };
+      })
+  }));
+
+  return NextResponse.json({ groups: processed });
 }
