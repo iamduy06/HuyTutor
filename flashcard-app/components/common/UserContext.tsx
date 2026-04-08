@@ -8,6 +8,9 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { UserProfile } from "@/types";
 
 // ── Singleton browser client ──────────────────────────────────────────────────
+// 1 instance duy nhất cho toàn bộ app client-side
+// SiteHeader signOut & UserContext subscription đều dùng cùng instance này
+// → SIGNED_OUT event chắc chắn được nhận
 let _client: ReturnType<typeof createBrowserClient> | null = null;
 export function getSupabaseClient() {
   if (!_client) {
@@ -27,7 +30,7 @@ interface UserContextValue {
 
 const UserContext = createContext<UserContextValue>({
   user: null,
-  loading: true,
+  loading: false,
   refresh: async () => {},
 });
 
@@ -38,32 +41,21 @@ interface UserProviderProps {
 
 export function UserProvider({ children, initialUser }: UserProviderProps) {
   const [user,    setUser]    = useState<UserProfile | null>(initialUser);
-  const [loading, setLoading] = useState(!initialUser); // Only load if no initialUser
+  const [loading, setLoading] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    try {
-      const { data, error } = await getSupabaseClient()
-        .from("users").select("*").eq("id", userId).single();
-      if (error) throw error;
-      return (data as UserProfile);
-    } catch (err) {
-      console.error("Error fetching user profile:", err);
-      return null;
-    }
+    const { data } = await getSupabaseClient()
+      .from("users").select("*").eq("id", userId).single();
+    return (data as UserProfile) ?? null;
   }, []);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
-      if (authUser) {
-        const profile = await fetchProfile(authUser.id);
-        setUser(profile);
-      } else {
-        setUser(null);
-      }
-    } finally {
-      setLoading(false);
+    const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
+    if (authUser) {
+      const profile = await fetchProfile(authUser.id);
+      setUser(profile);
+    } else {
+      setUser(null);
     }
   }, [fetchProfile]);
 
@@ -72,10 +64,9 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // console.log("AUTH EVENT:", event, session?.user?.email);
-        
         switch (event) {
           case "PASSWORD_RECOVERY":
+            // Redirect sang reset-password thay vì kệ để tự động đăng nhập vào dashboard
             window.location.href = "/reset-password";
             break;
 
@@ -86,17 +77,14 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
               const profile = await fetchProfile(session.user.id);
               setUser(profile);
             }
-            setLoading(false);
             break;
 
           case "SIGNED_OUT":
             setUser(null);
-            setLoading(false);
             break;
 
           case "INITIAL_SESSION":
             if (session?.user) {
-              // Only fetch if session is different or state is empty
               if (!user || user.id !== session.user.id) {
                 const profile = await fetchProfile(session.user.id);
                 setUser(profile);
@@ -104,7 +92,6 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
             } else if (!session) {
               setUser(null);
             }
-            setLoading(false);
             break;
         }
       }

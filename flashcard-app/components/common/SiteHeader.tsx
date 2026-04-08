@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, User, LayoutDashboard, Shield, Loader2 } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser, getSupabaseClient } from "@/components/common/UserContext";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +9,7 @@ import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 
 export function SiteHeader() {
-  const { user, loading } = useUser();
+  const { user } = useUser();
   const { toast } = useToast();
 
   async function handleLogout() {
@@ -54,9 +54,7 @@ export function SiteHeader() {
       <div className="flex items-center gap-2">
         <UIModeToggle />
 
-        {loading ? (
-          <div className="px-4"><Loader2 className="w-4 h-4 animate-spin text-brand" /></div>
-        ) : user ? (
+        {user ? (
           <>
             {user.role === "ADMIN" && (
               <Button variant="brand-outline" size="sm" asChild>
