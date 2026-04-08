@@ -17,18 +17,58 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const supabase = createAdminClient();
-  const { data: users, error } = await supabase
+
+  // 1. Get all users
+  const { data: users, error: usersError } = await supabase
     .from("users")
     .select(`
       *, 
       user_decks(id, deck_id, expired_at, deck:decks(title)), 
-      creator:users!created_by(id, email, role),
-      group:groups!group_id(id, name)
+      group:groups!group_id(id, name, owner_id)
     `)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ users });
+  if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
+
+  // 2. Get all groups to calculate capacity
+  const { data: groups, error: groupsError } = await supabase
+    .from("groups")
+    .select("*");
+
+  if (groupsError) return NextResponse.json({ error: groupsError.message }, { status: 500 });
+
+  // 3. For each group, calculate current users and find the owner's limit
+  const groupStats = await Promise.all(
+    (groups ?? []).map(async (g: any) => {
+      // Current count (all users in this group)
+      const { count } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .eq("group_id", g.id);
+
+      // Max limit (from the owner subadmin)
+      let maxLimit = 10;
+      if (g.owner_id) {
+        const { data: owner } = await supabase
+          .from("users")
+          .select("max_managed_users")
+          .eq("id", g.owner_id)
+          .single();
+        if (owner) maxLimit = owner.max_managed_users;
+      }
+
+      return {
+        id: g.id,
+        current_count: count ?? 0,
+        max_limit: maxLimit
+      };
+    })
+  );
+
+  return NextResponse.json({ 
+    users, 
+    groupStats 
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -56,7 +96,6 @@ export async function POST(request: NextRequest) {
   let finalGroupId = group_id;
 
   // 2. Special logic for SUBADMIN Root creation
-  // If role is SUBADMIN and no group_id is provided, create a new group
   if (role === "SUBADMIN" && !finalGroupId) {
     const { data: newGroup, error: groupErr } = await supabase
       .from("groups")
@@ -72,12 +111,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. Update profile (ensure metadata and group_id are synced)
+  // 3. Update profile
   const { error: upsertError } = await supabase.from("users").upsert({
     id: newUserId,
     email,
     role,
     group_id: finalGroupId,
+    max_managed_users: role === "SUBADMIN" ? 10 : null // Default limit
   }, { onConflict: "id" });
 
   if (upsertError) {
