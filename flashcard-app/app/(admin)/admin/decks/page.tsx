@@ -18,20 +18,19 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DECK_LEVELS } from "@/lib/constants";
-import { Switch } from "@/components/ui/switch";
 import { CEFR_LEVELS, WORD_TYPES } from "@/types";
 import type { Deck, Tab, VocabItem } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FlatCard {
-  _rowId:    string;
+  _rowId: string;
   _tabIndex: number;
   _tabLabel: string;
-  content:   VocabItem;
+  content: VocabItem;
 }
 interface DeckDetail {
-  deck:  Deck;
-  tabs:  Tab[];
+  deck: Deck;
+  tabs: Tab[];
   cards: FlatCard[];
 }
 
@@ -42,7 +41,7 @@ async function fetchAdminDecks(): Promise<Deck[]> {
 }
 
 async function fetchDeckDetail(deckId: string): Promise<DeckDetail> {
-  const res  = await fetch(`/api/admin/decks/${deckId}`);
+  const res = await fetch(`/api/admin/decks/${deckId}`);
   const data = await res.json();
   return { deck: data.deck, tabs: data.tabs ?? [], cards: data.cards ?? [] };
 }
@@ -63,34 +62,34 @@ export default function AdminDecksPage() {
   });
 
   const [expandedDeck, setExpandedDeck] = useState<string | null>(null);
-  const [deckDetail,   setDeckDetail]   = useState<Record<string, DeckDetail>>({});
+  const [deckDetail, setDeckDetail] = useState<Record<string, DeckDetail>>({});
 
   // ── Dialogs ──
-  const [showDeckDlg,     setShowDeckDlg]     = useState(false);
-  const [showTabDlg,      setShowTabDlg]       = useState<string | null>(null);   // deckId
-  const [showWordDlg,     setShowWordDlg]      = useState<{ deckId: string; tabIndex: number } | null>(null);
+  const [showDeckDlg, setShowDeckDlg] = useState(false);
+  const [showTabDlg, setShowTabDlg] = useState<string | null>(null);   // deckId
+  const [showWordDlg, setShowWordDlg] = useState<{ deckId: string; tabIndex: number } | null>(null);
   const [showBulkTabsDlg, setShowBulkTabsDlg] = useState<string | null>(null);   // deckId
-  const [showEditTabDlg,  setShowEditTabDlg]  = useState<{ deckId: string; tabIndex: number } | null>(null);
-  const [editTabForm,     setEditTabForm]     = useState({ id: "", label: "", desc: "" });
+  const [showEditTabDlg, setShowEditTabDlg] = useState<{ deckId: string; tabIndex: number } | null>(null);
+  const [editTabForm, setEditTabForm] = useState({ id: "", label: "", desc: "" });
 
   // ── Editing targets ──
-  const [editingDeck,  setEditingDeck]  = useState<Deck | null>(null);
-  const [editingWord,  setEditingWord]  = useState<FlatCard | null>(null);
+  const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
+  const [editingWord, setEditingWord] = useState<FlatCard | null>(null);
 
   // ── Forms ──
-  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", is_public: false });
-  const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
+  const [deckForm, setDeckForm] = useState({ title: "", description: "", level_min: "", level_max: "", access_mode: "assigned_only" as string });
+  const [tabForm, setTabForm] = useState({ id: "", label: "", desc: "" });
   const [wordForm, setWordForm] = useState(EMPTY_WORD);
 
   // ── File uploads ──
   // Per-tab JSON: import words vào 1 tab cụ thể
-  const [wordJsonFile,   setWordJsonFile]   = useState<File | null>(null);
+  const [wordJsonFile, setWordJsonFile] = useState<File | null>(null);
   const [wordJsonTarget, setWordJsonTarget] = useState<{ deckId: string; tabIndex: number } | null>(null);
 
   // Bulk tabs JSON: import nhiều tabs + vocabulary cùng lúc vào 1 deck
-  const [bulkTabsText, setBulkTabsText]   = useState("");
-  const [bulkTabsFile, setBulkTabsFile]   = useState<File | null>(null);
-  const [bulkTabsMode, setBulkTabsMode]   = useState<"file" | "paste">("file");
+  const [bulkTabsText, setBulkTabsText] = useState("");
+  const [bulkTabsFile, setBulkTabsFile] = useState<File | null>(null);
+  const [bulkTabsMode, setBulkTabsMode] = useState<"file" | "paste">("file");
 
   // ── Load deck detail ──────────────────────────────────────────────────────
   async function loadDetail(deckId: string) {
@@ -107,16 +106,18 @@ export default function AdminDecksPage() {
   // ── Deck CRUD ─────────────────────────────────────────────────────────────
   const saveDeck = useMutation({
     mutationFn: async () => {
-      const url    = editingDeck ? `/api/admin/decks/${editingDeck.id}` : "/api/admin/decks";
+      const url = editingDeck ? `/api/admin/decks/${editingDeck.id}` : "/api/admin/decks";
       const method = editingDeck ? "PUT" : "POST";
       const payload = {
         title: deckForm.title,
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
-        is_public: deckForm.is_public,
+        access_mode: deckForm.access_mode,
+        // backward compat: set is_public based on mode
+        is_public: deckForm.access_mode === "login_full" || deckForm.access_mode === "public_full",
       };
-      const res    = await fetch(url, {
+      const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
@@ -152,51 +153,51 @@ export default function AdminDecksPage() {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
-  const saveTabEdit = useMutation({
-    mutationFn: async ({ deckId, tabIndex }: { deckId: string; tabIndex: number }) => {
+  const saveTabEdit = useMutation<void, Error, { deckId: string; tabIndex: number }>({
+    mutationFn: async ({ deckId, tabIndex }) => {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editTabForm),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
     },
-    onSuccess: (_: unknown, { deckId }: { deckId: string }) => {
-      loadDetail(deckId); setShowEditTabDlg(null);
+    onSuccess: (_, variables) => {
+      loadDetail(variables.deckId); setShowEditTabDlg(null);
       toast({ title: "Đã cập nhật tab" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
-  const deleteTab = useMutation({
-    mutationFn: async ({ deckId, tabIndex }: { deckId: string; tabIndex: number }) => {
+  const deleteTab = useMutation<void, Error, { deckId: string; tabIndex: number }>({
+    mutationFn: async ({ deckId, tabIndex }) => {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
     },
-    onSuccess: (_: unknown, { deckId }: { deckId: string }) => {
-      loadDetail(deckId); toast({ title: "Đã xóa tab" });
+    onSuccess: (_: unknown, variables) => {
+      loadDetail(variables.deckId); toast({ title: "Đã xóa tab" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
 
   // ── Word CRUD ─────────────────────────────────────────────────────────────
-  const saveWord = useMutation({
-    mutationFn: async ({ deckId, tabIndex, wordIndex }: { deckId: string; tabIndex: number; wordIndex?: number }) => {
+  const saveWord = useMutation<void, Error, { deckId: string; tabIndex: number; wordIndex?: number }>({
+    mutationFn: async ({ deckId, tabIndex, wordIndex }) => {
       const vocabItem = {
         ...wordForm,
         synonyms: wordForm.synonyms.split(",").map((s: string) => s.trim()).filter(Boolean),
         antonyms: wordForm.antonyms.split(",").map((s: string) => s.trim()).filter(Boolean),
       };
-      const url    = wordIndex !== undefined
+      const url = wordIndex !== undefined
         ? `/api/admin/decks/${deckId}/tabs/${tabIndex}/words/${wordIndex}`
         : `/api/admin/decks/${deckId}/tabs/${tabIndex}/words`;
       const method = wordIndex !== undefined ? "PUT" : "POST";
-      const res    = await fetch(url, {
+      const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(vocabItem),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
     },
-    onSuccess: (_: unknown, { deckId }: { deckId: string }) => {
-      loadDetail(deckId); setShowWordDlg(null); setEditingWord(null);
+    onSuccess: (_, variables) => {
+      loadDetail(variables.deckId); setShowWordDlg(null); setEditingWord(null);
       toast({ title: "Đã lưu từ vựng" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
@@ -207,8 +208,8 @@ export default function AdminDecksPage() {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}/words/${wordIndex}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
     },
-    onSuccess: (_: unknown, { deckId }: { deckId: string }) => {
-      loadDetail(deckId); toast({ title: "Đã xóa từ vựng" });
+    onSuccess: (_: unknown, variables: { deckId: string; tabIndex: number; wordIndex: number }) => {
+      loadDetail(variables.deckId); toast({ title: "Đã xóa từ vựng" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -268,11 +269,11 @@ export default function AdminDecksPage() {
 
   // ── Open helpers ──────────────────────────────────────────────────────────
   function openCreateDeck() {
-    setEditingDeck(null); setDeckForm({ title: "", description: "", level_min: "", level_max: "", is_public: false }); setShowDeckDlg(true);
+    setDeckForm({ title: "", description: "", level_min: "", level_max: "", access_mode: "assigned_only" }); setShowDeckDlg(true);
   }
   function openEditDeck(deck: Deck) {
     setEditingDeck(deck);
-    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", is_public: Boolean((deck as any).is_public) });
+    setDeckForm({ title: deck.title, description: deck.description ?? "", level_min: (deck as any).level_min ?? "", level_max: (deck as any).level_max ?? "", access_mode: (deck as any).access_mode ?? "assigned_only" });
     setShowDeckDlg(true);
   }
   function openCreateTab(deckId: string) {
@@ -313,7 +314,7 @@ export default function AdminDecksPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {(decks as Deck[]).map((deck) => {
-            const detail   = deckDetail[deck.id];
+            const detail = deckDetail[deck.id];
             const expanded = expandedDeck === deck.id;
             return (
               <div key={deck.id} className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
@@ -488,17 +489,23 @@ export default function AdminDecksPage() {
             <div><Label>Mô tả</Label>
               <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
             </div>
-            <div className="flex items-center justify-between p-3 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
-              <div>
-                <p className="font-semibold text-sm text-[#1a1a2e]">Công khai (Public)</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {deckForm.is_public ? "✅ Mọi user đã đăng nhập đều học được full" : "🔒 Chỉ user được cấp quyền mới học được"}
-                </p>
-              </div>
-              <Switch
-                checked={deckForm.is_public}
-                onCheckedChange={v => setDeckForm({ ...deckForm, is_public: v })}
-              />
+            <div className="space-y-2">
+              <Label>Chế độ truy cập</Label>
+              <Select value={deckForm.access_mode} onValueChange={v => setDeckForm({ ...deckForm, access_mode: v })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assigned_only">🔒 Chỉ user được cấp quyền (mặc định)</SelectItem>
+                  <SelectItem value="login_full">🔑 Mọi user đã đăng nhập</SelectItem>
+                  <SelectItem value="public_full">🌐 Tất cả (không cần đăng nhập) — xem full</SelectItem>
+                  <SelectItem value="public_demo">👁️ Tất cả (không cần đăng nhập) — chỉ 10 từ demo</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {deckForm.access_mode === "assigned_only" && "Chỉ học viên được Admin/SubAdmin giao mới học được full."}
+                {deckForm.access_mode === "login_full" && "Bất kỳ user nào đã đăng nhập đều học được full, không cần cấp quyền."}
+                {deckForm.access_mode === "public_full" && "Tất cả mọi người (kể cả chưa đăng nhập) đều xem được full tại trang /decks."}
+                {deckForm.access_mode === "public_demo" && "Mọi người chỉ thấy 10 từ demo, kể cả khi đã đăng nhập."}
+              </p>
             </div>
             <div>
               <Label>Cấp độ CEFR (0–2 mức)</Label>
@@ -721,7 +728,7 @@ export default function AdminDecksPage() {
               <Label>CEFR</Label>
               <Select value={wordForm.cefr} onValueChange={v => setWordForm({ ...wordForm, cefr: v })}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{["A1","A2","B1","B2","C1","C2"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{["A1", "A2", "B1", "B2", "C1", "C2"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
@@ -733,8 +740,8 @@ export default function AdminDecksPage() {
                 if (!showWordDlg) return;
                 const wordIndex = editingWord
                   ? deckDetail[showWordDlg.deckId]?.cards
-                      .filter(c => c._tabIndex === showWordDlg.tabIndex)
-                      .indexOf(editingWord)
+                    .filter(c => c._tabIndex === showWordDlg.tabIndex)
+                    .indexOf(editingWord)
                   : undefined;
                 saveWord.mutate({
                   deckId: showWordDlg.deckId,

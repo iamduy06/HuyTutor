@@ -65,6 +65,11 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         switch (event) {
+          case "PASSWORD_RECOVERY":
+            // Redirect sang reset-password thay vì kệ để tự động đăng nhập vào dashboard
+            window.location.href = "/reset-password";
+            break;
+
           case "SIGNED_IN":
           case "TOKEN_REFRESHED":
           case "USER_UPDATED":

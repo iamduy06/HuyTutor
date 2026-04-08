@@ -138,178 +138,179 @@ export default function AdminSubAdminsPage() {
   const filtered = subadmins.filter(s => s.email.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#1a1a2e]">🛡️ Quản lý SubAdmin</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Thiết lập quyền hạn và bộ đề cho từng SubAdmin
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-5">
-        💡 SubAdmin quản lý giao diện tại <strong>/subadmin</strong>. Chỉ có thể thấy và giao những bộ đề bạn đã phân quyền cho họ.
-      </div>
-
-      <Input placeholder="🔍 Tìm SubAdmin..." value={search}
-        onChange={e => setSearch(e.target.value)} className="mb-4 max-w-sm" />
-
-      {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-[#f0e0e7] p-10 text-center">
-          <div className="text-4xl mb-3">🛡️</div>
-          <h3 className="font-bold text-[#1a1a2e] mb-2">Chưa có SubAdmin nào</h3>
-          <p className="text-muted-foreground text-sm">
-            Tạo tài khoản với role SUBADMIN trong{" "}
-            <a href="/admin/users" className="text-brand font-semibold hover:underline">Quản lý người dùng</a>
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {filtered.map(sa => (
-            <div key={sa.id}
-              className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-bold text-[#1a1a2e]">{sa.email}</span>
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-                      SUBADMIN
-                    </span>
-                  </div>
-                  {/* Progress */}
-                  <div className="flex items-center gap-3 mt-2">
-                    <div className="text-xs text-muted-foreground whitespace-nowrap">
-                      Tài khoản: <strong className="text-[#1a1a2e]">{sa.managed_count}</strong> / {sa.max_managed_users ?? 10}
-                    </div>
-                    <div className="flex-1 h-1.5 bg-[#f0e0e7] rounded-full overflow-hidden max-w-[120px]">
-                      <div className="h-full bg-brand rounded-full"
-                        style={{ width: `${Math.min(100, (sa.managed_count / (sa.max_managed_users ?? 10)) * 100)}%` }} />
-                    </div>
-                  </div>
-                  {/* Decks */}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {(sa.user_decks ?? []).length === 0
-                      ? <span className="text-xs text-muted-foreground">Chưa có bộ đề</span>
-                      : (sa.user_decks ?? []).map(ud => {
-                        const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
-                        return (
-                          <span key={ud.id}
-                            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${isExp ? "bg-red-100 text-red-600" : "bg-brand-light text-brand"}`}>
-                            {ud.deck?.title ?? "?"}
-                            {ud.expired_at && (
-                              <span className="text-[10px] opacity-70 ml-0.5">
-                                ({new Date(ud.expired_at).toLocaleDateString("vi-VN")})
-                              </span>
-                            )}
-                            <button
-                              onClick={() => revokeDeck.mutate({ userId: sa.id, deckId: ud.deck_id })}
-                              className="hover:text-red-500 transition-colors ml-0.5" title="Thu hồi">×</button>
-                          </span>
-                        );
-                      })
-                    }
-                  </div>
-                </div>
-                {/* Actions */}
-                <div className="flex gap-2 flex-wrap flex-shrink-0">
-                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
-                    onClick={() => { setShowDecks(sa); setDeckIds(new Set()); setExpiry(""); }}>
-                    <BookOpen className="w-3.5 h-3.5" /> Giao bộ đề
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
-                    onClick={() => { setShowSettings(sa); setMaxUsers(String(sa.max_managed_users ?? 10)); }}>
-                    <Settings className="w-3.5 h-3.5" /> Giới hạn
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-700"
-                    onClick={() => openDeleteDialog(sa)}>
-                    <UserMinus className="w-3.5 h-3.5" /> Xóa
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ════ Dialog: Set limit ════ */}
-      <Dialog open={!!showSettings} onOpenChange={() => setShowSettings(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>⚙️ Giới hạn tài khoản</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              SubAdmin: <strong>{showSettings?.email}</strong>
+    <>
+      <div className="p-6 max-w-5xl">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-extrabold text-[#1a1a2e]">🛡️ Quản lý SubAdmin</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Thiết lập quyền hạn và bộ đề cho từng SubAdmin
             </p>
-            <div>
-              <Label>Số tài khoản tối đa SubAdmin này có thể tạo</Label>
-              <Input type="number" min={1} max={9999}
-                value={maxUsers} onChange={e => setMaxUsers(e.target.value)} className="mt-1" />
-              <p className="text-xs text-muted-foreground mt-1">
-                Hiện đang quản lý <strong>{showSettings?.managed_count ?? 0}</strong> tài khoản
-              </p>
-            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSettings(null)}>Hủy</Button>
-            <Button variant="brand"
-              disabled={updateLimit.isPending || !maxUsers}
-              onClick={() => updateLimit.mutate({ userId: showSettings!.id, max: parseInt(maxUsers) })}>
-              {updateLimit.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Lưu
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
 
-      {/* ════ Dialog: Assign Decks to SubAdmin ════ */}
-      <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>📚 Giao bộ đề cho — {showDecks?.email}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-            {(showDecks?.user_decks ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Đã có:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(showDecks?.user_decks ?? []).map(ud => (
-                    <span key={ud.id} className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
-                      {ud.deck?.title ?? "?"}
-                    </span>
-                  ))}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-5">
+          💡 SubAdmin quản lý giao diện tại <strong>/subadmin</strong>. Chỉ có thể thấy và giao những bộ đề bạn đã phân quyền cho họ.
+        </div>
+
+        <Input placeholder="🔍 Tìm SubAdmin..." value={search}
+          onChange={e => setSearch(e.target.value)} className="mb-4 max-w-sm" />
+
+        {isLoading ? (
+          <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl border-2 border-dashed border-[#f0e0e7] p-10 text-center">
+            <div className="text-4xl mb-3">🛡️</div>
+            <h3 className="font-bold text-[#1a1a2e] mb-2">Chưa có SubAdmin nào</h3>
+            <p className="text-muted-foreground text-sm">
+              Tạo tài khoản với role SUBADMIN trong{" "}
+              <a href="/admin/users" className="text-brand font-semibold hover:underline">Quản lý người dùng</a>
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {filtered.map(sa => (
+              <div key={sa.id}
+                className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-bold text-[#1a1a2e]">{sa.email}</span>
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
+                        SUBADMIN
+                      </span>
+                    </div>
+                    {/* Progress */}
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        Tài khoản: <strong className="text-[#1a1a2e]">{sa.managed_count}</strong> / {sa.max_managed_users ?? 10}
+                      </div>
+                      <div className="flex-1 h-1.5 bg-[#f0e0e7] rounded-full overflow-hidden max-w-[120px]">
+                        <div className="h-full bg-brand rounded-full"
+                          style={{ width: `${Math.min(100, (sa.managed_count / (sa.max_managed_users ?? 10)) * 100)}%` }} />
+                      </div>
+                    </div>
+                    {/* Decks */}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(sa.user_decks ?? []).length === 0
+                        ? <span className="text-xs text-muted-foreground">Chưa có bộ đề</span>
+                        : (sa.user_decks ?? []).map(ud => {
+                          const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
+                          return (
+                            <span key={ud.id}
+                              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${isExp ? "bg-red-100 text-red-600" : "bg-brand-light text-brand"}`}>
+                              {ud.deck?.title ?? "?"}
+                              {ud.expired_at && (
+                                <span className="text-[10px] opacity-70 ml-0.5">
+                                  ({new Date(ud.expired_at).toLocaleDateString("vi-VN")})
+                                </span>
+                              )}
+                              <button
+                                onClick={() => revokeDeck.mutate({ userId: sa.id, deckId: ud.deck_id })}
+                                className="hover:text-red-500 transition-colors ml-0.5" title="Thu hồi">×</button>
+                            </span>
+                          );
+                        })
+                      }
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-wrap flex-shrink-0">
+                    <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
+                      onClick={() => { setShowDecks(sa); setDeckIds(new Set()); setExpiry(""); }}>
+                      <BookOpen className="w-3.5 h-3.5" /> Giao bộ đề
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
+                      onClick={() => { setShowSettings(sa); setMaxUsers(String(sa.max_managed_users ?? 10)); }}>
+                      <Settings className="w-3.5 h-3.5" /> Giới hạn
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-700"
+                      onClick={() => openDeleteDialog(sa)}>
+                      <UserMinus className="w-3.5 h-3.5" /> Xóa
+                    </Button>
+                  </div>
                 </div>
               </div>
-            )}
-            <AdminAssignDeckList
-              decks={decks}
-              assignedUser={showDecks}
-              deckIds={deckIds}
-              setDeckIds={setDeckIds}
-            />
-            <div>
-              <Label>Ngày hết hạn quyền truy cập</Label>
-              <Input type="datetime-local" value={expiry}
-                onChange={e => setExpiry(e.target.value)} className="mt-1" />
-              <p className="text-xs text-muted-foreground mt-1">Để trống = không giới hạn thời gian</p>
-            </div>
+            ))}
           </div>
-          <DialogFooter className="mt-3">
-            <Button variant="outline" onClick={() => setShowDecks(null)}>Hủy</Button>
-            <Button variant="brand"
-              disabled={deckIds.size === 0 || assignDeck.isPending}
-              onClick={() => assignDeck.mutate({ userId: showDecks!.id, dIds: Array.from(deckIds), exp: expiry })}>
-              {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Giao {deckIds.size > 0 ? `${deckIds.size} đề` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        )}
 
-      {/* ════ Dialog: Xóa SubAdmin ════ */}
+        {/* Dialog: Set limit */}
+        <Dialog open={!!showSettings} onOpenChange={() => setShowSettings(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>⚙️ Giới hạn tài khoản</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                SubAdmin: <strong>{showSettings?.email}</strong>
+              </p>
+              <div>
+                <Label>Số tài khoản tối đa SubAdmin này có thể tạo</Label>
+                <Input type="number" min={1} max={9999}
+                  value={maxUsers} onChange={e => setMaxUsers(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hiện đang quản lý <strong>{showSettings?.managed_count ?? 0}</strong> tài khoản
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSettings(null)}>Hủy</Button>
+              <Button variant="brand"
+                disabled={updateLimit.isPending || !maxUsers}
+                onClick={() => updateLimit.mutate({ userId: showSettings!.id, max: parseInt(maxUsers) })}>
+                {updateLimit.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Lưu
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Assign Decks to SubAdmin */}
+        <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
+          <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>📚 Giao bộ đề cho — {showDecks?.email}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+              {(showDecks?.user_decks ?? []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1.5">Đã có:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(showDecks?.user_decks ?? []).map(ud => (
+                      <span key={ud.id} className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
+                        {ud.deck?.title ?? "?"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <AdminAssignDeckList
+                decks={decks}
+                assignedUser={showDecks}
+                deckIds={deckIds}
+                setDeckIds={setDeckIds}
+              />
+              <div>
+                <Label>Ngày hết hạn quyền truy cập</Label>
+                <Input type="datetime-local" value={expiry}
+                  onChange={e => setExpiry(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">Để trống = không giới hạn thời gian</p>
+              </div>
+            </div>
+            <DialogFooter className="mt-3">
+              <Button variant="outline" onClick={() => setShowDecks(null)}>Hủy</Button>
+              <Button variant="brand"
+                disabled={deckIds.size === 0 || assignDeck.isPending}
+                onClick={() => assignDeck.mutate({ userId: showDecks!.id, dIds: Array.from(deckIds), exp: expiry })}>
+                {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                Giao {deckIds.size > 0 ? `${deckIds.size} đề` : ""}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Dialog: Delete SubAdmin */}
       <Dialog open={!!showDelete} onOpenChange={() => setShowDelete(null)}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
@@ -385,6 +386,7 @@ export default function AdminSubAdminsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
   );
 }
 
