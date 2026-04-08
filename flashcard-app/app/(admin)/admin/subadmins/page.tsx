@@ -307,7 +307,6 @@ export default function AdminSubAdminsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
 
       {/* ════ Dialog: Xóa SubAdmin ════ */}
       <Dialog open={!!showDelete} onOpenChange={() => setShowDelete(null)}>
@@ -385,6 +384,7 @@ export default function AdminSubAdminsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
   );
 }
 

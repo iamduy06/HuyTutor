@@ -105,7 +105,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
 
   // Mark first card as seen on mount
   useEffect(() => {
-    if (vocabulary.length > 0) markSeen(0, 0);
+    if (vocabulary.length > 0) markSeen(currentTab, 0);
   }, []); // eslint-disable-line
   const vocab = vocabulary[currentIndex];
 
@@ -275,8 +275,6 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
             </button>
           ))}
         </div>
-      </nav>
-
       </nav>
 
       {/* ── MAIN (desktop) ── */}
