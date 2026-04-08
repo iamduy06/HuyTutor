@@ -2,15 +2,12 @@
 
 import {
   createContext, useContext, useEffect,
-  useState, useCallback, type ReactNode,
+  useState, useCallback, useRef, type ReactNode,
 } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { UserProfile } from "@/types";
 
 // ── Singleton browser client ──────────────────────────────────────────────────
-// 1 instance duy nhất cho toàn bộ app client-side
-// SiteHeader signOut & UserContext subscription đều dùng cùng instance này
-// → SIGNED_OUT event chắc chắn được nhận
 let _client: ReturnType<typeof createBrowserClient> | null = null;
 export function getSupabaseClient() {
   if (!_client) {
@@ -42,6 +39,26 @@ interface UserProviderProps {
 export function UserProvider({ children, initialUser }: UserProviderProps) {
   const [user,    setUser]    = useState<UserProfile | null>(initialUser);
   const [loading, setLoading] = useState(false);
+  
+  // Dùng ref để track request ID mới nhất, tránh race condition
+  const fetchRequestId = useRef(0);
+  // Dùng ref để track timeout ID cho fail-safe
+  const timeoutId = useRef<NodeJS.Timeout | null>(null);
+
+  const clearFailSafe = () => {
+    if (timeoutId.current) {
+      clearTimeout(timeoutId.current);
+      timeoutId.current = null;
+    }
+  };
+
+  const startFailSafe = () => {
+    clearFailSafe();
+    timeoutId.current = setTimeout(() => {
+      console.warn("[USER_CONTEXT] Fail-safe triggered: Loading forced to false after 5s.");
+      setLoading(false);
+    }, 5000);
+  };
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     const supabase = getSupabaseClient();
@@ -68,20 +85,28 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
   }, []);
 
   const refresh = useCallback(async () => {
+    const currentId = ++fetchRequestId.current;
     setLoading(true);
+    startFailSafe();
+    
     try {
       const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
       if (authUser) {
         const profile = await fetchProfile(authUser.id);
-        console.log("[USER_CONTEXT] Profile refreshed:", profile);
-        setUser(profile);
+        if (currentId === fetchRequestId.current) {
+          console.log(`[USER_CONTEXT] Profile refreshed (ID:${currentId}):`, profile);
+          setUser(profile);
+        }
       } else {
-        setUser(null);
+        if (currentId === fetchRequestId.current) setUser(null);
       }
     } catch (err) {
-      console.error("[USER_CONTEXT] Refresh error:", err);
+      console.error(`[USER_CONTEXT] Refresh error (ID:${currentId}):`, err);
     } finally {
-      setLoading(false);
+      if (currentId === fetchRequestId.current) {
+        setLoading(false);
+        clearFailSafe();
+      }
     }
   }, [fetchProfile]);
 
@@ -90,7 +115,8 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("[USER_CONTEXT] Auth event:", event);
+        const currentId = ++fetchRequestId.current;
+        console.log(`[USER_CONTEXT] Auth event: ${event} (ID:${currentId})`);
         
         switch (event) {
           case "SIGNED_IN":
@@ -98,42 +124,61 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
           case "USER_UPDATED":
             if (session?.user) {
               setLoading(true);
+              startFailSafe();
               try {
                 const profile = await fetchProfile(session.user.id);
-                console.log("[USER_CONTEXT] Fetch success:", profile);
-                setUser(profile);
+                if (currentId === fetchRequestId.current) {
+                  console.log(`[USER_CONTEXT] Fetch success (ID:${currentId}):`, profile);
+                  setUser(profile);
+                }
               } finally {
-                setLoading(false);
+                if (currentId === fetchRequestId.current) {
+                  setLoading(false);
+                  clearFailSafe();
+                }
               }
             }
             break;
 
           case "SIGNED_OUT":
-            setUser(null);
-            setLoading(false);
+            if (currentId === fetchRequestId.current) {
+              setUser(null);
+              setLoading(false);
+              clearFailSafe();
+            }
             break;
 
           case "INITIAL_SESSION":
             if (session?.user) {
-              // Ngay cả khi đã có initialUser, ta vẫn fetch lại để đảm bảo 
-              // data mới nhất và đồng bộ flag is_subadmin chính xác
               setLoading(true);
+              startFailSafe();
               try {
                 const profile = await fetchProfile(session.user.id);
-                console.log("[USER_CONTEXT] Initial sync complete:", profile);
-                setUser(profile);
+                if (currentId === fetchRequestId.current) {
+                  console.log(`[USER_CONTEXT] Initial sync complete (ID:${currentId}):`, profile);
+                  setUser(profile);
+                }
               } finally {
-                setLoading(false);
+                if (currentId === fetchRequestId.current) {
+                  setLoading(false);
+                  clearFailSafe();
+                }
               }
             } else {
-              setLoading(false);
+              if (currentId === fetchRequestId.current) {
+                setLoading(false);
+                clearFailSafe();
+              }
             }
             break;
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearFailSafe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
