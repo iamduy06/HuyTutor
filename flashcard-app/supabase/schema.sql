@@ -12,6 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS public.groups (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name        TEXT NOT NULL,
+  description TEXT,
   owner_id    UUID, -- FK added later to avoid circular dependency
   max_users   INTEGER NOT NULL DEFAULT 10,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -29,11 +30,15 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 1.3 Add owner_id FK to groups
+-- 1.3 Add owner_id FK to groups & missing columns
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'groups_owner_id_fkey') THEN
     ALTER TABLE public.groups ADD CONSTRAINT groups_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='groups' AND column_name='description') THEN
+    ALTER TABLE public.groups ADD COLUMN description TEXT;
   END IF;
 END $$;
 
@@ -132,19 +137,22 @@ ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 -- ── 4. HELPER FUNCTIONS (SECURITY DEFINER to avoid RLS recursion) ─────────────────
 
 CREATE OR REPLACE FUNCTION public.get_my_role() RETURNS TEXT LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT role FROM public.users WHERE id = auth.uid();
+  SELECT COALESCE(auth.jwt() ->> 'role', (SELECT role FROM public.users WHERE id = auth.uid()));
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_group_id() RETURNS UUID LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT group_id FROM public.users WHERE id = auth.uid();
+  SELECT COALESCE(
+    (auth.jwt() -> 'user_metadata' ->> 'group_id')::UUID, 
+    (SELECT group_id FROM public.group_users WHERE user_id = auth.uid() LIMIT 1)
+  );
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_admin() RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'ADMIN');
+  SELECT COALESCE((auth.jwt() ->> 'role') = 'ADMIN', EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'ADMIN'));
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_subadmin() RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'SUBADMIN');
+  SELECT COALESCE((auth.jwt() ->> 'role') = 'SUBADMIN', EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'SUBADMIN'));
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_group_deck_expiry(p_group_id UUID, p_deck_id UUID) RETURNS TIMESTAMPTZ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
