@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { generatePassword } from "@/lib/utils";
 
+const ADMIN_MANAGED_GROUP_ID = "da000000-0000-0000-0000-000000000000";
+
 async function checkAdmin() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -26,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ tempPassword: newPassword });
   }
 
-  // 2. Assign deck (Super Admin - Bypasses everything)
+  // 2. Assign deck (Super Admin Power)
   if (body.action === "assign_deck") {
     const { deck_id, expired_at } = body;
     const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
@@ -44,40 +46,48 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ success: true });
   }
 
-  // 3. Update user details (Role, Group, Limit)
+  // 3. Update user details (Role, Group Reassignment)
   if (body.action === "update_user") {
     const { role, group_id, delete_user_ids, keep_user_ids } = body;
-    const updates: any = {};
-    if (role) updates.role = role;
     
-    // Multi-tenant: group_id is IMMUTABLE once set. 
-    // We only allow setting it if it was null.
-    if (group_id !== undefined && group_id !== "NONE") {
-      const { data: current } = await supabase.from("users").select("group_id").eq("id", params.id).single();
-      if (!current?.group_id) {
-        updates.group_id = group_id;
-      } else if (current.group_id !== group_id) {
-        return NextResponse.json({ error: "Không được phép thay đổi Nhóm sau khi đã gán." }, { status: 403 });
-      }
-    } else if (group_id === "NONE") {
-       // Only allow unsetting if Admin explicitly wants to move to "No Group" (be careful)
-       // But policy says isolation: cấm đổi. I'll stick to strict.
-       // updates.group_id = null;
+    // A. Update Role
+    if (role) {
+      const { error: dbErr } = await supabase.from("users").update({ role }).eq("id", params.id);
+      if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
     }
     
-    // Update User Profile
-    const { error: dbErr } = await supabase.from("users").update(updates).eq("id", params.id);
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    // B. Group Reassignment (Admin Power)
+    if (group_id !== undefined) {
+      const targetGroupId = (group_id === "NONE" || !group_id) ? ADMIN_MANAGED_GROUP_ID : group_id;
+      
+      // Delete old memberships
+      await supabase.from("group_users").delete().eq("user_id", params.id);
+      
+      // Insert new membership
+      const { error: gErr } = await supabase.from("group_users").insert({
+        group_id: targetGroupId,
+        user_id: params.id,
+        is_subadmin: role === "SUBADMIN" || (await (async () => {
+          const { data: u } = await supabase.from("users").select("role").eq("id", params.id).single();
+          return u?.role === "SUBADMIN";
+        })())
+      });
+      
+      if (gErr) return NextResponse.json({ error: gErr.message }, { status: 500 });
+    }
 
-    // Handle Downgrade / Deletion cleanup
+    // C. Handle Downgrade / Deletion cleanup
     if (delete_user_ids || keep_user_ids) {
       if (delete_user_ids?.length > 0) {
-        for (const uid of delete_user_ids) {
+        for (const uid of (delete_user_ids as string[])) {
           await supabase.auth.admin.deleteUser(uid);
         }
       }
       if (keep_user_ids?.length > 0) {
-        await supabase.from("users").update({ group_id: null, created_by: null }).in("id", keep_user_ids);
+        // Just move them to Admin Managed
+        await supabase.from("group_users").delete().in("user_id", keep_user_ids);
+        const memberships = (keep_user_ids as string[]).map(uid => ({ group_id: ADMIN_MANAGED_GROUP_ID, user_id: uid }));
+        await supabase.from("group_users").insert(memberships);
       }
     }
 
@@ -113,7 +123,10 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
   }
   if (kIds.length > 0) {
-    await supabase.from("users").update({ group_id: null, created_by: null }).in("id", kIds);
+    // Move to Admin Managed before deleting subadmin
+    await supabase.from("group_users").delete().in("user_id", kIds);
+    const memberships = kIds.map(uid => ({ group_id: ADMIN_MANAGED_GROUP_ID, user_id: uid }));
+    await supabase.from("group_users").insert(memberships);
   }
 
   const { error } = await supabase.auth.admin.deleteUser(params.id);

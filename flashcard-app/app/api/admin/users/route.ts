@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { generatePassword } from "@/lib/utils";
 
+const ADMIN_MANAGED_GROUP_ID = "da000000-0000-0000-0000-000000000000";
+
 async function checkAdmin() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -18,47 +20,22 @@ export async function GET() {
 
   const supabase = createAdminClient();
 
-  // 1. Get all users with their decks and group info
+  // 1. Get all users with their group association via group_users
   const { data: users, error: usersError } = await supabase
     .from("users")
     .select(`
       *, 
-      user_decks(id, deck_id, expired_at, deck:decks(title)), 
-      group:groups!group_id(id, name, owner_id)
+      user_decks(id, deck_id, expired_at, deck:decks(title)),
+      memberships:group_users(
+        is_subadmin,
+        group:groups(id, name)
+      )
     `)
     .order("created_at", { ascending: false });
 
   if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
 
-  // 2. Get all groups with their max_users limit
-  const { data: groups, error: groupsError } = await supabase
-    .from("groups")
-    .select("id, name, owner_id, max_users")
-    .order("created_at", { ascending: true });
-
-  if (groupsError) return NextResponse.json({ error: groupsError.message }, { status: 500 });
-
-  // 3. For each group, calculate current user count
-  const groupStats = await Promise.all(
-    (groups ?? []).map(async (g: any) => {
-      const { count } = await supabase
-        .from("users")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", g.id);
-
-      return {
-        id: g.id,
-        name: g.name,
-        current_count: count ?? 0,
-        max_limit: g.max_users ?? 10
-      };
-    })
-  );
-
-  return NextResponse.json({ 
-    users, 
-    groupStats 
-  });
+  return NextResponse.json({ users });
 }
 
 export async function POST(request: NextRequest) {
@@ -66,63 +43,49 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { email, role = "USER", group_id, group_name } = body;
+  const { email, role = "USER", group_id } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
   const password = body.password?.trim() || generatePassword(10);
   const supabase = createAdminClient();
 
-  // 1. Quota Check
-  if (group_id && group_id !== "NONE") {
-    const { data: group } = await supabase.from("groups").select("max_users").eq("id", group_id).single();
-    const { count } = await supabase.from("users").select("*", { count: "exact", head: true }).eq("group_id", group_id);
-    
-    if ((count ?? 0) >= (group?.max_users ?? 10)) {
-       return NextResponse.json({ error: "Nhóm đã đạt hạn mức tài khoản (Quota Full)" }, { status: 403 });
-    }
-  }
-
-  // 2. Create user in Auth
+  // 1. Create user in Auth
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { role, group_id },
+    user_metadata: { role },
   });
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
 
   const newUserId = authUser.user.id;
-  let finalGroupId = group_id === "NONE" ? null : group_id;
 
-  // 3. Special logic for SUBADMIN Root creation
-  if (role === "SUBADMIN" && !finalGroupId) {
-    const { data: newGroup, error: groupErr } = await supabase
-      .from("groups")
-      .insert({
-        name: group_name || `Nhóm của ${email}`,
-        owner_id: newUserId,
-        max_users: 10 // Default
-      })
-      .select()
-      .single();
-    
-    if (!groupErr) {
-      finalGroupId = newGroup.id;
-    }
-  }
-
-  // 4. Update profile
+  // 2. Update profile
   const { error: upsertError } = await supabase.from("users").upsert({
     id: newUserId,
     email,
-    role,
-    group_id: finalGroupId
+    role
   }, { onConflict: "id" });
 
   if (upsertError) {
     console.error("Profile upsert error:", upsertError.message);
   }
 
-  return NextResponse.json({ user: authUser.user, tempPassword: password, group_id: finalGroupId });
+  // 3. Handle Group Assignment
+  // If role is ADMIN or if no group is specified, assign to ADMIN_MANAGED
+  let targetGroupId = group_id && group_id !== "NONE" ? group_id : ADMIN_MANAGED_GROUP_ID;
+  if (role === "ADMIN") targetGroupId = ADMIN_MANAGED_GROUP_ID;
+
+  const { error: groupError } = await supabase.from("group_users").insert({
+    group_id: targetGroupId,
+    user_id: newUserId,
+    is_subadmin: role === "SUBADMIN"
+  });
+
+  if (groupError) {
+    console.error("Group assignment error:", groupError.message);
+  }
+
+  return NextResponse.json({ user: authUser.user, tempPassword: password });
 }
