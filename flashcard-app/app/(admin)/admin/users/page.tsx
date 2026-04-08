@@ -135,18 +135,34 @@ export default function AdminUsersPage() {
 
   // ── Derived State ──
   const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  
   const groupsWithUsage = useMemo(() => {
-    const map = filtered.reduce((acc, u) => {
-      const gid = u.group_id || "ADMIN_MANAGED";
-      if (!acc[gid]) acc[gid] = { name: u.group?.name || "👑 ADMIN MANAGED", users: [] };
-      acc[gid].users.push(u);
-      return acc;
-    }, {} as Record<string, { name: string; users: UserData[] }>);
+    // 1. Initialize map with all available groups from groupStats
+    const map: Record<string, { name: string; users: UserData[]; usage?: GroupStat }> = {};
+    
+    // Add virtual ADMIN_MANAGED group
+    map["ADMIN_MANAGED"] = { name: "👑 ADMIN MANAGED", users: [] };
+    
+    // Populate with real groups from stats
+    groupStats.forEach(gs => {
+      map[gs.id] = { name: gs.name, users: [], usage: gs };
+    });
 
-    return Object.entries(map).map(([id, data]) => {
-      const stat = groupStats.find(s => s.id === id);
-      return { id, ...data, usage: stat };
-    }).sort((a,b) => a.id === "ADMIN_MANAGED" ? -1 : 1);
+    // 2. Distribute filtered users into their groups
+    filtered.forEach(u => {
+      const gid = u.group_id || "ADMIN_MANAGED";
+      if (!map[gid]) {
+        // Fallback for cases where group metadata might be missing from Stats
+        map[gid] = { name: u.group?.name || "📂 Nhóm không xác định", users: [] };
+      }
+      map[gid].users.push(u);
+    });
+
+    // 3. Convert to array and sort (Admin Managed always first)
+    return Object.entries(map).map(([id, data]) => ({
+      id,
+      ...data
+    })).sort((a, b) => a.id === "ADMIN_MANAGED" ? -1 : 1);
   }, [filtered, groupStats]);
 
   const [managedUsers, setManagedUsers] = useState<UserData[]>([]);
