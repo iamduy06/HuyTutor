@@ -138,10 +138,12 @@ export default function AdminUsersPage() {
   const assignDeck = useMutation({
     mutationFn: async ({ userId, deckIds, expiredAt }: { userId: string; deckIds: string[]; expiredAt: string }) => {
       for (const deckId of deckIds) {
-        await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }) });
+        const res = await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }) });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed to assign"); }
       }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); setShowAssign(null); toast({ title: "Thành công", description: "Đã giao bộ đề cho người dùng" }); },
+    onError: (e: Error) => toast({ title: "Lỗi", description: e.message, variant: "destructive" }),
   });
 
   const revokeDeck = useMutation({
@@ -177,17 +179,19 @@ export default function AdminUsersPage() {
     setEditingUser(u);
     setEditRole(u.role);
     setEditGroup(u.group_id || "NONE");
-    setEditLimit(u.max_managed_users || 10);
+    
+    // Find Group limit
+    const gs = groupStats.find(s => s.id === u.group_id);
+    setEditLimit(gs?.max_limit || 10);
     setShowDowngrade(false);
   };
 
   const handleEditConfirm = async () => {
-    // If downgrading from SUBADMIN to USER, and user has managed units, show downgrade dialog
     if (editingUser?.role === "SUBADMIN" && editRole === "USER") {
       const managed = users.filter(u => u.group_id === editingUser.id);
       if (managed.length > 0) {
-        setShowDowngrade(true);
         setManagedUsers(managed);
+        setShowDowngrade(true);
         setDeleteIds(new Set());
         setKeepIds(new Set());
         return;
@@ -196,7 +200,6 @@ export default function AdminUsersPage() {
     updateUser.mutate({ id: editingUser?.id, role: editRole, group_id: editGroup, max_managed_users: editLimit });
   };
 
-  // State for Downgrade/Delete Logic
   const [managedUsers, setManagedUsers] = useState<UserData[]>([]);
 
   return (
@@ -240,7 +243,7 @@ export default function AdminUsersPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-8">
-          {adminManaged && (
+          {adminManaged && adminManaged.users.length > 0 && (
             <UserGroupTable
               title={adminManaged.name}
               titleColor="text-[#ed0046]" 
@@ -285,25 +288,27 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Dialog: Create User (Improved UI) */}
+      {/* Dialog: Create User */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-md rounded-2xl border-2 border-[#f0e0e7] overflow-hidden p-0">
+        <DialogContent className="max-w-md rounded-2xl border-2 border-[#f0e0e7] overflow-hidden p-0 shadow-2xl">
           <div className="bg-[#fff0f4] p-6 border-b border-[#ffd6e4]">
-            <DialogHeader><DialogTitle className="text-2xl font-extrabold text-[#ed0046]">Tạo người dùng mới</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-2xl font-extrabold text-[#ed0046] flex items-center gap-2"><Plus className="w-6 h-6" /> Tạo người dùng</DialogTitle></DialogHeader>
           </div>
           <div className="p-6 space-y-5">
              {tempPw ? (
-                <div className="p-6 bg-green-50 rounded-xl text-center space-y-3">
-                   <p className="font-bold text-green-700">Tạo công! Mật khẩu: <code>{tempPw}</code></p>
-                   <Button className="w-full bg-[#1a1a2e]" onClick={() => setShowCreate(false)}>Đóng</Button>
+                <div className="p-6 bg-green-50 rounded-xl text-center space-y-4 border border-green-200">
+                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto"><Check className="text-green-600" /></div>
+                   <p className="font-bold text-green-700">Tạo công! Mật khẩu mới:</p>
+                   <code className="block bg-white p-3 rounded-lg border text-xl font-mono">{tempPw}</code>
+                   <Button className="w-full bg-[#1a1a2e] rounded-xl" onClick={() => setShowCreate(false)}>Đóng</Button>
                 </div>
              ) : (
                 <div className="space-y-4">
-                  <div className="space-y-1"><Label>Email</Label><Input value={newEmail} onChange={e => setNewEmail(e.target.value)} className="rounded-xl border-[#f0e0e7]" /></div>
+                  <div className="space-y-1"><Label className="font-bold">Email đăng nhập</Label><Input value={newEmail} onChange={e => setNewEmail(e.target.value)} className="rounded-xl border-[#f0e0e7] h-11" /></div>
                   <div className="space-y-1">
-                    <Label>Vai trò</Label>
+                    <Label className="font-bold">Vai trò</Label>
                     <Select value={newRole} onValueChange={setNewRole}>
-                      <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USER">USER</SelectItem>
                         <SelectItem value="SUBADMIN">SUBADMIN</SelectItem>
@@ -313,9 +318,9 @@ export default function AdminUsersPage() {
                   </div>
                   {newRole !== "ADMIN" && (
                     <div className="space-y-1">
-                      <Label>Nhóm</Label>
+                      <Label className="font-bold">Nhóm học tập</Label>
                       <Select value={selGroupId} onValueChange={setSelGroupId}>
-                        <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="NONE">Admin quản lý</SelectItem>
                           <SelectItem value="NEW_GROUP">+ Tạo nhóm mới</SelectItem>
@@ -324,91 +329,199 @@ export default function AdminUsersPage() {
                       </Select>
                     </div>
                   )}
-                  <DialogFooter className="pt-4"><Button className="bg-[#ed0046] w-full rounded-xl" onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, group_id: selGroupId === "NONE" || selGroupId === "NEW_GROUP" ? undefined : selGroupId, group_name: selGroupId === "NEW_GROUP" ? newGroupName : undefined })}>Xác nhận</Button></DialogFooter>
+                  {selGroupId === "NEW_GROUP" && (
+                     <div className="space-y-1 animate-in slide-in-from-top-2">
+                        <Label className="font-bold">Tên nhóm mới</Label>
+                        <Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="rounded-xl h-11" />
+                     </div>
+                  )}
+                  <DialogFooter className="pt-4">
+                    <Button variant="ghost" onClick={() => setShowCreate(false)}>Hủy</Button>
+                    <Button className="bg-[#ed0046] w-full rounded-xl h-11 font-bold shadow-lg" onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, group_id: selGroupId === "NONE" || selGroupId === "NEW_GROUP" ? undefined : selGroupId, group_name: selGroupId === "NEW_GROUP" ? newGroupName : undefined })} disabled={createUser.isPending}>
+                       {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />} Xác nhận Tạo
+                    </Button>
+                  </DialogFooter>
                 </div>
              )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Edit User (New) */}
+      {/* Dialog: Edit User */}
       <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-2 border-[#f0e0e7]">
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-2 border-[#f0e0e7] shadow-2xl">
            <div className="bg-[#fff0f4] p-6 border-b border-[#ffd6e4]">
-             <DialogHeader><DialogTitle className="text-xl font-extrabold text-[#1a1a2e]">Chỉnh sửa người dùng</DialogTitle></DialogHeader>
+             <DialogHeader><DialogTitle className="text-xl font-extrabold text-[#1a1a2e] flex items-center gap-2"><Edit2 className="w-5 h-5 text-[#ed0046]" /> Chỉnh sửa tài khoản</DialogTitle></DialogHeader>
            </div>
            <div className="p-6 space-y-5">
-              <div className="space-y-1"><Label>Email</Label><Input disabled value={editingUser?.email} className="bg-gray-50 border-[#f0e0e7] rounded-xl" /></div>
-              <div className="space-y-1">
-                <Label>Vai trò</Label>
-                <Select value={editRole} onValueChange={setEditRole}>
-                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USER">USER</SelectItem>
-                    <SelectItem value="SUBADMIN">SUBADMIN</SelectItem>
-                    <SelectItem value="ADMIN">ADMIN</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Nhóm</Label>
-                <Select value={editGroup} onValueChange={setEditGroup}>
-                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">Admin quản lý</SelectItem>
-                    {groups.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1"><Label className="text-muted-foreground font-bold">Email</Label><Input disabled value={editingUser?.email} className="bg-gray-50 border-[#f0e0e7] rounded-xl h-11 font-medium" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                    <Label className="font-bold">Vai trò</Label>
+                    <Select value={editRole} onValueChange={setEditRole}>
+                      <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USER">USER</SelectItem>
+                        <SelectItem value="SUBADMIN">SUBADMIN</SelectItem>
+                        <SelectItem value="ADMIN">ADMIN</SelectItem>
+                      </SelectContent>
+                    </Select>
+                 </div>
+                 <div className="space-y-1">
+                    <Label className="font-bold">Nhóm</Label>
+                    <Select value={editGroup} onValueChange={setEditGroup}>
+                      <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Admin quản lý</SelectItem>
+                        {groups.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                 </div>
               </div>
               {editRole === "SUBADMIN" && (
-                <div className="space-y-1">
-                  <Label>Giới hạn tài khoản managed</Label>
-                  <Input type="number" value={editLimit} onChange={e => setEditLimit(parseInt(e.target.value))} className="rounded-xl" />
+                <div className="space-y-1 bg-gray-50 p-4 rounded-xl border border-[#f0e0e7]">
+                  <Label className="font-bold flex items-center gap-2 text-[#ed0046]"><Settings className="w-4 h-4" /> Hạn mức Nhóm (Quota)</Label>
+                  <Input type="number" value={editLimit} onChange={e => setEditLimit(parseInt(e.target.value))} className="rounded-xl mt-2 h-11" />
+                  <p className="text-[10px] text-muted-foreground mt-2 font-medium uppercase tracking-wider">(*) Áp dụng cho toàn bộ các Subadmin trong nhóm này</p>
                 </div>
               )}
            </div>
-           <DialogFooter className="p-6 bg-gray-50 border-t">
-              <Button variant="ghost" onClick={() => setEditingUser(null)}>Hủy</Button>
-              <Button className="bg-[#ed0046]" onClick={handleEditConfirm}>Lưu thay đổi</Button>
+           <DialogFooter className="p-6 bg-gray-50 border-t items-center">
+              <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setEditingUser(null)}>Hủy</Button>
+              <Button className="bg-[#ed0046] rounded-xl h-11 px-8 font-bold shadow-md" onClick={handleEditConfirm} disabled={updateUser.isPending}>
+                 {updateUser.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />} Lưu thay đổi
+              </Button>
            </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Downgrade / Delete Handling */}
+      {/* Dialog: Assign Deck */}
+      <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-2 border-[#f0e0e7] shadow-3xl">
+          <div className="bg-[#fff0f4] p-6 border-b border-[#ffd6e4]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-extrabold text-[#1a1a2e] flex items-center gap-2">
+                <Plus className="w-6 h-6 text-[#ed0046]" /> Cấp quyền bộ đề
+              </DialogTitle>
+              <DialogDescription className="font-bold text-[#ed0046]">{assignedUser?.email}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label className="font-bold text-[#1a1a2e] text-sm px-1">Chọn danh sách bộ đề</Label>
+              <div className="max-h-56 overflow-y-auto border-2 border-[#f0e0e7] rounded-2xl divide-y divide-[#f0e0e7] bg-white shadow-inner">
+                {decks.map(d => {
+                  const checked = assignDeckIds.has(d.id);
+                  const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+                  return (
+                    <label 
+                      key={d.id} 
+                      className={`flex items-center gap-4 p-4 transition-all cursor-pointer ${alreadyHas ? "opacity-40 cursor-not-allowed bg-gray-50" : "hover:bg-[#fff8fa]"}`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        disabled={alreadyHas}
+                        checked={checked} 
+                        onChange={e => { const n = new Set(assignDeckIds); e.target.checked ? n.add(d.id) : n.delete(d.id); setAssignDeckIds(n); }} 
+                        className="w-5 h-5 accent-[#ed0046] rounded-md"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`text-sm font-bold ${checked ? "text-[#ed0046]" : "text-gray-700"}`}>{alreadyHas ? "✓ " : ""}{d.title}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{d.level}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold text-[#1a1a2e] text-sm px-1">Thời hạn sử dụng</Label>
+              <Input 
+                type="datetime-local" 
+                value={assignExpiry} 
+                onChange={e => setAssignExpiry(e.target.value)} 
+                className="border-2 border-[#f0e0e7] rounded-xl h-11"
+              />
+              <p className="text-[10px] text-muted-foreground font-bold italic px-1 uppercase tracking-widest leading-none">(*) Super Admin bypass mọi giới hạn nhóm</p>
+            </div>
+          </div>
+          <DialogFooter className="p-6 bg-gray-50 border-t">
+            <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setShowAssign(null)}>Đóng</Button>
+            <Button 
+              className="bg-[#1a1a2e] hover:bg-black text-white rounded-xl px-8 font-bold h-11 shadow-lg" 
+              disabled={assignDeckIds.size === 0 || assignDeck.isPending} 
+              onClick={() => assignDeck.mutate({ userId: showAssign!, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}
+            >
+              {assignDeck.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+              Xác nhận Giao {assignDeckIds.size} bộ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Delete / Downgrade cleanup */}
       <Dialog open={showDowngrade || !!showDeleteSubAdmin} onOpenChange={() => { setShowDowngrade(false); setShowDeleteSubAdmin(null); }}>
-        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-2 border-orange-200 shadow-2xl">
            <div className="bg-orange-50 p-6 border-b border-orange-200">
-             <DialogHeader><DialogTitle className="text-xl font-bold text-orange-800">Cần xử lý thành viên nhóm</DialogTitle></DialogHeader>
+             <DialogHeader><DialogTitle className="text-xl font-extrabold text-orange-800 flex items-center gap-2"><AlertCircle className="w-6 h-6" /> Cần xử lý thành viên mồ côi</DialogTitle></DialogHeader>
            </div>
            <div className="p-6 space-y-4">
-              <p className="text-sm">Bạn đang {showDowngrade ? "hạ cấp" : "xóa"} SubAdmin <strong>{editingUser?.email || showDeleteSubAdmin?.subadmin.email}</strong>. Hãy chọn phương án xử lý cho các thành viên họ đang quản lý:</p>
-              <div className="divide-y border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+              <p className="text-sm font-medium text-orange-900 leading-relaxed">Bạn đang {showDowngrade ? "hạ cấp" : "xóa"} SubAdmin <strong>{editingUser?.email || showDeleteSubAdmin?.subadmin.email}</strong>. Hãy chọn phương án xử lý cho <strong>{managedUsers.length} thành viên</strong> cấp dưới:</p>
+              <div className="divide-y border-2 border-orange-100 rounded-2xl overflow-hidden max-h-56 overflow-y-auto bg-white shadow-inner">
                 {managedUsers.map(u => (
-                  <div key={u.id} className="p-2 flex items-center justify-between text-xs">
-                    <span className="truncate">{u.email}</span>
-                    <div className="flex gap-1 shrink-0">
-                      <Button size="sm" variant={deleteIds.has(u.id) ? "destructive" : "outline"} className="h-7 px-2" onClick={() => { const n = new Set(deleteIds); n.has(u.id) ? n.delete(u.id) : n.add(u.id); setDeleteIds(n); const k = new Set(keepIds); k.delete(u.id); setKeepIds(k); }}>Xóa</Button>
-                      <Button size="sm" variant={keepIds.has(u.id) ? "brand" : "outline"} className="h-7 px-2" onClick={() => { const k = new Set(keepIds); k.has(u.id) ? k.delete(u.id) : k.add(u.id); setKeepIds(k); const n = new Set(deleteIds); n.delete(u.id); setDeleteIds(n); }}>Giữ</Button>
+                  <div key={u.id} className="p-3 flex items-center justify-between gap-4 hover:bg-orange-50/30 transition-colors">
+                    <span className="text-xs font-bold text-gray-700 truncate">{u.email}</span>
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="sm" variant={deleteIds.has(u.id) ? "destructive" : "outline"} className="h-8 px-3 text-[10px] font-bold uppercase rounded-lg" onClick={() => { const n = new Set(deleteIds); n.has(u.id) ? n.delete(u.id) : n.add(u.id); setDeleteIds(n); const k = new Set(keepIds); k.delete(u.id); setKeepIds(k); }}>Xóa</Button>
+                      <Button size="sm" variant={keepIds.has(u.id) ? "brand" : "outline"} className={`h-8 px-3 text-[10px] font-bold uppercase rounded-lg ${keepIds.has(u.id) ? "bg-[#ed0046] text-white" : ""}`} onClick={() => { const k = new Set(keepIds); k.has(u.id) ? k.delete(u.id) : k.add(u.id); setKeepIds(k); const n = new Set(deleteIds); n.delete(u.id); setDeleteIds(n); }}>Giữ</Button>
                     </div>
                   </div>
                 ))}
               </div>
            </div>
-           <DialogFooter className="p-6 bg-gray-50 border-t">
-              <Button variant="ghost" onClick={() => { setShowDowngrade(false); setShowDeleteSubAdmin(null); }}>Hủy</Button>
-              <Button className="bg-[#ed0046]" onClick={() => {
+           <DialogFooter className="p-6 bg-orange-50 border-t">
+              <Button variant="ghost" className="rounded-xl font-bold" onClick={() => { setShowDowngrade(false); setShowDeleteSubAdmin(null); }}>Hủy bỏ</Button>
+              <Button className="bg-[#ed0046] hover:bg-red-700 text-white rounded-xl px-6 font-bold h-11 shadow-lg" onClick={() => {
                 if (showDowngrade) {
                    updateUser.mutate({ id: editingUser?.id, role: editRole, group_id: editGroup, max_managed_users: editLimit, delete_user_ids: Array.from(deleteIds), keep_user_ids: Array.from(keepIds) });
                 } else {
                    deleteUser.mutate({ id: showDeleteSubAdmin?.subadmin.id, delete_user_ids: Array.from(deleteIds), keep_user_ids: Array.from(keepIds) });
                 }
-              }}>Xác nhận</Button>
+              }} disabled={updateUser.isPending || deleteUser.isPending}>
+                 { (updateUser.isPending || deleteUser.isPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />} Xác nhận Xử lý
+              </Button>
            </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {/* (Other Dialogs for Decks, Assign, Reset preserved but optimized...) */}
-      {/* ... keeping Decks View and Assign Deck dialogs ... */}
+      {/* Dialog: Decks View */}
+      <Dialog open={!!showDecks} onOpenChange={() => setShowDecks(null)}>
+        <DialogContent className="max-w-md rounded-2xl border-2 border-[#f0e0e7] p-0 overflow-hidden shadow-2xl">
+          <div className="bg-[#fff0f4] p-6 border-b border-[#ffd6e4]">
+            <DialogHeader><DialogTitle className="text-xl font-extrabold text-[#1a1a2e] flex items-center gap-2"><BookOpen className="w-6 h-6 text-[#ed0046]" /> Danh mục bộ đề</DialogTitle></DialogHeader>
+          </div>
+          <div className="p-6">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {(showDecks?.user_decks ?? []).length === 0 ? (
+                <div className="text-center py-10 space-y-3 bg-gray-50 rounded-2xl border-2 border-dashed border-[#f0e0e7]">
+                  <p className="text-sm text-muted-foreground font-medium">Người dùng này chưa có bộ đề nào.</p>
+                </div>
+              ) : (showDecks?.user_decks ?? []).map(ud => (
+                <div key={ud.id} className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-[#f0e0e7] hover:border-[#ffd6e4] transition-all group shadow-sm">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-bold text-[#1a1a2e]">{ud.deck?.title}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Hết hạn: {ud.expired_at ? new Date(ud.expired_at).toLocaleDateString("vi-VN") : "Vĩnh viễn"}</span>
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100" onClick={() => revokeDeck.mutate({ userId: showDecks!.id, deck_id: ud.deck_id })}><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-6 bg-gray-50 border-t">
+            <Button className="w-full bg-[#ed0046] hover:bg-[#c0003a] text-white rounded-xl font-bold h-11 shadow-sm" onClick={() => { const id = showDecks!.id; setShowDecks(null); openAssign(id); }}>+ Giao quyền thêm bộ đề</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -441,7 +554,7 @@ function UserGroupTable({ title, usage, titleColor, bgColor, users, onAssign, on
                 <tr key={u.id} className="hover:bg-[#fff8fa] transition-colors group">
                    <td className="p-4 font-bold text-[#1a1a2e] align-middle">{u.email}</td>
                    <td className="p-4 align-middle">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border-2 ${
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border-2 ${
                         u.role === "ADMIN" ? "bg-purple-100 text-purple-700 border-purple-200" :
                         u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700 border-orange-200" : 
                         "bg-[#fff0f4] text-[#ed0046] border-[#ffd6e4]"
@@ -450,10 +563,10 @@ function UserGroupTable({ title, usage, titleColor, bgColor, users, onAssign, on
                       </span>
                    </td>
                    <td className="p-4 align-middle">
-                      <div className="flex justify-end gap-1 items-center">
-                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-[#ed0046] hover:text-white" onClick={() => onEdit(u)} title="Sửa vai trò/nhóm"><Edit2 className="w-4 h-4" /></Button>
-                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-[#ed0046] hover:text-white" onClick={() => onViewDecks(u)} title="Bộ đề"><BookOpen className="w-4 h-4" /></Button>
-                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-red-600 hover:text-white" onClick={() => onDelete(u)} title="Xóa"><Trash2 className="w-4 h-4" /></Button>
+                      <div className="flex justify-end gap-1.5 items-center">
+                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-[#ed0046] hover:text-white" onClick={() => onEdit(u)} title="Sửa vai trò/nhóm"><Edit2 className="w-3.5 h-3.5" /></Button>
+                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-[#ed0046] hover:text-white" onClick={() => onViewDecks(u)} title="Danh mục bộ đề"><BookOpen className="w-3.5 h-3.5" /></Button>
+                         <Button size="sm" variant="outline" className="h-8 w-8 p-0 rounded-lg border-2 border-[#f0e0e7] hover:bg-red-600 hover:text-white" onClick={() => onDelete(u)} title="Xóa tài khoản vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /></Button>
                       </div>
                    </td>
                 </tr>

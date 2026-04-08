@@ -26,10 +26,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ tempPassword: newPassword });
   }
 
-  // 2. Assign deck
+  // 2. Assign deck (Super Admin - Bypasses everything)
   if (body.action === "assign_deck") {
     const { deck_id, expired_at } = body;
     const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
+    
+    // Admin inserts directly into user_decks
     const { error } = await supabase.from("user_decks").upsert({
       user_id: params.id,
       deck_id,
@@ -38,20 +40,33 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       learned_count: 0,
       streak: 0,
     }, { onConflict: "user_id,deck_id" });
+    
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ success: true });
   }
 
-  // 3. Change role & group & limit (Integrated Edit)
+  // 3. Update user details (Role, Group, Limit)
   if (body.action === "update_user") {
     const { role, group_id, max_managed_users, delete_user_ids, keep_user_ids } = body;
     const updates: any = {};
     if (role) updates.role = role;
     if (group_id !== undefined) updates.group_id = group_id === "NONE" ? null : group_id;
-    if (max_managed_users !== undefined) updates.max_managed_users = max_managed_users;
+    
+    // Update User Profile
+    const { error: dbErr } = await supabase.from("users").update(updates).eq("id", params.id);
+    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
 
-    // Special Case: Downgrade from SUBADMIN to USER
-    // The client should provide delete_user_ids / keep_user_ids if it's a downgrade
+    // IMPORTANT: max_managed_users now applies to the GROUP, not the user
+    // If we are setting a limit for a subadmin, we find the group they belong to (or own) and update its max_users
+    if (max_managed_users !== undefined) {
+      // Find the group related to this user
+      const { data: userData } = await supabase.from("users").select("group_id").eq("id", params.id).single();
+      if (userData?.group_id) {
+        await supabase.from("groups").update({ max_users: max_managed_users }).eq("id", userData.group_id);
+      }
+    }
+
+    // Handle Downgrade / Deletion cleanup
     if (delete_user_ids || keep_user_ids) {
       if (delete_user_ids?.length > 0) {
         for (const uid of delete_user_ids) {
@@ -63,17 +78,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
     }
 
-    const { error: dbErr } = await supabase.from("users").update(updates).eq("id", params.id);
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
-
-    return NextResponse.json({ success: true, updates });
-  }
-
-  // Legacy actions (maintained for compatibility)
-  if (body.action === "change_role") {
-    const { role } = body;
-    const { error: dbErr } = await supabase.from("users").update({ role }).eq("id", params.id);
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }
 
@@ -92,17 +96,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const supabase = createAdminClient();
-  
-  // Try to parse body for managed user handling
   let deleteUserIds: string[] = [];
   let keepUserIds: string[] = [];
   try {
     const body = await request.json();
     deleteUserIds = body.delete_user_ids ?? [];
     keepUserIds = body.keep_user_ids ?? [];
-  } catch (e) { /* ignore if no body */ }
+  } catch (e) {}
 
-  // 1. Handle managed users if any
   if (deleteUserIds.length > 0) {
     for (const uid of deleteUserIds) {
       await supabase.auth.admin.deleteUser(uid);
@@ -112,9 +113,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     await supabase.from("users").update({ group_id: null, created_by: null }).in("id", keep_user_ids);
   }
 
-  // 2. Delete the user
   const { error } = await supabase.auth.admin.deleteUser(params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  
   return NextResponse.json({ success: true });
 }

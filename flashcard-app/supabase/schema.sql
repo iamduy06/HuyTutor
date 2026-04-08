@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.groups (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name        TEXT NOT NULL,
   owner_id    UUID, -- FK added later to avoid circular dependency
+  max_users   INTEGER NOT NULL DEFAULT 10,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -71,6 +72,15 @@ CREATE TABLE IF NOT EXISTS public.user_decks (
   UNIQUE (user_id, deck_id)
 );
 
+-- 1.6.1 GROUP_DECKS (New)
+CREATE TABLE IF NOT EXISTS public.group_decks (
+  group_id    UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  deck_id     UUID NOT NULL REFERENCES public.decks(id) ON DELETE CASCADE,
+  expired_at  TIMESTAMPTZ DEFAULT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (group_id, deck_id)
+);
+
 -- 1.7 USER_DEVICES
 CREATE TABLE IF NOT EXISTS public.user_devices (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -125,6 +135,10 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.is_subadmin() RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'SUBADMIN');
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_group_deck_expiry(p_group_id UUID, p_deck_id UUID) RETURNS TIMESTAMPTZ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT expired_at FROM public.group_decks WHERE group_id = p_group_id AND deck_id = p_deck_id;
 $$;
 
 -- ── 5. RLS POLICIES ─────────────────────────────────────────────
@@ -195,6 +209,14 @@ DROP POLICY IF EXISTS "ud_update_own" ON public.user_decks;
 CREATE POLICY "ud_update_own" ON public.user_decks FOR UPDATE USING (auth.uid() = user_id);
 DROP POLICY IF EXISTS "ud_write_admin" ON public.user_decks;
 CREATE POLICY "ud_write_admin" ON public.user_decks FOR ALL USING (public.is_admin() OR public.is_subadmin());
+
+-- 5.5.1 GROUP_DECKS (New Policies)
+DROP POLICY IF EXISTS "gd_select" ON public.group_decks;
+CREATE POLICY "gd_select" ON public.group_decks FOR SELECT USING (
+  public.is_admin() OR group_id = public.get_my_group_id()
+);
+DROP POLICY IF EXISTS "gd_admin_all" ON public.group_decks;
+CREATE POLICY "gd_admin_all" ON public.group_decks FOR ALL USING (public.is_admin());
 
 -- 5.6 DEVICES & SETTINGS
 DROP POLICY IF EXISTS "devices_own" ON public.user_devices;
