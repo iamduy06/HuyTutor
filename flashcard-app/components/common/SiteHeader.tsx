@@ -9,7 +9,7 @@ import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 
 export function SiteHeader() {
-  const { user, loading } = useUser();
+  const { user } = useUser();
   const { toast } = useToast();
 
   async function handleLogout() {
@@ -49,11 +49,7 @@ export function SiteHeader() {
       <div className="flex items-center gap-2">
         <UIModeToggle />
 
-        {loading ? (
-          <div className="w-10 h-8 flex items-center justify-center">
-            <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : user ? (
+        {user ? (
           <>
             {user.role === "ADMIN" && (
               <Button variant="brand-outline" size="sm" asChild>
