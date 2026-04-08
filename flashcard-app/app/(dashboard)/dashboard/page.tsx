@@ -26,14 +26,14 @@ export default async function DashboardPage() {
     admin.from("users").select("*").eq("id", user.id).single(),
     admin
       .from("user_decks")
-      .select("id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, is_public)")
+      .select("id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, access_level)")
       .eq("user_id", user.id)
       .order("deck_id"),
-    // Tất cả deck public — user chưa được assign cũng thấy
+    // Tất cả deck public hoặc authenticated — user chưa được assign cũng thấy
     admin
       .from("decks")
-      .select("id, title, description, level, is_public")
-      .eq("is_public", true)
+      .select("id, title, description, level, access_level")
+      .in("access_level", ["public", "authenticated"])
       .order("created_at", { ascending: true }),
   ]);
 
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const totalLearned = (userDecks ?? []).reduce((s: number, ud: any) => s + ((ud.learned_count as number) ?? 0), 0);
   const activeAssigned = (userDecks ?? []).filter((ud: any) => {
     const deck = ud.deck as any;
-    if (deck?.is_public) return true; // public luôn active
+    if (deck?.access_level === "public" || deck?.access_level === "authenticated") return true; 
     return hasFullAccess(ud.expired_at as string | null);
   }).length;
   const activeCount = activeAssigned + extraPublicDecks.length;
@@ -116,25 +116,25 @@ export default async function DashboardPage() {
             {(userDecks ?? []).map((ud: any) => {
               const deck      = ud.deck as any;
               const expired_at = ud.expired_at as string | null;
-              const isPublic  = Boolean(deck?.is_public);
-              // Public deck luôn active; private deck check expired_at
-              const active    = isPublic || hasFullAccess(expired_at);
+              const isFree    = deck?.access_level === "public" || deck?.access_level === "authenticated";
+              // Free decks luôn active; restricted check expired_at
+              const active    = isFree || hasFullAccess(expired_at);
               const words     = wordCountMap[ud.deck_id as string] ?? 0;
               if (!deck) return null;
-
+ 
               return (
                 <DeckCard
                   key={ud.id as string}
                   title={deck.title}
                   description={deck.description}
-                  isPublic={isPublic}
+                  accessLevel={deck.access_level}
                   active={active}
                   words={words}
                   streak={(ud.streak as number) ?? 0}
                   progressPercent={(ud.progress_percent as number) ?? 0}
-                  expiredAt={isPublic ? null : expired_at}  // public không show hạn
+                  expiredAt={isFree ? null : expired_at}  // public không show hạn
                   deckId={deck.id}
-                  showExpiry={!isPublic}
+                  showExpiry={!isFree}
                 />
               );
             })}
@@ -145,7 +145,7 @@ export default async function DashboardPage() {
                 key={deck.id}
                 title={deck.title}
                 description={deck.description}
-                isPublic={true}
+                accessLevel={deck.access_level}
                 active={true}
                 words={wordCountMap[deck.id] ?? 0}
                 streak={0}
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
 interface DeckCardProps {
   title: string;
   description: string | null;
-  isPublic: boolean;
+  accessLevel: string;
   active: boolean;
   words: number;
   streak: number;
@@ -176,11 +176,12 @@ interface DeckCardProps {
   deckId: string;
   showExpiry: boolean;
 }
-
+ 
 function DeckCard({
-  title, description, isPublic, active, words, streak,
+  title, description, accessLevel, active, words, streak,
   progressPercent, expiredAt, deckId, showExpiry,
 }: DeckCardProps) {
+  const isFree = accessLevel === "public" || accessLevel === "authenticated";
   return (
     <div className={`bg-white rounded-2xl border-2 p-5 flex flex-col transition-all hover:shadow-md ${
       active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"
@@ -194,8 +195,8 @@ function DeckCard({
           {title}
         </h3>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          {isPublic
-            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">🌐 Public</span>
+          {isFree
+            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">🌐 {accessLevel}</span>
             : <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                 {active ? "Còn hạn" : "Hết hạn"}
               </span>

@@ -27,9 +27,13 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
               {deck.level}
             </span>
           )}
-          {showPublicBadge && (
-            deck.is_public
+           {showPublicBadge && (
+            deck.access_level === "public"
               ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>
+              : deck.access_level === "authenticated"
+              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">🔑 Auth</span>
+              : deck.access_level === "preview"
+              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">👁️ Preview</span>
               : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
           )}
         </div>
@@ -46,7 +50,7 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground font-medium">
-          📝 {deck.word_count ?? deck.flashcard_count ?? 0} từ
+          📝 {deck.word_count ?? 0} từ
         </span>
         {showProgress && progressPercent !== undefined && (
           <span className="text-xs font-semibold text-brand">{progressPercent}%</span>

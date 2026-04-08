@@ -18,7 +18,7 @@ export async function GET() {
     // Admin sees all decks
     const { data } = await admin
       .from("decks")
-      .select("id, title, description, level, is_public, flashcards(count)")
+      .select("id, title, description, level, access_level, flashcards(count)")
       .order("created_at", { ascending: true });
     const formatted = (data ?? []).map((d: any) => ({
       ...d, word_count: d.flashcards?.[0]?.count ?? 0, flashcards: undefined,
@@ -29,7 +29,7 @@ export async function GET() {
   // SubAdmin only sees their assigned decks
   const { data: userDecks } = await admin
     .from("user_decks")
-    .select("deck_id, expired_at, deck:decks(id, title, description, level, is_public)")
+    .select("deck_id, expired_at, deck:decks(id, title, description, level, access_level)")
     .eq("user_id", user.id);
 
   const deckIds = (userDecks ?? []).map((ud: any) => ud.deck?.id).filter(Boolean);

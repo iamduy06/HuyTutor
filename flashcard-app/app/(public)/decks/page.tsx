@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/services/supabase/admin";
-import { normaliseUnits, countWords } from "@/lib/utils";
+import { countWords } from "@/lib/utils";
 import { DeckCard } from "@/components/flashcard/DeckCard";
 import type { FlashcardRow } from "@/types";
 
@@ -10,7 +10,8 @@ export default async function DecksPage() {
 
   const { data: decks } = await supabase
     .from("decks")
-    .select("id, title, description, level, is_public, created_at")
+    .select("id, title, description, level, access_level, created_at")
+    .in("access_level", ["public", "preview"])
     .order("created_at", { ascending: true });
 
   const { data: cards } = await supabase

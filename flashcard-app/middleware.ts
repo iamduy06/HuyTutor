@@ -86,15 +86,15 @@ export async function middleware(request: NextRequest) {
     if (parts.length === 3) {
       const deckId = parts[2];
 
-      // Check is_public
+      // Check access_level
       const { data: deck } = await supabase
         .from("decks")
-        .select("is_public")
+        .select("access_level")
         .eq("id", deckId)
         .single();
 
-      if (deck?.is_public) {
-        // Deck public → vào learning trực tiếp
+      if (deck?.access_level === "public" || deck?.access_level === "authenticated") {
+        // Deck open to logged in users → vào learning trực tiếp
         return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
       }
 

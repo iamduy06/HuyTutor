@@ -223,11 +223,23 @@ export default function AdminSubAdminsPage() {
   };
 
   const filteredGroups = useMemo(() => {
-    if (!search) return groups;
-    return groups.filter(g => 
-      g.name.toLowerCase().includes(search.toLowerCase()) || 
-      g.group_users.some(u => u.email.toLowerCase().includes(search.toLowerCase()))
-    );
+    let list = groups;
+    if (search) {
+      list = groups.filter(g => 
+        g.name.toLowerCase().includes(search.toLowerCase()) || 
+        g.group_users.some(u => u.email.toLowerCase().includes(search.toLowerCase()))
+      );
+    }
+
+    // Prioritize SYSTEM_ADMIN_CREATED and SYSTEM_REGISTERED
+    return [...list].sort((a, b) => {
+      const systemGroups = ["SYSTEM_ADMIN_CREATED", "SYSTEM_REGISTERED"];
+      const aIsSystem = systemGroups.includes(a.name);
+      const bIsSystem = systemGroups.includes(b.name);
+      if (aIsSystem && !bIsSystem) return -1;
+      if (!aIsSystem && bIsSystem) return 1;
+      return 0; // maintain original relative order otherwise
+    });
   }, [groups, search]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-brand" /></div>;
@@ -260,6 +272,11 @@ export default function AdminSubAdminsPage() {
                 <div>
                    <h3 className="font-bold text-[#1a1a2e] text-lg flex items-center gap-2">
                      {group.name}
+                     {["SYSTEM_ADMIN_CREATED", "SYSTEM_REGISTERED"].includes(group.name) && (
+                       <span className="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded font-extrabold flex items-center gap-1 uppercase">
+                         <ShieldCheck className="w-2.5 h-2.5" /> Hệ Thống
+                       </span>
+                     )}
                      <span className="text-xs font-normal text-gray-400">#{group.id.slice(0,8)}</span>
                    </h3>
                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-3">
