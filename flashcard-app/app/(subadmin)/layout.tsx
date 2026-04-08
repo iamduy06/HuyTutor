@@ -20,31 +20,15 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "ADMIN") {
-    // Admin bypass subadmin check
-  } else if (profile?.role === "SUBADMIN") {
-    const { data: groupSub } = await supabase
-      .from("group_users")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("is_subadmin", true)
-      .limit(1)
-      .maybeSingle();
-
-    if (!groupSub) {
-      console.warn("[SUBADMIN_LAYOUT] User has SUBADMIN role but no group permission. Redirecting.");
-      redirect("/dashboard");
-    }
-  } else {
+  if (!profile || (profile.role !== "SUBADMIN" && profile.role !== "ADMIN")) {
     redirect("/dashboard");
   }
-
-  const { SubAdminGuard } = await import("@/components/auth/SubAdminGuard");
 
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
       <div className="flex flex-1">
+        {/* Sidebar */}
         <aside className="w-56 bg-white border-r-2 border-[#f0e0e7] flex-shrink-0 sticky top-[62px] h-[calc(100vh-62px)] hidden md:flex flex-col py-4">
           <div className="px-4 pb-3 border-b border-[#f0e0e7] mb-3">
             <div className="flex items-center gap-2">
@@ -65,6 +49,7 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
           </nav>
         </aside>
 
+        {/* Mobile bottom nav */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-[#f0e0e7] flex">
           {navItems.map(item => (
             <Link key={item.href} href={item.href}
@@ -76,9 +61,7 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
         </div>
 
         <main className="flex-1 bg-[#f8f9fa] min-w-0 pb-16 md:pb-0">
-          <SubAdminGuard>
-            {children}
-          </SubAdminGuard>
+          {children}
         </main>
       </div>
     </div>
