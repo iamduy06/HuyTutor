@@ -72,17 +72,7 @@ CREATE TABLE IF NOT EXISTS public.user_decks (
   UNIQUE (user_id, deck_id)
 );
 
--- 1.6.1 GROUP_USERS (New Many-to-Many with Roles)
-CREATE TABLE IF NOT EXISTS public.group_users (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  group_id    UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  is_subadmin BOOLEAN NOT NULL DEFAULT false,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (group_id, user_id)
-);
-
--- 1.6.2 GROUP_DECKS
+-- 1.6.1 GROUP_DECKS (New)
 CREATE TABLE IF NOT EXISTS public.group_decks (
   group_id    UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
   deck_id     UUID NOT NULL REFERENCES public.decks(id) ON DELETE CASCADE,
@@ -151,10 +141,6 @@ CREATE OR REPLACE FUNCTION public.get_group_deck_expiry(p_group_id UUID, p_deck_
   SELECT expired_at FROM public.group_decks WHERE group_id = p_group_id AND deck_id = p_deck_id;
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_group_subadmin(p_group_id UUID) RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT EXISTS (SELECT 1 FROM public.group_users WHERE user_id = auth.uid() AND group_id = p_group_id AND is_subadmin = true);
-$$;
-
 -- ── 5. RLS POLICIES ─────────────────────────────────────────────
 
 -- 5.1 GROUPS
@@ -170,14 +156,27 @@ DROP POLICY IF EXISTS "users_select" ON public.users;
 CREATE POLICY "users_select" ON public.users FOR SELECT USING (
   auth.uid() = id 
   OR public.is_admin() 
-  -- Subadmin sees users who share a group where they are subadmin
-  OR EXISTS (
-    SELECT 1 FROM public.group_users gu 
-    JOIN public.group_users sub_lookup ON gu.group_id = sub_lookup.group_id
-    WHERE gu.user_id = users.id 
-    AND sub_lookup.user_id = auth.uid() 
-    AND sub_lookup.is_subadmin = true
-  )
+  OR (public.is_subadmin() AND group_id = public.get_my_group_id())
+);
+
+DROP POLICY IF EXISTS "users_insert" ON public.users;
+CREATE POLICY "users_insert" ON public.users FOR INSERT WITH CHECK (
+  auth.uid() = id 
+  OR public.is_admin() 
+  OR (public.is_subadmin() AND group_id = public.get_my_group_id())
+);
+
+DROP POLICY IF EXISTS "users_update" ON public.users;
+CREATE POLICY "users_update" ON public.users FOR UPDATE USING (
+  auth.uid() = id 
+  OR public.is_admin() 
+  OR (public.is_subadmin() AND group_id = public.get_my_group_id())
+);
+
+DROP POLICY IF EXISTS "users_delete" ON public.users;
+CREATE POLICY "users_delete" ON public.users FOR DELETE USING (
+  public.is_admin() 
+  OR (public.is_subadmin() AND group_id = public.get_my_group_id())
 );
 
 -- 5.3 DECKS
@@ -231,33 +230,20 @@ CREATE POLICY "settings_admin_write" ON public.app_settings FOR ALL USING (publi
 
 CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_role           TEXT;
-  v_group_id       UUID;
-  ADMIN_MANAGED    UUID := 'da000000-0000-0000-0000-000000000000';
-  SELF_REGISTERED  UUID := 'de000000-0000-0000-0000-000000000000';
+  v_role       TEXT;
+  v_created_by UUID;
+  v_group_id   UUID;
 BEGIN
-  v_role     := COALESCE(NEW.raw_user_meta_data->>'role', 'USER');
-  v_group_id := NULLIF(NEW.raw_user_meta_data->>'group_id', '')::UUID;
+  v_role       := COALESCE(NEW.raw_user_meta_data->>'role', 'USER');
+  v_created_by := NULLIF(NEW.raw_user_meta_data->>'created_by', '')::UUID;
+  v_group_id   := NULLIF(NEW.raw_user_meta_data->>'group_id', '')::UUID;
 
-  -- 1. Create Profile
-  INSERT INTO public.users (id, email, role)
-  VALUES (NEW.id, NEW.email, v_role)
-  ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role;
-
-  -- 2. Handle Group Assignment
-  IF v_group_id IS NULL THEN
-    IF v_role = 'ADMIN' THEN
-      v_group_id := ADMIN_MANAGED;
-    ELSE
-      -- Any other user (including self-reg) goes to SELF REGISTERED if no group provided
-      v_group_id := SELF_REGISTERED;
-    END IF;
-  END IF;
-
-  INSERT INTO public.group_users (group_id, user_id, is_subadmin)
-  VALUES (v_group_id, NEW.id, (v_role = 'SUBADMIN'))
-  ON CONFLICT (group_id, user_id) DO NOTHING;
-
+  INSERT INTO public.users (id, email, role, created_by, group_id)
+  VALUES (NEW.id, NEW.email, v_role, v_created_by, v_group_id)
+  ON CONFLICT (id) DO UPDATE
+    SET role       = EXCLUDED.role,
+        created_by = COALESCE(EXCLUDED.created_by, public.users.created_by),
+        group_id   = COALESCE(EXCLUDED.group_id, public.users.group_id);
   RETURN NEW;
 END;
 $$;
@@ -266,7 +252,17 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ── 6.1 TRIGGER: Prevent group_id change ───────────────────────
--- Note: logic prevent_group_change has been removed to allow Admin reassignment.
+CREATE OR REPLACE FUNCTION public.prevent_group_change() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.group_id IS NOT NULL AND NEW.group_id IS DISTINCT FROM OLD.group_id THEN
+    RAISE EXCEPTION 'Không được phép thay đổi Nhóm (group_id) sau khi tài khoản đã được tạo.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_prevent_group_change ON public.users;
+CREATE TRIGGER tg_prevent_group_change BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.prevent_group_change();
 
 -- ── 7. DATA MIGRATION & SAMPLE DATA ───────────────────────────────────────────
 
@@ -280,19 +276,6 @@ BEGIN
   SELECT id, 'Nhóm của ' || email, id
   FROM public.users WHERE role = 'SUBADMIN'
   ON CONFLICT (id) DO NOTHING;
-
-  -- 7.3 SEED SYSTEM GROUPS
-  INSERT INTO public.groups (id, name, description)
-  VALUES 
-    ('da000000-0000-0000-0000-000000000000', '👑 ADMIN MANAGED', 'Mặc định cho Admin và User do Admin tạo'),
-    ('de000000-0000-0000-0000-000000000000', '🌐 SELF REGISTERED', 'Nhóm cho tài khoản tự đăng ký')
-  ON CONFLICT (id) DO NOTHING;
-
-  -- 7.4 MIGRATE users.group_id TO group_users
-  INSERT INTO public.group_users (group_id, user_id, is_subadmin)
-  SELECT group_id, id, (role = 'SUBADMIN')
-  FROM public.users WHERE group_id IS NOT NULL
-  ON CONFLICT (group_id, user_id) DO NOTHING;
 
   -- 7.3 Sample Deck if empty
   IF (SELECT COUNT(*) FROM public.decks) = 0 THEN

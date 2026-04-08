@@ -14,12 +14,34 @@ export async function GET() {
   const admin = await checkAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const db = createAdminClient();
+  const { data: groups, error } = await db
     .from("groups")
-    .select("id, name, description, max_users, owner_id")
-    .order("created_at", { ascending: true });
+    .select(`
+      *,
+      owner:users!owner_id(id, email),
+      member_count:users(count)
+    `)
+    .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ groups: data });
+  return NextResponse.json({ groups });
+}
+
+export async function POST(request: NextRequest) {
+  const admin = await checkAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { name, owner_id } = await request.json();
+  if (!name) return NextResponse.json({ error: "Group name required" }, { status: 400 });
+
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("groups")
+    .insert({ name, owner_id: owner_id || null })
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ group: data });
 }
