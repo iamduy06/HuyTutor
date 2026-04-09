@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
     email_confirm: true,
     user_metadata: { 
       role,
-      created_by_admin: true
+      created_by_admin: true,
+      skip_system_group: !!(group_id && group_id !== "none")
     },
   });
 
