@@ -79,11 +79,13 @@ export function ResetPasswordForm() {
     }
 
     setLoading(true);
+    toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
+    
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       toast({
         title: "Đặt lại mật khẩu thất bại",
         description: error.message,
@@ -92,10 +94,13 @@ export function ResetPasswordForm() {
       return;
     }
 
-    // Sign out to force fresh login with new password
-    await supabase.auth.signOut();
+    // Hiển thị thành công ngay lập tức để cải thiện UX
     setDone(true);
+    setLoading(false);
     toast({ title: "Mật khẩu đã được cập nhật thành công 🎉" });
+
+    // Đăng xuất ngầm để dọn dẹp session quay lại màn hình login
+    supabase.auth.signOut().catch(console.error);
   }
 
   // Success Screen
@@ -209,8 +214,14 @@ export function ResetPasswordForm() {
         )}
 
         <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
-          {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-          Cập nhật mật khẩu
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              Đang xử lý...
+            </>
+          ) : (
+            "Cập nhật mật khẩu"
+          )}
         </Button>
       </form>
     </div>

@@ -41,6 +41,8 @@ export default function ProfilePage() {
     if (newPw !== confirmPw) { toast({ title: "Mật khẩu không khớp", variant: "destructive" }); return; }
     if (newPw.length < 6)   { toast({ title: "Mật khẩu tối thiểu 6 ký tự", variant: "destructive" }); return; }
     setSaving(true);
+    toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
+    
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password: newPw });
     setSaving(false);
@@ -110,8 +112,14 @@ export default function ProfilePage() {
               placeholder="Nhập lại" required className="mt-1" />
           </div>
           <Button type="submit" variant="brand" className="w-full rounded-full" disabled={saving}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Cập nhật
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Đang xử lý...
+              </>
+            ) : (
+              "Cập nhật"
+            )}
           </Button>
         </form>
       </div>
