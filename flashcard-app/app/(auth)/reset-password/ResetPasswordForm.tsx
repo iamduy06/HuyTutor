@@ -126,7 +126,9 @@ export function ResetPasswordForm() {
           </div>
           <div>
             <h1 className="text-2xl font-extrabold text-[#1a1a2e]">Xác thực OTP</h1>
-            <p className="text-muted-foreground text-xs font-medium">Nhập mã 6 số được gửi tới email</p>
+            <p className="text-muted-foreground text-[10px] font-medium italic">
+              Nhập mã 6 số được gửi tới email (Mã có hiệu lực trong <strong>5 phút</strong>)
+            </p>
           </div>
         </div>
 
