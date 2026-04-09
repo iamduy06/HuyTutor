@@ -43,11 +43,24 @@ export default function ProfilePage() {
     setSaving(true);
     toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
     
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: newPw });
+    // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
+    const response = await fetch("/api/auth/update-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newPw }),
+    });
+
+    const result = await response.json();
     setSaving(false);
-    if (error) { toast({ title: "Thất bại", description: error.message, variant: "destructive" }); }
-    else       { toast({ title: "Đổi mật khẩu thành công 🎉" }); setNewPw(""); setConfirmPw(""); }
+
+    if (!response.ok) { 
+      toast({ title: "Thất bại", description: result.error || "Có lỗi xảy ra", variant: "destructive" }); 
+    }
+    else { 
+      toast({ title: "Đổi mật khẩu thành công 🎉" }); 
+      setNewPw(""); 
+      setConfirmPw(""); 
+    }
   }
 
   // Xác định màu badge

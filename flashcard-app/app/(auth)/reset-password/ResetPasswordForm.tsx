@@ -81,14 +81,20 @@ export function ResetPasswordForm() {
     setLoading(true);
     toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
     
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
+    const response = await fetch("/api/auth/update-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
 
-    if (error) {
+    const result = await response.json();
+
+    if (!response.ok) {
       setLoading(false);
       toast({
         title: "Đặt lại mật khẩu thất bại",
-        description: error.message,
+        description: result.error || "Có lỗi xảy ra",
         variant: "destructive",
       });
       return;
@@ -100,6 +106,7 @@ export function ResetPasswordForm() {
     toast({ title: "Mật khẩu đã được cập nhật thành công 🎉" });
 
     // Đăng xuất ngầm để dọn dẹp session quay lại màn hình login
+    const supabase = createClient();
     supabase.auth.signOut().catch(console.error);
   }
 
