@@ -48,7 +48,7 @@ export default async function AdminAnalyticsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { icon: <Users className="w-5 h-5" />, label: "Tổng người dùng", value: totalUsers ?? 0, color: "text-blue-500", bg: "bg-blue-50" },
-          { icon: <BookOpen className="w-5 h-5" />, label: "Bộ đề", value: totalDecks ?? 0, color: "text-brand", bg: "bg-brand-light" },
+          { icon: <BookOpen className="w-5 h-5" />, label: "Flashcard", value: totalDecks ?? 0, color: "text-brand", bg: "bg-brand-light" },
           { icon: <TrendingUp className="w-5 h-5" />, label: "Tiến độ TB", value: `${avgProgress}%`, color: "text-green-600", bg: "bg-green-50" },
           { icon: <Flame className="w-5 h-5" />, label: "Streak cao nhất", value: `${maxStreak} ngày`, color: "text-orange-500", bg: "bg-orange-50" },
         ].map((s) => (
@@ -62,7 +62,7 @@ export default async function AdminAnalyticsPage() {
 
       {/* Popular decks */}
       <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-6">
-        <h2 className="font-bold text-lg text-[#1a1a2e] mb-5">🏆 Bộ đề phổ biến</h2>
+        <h2 className="font-bold text-lg text-[#1a1a2e] mb-5">🏆 Bộ Flashcard phổ biến</h2>
         {popularDecks.length === 0 ? (
           <p className="text-muted-foreground text-sm text-center py-4">Chưa có dữ liệu</p>
         ) : (

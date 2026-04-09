@@ -120,7 +120,7 @@ export default function HomePage() {
         <h2 className="text-3xl font-extrabold mb-4 text-[--text]">Sẵn sàng bắt đầu học?</h2>
         <p className="text-[--muted] mb-10 max-w-xl mx-auto">Học thử ngay hôm nay để trải nghiệm phương pháp ghi nhớ từ vựng hiệu quả nhất cùng Huy Tutor.</p>
         <div className="flex gap-4 justify-center flex-wrap">
-          <Link href="/decks" className="btn-primary-custom text-center">Vào thư viện bộ đề</Link>
+          <Link href="/decks" className="btn-primary-custom text-center">Vào thư viện Flashcard</Link>
           <Link href="/register" className="btn-secondary-custom text-center">Đăng ký tài khoản</Link>
         </div>
       </section>

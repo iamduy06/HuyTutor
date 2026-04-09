@@ -131,7 +131,7 @@ export default function AdminDecksPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       setShowDeckDlg(false); setEditingDeck(null);
-      toast({ title: editingDeck ? "Cập nhật bộ đề thành công" : "Tạo bộ đề thành công" });
+      toast({ title: editingDeck ? "Cập nhật Flashcard thành công" : "Tạo Flashcard thành công" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -141,7 +141,7 @@ export default function AdminDecksPage() {
       const res = await fetch(`/api/admin/decks/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-decks"] }); toast({ title: "Đã xóa bộ đề" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-decks"] }); toast({ title: "Đã xóa Flashcard" }); },
   });
 
   // ── Tab CRUD ──────────────────────────────────────────────────────────────
@@ -334,8 +334,8 @@ export default function AdminDecksPage() {
   return (
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-extrabold text-[#1a1a2e]">📚 Quản lý bộ đề</h1>
-        <Button variant="brand" onClick={openCreateDeck}><Plus className="w-4 h-4" /> Tạo bộ đề</Button>
+        <h1 className="text-2xl font-extrabold text-[#1a1a2e]">📚 Quản lý Flashcard</h1>
+        <Button variant="brand" onClick={openCreateDeck}><Plus className="w-4 h-4" /> Tạo Flashcard</Button>
       </div>
 
       {isLoading ? (
@@ -379,7 +379,7 @@ export default function AdminDecksPage() {
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button size="sm" variant="outline" className="h-8 px-2 text-red-500"
-                      onClick={() => { if (confirm("Xóa bộ đề này và tất cả flashcard?")) deleteDeck.mutate(deck.id); }}>
+                      onClick={() => { if (confirm("Xóa bộ Flashcard này và tất cả Flashcard bên trong?")) deleteDeck.mutate(deck.id); }}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -506,7 +506,7 @@ export default function AdminDecksPage() {
           {decks.length === 0 && !isLoading && (
             <div className="text-center py-16 text-muted-foreground">
               <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Chưa có bộ đề nào. Nhấn "Tạo bộ đề" để bắt đầu.</p>
+              <p>Chưa có Flashcard nào. Nhấn "Tạo Flashcard" để bắt đầu.</p>
             </div>
           )}
         </div>
@@ -515,9 +515,9 @@ export default function AdminDecksPage() {
       {/* ════ Dialog: Tạo/Sửa Deck ════ */}
       <Dialog open={showDeckDlg} onOpenChange={setShowDeckDlg}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingDeck ? "Sửa bộ đề" : "Tạo bộ đề mới"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingDeck ? "Sửa Flashcard" : "Tạo Flashcard mới"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Tên bộ đề *</Label>
+            <div><Label>Tên Flashcard *</Label>
               <Input value={deckForm.title} onChange={e => setDeckForm({ ...deckForm, title: e.target.value })} className="mt-1" />
             </div>
             <div><Label>Mô tả</Label>

@@ -155,7 +155,7 @@ export default function SubAdminUsersPage() {
           const groupExp = new Date(deckInfo.group_expired_at);
           const userExp = new Date(expiredAt);
           if (userExp > groupExp) {
-            throw new Error(`Bộ đề "${deckInfo.title}" hết hạn vào ${groupExp.toLocaleString()}. Bạn không thể gán quá hạn này.`);
+            throw new Error(`Flashcard "${deckInfo.title}" hết hạn vào ${groupExp.toLocaleString()}. Bạn không thể gán quá hạn này.`);
           }
         }
 
@@ -169,7 +169,7 @@ export default function SubAdminUsersPage() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
       setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
-      toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
+      toast({ title: `Giao ${vars.deckIds.length} Flashcard thành công!` });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -184,7 +184,7 @@ export default function SubAdminUsersPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
-      toast({ title: "Đã thu hồi bộ đề" });
+      toast({ title: "Đã thu hồi Flashcard" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -273,7 +273,7 @@ export default function SubAdminUsersPage() {
                   <th className="text-left p-3 font-bold text-[#1a1a2e]">Email</th>
                   <th className="text-left p-3 font-bold text-[#1a1a2e]">Role</th>
                   <th className="text-left p-3 font-bold text-[#1a1a2e]">Ngày tạo</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Bộ đề</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Flashcard</th>
                   <th className="text-left p-3 font-bold text-[#1a1a2e]">Thao tác</th>
                 </tr>
               </thead>
@@ -446,7 +446,7 @@ export default function SubAdminUsersPage() {
       <Dialog open={!!showAssign} onOpenChange={() => setShowAssign(null)}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>📚 Giao bộ đề — {assignedUser?.email}</DialogTitle>
+            <DialogTitle>📚 Giao Flashcard — {assignedUser?.email}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 overflow-y-auto flex-1 pr-1">
             {(assignedUser?.user_decks ?? []).length > 0 && (
@@ -581,7 +581,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <Label>Chọn bộ đề <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span></Label>
+        <Label>Chọn Flashcard <span className="font-normal text-muted-foreground">(có thể chọn nhiều)</span></Label>
         {assignable.length > 0 && (
           <button type="button" onClick={toggleAll}
             className="text-xs font-semibold text-brand hover:underline flex-shrink-0">
@@ -590,7 +590,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
         )}
       </div>
       {decks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Bạn chưa được phân quyền bộ đề nào cho nhóm.</p>
+        <p className="text-xs text-muted-foreground">Bạn chưa được phân quyền Flashcard nào cho nhóm.</p>
       ) : (
         <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
           {decks.map(d => {
@@ -619,7 +619,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
         </div>
       )}
       {assignDeckIds.size > 0 && (
-        <p className="text-xs text-brand font-semibold mt-1.5">Đã chọn {assignDeckIds.size} bộ đề</p>
+        <p className="text-xs text-brand font-semibold mt-1.5">Đã chọn {assignDeckIds.size} Flashcard</p>
       )}
     </div>
   );

@@ -252,7 +252,7 @@ export default function AdminUsersPage() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       setAssignDeckIds(new Set()); setAssignExpiry("");
-      toast({ title: `Giao ${vars.deckIds.length} bộ đề thành công!` });
+      toast({ title: `Giao ${vars.deckIds.length} Flashcard thành công!` });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -282,7 +282,7 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Đã thu hồi bộ đề" });
+      toast({ title: "Đã thu hồi Flashcard" });
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
@@ -473,7 +473,7 @@ export default function AdminUsersPage() {
                             <Users className="w-4 h-4" />
                           </Button>
                           <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 hover:bg-green-50"
-                            onClick={() => openDialog("DECKS", u)} title="Quản lý Bộ Đề">
+                            onClick={() => openDialog("DECKS", u)} title="Quản lý Flashcard">
                             <BookOpen className="w-4 h-4" />
                           </Button>
                           <Button size="icon" variant="outline" className="h-8 w-8 text-purple-600 hover:bg-purple-50"
@@ -682,21 +682,21 @@ export default function AdminUsersPage() {
       <Dialog open={activeDialog === "DECKS"} onOpenChange={closeDialogs}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Quản lý Bộ đề: {editingUser?.email}</DialogTitle>
+            <DialogTitle>Quản lý Flashcard: {editingUser?.email}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             
             {/* List existing decks */}
             <div>
-              <h3 className="font-semibold mb-3 border-b pb-2 text-[#1a1a2e]">Bộ đề đã được giao</h3>
+              <h3 className="font-semibold mb-3 border-b pb-2 text-[#1a1a2e]">Flashcard đã được giao</h3>
               {!currentUserData?.user_decks?.length ? (
-                <p className="text-sm text-muted-foreground italic">Chưa giao bộ đề nào.</p>
+                <p className="text-sm text-muted-foreground italic">Chưa giao Flashcard nào.</p>
               ) : (
                 <div className="space-y-3">
                   {currentUserData.user_decks.map(ud => (
                     <DeckProgressEditor key={ud.id} ud={ud}
                       onUpdate={(args) => updateDeckProgress.mutate({ userId: currentUserData.id, deckId: ud.deck_id, ...args })}
-                      onRevoke={() => { if(confirm("Thu hồi bộ đề này? Tiền trình học sẽ mất.")) revokeDeck.mutate({ userId: currentUserData.id, deckId: ud.deck_id }) }}
+                      onRevoke={() => { if(confirm("Thu hồi Flashcard này? Tiến trình học sẽ mất.")) revokeDeck.mutate({ userId: currentUserData.id, deckId: ud.deck_id }) }}
                     />
                   ))}
                 </div>
@@ -705,7 +705,7 @@ export default function AdminUsersPage() {
 
             {/* Assign new deck */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-               <h3 className="font-semibold mb-3">Giao bộ đề mới</h3>
+               <h3 className="font-semibold mb-3">Giao Flashcard mới</h3>
                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-3 divide-y">
                  {decks.map(d => {
                     const alreadyHas = currentUserData?.user_decks?.some(ud => ud.deck_id === d.id);
@@ -731,7 +731,7 @@ export default function AdminUsersPage() {
                </div>
                <Button className="mt-3 w-full" variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
                  onClick={() => assignDeck.mutate({ userId: currentUserData!.id, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
-                 Giao {assignDeckIds.size} bộ đề đã chọn
+                 Giao {assignDeckIds.size} Flashcard đã chọn
                </Button>
             </div>
           </div>

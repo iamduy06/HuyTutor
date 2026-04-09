@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const finalExpiry = expired_at?.trim() ? expired_at : null;
 
     if (!Array.isArray(deck_ids) || deck_ids.length === 0) {
-      return NextResponse.json({ error: "Chưa chọn bộ đề" }, { status: 400 });
+      return NextResponse.json({ error: "Chưa chọn Flashcard" }, { status: 400 });
     }
 
     // A. Upsert into group_decks

@@ -75,8 +75,8 @@ export default async function DeckDetailPage({ params }: Props) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center">
         <div className="text-6xl mb-6">🔒</div>
-        <h2 className="text-2xl font-bold text-[#1a1a2e] mb-2">Bộ đề có giới hạn quyền truy cập</h2>
-        <p className="text-muted-foreground mb-6">Vui lòng đăng nhập hoặc liên hệ Admin để được cấp quyền học bộ đề này.</p>
+        <h2 className="text-2xl font-bold text-[#1a1a2e] mb-2">Bộ Flashcard có giới hạn quyền truy cập</h2>
+        <p className="text-muted-foreground mb-6">Vui lòng đăng nhập hoặc liên hệ Admin để được cấp quyền học bộ Flashcard này.</p>
         <div className="flex gap-4">
           <Button variant="brand" asChild><Link href="/login">Đăng nhập ngay</Link></Button>
           <Button variant="outline" asChild><Link href={FACEBOOK_URL} target="_blank">Liên hệ mua tài liệu</Link></Button>
@@ -94,7 +94,7 @@ export default async function DeckDetailPage({ params }: Props) {
             <Link href="/login">Đăng nhập để học đầy đủ</Link>
           </Button>
           <Button variant="outline" size="sm" asChild className="rounded-full h-7 text-xs px-3">
-            <Link href={FACEBOOK_URL} target="_blank">💬 Mua bộ đề</Link>
+            <Link href={FACEBOOK_URL} target="_blank">💬 Mua bộ Flashcard</Link>
           </Button>
         </div>
       )}

@@ -45,7 +45,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-20 gap-3">
         <Loader2 className="w-10 h-10 animate-spin text-brand" />
-        <p className="text-muted-foreground">Đang tải bộ đề…</p>
+        <p className="text-muted-foreground">Đang tải Flashcard…</p>
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-20 gap-4 text-muted-foreground">
         <AlertCircle className="w-10 h-10 text-destructive" />
-        <p className="font-medium">{error?.message ?? "Không tìm thấy bộ đề hoặc bạn không có quyền truy cập."}</p>
+        <p className="font-medium">{error?.message ?? "Không tìm thấy Flashcard hoặc bạn không có quyền truy cập."}</p>
         <Button variant="brand-outline" asChild>
           <Link href="/dashboard">← Quay lại Dashboard</Link>
         </Button>
@@ -69,7 +69,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-20 gap-4 text-muted-foreground">
         <AlertCircle className="w-10 h-10 text-brand" />
-        <p className="font-medium">Bộ đề này hiện đang trống hoặc đang được cập nhật.</p>
+        <p className="font-medium">Bộ Flashcard này hiện đang trống hoặc đang được cập nhật.</p>
         <Button variant="brand-outline" asChild>
           <Link href="/dashboard">← Quay lại Dashboard</Link>
         </Button>

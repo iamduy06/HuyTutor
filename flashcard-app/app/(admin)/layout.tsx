@@ -11,7 +11,7 @@ const navItems = [
   { href: "/admin",               label: "Tổng quan",     icon: LayoutDashboard },
   { href: "/admin/users",         label: "Người dùng",    icon: Users           },
   { href: "/admin/subadmins",     label: "SubAdmin",      icon: Shield          },
-  { href: "/admin/decks",         label: "Bộ đề",         icon: BookOpen        },
+  { href: "/admin/decks",         label: "Flashcard",         icon: BookOpen        },
   { href: "/admin/devices",       label: "Thiết bị",      icon: Monitor         },
   { href: "/admin/analytics",     label: "Thống kê",      icon: BarChart3       },
   { href: "/admin/import-export", label: "Import/Export", icon: ArrowLeftRight  },

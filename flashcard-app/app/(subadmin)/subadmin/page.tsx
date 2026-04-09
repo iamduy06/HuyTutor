@@ -57,7 +57,7 @@ export default async function SubAdminPage() {
           🛡️ Sub Admin — {me.email}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {isAdmin ? "Bạn đang xem giao diện SubAdmin với quyền ADMIN đầy đủ." : "Quản lý người dùng và bộ đề trong phạm vi được cấp."}
+          {isAdmin ? "Bạn đang xem giao diện SubAdmin với quyền ADMIN đầy đủ." : "Quản lý người dùng và Flashcard trong phạm vi được cấp."}
         </p>
       </div>
 
@@ -92,7 +92,7 @@ export default async function SubAdminPage() {
             {(myDecks as any[])?.length ?? 0}
           </div>
           <div className="text-xs text-muted-foreground font-medium mt-1">
-            Bộ đề {isAdmin ? "trong hệ thống" : "của các nhóm"}
+            Flashcard {isAdmin ? "trong hệ thống" : "của các nhóm"}
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default async function SubAdminPage() {
           {/* My assigned decks preview */}
           {!isAdmin && (myDecks as any[])?.length > 0 && (
             <div className="p-3 rounded-xl border-2 border-[#f0e0e7]">
-              <div className="font-semibold text-sm text-[#1a1a2e] mb-2">📚 Bộ đề bạn được phân quyền:</div>
+              <div className="font-semibold text-sm text-[#1a1a2e] mb-2">📚 Flashcard bạn được phân quyền:</div>
               <div className="flex flex-wrap gap-1.5">
                 {(myDecks as any[]).map((ud: any) => (
                   <span key={ud.deck?.id ?? ud.id}

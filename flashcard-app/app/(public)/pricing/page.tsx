@@ -38,7 +38,7 @@ export default function PricingPage() {
           <ul className="price-features">
             <li className="check">Trọn bộ flashcard tất cả chủ đề</li>
             <li className="check">296 collocations + 1000+ cụm từ</li>
-            <li className="check">30+ bộ đề luyện tập</li>
+            <li className="check">30+ Bộ Flashcard luyện tập</li>
             <li className="check">Nghe phát âm không giới hạn</li>
           </ul>
           <Link

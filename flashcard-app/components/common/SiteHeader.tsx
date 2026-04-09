@@ -55,7 +55,7 @@ export function SiteHeader() {
             Báo giá
           </Link>
           <Link href="/decks" className="px-3 py-1.5 rounded-lg text-sm font-bold text-[#6b7280] hover:bg-[#fff0f4] hover:text-[#ed0046] transition-all">
-            Bộ đề
+            Flashcard
           </Link>
         </nav>
       </div>

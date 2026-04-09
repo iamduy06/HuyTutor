@@ -101,7 +101,7 @@ export default async function DashboardPage() {
       {totalDecks === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-[#f0e0e7] p-10 text-center">
           <div className="text-4xl mb-3">📚</div>
-          <h3 className="font-bold text-[#1a1a2e] mb-2">Bạn chưa có bộ đề nào</h3>
+          <h3 className="font-bold text-[#1a1a2e] mb-2">Bạn chưa có Flashcard nào</h3>
           <p className="text-muted-foreground text-sm mb-4">Liên hệ admin để được cấp quyền truy cập</p>
           <div className="flex gap-3 justify-center flex-wrap">
             <Button variant="brand" asChild><Link href={FACEBOOK_URL} target="_blank">💬 Liên hệ</Link></Button>
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <>
-          <h2 className="text-xl font-extrabold text-[#1a1a2e] mb-5">📖 Bộ đề của tôi</h2>
+          <h2 className="text-xl font-extrabold text-[#1a1a2e] mb-5">📖 Bộ Flashcard của tôi</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
             {/* ── Assigned decks ── */}

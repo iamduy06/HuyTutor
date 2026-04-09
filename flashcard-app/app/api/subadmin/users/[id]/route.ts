@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .maybeSingle();
 
     if (!groupDeck) {
-      return NextResponse.json({ error: "Bộ đề này không thuộc kho tài nguyên của nhóm" }, { status: 403 });
+      return NextResponse.json({ error: "Flashcard này không thuộc kho tài nguyên của nhóm" }, { status: 403 });
     }
 
     // Kiểm tra và validate expired_at không vượt quá hạn của nhóm

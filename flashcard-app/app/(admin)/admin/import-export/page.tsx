@@ -67,7 +67,7 @@ export default function ImportExportPage() {
   return (
     <div className="p-6 max-w-4xl">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">📦 Import / Export</h1>
-      <p className="text-muted-foreground text-sm mb-8">Quản lý người dùng và bộ đề hàng loạt bằng file JSON.</p>
+      <p className="text-muted-foreground text-sm mb-8">Quản lý người dùng và Flashcard hàng loạt bằng file JSON.</p>
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         {/* EXPORT */}
@@ -81,7 +81,7 @@ export default function ImportExportPage() {
               <FileJson className="w-4 h-4" /> Xuất người dùng (users.json)
             </Button>
             <Button variant="brand-outline" className="w-full justify-start gap-2" onClick={() => handleExport("decks")}>
-              <FileJson className="w-4 h-4" /> Xuất bộ đề (decks.json)
+              <FileJson className="w-4 h-4" /> Xuất Flashcard (decks.json)
             </Button>
             <Button variant="brand" className="w-full justify-start gap-2" onClick={() => handleExport("all")}>
               <Download className="w-4 h-4" /> Xuất tất cả

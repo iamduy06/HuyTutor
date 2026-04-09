@@ -183,7 +183,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
   if (!vocab) {
     return (
       <div className={cn("flex items-center justify-center py-20 text-muted-foreground", isKid && "kid-mode")}>
-        Không có từ vựng nào trong bộ đề này.
+        Không có từ vựng nào trong bộ Flashcard này.
       </div>
     );
   }

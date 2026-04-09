@@ -208,7 +208,7 @@ export default function AdminSubAdminsPage() {
       });
       if (!res.ok) throw new Error("Failed");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); toast({ title: "Đã thu hồi bộ đề cá nhân" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); toast({ title: "Đã thu hồi Flashcard cá nhân" }); },
   });
 
   const updateUserDeckProgress = useMutation({
@@ -276,7 +276,7 @@ export default function AdminSubAdminsPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-[#1a1a2e]">🏷️ Quản Lý Nhóm & SubAdmin</h1>
-          <p className="text-sm text-gray-500 mt-1">Quản lý thành viên, phân quyền bộ đề và tài khoản theo từng đơn vị nhóm.</p>
+          <p className="text-sm text-gray-500 mt-1">Quản lý thành viên, phân quyền Flashcard và tài khoản theo từng đơn vị nhóm.</p>
         </div>
         <div className="flex gap-3">
           <Input placeholder="🔍 Tìm nhóm hoặc email..." value={search} onChange={e=>setSearch(e.target.value)} className="w-72 bg-white" />
@@ -311,7 +311,7 @@ export default function AdminSubAdminsPage() {
                        Thành viên: <strong className="text-brand">{group.user_count}</strong> / {group.max_users}
                      </span>
                      <span className="bg-white px-2 py-0.5 rounded border">
-                       Bộ đề nhóm: <strong className="text-blue-600">{group.group_decks.length}</strong>
+                       Flashcard nhóm: <strong className="text-blue-600">{group.group_decks.length}</strong>
                      </span>
                    </div>
                 </div>
@@ -319,7 +319,7 @@ export default function AdminSubAdminsPage() {
 
               {/* Group Actions */}
               <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                <Button size="sm" variant="outline" className="h-9 gap-1.5" title="Quản lý bộ đề dùng chung toàn nhóm" 
+                <Button size="sm" variant="outline" className="h-9 gap-1.5" title="Quản lý Flashcard dùng chung toàn nhóm" 
                   onClick={() => { 
                     setSelectedGroupDecksIds(new Set()); 
                     setGroupDecksExpiry(""); 
@@ -355,7 +355,7 @@ export default function AdminSubAdminsPage() {
                          <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs uppercase text-gray-500">
                            <th className="px-4 py-3 font-semibold">User / Vai trò</th>
                            <th className="px-4 py-3 font-semibold text-center w-28">Thiết bị</th>
-                           <th className="px-4 py-3 font-semibold text-center w-32">Bộ đề cá nhân</th>
+                           <th className="px-4 py-3 font-semibold text-center w-32">Flashcard cá nhân</th>
                            <th className="px-4 py-3 font-semibold text-center w-[200px]">Thao tác User</th>
                          </tr>
                        </thead>
@@ -479,12 +479,12 @@ export default function AdminSubAdminsPage() {
         <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600"/> Tài nguyên Nhóm: {showGroupDecks?.name}</DialogTitle>
-            <p className="text-[11px] text-muted-foreground mt-1 uppercase font-bold tracking-tight">Kế thừa: Toàn bộ thành viên sẽ thấy các bộ đề này.</p>
+            <p className="text-[11px] text-muted-foreground mt-1 uppercase font-bold tracking-tight">Kế thừa: Toàn bộ thành viên sẽ thấy các Flashcard này.</p>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-6 pt-2 pr-1">
             <div className="space-y-2">
               <Label className="uppercase text-[10px] font-bold text-gray-400">Đề đang có trong nhóm</Label>
-              {!showGroupDecks?.group_decks.length ? <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">Chưa có bộ đề nào.</p> : (
+              {!showGroupDecks?.group_decks.length ? <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">Chưa có Flashcard nào.</p> : (
                 <div className="space-y-2">
                    {showGroupDecks.group_decks.map(gd => (
                      <div key={gd.deck_id} className="p-3 border rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-brand-light transition">
@@ -495,7 +495,7 @@ export default function AdminSubAdminsPage() {
                          <p className="text-[10px] font-semibold text-red-500 mt-1">{gd.expired_at ? `⏳ Hết hạn: ${new Date(gd.expired_at).toLocaleString()}` : "∞ Dùng vĩnh viễn"}</p>
                        </div>
                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0" title="Rút đề"
-                        onClick={() => { if(confirm("Gỡ bộ đề này khỏi nhóm?")) groupAction.mutate({ groupId: showGroupDecks.id, action: "revoke_group_deck", payload: { deck_id: gd.deck_id }})}}><Trash2 className="w-4 h-4"/></Button>
+                        onClick={() => { if(confirm("Gỡ Flashcard này khỏi nhóm?")) groupAction.mutate({ groupId: showGroupDecks.id, action: "revoke_group_deck", payload: { deck_id: gd.deck_id }})}}><Trash2 className="w-4 h-4"/></Button>
                      </div>
                    ))}
                 </div>
@@ -503,11 +503,11 @@ export default function AdminSubAdminsPage() {
             </div>
             
             <div className="pt-4 border-t space-y-4 bg-brand-light/30 p-4 rounded-xl border border-brand-light">
-              <Label className="text-brand font-bold uppercase text-xs tracking-wider">Giao nhiều bộ đề mới</Label>
+              <Label className="text-brand font-bold uppercase text-xs tracking-wider">Giao nhiều Flashcard mới</Label>
               
               <div className="max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y">
                  {decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).length === 0 ? (
-                   <p className="p-3 text-xs text-center text-gray-400 italic">Nhóm đã có tất cả các bộ đề.</p>
+                   <p className="p-3 text-xs text-center text-gray-400 italic">Nhóm đã có tất cả các Flashcard.</p>
                  ) : decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).map(d => {
                     const isSelected = selectedGroupDecksIds.has(d.id);
                     return (
@@ -547,7 +547,7 @@ export default function AdminSubAdminsPage() {
                   } 
                 })}>
                 {groupAction.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Giao {selectedGroupDecksIds.size} bộ đề đã chọn
+                Giao {selectedGroupDecksIds.size} Flashcard đã chọn
               </Button>
             </div>
           </div>
@@ -630,20 +630,20 @@ export default function AdminSubAdminsPage() {
       {/* 1. Manage User Decks (Specific user) */}
       <Dialog open={!!showingUserDecks} onOpenChange={() => setShowingUserDecks(null)}>
         <DialogContent className="max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
-          <DialogHeader><DialogTitle className="text-brand">Bộ đề cá nhân của: {showingUserDecks?.email}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-brand">Flashcard cá nhân của: {showingUserDecks?.email}</DialogTitle></DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             
             {/* Existing Decks */}
             <div>
-              <Label className="text-xs uppercase text-gray-500 font-bold tracking-wider mb-2 block">Các bộ đề đã cấp lẻ</Label>
+              <Label className="text-xs uppercase text-gray-500 font-bold tracking-wider mb-2 block">Các Flashcard đã cấp lẻ</Label>
               {!showingUserDecks?.user_decks?.length ? (
-                <div className="text-sm italic text-gray-500 border border-dashed border-gray-200 p-4 text-center rounded-lg bg-gray-50">Không có bộ đề cá nhân.</div>
+                <div className="text-sm italic text-gray-500 border border-dashed border-gray-200 p-4 text-center rounded-lg bg-gray-50">Không có Flashcard cá nhân.</div>
               ) : (
                 <div className="space-y-2">
                   {showingUserDecks.user_decks.map(ud => (
                     <UserDeckEditor key={ud.deck_id} ud={ud} 
                        onUpdate={(args) => updateUserDeckProgress.mutate({ userId: showingUserDecks.id, deckId: ud.deck_id, ...args })}
-                       onRevoke={() => { if(confirm("Thu hồi bộ đề này khỏi user?")) revokeUserDeck.mutate({ userId: showingUserDecks.id, deckId: ud.deck_id }) }}
+                       onRevoke={() => { if(confirm("Thu hồi Flashcard này khỏi user?")) revokeUserDeck.mutate({ userId: showingUserDecks.id, deckId: ud.deck_id }) }}
                     />
                   ))}
                 </div>
@@ -652,10 +652,10 @@ export default function AdminSubAdminsPage() {
 
             {/* Assign New */}
             <div className="bg-brand-light/30 border border-brand-light rounded-xl p-4 space-y-3">
-               <Label className="uppercase text-xs font-bold text-brand tracking-wider">Cấp thêm bộ đề mới</Label>
+               <Label className="uppercase text-xs font-bold text-brand tracking-wider">Cấp thêm Flashcard mới</Label>
                <div className="max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y">
                  {decks.filter(d => !showingUserDecks?.user_decks.some(ud => ud.deck_id === d.id)).length === 0 ? (
-                   <p className="p-3 text-xs text-gray-400 italic text-center">User đã có tất cả bộ đề trong hệ thống.</p>
+                   <p className="p-3 text-xs text-gray-400 italic text-center">User đã có tất cả Flashcard trong hệ thống.</p>
                  ) : decks.filter(d => !showingUserDecks?.user_decks.some(ud => ud.deck_id === d.id)).map(d => {
                     const checked = manageDecksIds.has(d.id);
                     return (
@@ -676,7 +676,7 @@ export default function AdminSubAdminsPage() {
                </div>
                <Button className="w-full" variant="brand" disabled={manageDecksIds.size === 0 || assignUserDeck.isPending}
                  onClick={() => assignUserDeck.mutate({ userId: showingUserDecks!.id, deckIds: Array.from(manageDecksIds), expiredAt: manageDecksExpiry })}>
-                 Giao {manageDecksIds.size} bộ đề đã chọn
+                 Giao {manageDecksIds.size} Flashcard đã chọn
                </Button>
             </div>
           </div>
@@ -764,7 +764,7 @@ export default function AdminSubAdminsPage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="p-3 bg-blue-50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-100">
-              Dịch chuyển người dùng sang một nhóm quản lý khác. Bạn có thể chọn giữ nguyên hoặc xóa các bộ đề cũ của họ.
+              Dịch chuyển người dùng sang một nhóm quản lý khác. Bạn có thể chọn giữ nguyên hoặc xóa các Flashcard cũ của họ.
             </div>
             <div>
               <Label className="text-xs font-bold uppercase text-gray-500">Chọn nhóm đích</Label>
@@ -785,7 +785,7 @@ export default function AdminSubAdminsPage() {
             </div>
             <div className="flex items-center gap-2 pt-2">
               <input type="checkbox" id="clear_decks" checked={clearDecksOnMove} onChange={e => setClearDecksOnMove(e.target.checked)} className="w-4 h-4 accent-red-500" />
-              <Label htmlFor="clear_decks" className="text-xs font-bold text-red-600 cursor-pointer">Xoá toàn bộ bộ đề cũ của User này sau khi chuyển</Label>
+              <Label htmlFor="clear_decks" className="text-xs font-bold text-red-600 cursor-pointer">Xoá toàn bộ Flashcard cũ của User này sau khi chuyển</Label>
             </div>
             <DialogFooter className="pt-4 border-t">
               <Button variant="outline" onClick={() => setShowMoveMember(null)}>Huỷ</Button>

@@ -32,9 +32,9 @@ export default async function AdminPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: "Tổng người dùng", value: totalUsers ?? 0, icon: <Users className="w-5 h-5" />, color: "text-blue-500", bg: "bg-blue-50" },
-          { label: "Bộ đề", value: totalDecks ?? 0, icon: <BookOpen className="w-5 h-5" />, color: "text-brand", bg: "bg-brand-light" },
+          { label: "Flashcard", value: totalDecks ?? 0, icon: <BookOpen className="w-5 h-5" />, color: "text-brand", bg: "bg-brand-light" },
           { label: "Tiến độ TB", value: `${avgProgress}%`, icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Lượt giao bộ đề", value: progressData?.length ?? 0, icon: <Award className="w-5 h-5" />, color: "text-purple-600", bg: "bg-purple-50" },
+          { label: "Lượt giao Flashcard", value: progressData?.length ?? 0, icon: <Award className="w-5 h-5" />, color: "text-purple-600", bg: "bg-purple-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5 flex flex-col gap-2">
             <div className={`w-10 h-10 rounded-xl ${s.bg} ${s.color} flex items-center justify-center`}>{s.icon}</div>
@@ -69,8 +69,8 @@ export default async function AdminPage() {
           <h2 className="font-bold text-[#1a1a2e] mb-4">Thao tác nhanh</h2>
           <div className="flex flex-col gap-3">
             {[
-              { href: "/admin/users", label: "➕ Tạo người dùng mới", desc: "Thêm tài khoản và giao bộ đề" },
-              { href: "/admin/decks", label: "📚 Quản lý bộ đề", desc: "Thêm, sửa, xóa deck và flashcard" },
+              { href: "/admin/users", label: "➕ Tạo người dùng mới", desc: "Thêm tài khoản và giao Flashcard" },
+              { href: "/admin/decks", label: "📚 Quản lý Flashcard", desc: "Thêm, sửa, xóa bộ và flashcard" },
               { href: "/admin/analytics", label: "📊 Xem thống kê chi tiết", desc: "Phân tích tiến độ học tập" },
             ].map((item) => (
               <Link key={item.href} href={item.href}
