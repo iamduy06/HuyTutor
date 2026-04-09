@@ -45,9 +45,6 @@ export function SiteHeader() {
       <div className="flex items-center gap-8">
         <Link href="/" className="flex items-center">
           <Logo height={34} />
-          <div className="hidden md:block ml-2.5 font-extrabold text-[#1a1a2e] text-[1.05em]">
-            Huy Tutor <span className="text-[#ed0046]">Flashcard</span>
-          </div>
         </Link>
         
         <nav className="hidden sm:flex items-center gap-1">
