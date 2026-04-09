@@ -42,9 +42,26 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-[5%] h-[62px] bg-white border-b-2 border-[#f0e0e7]">
-      <Link href="/" className="flex items-center">
-        <Logo height={40} />
-      </Link>
+      <div className="flex items-center gap-8">
+        <Link href="/" className="flex items-center">
+          <Logo height={34} />
+          <div className="hidden md:block ml-2.5 font-extrabold text-[#1a1a2e] text-[1.05em]">
+            Huy Tutor <span className="text-[#ed0046]">Flashcard</span>
+          </div>
+        </Link>
+        
+        <nav className="hidden sm:flex items-center gap-1">
+          <Link href="/" className="px-3 py-1.5 rounded-lg text-sm font-bold text-[#6b7280] hover:bg-[#fff0f4] hover:text-[#ed0046] transition-all">
+            Trang chủ
+          </Link>
+          <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-sm font-bold text-[#6b7280] hover:bg-[#fff0f4] hover:text-[#ed0046] transition-all">
+            Báo giá
+          </Link>
+          <Link href="/decks" className="px-3 py-1.5 rounded-lg text-sm font-bold text-[#6b7280] hover:bg-[#fff0f4] hover:text-[#ed0046] transition-all">
+            Bộ đề
+          </Link>
+        </nav>
+      </div>
 
       <div className="flex items-center gap-2">
         <UIModeToggle />

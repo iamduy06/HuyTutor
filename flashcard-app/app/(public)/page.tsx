@@ -1,109 +1,127 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Brain, TrendingUp, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { FACEBOOK_URL } from "@/lib/constants";
+import "./landing.css";
 
 export default function HomePage() {
   return (
     <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-white via-brand-light to-[#ffd6e4] py-20 px-[5%]">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-brand rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-48 h-48 bg-brand rounded-full blur-2xl" />
+      {/* HERO */}
+      <section className="hero">
+        <div className="hero-badge">✦ Hệ thống Flashcard chuyên biệt</div>
+        <h1>Học từ vựng tiếng Anh<br /><span>hiệu quả & thông minh</span></h1>
+        <p>Hàng nghìn flashcard phân loại theo chuẩn CEFR, có phát âm, ví dụ song ngữ và từ đồng/trái nghĩa — được biên soạn bởi Huy Tutor.</p>
+        <div className="hero-btns">
+          <Link href="/decks" className="btn-primary-custom text-center">Bắt đầu học ngay</Link>
+          <Link href="/pricing" className="btn-secondary-custom text-center">Xem báo giá</Link>
         </div>
-        <div className="relative max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white border border-brand-mid rounded-full px-4 py-1.5 text-sm font-semibold text-brand mb-6">
-            🎯 Học từ vựng thông minh hơn với Flashcard
+        <div className="stats">
+          <div className="stat">
+            <div className="stat-num">1000+</div>
+            <div className="stat-label">Cụm từ & Từ vựng</div>
           </div>
-          <h1 className="text-5xl md:text-6xl font-extrabold text-[#1a1a2e] leading-tight mb-6">
-            Nâng cao vốn từ vựng{" "}
-            <span className="text-brand">tiếng Anh</span>{" "}
-            của bạn
-          </h1>
-          <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-            Hệ thống Flashcard chuyên nghiệp với phát âm chuẩn, theo dõi tiến độ cá nhân hóa
-            và bộ đề từ B1 đến C2.
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Button variant="brand" size="lg" asChild className="rounded-full px-8 text-base font-bold shadow-lg">
-              <Link href="/decks">
-                Bắt đầu học <ArrowRight className="w-5 h-5" />
-              </Link>
-            </Button>
-            <Button variant="brand-outline" size="lg" asChild className="rounded-full px-8 text-base font-bold">
-              <Link href="/decks">
-                Xem bộ đề
-              </Link>
-            </Button>
-            <Button variant="brand-outline" size="lg" asChild className="rounded-full px-8 text-base font-bold border-2">
-              <Link href={FACEBOOK_URL} target="_blank">
-                💬 Liên hệ đăng ký mua bộ đề
-              </Link>
-            </Button>
+          <div className="stat">
+            <div className="stat-num">B1–C2</div>
+            <div className="stat-label">Phân cấp CEFR</div>
+          </div>
+          <div className="stat">
+            <div className="stat-num">90+</div>
+            <div className="stat-label">Bảng từ đề thi</div>
+          </div>
+          <div className="stat">
+            <div className="stat-num">100%</div>
+            <div className="stat-label">Chuẩn mực & Chi tiết</div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-20 px-[5%] bg-white">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-extrabold text-center text-[#1a1a2e] mb-4">
-            Tại sao chọn Huy Tutor Flashcard?
-          </h2>
-          <p className="text-center text-muted-foreground mb-12 text-lg">
-            Được thiết kế bởi giáo viên, dành cho người học thực sự
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                icon: <Brain className="w-7 h-7" />,
-                title: "Học thông minh",
-                desc: "Hệ thống Flashcard với flip card animation giúp ghi nhớ hiệu quả",
-              },
-              {
-                icon: <BookOpen className="w-7 h-7" />,
-                title: "Nội dung chất lượng",
-                desc: "Từ vựng được phân loại theo CEFR từ A1 đến C2 với ví dụ thực tế",
-              },
-              {
-                icon: <TrendingUp className="w-7 h-7" />,
-                title: "Theo dõi tiến độ",
-                desc: "Dashboard cá nhân hóa, streak hàng ngày và thống kê chi tiết",
-              },
-              {
-                icon: <Users className="w-7 h-7" />,
-                title: "Hỗ trợ tận tình",
-                desc: "Đội ngũ giáo viên hỗ trợ và cập nhật nội dung thường xuyên",
-              },
-            ].map((f) => (
-              <div key={f.title} className="p-6 rounded-2xl border-2 border-[#f0e0e7] hover:border-brand hover:shadow-md transition-all group">
-                <div className="w-12 h-12 rounded-xl bg-brand-light flex items-center justify-center text-brand mb-4 group-hover:bg-brand group-hover:text-white transition-all">
-                  {f.icon}
-                </div>
-                <h3 className="font-bold text-[#1a1a2e] mb-2">{f.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
+      {/* FEATURES */}
+      <section className="section">
+        <div className="text-center mb-0">
+          <div className="section-label">Tính năng nổi bật</div>
+          <div className="section-title">Thiết kế để bạn <span className="text-[--red]">học tốt hơn</span></div>
+        </div>
+        <div className="features-grid">
+          {[
+            { icon: "🎨", title: "Giao diện hiện đại", desc: "Thiết kế tối giản, dễ nhìn. Thẻ lật mượt mà, hoạt động tốt trên mọi thiết bị — máy tính, điện thoại, máy tính bảng." },
+            { icon: "🏷️", title: "Phân loại B1/B2/C1/C2", desc: "Từng thẻ được gắn nhãn cấp độ CEFR rõ ràng, giúp bạn tập trung đúng mục tiêu từ trung cấp đến nâng cao." },
+            { icon: "⚡", title: "Truy cập nhanh, không reload", desc: "Chuyển giữa các bộ từ vựng tức thì, không cần tải lại trang. Trải nghiệm học mượt mà, tiết kiệm thời gian." },
+            { icon: "🔊", title: "Nghe phát âm không giới hạn", desc: "Nhấn nút loa để nghe phát âm chuẩn tiếng Anh Mỹ bất kỳ lúc nào, không giới hạn số lần." },
+            { icon: "📋", title: "Bảng chọn từ nhanh", desc: "Thanh danh sách bên phải liệt kê toàn bộ từ trong bộ. Nhấn thẳng vào từ muốn học, không cần bấm thủ công từ đầu đến cuối." },
+            { icon: "🔢", title: "Nhảy đến thẻ theo số thứ tự", desc: "Nhập số thứ tự của thẻ vào ô tìm kiếm, hệ thống chuyển đến ngay lập tức — tiện lợi khi ôn tập có mục tiêu." },
+            { icon: "🔄", title: "Từ đồng nghĩa & trái nghĩa", desc: "Hầu hết từ đơn đều được bổ sung synonyms và antonyms, giúp mở rộng vốn từ và hiểu sắc thái ngôn ngữ sâu hơn." },
+            { icon: "💡", title: "Ví dụ song ngữ Anh–Việt", desc: "Mỗi thẻ có câu ví dụ thực tế và bản dịch tiếng Việt, giúp bạn hiểu rõ cách áp dụng từ/cụm từ trong ngữ cảnh." }
+          ].map((f, i) => (
+            <div key={i} className="feat-card">
+              <div className="feat-icon">{f.icon}</div>
+              <div className="feat-title">{f.title}</div>
+              <div className="feat-desc">{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CEFR */}
+      <section className="cefr-section">
+        <div className="text-center mb-0">
+          <div className="section-label">Phân loại trình độ</div>
+          <div className="section-title">Nội dung từ <span className="text-[--red]">B1 đến C2</span></div>
+          <p className="section-sub mx-auto text-center mt-2">Mỗi bộ flashcard được biên soạn với từ vựng phù hợp từng cấp độ theo khung năng lực CEFR châu Âu.</p>
+        </div>
+        <div className="cefr-grid">
+          <div className="cefr-card cefr-B1">
+            <div className="cefr-badge">B1</div>
+            <div className="cefr-name">Trung cấp</div>
+            <p className="cefr-desc text-muted-foreground">Từ vựng giao tiếp hàng ngày, nền tảng vững chắc cho kỳ thi</p>
+          </div>
+          <div className="cefr-card cefr-B2">
+            <div className="cefr-badge">B2</div>
+            <div className="cefr-name">Trung-Cao cấp</div>
+            <p className="cefr-desc text-muted-foreground">Từ học thuật, collocations phổ biến trong đề thi</p>
+          </div>
+          <div className="cefr-card cefr-C1">
+            <div className="cefr-badge">C1</div>
+            <div className="cefr-name">Cao cấp</div>
+            <p className="cefr-desc text-muted-foreground">Từ vựng chuyên sâu, phrasal verbs nâng cao</p>
+          </div>
+          <div className="cefr-card cefr-C2">
+            <div className="cefr-badge">C2</div>
+            <div className="cefr-name">Thành thạo</div>
+            <p className="cefr-desc text-muted-foreground">Ngữ pháp & từ vựng chuẩn học thuật, Olympic</p>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-16 px-[5%] bg-brand">
-        <div className="max-w-2xl mx-auto text-center text-white">
-          <h2 className="text-3xl font-extrabold mb-4">Sẵn sàng bắt đầu?</h2>
-          <p className="mb-8 opacity-90 text-lg">
-            Học thử miễn phí ngay hôm nay — không cần tài khoản
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Button size="lg" className="bg-white text-brand hover:bg-brand-light rounded-full px-8 font-bold" asChild>
-              <Link href="/decks">Xem bộ đề ngay</Link>
-            </Button>
-            <Button size="lg" className="bg-white text-brand hover:bg-brand-light border-2 border-white rounded-full px-8 font-bold" asChild>
-              <Link href={FACEBOOK_URL} target="_blank">Mua bộ đề đầy đủ</Link>
-            </Button>
-          </div>
+      {/* CONTENT LIST */}
+      <section className="content-section">
+        <div className="text-center">
+          <div className="section-label">Nội dung hiện có</div>
+          <div className="section-title">Kho tài liệu <span className="text-[--red]">phong phú</span></div>
+        </div>
+        <div className="content-list max-w-5xl mx-auto">
+          {[
+            "296 Collocations trọng tâm (cụm từ cố định)",
+            "25 chủ đề Phrasal Verbs (hơn 1.000 cụm từ)",
+            "Sổ tay từ vựng ôn tập tốt nghiệp — cơ bản đến nâng cao",
+            "30 đề chuẩn cấu trúc — ôn luyện nước rút",
+            "30 đề nâng cao (B2–C2)",
+            "30 đề cơ bản theo chủ đề (B1–B2)",
+            "30 đề thi thử ngôn ngữ Anh — ĐGNL BCA",
+            "Tuyển tập đề thi thử trường, sở tỉnh Bắc Ninh"
+          ].map((item, i) => (
+            <div key={i} className="content-item">
+              <div className="content-dot" />
+              <div className="content-item-text">{item}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA Final */}
+      <section className="py-20 px-[5%] text-center bg-white border-t border-[--border]">
+        <h2 className="text-3xl font-extrabold mb-4 text-[--text]">Sẵn sàng bắt đầu học?</h2>
+        <p className="text-[--muted] mb-10 max-w-xl mx-auto">Học thử ngay hôm nay để trải nghiệm phương pháp ghi nhớ từ vựng hiệu quả nhất cùng Huy Tutor.</p>
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Link href="/decks" className="btn-primary-custom text-center">Vào thư viện bộ đề</Link>
+          <Link href="/register" className="btn-secondary-custom text-center">Đăng ký tài khoản</Link>
         </div>
       </section>
     </div>
