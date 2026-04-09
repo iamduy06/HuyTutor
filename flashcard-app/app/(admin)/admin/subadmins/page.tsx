@@ -74,6 +74,9 @@ export default function AdminSubAdminsPage() {
 
   // Member Modals
   const [editingMember, setEditingMember] = useState<{ groupId: string, user: GroupMember } | null>(null);
+  const [showMoveMember, setShowMoveMember] = useState<{ groupId: string, user: GroupMember } | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<string>("none");
+  const [clearDecksOnMove, setClearDecksOnMove] = useState(false);
   
   // Custom Modals
   const [showingUserDecks, setShowingUserDecks] = useState<GroupMember | null>(null);
@@ -82,10 +85,11 @@ export default function AdminSubAdminsPage() {
   const [manageDecksExpiry, setManageDecksExpiry] = useState("");
   const [editMaxDevicesLocal, setEditMaxDevicesLocal] = useState("");
 
-  // Selectable states for dialogs
+  // Selectable states for Group Decks
+  const [selectedGroupDecksIds, setSelectedGroupDecksIds] = useState<Set<string>>(new Set());
+  const [groupDecksExpiry, setGroupDecksExpiry] = useState("");
+  const [assignAllUsers, setAssignAllUsers] = useState(false);
   const [selectedUserForGroup, setSelectedUserForGroup] = useState<string>("none");
-  const [selectedDeckForGroup, setSelectedDeckForGroup] = useState<string>("none");
-  const [deckExpiry, setDeckExpiry] = useState("");
 
   // Queries
   const { data, isLoading } = useQuery({
@@ -120,8 +124,31 @@ export default function AdminSubAdminsPage() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] });
       if (vars.action === "add_member") { setShowAddMember(null); setSelectedUserForGroup("none"); }
-      if (vars.action === "assign_group_deck") { setDeckExpiry(""); setSelectedDeckForGroup("none"); }
+      if (vars.action === "assign_group_deck") { 
+        setShowGroupDecks(null); 
+        setSelectedGroupDecksIds(new Set());
+        setGroupDecksExpiry("");
+        setAssignAllUsers(false);
+      }
       toast({ title: "Thành công" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const moveMember = useMutation({
+    mutationFn: async ({ currentGroupId, userId, targetGroupId, clearDecks }: { currentGroupId: string, userId: string, targetGroupId: string, clearDecks: boolean }) => {
+      const res = await fetch(`/api/admin/subadmins/groups/${currentGroupId}/actions`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "move_member", user_id: userId, target_group_id: targetGroupId, clear_decks: clearDecks }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Lỗi di chuyển");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] });
+      setShowMoveMember(null);
+      setTargetGroupId("none");
+      setClearDecksOnMove(false);
+      toast({ title: "Đã di chuyển thành viên sang nhóm mới" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -292,7 +319,13 @@ export default function AdminSubAdminsPage() {
 
               {/* Group Actions */}
               <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                <Button size="sm" variant="outline" className="h-9 gap-1.5" title="Quản lý bộ đề dùng chung toàn nhóm" onClick={() => { setDeckExpiry(""); setSelectedDeckForGroup("none"); setShowGroupDecks(group); }}>
+                <Button size="sm" variant="outline" className="h-9 gap-1.5" title="Quản lý bộ đề dùng chung toàn nhóm" 
+                  onClick={() => { 
+                    setSelectedGroupDecksIds(new Set()); 
+                    setGroupDecksExpiry(""); 
+                    setAssignAllUsers(false);
+                    setShowGroupDecks(group); 
+                  }}>
                   <BookOpen className="w-3.5 h-3.5" /> Quản lý Đề Nhóm
                 </Button>
                 <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => setShowAddMember(group)}>
@@ -364,13 +397,23 @@ export default function AdminSubAdminsPage() {
                              </td>
                              <td className="px-4 py-3">
                                <div className="flex gap-1.5 justify-center">
-                                 <Button size="icon" variant="ghost" className={`h-8 w-8 ${u.is_group_subadmin ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
-                                   title="Gán/Huỷ quyền SubAdmin cho Group" onClick={() => groupAction.mutate({ groupId: group.id, action: "toggle_subadmin", payload: { user_id: u.id, is_subadmin: !u.is_group_subadmin } })}>
+                                 <Button size="icon" variant="ghost" 
+                                   className={`h-8 w-8 transition-colors ${
+                                     u.is_group_subadmin 
+                                       ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                                       : "bg-green-100 text-green-600 hover:bg-green-200"
+                                   }`}
+                                   title={u.is_group_subadmin ? "Huỷ quyền SubAdmin cho Group" : "Gán quyền SubAdmin cho Group"}
+                                   onClick={() => groupAction.mutate({ groupId: group.id, action: "toggle_subadmin", payload: { user_id: u.id, is_subadmin: !u.is_group_subadmin } })}>
                                    <Shield className="w-4 h-4" />
                                  </Button>
-                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="Sửa thông tin cá nhân (Role/Max Devices)"
+                                 <Button size="icon" variant="ghost" className="h-8 w-8 bg-orange-50 text-orange-600 hover:bg-orange-100" title="Sửa thông tin cá nhân (Role/Max Devices)"
                                    onClick={() => setEditingMember({ groupId: group.id, user: u })}>
                                    <UserCog className="w-4 h-4" />
+                                 </Button>
+                                 <Button size="icon" variant="ghost" className="h-8 w-8 bg-blue-50 text-blue-600 hover:bg-blue-100" title="Chuyển sang nhóm khác"
+                                   onClick={() => { setShowMoveMember({ groupId: group.id, user: u }); setTargetGroupId("none"); setClearDecksOnMove(false); }}>
+                                   <ChevronRight className="w-4 h-4" />
                                  </Button>
                                  <div className="w-px bg-gray-200 mx-1"></div>
                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" title="Xoá vĩnh viễn User"
@@ -433,49 +476,79 @@ export default function AdminSubAdminsPage() {
       </Dialog>
 
       <Dialog open={!!showGroupDecks} onOpenChange={() => setShowGroupDecks(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Tài nguyên Nhóm: {showGroupDecks?.name}</DialogTitle>
-            <p className="text-xs text-muted-foreground mt-1">Toàn bộ thành viên trong nhóm sẽ có quyền truy cập chung vào các bộ đề này (không thể sửa cho từng người).</p>
+            <DialogTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600"/> Tài nguyên Nhóm: {showGroupDecks?.name}</DialogTitle>
+            <p className="text-[11px] text-muted-foreground mt-1 uppercase font-bold tracking-tight">Kế thừa: Toàn bộ thành viên sẽ thấy các bộ đề này.</p>
           </DialogHeader>
-          <div className="space-y-6 pt-2">
+          <div className="flex-1 overflow-y-auto space-y-6 pt-2 pr-1">
             <div className="space-y-2">
-              <Label className="uppercase text-xs font-bold text-gray-500 tracking-wider">Đề đã cấp cho nhóm</Label>
-              {!showGroupDecks?.group_decks.length ? <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">Chưa cấp bộ đề chung nào.</p> : (
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+              <Label className="uppercase text-[10px] font-bold text-gray-400">Đề đang có trong nhóm</Label>
+              {!showGroupDecks?.group_decks.length ? <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">Chưa có bộ đề nào.</p> : (
+                <div className="space-y-2">
                    {showGroupDecks.group_decks.map(gd => (
                      <div key={gd.deck_id} className="p-3 border rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-brand-light transition">
-                       <div>
-                         <p className="font-bold text-sm text-[#1a1a2e] flex items-center gap-2">
+                       <div className="min-w-0 flex-1">
+                         <p className="font-bold text-sm text-[#1a1a2e] truncate flex items-center gap-2">
                            <BookOpen className="w-3.5 h-3.5 text-brand" /> {gd.deck?.title}
                          </p>
                          <p className="text-[10px] font-semibold text-red-500 mt-1">{gd.expired_at ? `⏳ Hết hạn: ${new Date(gd.expired_at).toLocaleString()}` : "∞ Dùng vĩnh viễn"}</p>
                        </div>
-                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full" title="Rút đề"
-                        onClick={() => groupAction.mutate({ groupId: showGroupDecks.id, action: "revoke_group_deck", payload: { deck_id: gd.deck_id }})}><Trash2 className="w-4 h-4"/></Button>
+                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0" title="Rút đề"
+                        onClick={() => { if(confirm("Gỡ bộ đề này khỏi nhóm?")) groupAction.mutate({ groupId: showGroupDecks.id, action: "revoke_group_deck", payload: { deck_id: gd.deck_id }})}}><Trash2 className="w-4 h-4"/></Button>
                      </div>
                    ))}
                 </div>
               )}
             </div>
             
-            <div className="pt-4 border-t space-y-3 bg-brand-light/30 p-4 rounded-xl border border-brand-light">
-              <Label className="text-brand font-bold uppercase text-xs tracking-wider">Mở khoá thêm đề nhóm</Label>
-              <Select value={selectedDeckForGroup} onValueChange={setSelectedDeckForGroup}>
-                <SelectTrigger className="bg-white"><SelectValue placeholder="Chọn bộ đề" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- Chọn một bộ đề --</SelectItem>
-                  {decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div>
-                 <Label className="text-xs">Hết hạn (Tuỳ chọn)</Label>
-                 <Input type="datetime-local" value={deckExpiry} onChange={e=>setDeckExpiry(e.target.value)} className="mt-1 bg-white" />
+            <div className="pt-4 border-t space-y-4 bg-brand-light/30 p-4 rounded-xl border border-brand-light">
+              <Label className="text-brand font-bold uppercase text-xs tracking-wider">Giao nhiều bộ đề mới</Label>
+              
+              <div className="max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y">
+                 {decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).length === 0 ? (
+                   <p className="p-3 text-xs text-center text-gray-400 italic">Nhóm đã có tất cả các bộ đề.</p>
+                 ) : decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).map(d => {
+                    const isSelected = selectedGroupDecksIds.has(d.id);
+                    return (
+                      <label key={d.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors">
+                        <input type="checkbox" checked={isSelected} 
+                          onChange={e => {
+                            const next = new Set(selectedGroupDecksIds);
+                            if (e.target.checked) next.add(d.id); else next.delete(d.id);
+                            setSelectedGroupDecksIds(next);
+                          }} 
+                          className="w-4 h-4 accent-brand" />
+                        <span className={`text-sm ${isSelected ? "font-bold text-brand" : "text-gray-700"}`}>{d.title}</span>
+                      </label>
+                    );
+                 })}
               </div>
-              <Button variant="brand" className="w-full" disabled={selectedDeckForGroup === "none" || groupAction.isPending}
-                onClick={() => groupAction.mutate({ groupId: showGroupDecks!.id, action: "assign_group_deck", payload: { deck_id: selectedDeckForGroup, expired_at: deckExpiry } })}>Giao cho toàn nhóm</Button>
+
+              <div>
+                 <Label className="text-[10px] font-bold uppercase text-gray-500">Hết hạn (Tuỳ chọn)</Label>
+                 <Input type="datetime-local" value={groupDecksExpiry} onChange={e=>setGroupDecksExpiry(e.target.value)} className="mt-1 bg-white h-9" />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input type="checkbox" id="assign_all" checked={assignAllUsers} onChange={e=>setAssignAllUsers(e.target.checked)} className="w-4 h-4 accent-brand" />
+                <Label htmlFor="assign_all" className="text-xs font-bold text-[#1a1a2e] cursor-pointer">Tự động cấp quyền học cho tất cả user trong nhóm này</Label>
+              </div>
+
+              <Button variant="brand" className="w-full h-11 text-base font-bold" 
+                disabled={selectedGroupDecksIds.size === 0 || groupAction.isPending}
+                onClick={() => groupAction.mutate({ 
+                  groupId: showGroupDecks!.id, 
+                  action: "assign_group_deck", 
+                  payload: { 
+                    deck_ids: Array.from(selectedGroupDecksIds), 
+                    expired_at: groupDecksExpiry,
+                    assign_all_users: assignAllUsers
+                  } 
+                })}>
+                {groupAction.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Giao {selectedGroupDecksIds.size} bộ đề đã chọn
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -676,6 +749,56 @@ export default function AdminSubAdminsPage() {
             <DialogFooter className="border-t pt-3">
               <Button variant="brand" className="w-full" disabled={updateUserInfo.isPending}
                 onClick={() => updateUserInfo.mutate({ id: editingMember!.user.id, role: editingMember!.user.role, max_devices: editingMember!.user.max_devices || null })}>Lưu thay đổi</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 4. Move Member (Group Migration) */}
+      <Dialog open={!!showMoveMember} onOpenChange={() => setShowMoveMember(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <ChevronRight className="w-5 h-5"/> Chuyển nhóm: {showMoveMember?.user.email}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="p-3 bg-blue-50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-100">
+              Dịch chuyển người dùng sang một nhóm quản lý khác. Bạn có thể chọn giữ nguyên hoặc xóa các bộ đề cũ của họ.
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase text-gray-500">Chọn nhóm đích</Label>
+              <Select value={targetGroupId} onValueChange={setTargetGroupId}>
+                <SelectTrigger className="mt-1 bg-white">
+                  <SelectValue placeholder="-- Chọn nhóm mới --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Chọn nhóm --</SelectItem>
+                  {groups
+                    .filter(g => g.id !== showMoveMember?.groupId && !["SYSTEM_ADMIN_CREATED", "SYSTEM_REGISTERED"].includes(g.name))
+                    .map(g => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <input type="checkbox" id="clear_decks" checked={clearDecksOnMove} onChange={e => setClearDecksOnMove(e.target.checked)} className="w-4 h-4 accent-red-500" />
+              <Label htmlFor="clear_decks" className="text-xs font-bold text-red-600 cursor-pointer">Xoá toàn bộ bộ đề cũ của User này sau khi chuyển</Label>
+            </div>
+            <DialogFooter className="pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowMoveMember(null)}>Huỷ</Button>
+              <Button variant="brand" disabled={targetGroupId === "none" || moveMember.isPending}
+                onClick={() => moveMember.mutate({ 
+                  currentGroupId: showMoveMember!.groupId, 
+                  userId: showMoveMember!.user.id, 
+                  targetGroupId, 
+                  clearDecks: clearDecksOnMove 
+                })}>
+                {moveMember.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Xác nhận Chuyển
+              </Button>
             </DialogFooter>
           </div>
         </DialogContent>
