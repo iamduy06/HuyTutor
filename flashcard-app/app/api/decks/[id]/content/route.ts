@@ -14,7 +14,7 @@ export async function GET(
   // 1. Lấy thông tin deck
   const { data: deck } = await adminSupabase
     .from("decks")
-    .select("access_level")
+    .select("id, title, description, access_level, preview_word_limit")
     .eq("id", params.id)
     .single();
 
@@ -54,5 +54,14 @@ export async function GET(
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
-  return NextResponse.json({ tabs: allTabs, isFull: true });
+  return NextResponse.json({ 
+    deck: {
+      id: deck.id,
+      title: deck.title,
+      description: deck.description
+    },
+    tabs: allTabs, 
+    isDemo: false,
+    totalWords: allTabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0)
+  });
 }
