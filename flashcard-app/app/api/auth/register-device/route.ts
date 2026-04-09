@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     .from("user_devices").select("*", { count: "exact", head: true }).eq("user_id", user.id);
 
   if ((count ?? 0) >= maxDevices) {
+    console.warn(`[AUTH] Device enrollment blocked for user ${user.id}: max ${maxDevices} reached.`);
     return NextResponse.json({
       allowed: false,
       message: `Tài khoản đã đạt giới hạn ${maxDevices} thiết bị.`,

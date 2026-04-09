@@ -50,7 +50,6 @@ export default function RegisterPage() {
     // Supabase trả session=null khi email confirm bắt buộc
     // Nếu có session ngay → auto-confirmed (dev mode) → vào dashboard
     if (data.session) {
-      await supabase.from("users").upsert({ id: data.user!.id, email, role: "USER" });
       window.location.href = "/dashboard";
       return;
     }

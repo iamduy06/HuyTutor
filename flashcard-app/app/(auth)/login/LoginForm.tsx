@@ -39,21 +39,32 @@ export function LoginForm() {
     }
 
     // Kiểm tra giới hạn thiết bị
-    const deviceCheck = await fetch("/api/auth/register-device", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        device_id:   getDeviceId(),
-        device_name: getDeviceName(),
-      }),
-    });
-    const deviceResult = await deviceCheck.json();
+    try {
+      const deviceCheck = await fetch("/api/auth/register-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          device_id:   getDeviceId(),
+          device_name: getDeviceName(),
+        }),
+      });
 
-    if (!deviceResult.allowed) {
-      // Sign out ngay, không cho vào
-      await supabase.auth.signOut();
-      setBlocked({ message: deviceResult.message, contactUrl: deviceResult.contactUrl });
-      setLoading(false); return;
+      if (!deviceCheck.ok) {
+        throw new Error("API check thiết bị không phản hồi");
+      }
+
+      const deviceResult = await deviceCheck.json();
+
+      if (!deviceResult.allowed) {
+        // Sign out ngay, không cho vào
+        await supabase.auth.signOut();
+        setBlocked({ message: deviceResult.message, contactUrl: deviceResult.contactUrl });
+        setLoading(false); return;
+      }
+    } catch (err: any) {
+      console.error("[DEVICE_CHECK_ERROR]", err);
+      // Nếu API lỗi, tạm thời cho qua hoặc báo lỗi nhẹ tùy chính sách, 
+      // ở đây ta chọn cho qua để không chặn user đăng nhập nếu server device check gặp sự cố nhỏ.
     }
 
     toast({ title: "Đăng nhập thành công 🎉" });

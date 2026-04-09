@@ -28,17 +28,35 @@ export function ResetPasswordForm() {
   const router    = useRouter();
   const { toast } = useToast();
 
-  // Kiểm tra xem Supabase đã exchange token từ URL hash chưa
+  // Kiểm tra session và lắng nghe sự kiện PASSWORD_RECOVERY
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setTokenOk(!!data.session);
+    
+    // 1. Kiểm tra session hiện tại
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setTokenOk(true);
+      } else {
+        // Nếu chưa có session, đợi 1 chút (tránh race condition với hash fragment)
+        setTimeout(async () => {
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (retrySession) setTokenOk(true);
+          else if (tokenOk === null) setTokenOk(false);
+        }, 1500);
+      }
     });
 
-    // Lắng nghe sự kiện PASSWORD_RECOVERY từ Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setTokenOk(true);
+    // 2. Lắng nghe sự kiện từ Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AUTH EVENT]", event);
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        if (session) setTokenOk(true);
+      }
+      if (event === "SIGNED_OUT") {
+        // Không làm gì, để form Handle
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
