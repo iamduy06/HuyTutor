@@ -251,19 +251,24 @@
   text-align: center;
 }
 .pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 24px;
   padding: 0 5% 70px;
-  max-width: 960px;
+  max-width: 1300px;
   margin: 0 auto;
 }
 .price-card {
+  flex: 1 1 280px;
+  max-width: 300px;
   background: #fff;
   border: 2px solid var(--border);
   border-radius: 20px;
   padding: 32px 28px;
   transition: all 0.25s;
+  display: flex;
+  flex-direction: column;
 }
 .price-card.featured {
   border-color: var(--red);

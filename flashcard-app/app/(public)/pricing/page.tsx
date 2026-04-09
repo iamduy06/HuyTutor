@@ -27,7 +27,7 @@ export default function PricingPage() {
         <h2 className="text-[1.05em] font-bold text-[--text] mb-5">Truy cập trọn bộ flashcard với gói đăng ký</h2>
       </div>
 
-      <div className="pricing-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 max-w-[1100px]">
+      <div className="pricing-grid">
         {/* 6 MONTHS */}
         <div className="price-card">
           <div className="price-tier">Cá nhân</div>
@@ -41,8 +41,8 @@ export default function PricingPage() {
             <li className="check">30+ bộ đề luyện tập</li>
             <li className="check">Nghe phát âm không giới hạn</li>
           </ul>
-          <Link 
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform" 
+          <Link
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
             target="_blank"
             className="btn-price outline"
           >
@@ -63,8 +63,8 @@ export default function PricingPage() {
             <li className="check">Đồng hành suốt năm học</li>
             <li className="check">Cập nhật nội dung mới liên tục</li>
           </ul>
-          <Link 
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform" 
+          <Link
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
             target="_blank"
             className="btn-price outline"
           >
@@ -85,8 +85,8 @@ export default function PricingPage() {
             <li className="check">Tiết kiệm 25% so với mua lẻ</li>
             <li className="check">Hỗ trợ kỹ thuật 24/7</li>
           </ul>
-          <Link 
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform" 
+          <Link
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
             target="_blank"
             className="btn-price solid"
           >
@@ -107,8 +107,8 @@ export default function PricingPage() {
             <li className="check">Không lo gián đoạn ôn thi</li>
             <li className="check">Ưu tiên trải nghiệm tính năng mới</li>
           </ul>
-          <Link 
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform" 
+          <Link
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
             target="_blank"
             className="btn-price outline"
           >
@@ -119,11 +119,11 @@ export default function PricingPage() {
 
       {/* DETAILED TABLES */}
       <div className="group-section max-w-[1000px] mx-auto w-full">
-        
+
         {/* SECTION A */}
         <div className="mb-12">
           <h2 className="text-2xl font-black text-[--red] mb-6 border-l-4 border-[--red] pl-4">A. SỬ DỤNG TOÀN BỘ HỆ THỐNG</h2>
-          
+
           {/* I. ĐĂNG KÝ CÁ NHÂN */}
           <h3 className="group-title">I. ĐĂNG KÝ CÁ NHÂN (1 TÀI KHOẢN)</h3>
           <div className="table-wrap mb-10">
