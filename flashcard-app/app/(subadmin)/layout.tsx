@@ -23,7 +23,7 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
   if (profile?.role === "ADMIN") {
     // Admin bypass subadmin check
   } else if (profile?.role === "SUBADMIN") {
-    const { data: groupSub } = await supabase
+    const { data: groupSub, error: groupErr } = await supabase
       .from("group_users")
       .select("id")
       .eq("user_id", user.id)
@@ -31,8 +31,8 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
       .limit(1)
       .maybeSingle();
 
-    if (!groupSub) {
-      console.warn("[SUBADMIN_LAYOUT] User has SUBADMIN role but no group permission. Redirecting.");
+    if (groupErr || !groupSub) {
+      console.warn("[SUBADMIN_LAYOUT] Fail:", groupErr?.message, !!groupSub);
       redirect("/dashboard");
     }
   } else {

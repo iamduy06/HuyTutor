@@ -72,19 +72,29 @@ export async function middleware(request: NextRequest) {
     }
     
     // Check role SUBADMIN/ADMIN và is_subadmin trong group_users
-    const { data: profile } = await supabase
+    const { data: profile, error: profileErr } = await supabase
       .from("users").select("role").eq("id", user.id).single();
+
+    console.log("[MIDDLEWARE] Subadmin route check:", {
+      role: profile?.role,
+      profileErr
+    });
 
     if (profile?.role === "ADMIN") {
       // Admin bypass subadmin check
     } else if (profile?.role === "SUBADMIN") {
-      const { data: groupSub } = await supabase
+      const { data: groupSub, error: groupErr } = await supabase
         .from("group_users")
         .select("id")
         .eq("user_id", user.id)
         .eq("is_subadmin", true)
         .limit(1)
         .maybeSingle();
+      
+      console.log("[MIDDLEWARE] Subadmin group check:", {
+        hasGroup: !!groupSub,
+        groupErr
+      });
       
       if (!groupSub) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
