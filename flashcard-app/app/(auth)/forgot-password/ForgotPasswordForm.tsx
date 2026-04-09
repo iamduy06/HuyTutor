@@ -45,17 +45,25 @@ export function ForgotPasswordForm() {
         <div className="flex justify-center mb-4">
           <CheckCircle className="w-14 h-14 text-green-500" />
         </div>
-        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">Email đã được gửi!</h1>
+        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">Kiểm tra Email!</h1>
         <p className="text-muted-foreground text-sm mb-2">
-          Chúng tôi đã gửi link đặt lại mật khẩu đến:
+          Chúng tôi đã gửi mã xác thực (OTP) tới:
         </p>
         <p className="font-semibold text-brand mb-6">{email}</p>
         <p className="text-muted-foreground text-xs mb-6">
-          Kiểm tra hộp thư đến (và thư mục spam). Link có hiệu lực trong <strong>1 giờ</strong>.
+          Vui lòng nhập mã OTP 6 số vào trang đặt lại mật khẩu để tiếp tục. 
+          Mã có hiệu lực trong <strong>1 giờ</strong>.
         </p>
-        <Button variant="brand-outline" className="w-full rounded-full" onClick={() => { setEmail(""); setSent(false); }}>
-          Gửi lại email khác
-        </Button>
+        <div className="space-y-3">
+          <Button variant="brand" className="w-full rounded-full" asChild>
+            <Link href={`/reset-password?email=${encodeURIComponent(email)}`}>
+              Nhập mã xác thực →
+            </Link>
+          </Button>
+          <Button variant="ghost" className="w-full rounded-full text-xs" onClick={() => { setEmail(""); setSent(false); }}>
+            Gửi lại mã khác
+          </Button>
+        </div>
         <p className="text-center text-sm text-muted-foreground mt-4">
           <Link href="/login" className="text-brand font-semibold hover:underline flex items-center justify-center gap-1">
             <ArrowLeft className="w-3 h-3" /> Quay lại đăng nhập
@@ -69,7 +77,7 @@ export function ForgotPasswordForm() {
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Quên mật khẩu?</h1>
       <p className="text-muted-foreground text-sm mb-6">
-        Nhập email của bạn — chúng tôi sẽ gửi link đặt lại mật khẩu.
+        Nhập email của bạn — chúng tôi sẽ gửi mã OTP đặt lại mật khẩu.
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -83,7 +91,7 @@ export function ForgotPasswordForm() {
         </div>
         <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          Gửi link đặt lại mật khẩu
+          Gửi mã OTP xác thực
         </Button>
       </form>
 
