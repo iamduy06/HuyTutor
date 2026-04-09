@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,33 +10,34 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
-  const [email,       setEmail]       = useState("");
-  const [password,    setPassword]    = useState("");
-  const [confirm,     setConfirm]     = useState("");
-  const [showPw,      setShowPw]      = useState(false);
-  const [loading,     setLoading]     = useState(false);
-  const [registered,  setRegistered]  = useState(false); // show confirm screen
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [otp, setOtp] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"form" | "verify">("form");
   const { toast } = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      toast({ title: "Mật khẩu không khớp", variant: "destructive" }); return;
+      toast({ title: "Mật khẩu không khớp", variant: "destructive" });
+      return;
     }
     if (password.length < 6) {
-      toast({ title: "Mật khẩu ít nhất 6 ký tự", variant: "destructive" }); return;
+      toast({ title: "Mật khẩu ít nhất 6 ký tự", variant: "destructive" });
+      return;
     }
     setLoading(true);
     const supabase = createClient();
-
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        // Sau khi click link xác nhận → về /login
-        emailRedirectTo: `${origin}/login`,
+        // Mặc định Supabase sẽ gửi mã OTP nếu template được cấu hình đúng
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
 
@@ -47,49 +48,88 @@ export default function RegisterPage() {
       return;
     }
 
-    // Supabase trả session=null khi email confirm bắt buộc
-    // Nếu có session ngay → auto-confirmed (dev mode) → vào dashboard
+    // Nếu có session ngay (email confirm off) -> vào dashboard
     if (data.session) {
       window.location.href = "/dashboard";
       return;
     }
 
-    // Email confirm required → hiện màn xác nhận
-    setRegistered(true);
+    // Chuyển sang bước xác thực OTP
+    setStep("verify");
+    toast({ title: "Vui lòng kiểm tra mã OTP trong email! 📬" });
   }
 
-  // ── Màn xác nhận email ──────────────────────────────────────────
-  if (registered) {
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!otp || otp.length < 6) {
+      toast({ title: "Vui lòng nhập mã OTP 6 số", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: "signup",
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast({
+        title: "Xác thực thất bại",
+        description: error.message === "Token has expired or is invalid" 
+          ? "Mã OTP không chính xác hoặc đã hết hạn." 
+          : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Đăng ký và xác thực thành công! 🎉" });
+    window.location.href = "/dashboard";
+  }
+
+  // ── Bước 2: Xác thực OTP ──────────────────────────────────────────
+  if (step === "verify") {
     return (
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center">
         <div className="w-16 h-16 bg-brand-light rounded-full flex items-center justify-center mx-auto mb-5">
-          <Mail className="w-8 h-8 text-brand" />
+          <ShieldCheck className="w-8 h-8 text-brand" />
         </div>
-        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">Kiểm tra email!</h1>
+        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-2">Xác thực tài khoản</h1>
         <p className="text-muted-foreground text-sm mb-1">
-          Chúng tôi đã gửi email xác nhận tới:
+          Chúng tôi đã gửi mã OTP 6 số tới:
         </p>
-        <p className="font-bold text-brand text-base mb-5">{email}</p>
-        <div className="bg-[#f8f9fa] border border-[#f0e0e7] rounded-xl p-4 text-sm text-[#495057] text-left mb-6 space-y-2">
-          <p>📬 Mở email và nhấn <strong>Confirm your email</strong></p>
-          <p>🔗 Link xác nhận sẽ đưa bạn tới trang đăng nhập</p>
-          <p>⚠️ Nếu không thấy, hãy kiểm tra thư mục <strong>Spam/Junk</strong></p>
-        </div>
-        <Button variant="brand" className="w-full rounded-full" asChild>
-          <Link href="/login">Đi đến trang đăng nhập →</Link>
-        </Button>
-        <p className="text-xs text-muted-foreground mt-4">
+        <p className="font-bold text-brand text-base mb-6">{email}</p>
+
+        <form onSubmit={handleVerifyOtp} className="space-y-4">
+          <div className="space-y-2 text-left">
+            <Label htmlFor="otp">Mã xác thực 6 số</Label>
+            <Input id="otp" type="text" placeholder="------" required maxLength={6}
+              value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="text-center text-lg tracking-[0.5em] font-bold h-12" />
+          </div>
+
+          <Button type="submit" variant="brand" className="w-full rounded-full" disabled={loading}>
+            {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            Xác nhận và Hoàn tất
+          </Button>
+        </form>
+
+        <p className="text-xs text-muted-foreground mt-6">
           Nhập sai email?{" "}
-          <button onClick={() => setRegistered(false)}
+          <button onClick={() => setStep("form")}
             className="text-brand font-semibold hover:underline">
-            Đăng ký lại
+            Quay lại đăng ký
           </button>
         </p>
       </div>
     );
   }
 
-  // ── Form đăng ký ────────────────────────────────────────────────
+  // ── Bước 1: Form đăng ký ────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Đăng ký</h1>
@@ -118,8 +158,8 @@ export default function RegisterPage() {
             value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="••••••••" />
         </div>
         <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          Đăng ký
+          {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+          Đăng ký ngay
         </Button>
       </form>
       <p className="text-center text-sm text-muted-foreground mt-6">
