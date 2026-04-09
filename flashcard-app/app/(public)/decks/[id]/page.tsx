@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/services/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { FACEBOOK_URL } from "@/lib/constants";
-import { hasFullAccess, extractTabs } from "@/lib/utils";
+import { getDeckAccess, extractTabs } from "@/lib/utils";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
 import { Button } from "@/components/ui/button";
 import type { Tab, FlashcardRow } from "@/types";
@@ -23,28 +23,28 @@ export default async function DeckDetailPage({ params }: Props) {
 
   if (!deck) notFound();
 
-  // 2. Determine Access
-  let fullAccess = deck.access_level === "public";
+  // 2. Determine Access using unified logic
   const { data: { user } } = await supabase.auth.getUser();
+  const { data: userProfile } = user 
+    ? await adminSupabase.from("users").select("role").eq("id", user.id).single()
+    : { data: null };
 
-  if (!fullAccess && user) {
-    const { data: userDeck } = await adminSupabase
-      .from("user_decks")
-      .select("expired_at")
-      .eq("user_id", user.id)
-      .eq("deck_id", params.id)
-      .maybeSingle();
+  const { data: userDeck } = user
+    ? await adminSupabase
+        .from("user_decks")
+        .select("expired_at")
+        .eq("user_id", user.id)
+        .eq("deck_id", params.id)
+        .maybeSingle()
+    : { data: null };
 
-    if (userDeck && hasFullAccess(userDeck.expired_at)) {
-      fullAccess = true;
-    }
-  }
+  const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
-  // 3. Fetch Content (Implementation of Step 2 logic)
+  // 3. Fetch Content based on access
   let tabs: Tab[] = [];
   let isPreview = false;
 
-  if (fullAccess) {
+  if (access.canLearnFull) {
     const { data: rows } = await adminSupabase
       .from("flashcards")
       .select("content, created_at")
@@ -52,9 +52,8 @@ export default async function DeckDetailPage({ params }: Props) {
       .order("created_at", { ascending: true });
     
     tabs = (rows ?? []).flatMap(r => extractTabs((r as unknown as FlashcardRow).content));
-  } else if (deck.access_level === "preview") {
-    // Logic equivalent to calling /api/decks/[id]/preview
-    const limit = deck.preview_word_limit || 10;
+  } else if (access.isPreview) {
+    const limit = access.previewLimit || 10;
     const { data: rows } = await adminSupabase
       .from("flashcards")
       .select("content, created_at")
@@ -72,7 +71,7 @@ export default async function DeckDetailPage({ params }: Props) {
     }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
     isPreview = true;
   } else {
-    // authenticated or authorized without access -> unauthorized message or redirect
+    // No access at all (authorized or authenticated/not-logged-in)
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center">
         <div className="text-6xl mb-6">🔒</div>
@@ -104,7 +103,7 @@ export default async function DeckDetailPage({ params }: Props) {
         deckTitle={deck.title}
         deckDesc={deck.description ?? undefined}
         isDemo={isPreview}
-        deckId={fullAccess ? deck.id : undefined}
+        deckId={access.canLearnFull ? deck.id : undefined}
       />
     </div>
   );

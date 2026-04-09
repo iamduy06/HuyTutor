@@ -50,11 +50,26 @@ export function Workspace({ deckId }: WorkspaceProps) {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !data.deck) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-20 gap-4 text-muted-foreground">
         <AlertCircle className="w-10 h-10 text-destructive" />
-        <p className="font-medium">{error?.message ?? "Không thể tải bộ đề."}</p>
+        <p className="font-medium">{error?.message ?? "Không tìm thấy bộ đề hoặc bạn không có quyền truy cập."}</p>
+        <Button variant="brand-outline" asChild>
+          <Link href="/dashboard">← Quay lại Dashboard</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Dự phòng nếu tabs bị undefined/null
+  const tabs = data.tabs ?? [];
+
+  if (tabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-20 gap-4 text-muted-foreground">
+        <AlertCircle className="w-10 h-10 text-brand" />
+        <p className="font-medium">Bộ đề này hiện đang trống hoặc đang được cập nhật.</p>
         <Button variant="brand-outline" asChild>
           <Link href="/dashboard">← Quay lại Dashboard</Link>
         </Button>
@@ -65,7 +80,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
   return (
     <FlashcardPlayer
       deckId={deckId}
-      tabs={data.tabs}
+      tabs={tabs}
       deckTitle={data.deck.title}
       deckDesc={data.deck.description ?? undefined}
       isDemo={data.isDemo}

@@ -9,16 +9,15 @@ export async function GET(
 ) {
   const adminSupabase = createAdminClient();
 
-  // 1. Lấy thông tin deck để biết level và limit
-  const { data: deck } = await adminSupabase
+  // 1. Lấy thông tin deck và giới hạn preview
+  const { data: deck, error: deckError } = await adminSupabase
     .from("decks")
-    .select("access_level, preview_word_limit")
+    .select("id, preview_word_limit")
     .eq("id", params.id)
     .single();
 
-  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (deck.access_level !== "preview") {
-    return NextResponse.json({ error: "This deck does not support preview" }, { status: 403 });
+  if (deckError || !deck) {
+    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
   }
 
   const limit = deck.preview_word_limit || 10;
@@ -34,15 +33,28 @@ export async function GET(
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
-  // 3. Cắt nội dung tại backend
-  let seen = 0;
-  const previewTabs = allTabs.map(tab => {
-    const remaining = limit - seen;
-    if (remaining <= 0) return null;
-    const vocab = (tab.vocabulary ?? []).slice(0, remaining);
-    seen += vocab.length;
-    return { ...tab, vocabulary: vocab };
-  }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
+  // 3. Slice vobabulary dựa trên giới hạn preview
+  let count = 0;
+  const slicedTabs: Tab[] = [];
 
-  return NextResponse.json({ tabs: previewTabs, isPreview: true });
+  for (const tab of allTabs) {
+    if (count >= limit) break;
+    
+    const remaining = limit - count;
+    const items = tab.vocabulary.slice(0, remaining);
+    
+    slicedTabs.push({
+      ...tab,
+      vocabulary: items
+    });
+    
+    count += items.length;
+  }
+
+  return NextResponse.json({ 
+    tabs: slicedTabs, 
+    isFull: false, 
+    previewLimit: limit,
+    totalActualWords: allTabs.reduce((s, t) => s + t.vocabulary.length, 0)
+  });
 }

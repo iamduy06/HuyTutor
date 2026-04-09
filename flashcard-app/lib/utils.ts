@@ -43,6 +43,72 @@ export function hasFullAccess(expiredAt: string | null | undefined): boolean {
   return !isExpired(expiredAt);               // null → false → !false = true ✓
 }
 
+export interface DeckAccess {
+  canView: boolean;
+  canLearnFull: boolean;
+  isPreview: boolean;
+  previewLimit: number | null;
+}
+
+/**
+ * Hàm kiểm tra quyền truy cập bộ đề trung tâm
+ */
+export function getDeckAccess(
+  user: { role: string } | null,
+  deck: { access_level: string; preview_word_limit?: number },
+  userDeck: { expired_at: string | null } | null
+): DeckAccess {
+  // Admin có toàn quyền
+  if (user?.role === "ADMIN") {
+    return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
+  }
+
+  const { access_level, preview_word_limit } = deck;
+  const hasAssignment = userDeck !== null && !isExpired(userDeck.expired_at);
+
+  // 3.1. PUBLIC
+  if (access_level === "public") {
+    return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
+  }
+
+  // 3.2. AUTHENTICATED
+  if (access_level === "authenticated") {
+    const isLoggedIn = user !== null;
+    return {
+      canView: isLoggedIn,
+      canLearnFull: isLoggedIn,
+      isPreview: false,
+      previewLimit: null
+    };
+  }
+
+  // 3.3. AUTHORIZED
+  if (access_level === "authorized") {
+    return {
+      canView: hasAssignment,
+      canLearnFull: hasAssignment,
+      isPreview: false,
+      previewLimit: null
+    };
+  }
+
+  // 3.4. PREVIEW
+  if (access_level === "preview") {
+    if (hasAssignment) {
+      return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
+    }
+    return {
+      canView: true,
+      canLearnFull: false,
+      isPreview: true,
+      previewLimit: preview_word_limit ?? 10
+    };
+  }
+
+  // Mặc định: Từ chối
+  return { canView: false, canLearnFull: false, isPreview: false, previewLimit: null };
+}
+
 export function getCefrColor(cefr: string): string {
   const map: Record<string, string> = {
     A1: "bg-green-100 text-green-800",
