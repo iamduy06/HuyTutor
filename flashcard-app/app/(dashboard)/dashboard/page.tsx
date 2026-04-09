@@ -196,7 +196,9 @@ function DeckCard({
         </h3>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           {isFree
-            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">🌐 {accessLevel}</span>
+            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
+                🌐 {accessLevel === "public" ? "Miễn phí" : accessLevel === "authenticated" ? "Thành viên" : accessLevel}
+              </span>
             : <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                 {active ? "Còn hạn" : "Hết hạn"}
               </span>
