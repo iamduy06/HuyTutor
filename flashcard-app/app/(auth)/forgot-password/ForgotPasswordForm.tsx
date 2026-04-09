@@ -52,7 +52,7 @@ export function ForgotPasswordForm() {
         <p className="font-semibold text-brand mb-6">{email}</p>
         <p className="text-muted-foreground text-xs mb-6">
           Vui lòng nhập mã OTP 6 số vào trang đặt lại mật khẩu để tiếp tục. 
-          Mã có hiệu lực trong <strong>1 giờ</strong>.
+          Mã có hiệu lực trong <strong>5 phút</strong>.
         </p>
         <div className="space-y-3">
           <Button variant="brand" className="w-full rounded-full" asChild>

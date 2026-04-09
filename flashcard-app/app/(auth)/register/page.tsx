@@ -102,7 +102,10 @@ export default function RegisterPage() {
         <p className="text-muted-foreground text-sm mb-1">
           Chúng tôi đã gửi mã OTP 6 số tới:
         </p>
-        <p className="font-bold text-brand text-base mb-6">{email}</p>
+        <p className="font-bold text-brand text-base mb-2">{email}</p>
+        <p className="text-muted-foreground text-[10px] mb-6 italic">
+          Mã có hiệu lực trong <strong>5 phút</strong>.
+        </p>
 
         <form onSubmit={handleVerifyOtp} className="space-y-4">
           <div className="space-y-2 text-left">
