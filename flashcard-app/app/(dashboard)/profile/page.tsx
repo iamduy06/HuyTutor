@@ -8,14 +8,24 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
+import { useSubadmin } from "@/hooks/use-subadmin";
 import { formatDate } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { user, loading } = useUser();
+  const { isSystemAdmin, isSystemSubadmin, isGroupActive, effectiveRoleLabel } = useSubadmin();
   const { toast } = useToast();
   const [newPw,    setNewPw]    = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [saving,   setSaving]   = useState(false);
+
+  // Debug logic quyền hạn
+  console.log("[PROFILE_DEBUG] User data:", {
+    email: user?.email,
+    role: user?.role,
+    is_subadmin: user?.is_subadmin,
+    effectiveRoleLabel
+  });
 
   if (loading) {
     return (
@@ -38,6 +48,17 @@ export default function ProfilePage() {
     else       { toast({ title: "Đổi mật khẩu thành công 🎉" }); setNewPw(""); setConfirmPw(""); }
   }
 
+  // Xác định màu badge
+  const getBadgeStyles = () => {
+    if (isSystemAdmin) return "bg-purple-100 text-purple-700 ring-1 ring-purple-200";
+    if (isSystemSubadmin) {
+      return isGroupActive 
+        ? "bg-green-100 text-green-700 ring-1 ring-green-200" 
+        : "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200";
+    }
+    return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-extrabold text-[#1a1a2e] mb-8">👤 Hồ sơ cá nhân</h1>
@@ -48,17 +69,25 @@ export default function ProfilePage() {
           {[
             { icon: <Mail className="w-5 h-5 text-brand" />, label: "Email", value: user.email },
             { icon: <Calendar className="w-5 h-5 text-brand" />, label: "Ngày tham gia", value: formatDate(user.created_at) },
-            { icon: <Shield className="w-5 h-5 text-brand" />, label: "Vai trò",
-              value: <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${user.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-brand-light text-brand"}`}>
-                {user.role === "ADMIN" ? "🛡️ Admin" : "👤 User"}
-              </span>
+            { icon: <Shield className="w-5 h-5 text-brand" />, label: "Vai trò hoạt động",
+              value: (
+                <div className="flex flex-col gap-1">
+                  <span className={`inline-flex items-center w-fit text-[11px] font-bold px-3 py-1 rounded-full ${getBadgeStyles()}`}>
+                    {isSystemAdmin && "🛡️ "}
+                    {effectiveRoleLabel}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground italic">
+                    (Phân quyền dựa trên vai trò hệ thống và nhóm quản lý)
+                  </span>
+                </div>
+              )
             },
           ].map(row => (
             <div key={row.label} className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">{row.icon}</div>
               <div>
                 <div className="text-xs text-muted-foreground font-medium">{row.label}</div>
-                <div className="font-semibold text-[#1a1a2e]">{row.value}</div>
+                <div className="font-semibold text-[#1a1a2e] leading-tight">{row.value}</div>
               </div>
             </div>
           ))}
