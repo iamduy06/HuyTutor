@@ -436,7 +436,19 @@ export default function GroupDecksPage() {
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
                       checked={(deckForm.access_level as any).public}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, public: e.target.checked } })}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setDeckForm({ 
+                          ...deckForm, 
+                          access_level: { 
+                            ...(deckForm.access_level as any), 
+                            public: val,
+                            auth: val ? false : (deckForm.access_level as any).auth,
+                            paid: val ? false : (deckForm.access_level as any).paid,
+                            preview: val ? false : (deckForm.access_level as any).preview
+                          } 
+                        });
+                      }}
                     />
                     <span className="text-sm font-medium">🌐 public</span>
                   </label>
@@ -445,7 +457,18 @@ export default function GroupDecksPage() {
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
                       checked={(deckForm.access_level as any).auth}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, auth: e.target.checked } })}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setDeckForm({ 
+                          ...deckForm, 
+                          access_level: { 
+                            ...(deckForm.access_level as any), 
+                            auth: val,
+                            public: val ? false : (deckForm.access_level as any).public,
+                            paid: val ? false : (deckForm.access_level as any).paid
+                          } 
+                        });
+                      }}
                     />
                     <span className="text-sm font-medium">🔑 auth</span>
                   </label>
@@ -454,7 +477,18 @@ export default function GroupDecksPage() {
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
                       checked={(deckForm.access_level as any).paid}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, paid: e.target.checked } })}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setDeckForm({ 
+                          ...deckForm, 
+                          access_level: { 
+                            ...(deckForm.access_level as any), 
+                            paid: val,
+                            public: val ? false : (deckForm.access_level as any).public,
+                            auth: val ? false : (deckForm.access_level as any).auth
+                          } 
+                        });
+                      }}
                     />
                     <span className="text-sm font-medium">💰 paid</span>
                   </label>
@@ -463,7 +497,17 @@ export default function GroupDecksPage() {
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
                       checked={(deckForm.access_level as any).preview}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, preview: e.target.checked } })}
+                      onChange={e => {
+                        const val = e.target.checked;
+                        setDeckForm({ 
+                          ...deckForm, 
+                          access_level: { 
+                            ...(deckForm.access_level as any), 
+                            preview: val,
+                            public: val ? false : (deckForm.access_level as any).public
+                          } 
+                        });
+                      }}
                     />
                     <span className="text-sm font-medium">👁️ preview</span>
                   </label>
