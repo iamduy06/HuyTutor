@@ -63,47 +63,47 @@ export function getDeckAccess(
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
-  const { access_level, preview_word_limit } = deck;
+  const { access_level, preview_word_limit } = deck as any;
+  const levels = typeof access_level === "string" 
+    ? { public: access_level === "public", authenticated: access_level === "authenticated", authorized: access_level === "authorized", preview: access_level === "preview" }
+    : access_level;
+
   const hasAssignment = userDeck !== null && !isExpired(userDeck.expired_at);
+  const isLoggedIn = user !== null;
 
-  // 3.1. PUBLIC
-  if (access_level === "public") {
-    return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
+  let canView = false;
+  let canLearnFull = false;
+
+  // Rule 1: Public - Open for everyone
+  if (levels.public) {
+    canView = true;
+    canLearnFull = true;
   }
 
-  // 3.2. AUTHENTICATED
-  if (access_level === "authenticated") {
-    const isLoggedIn = user !== null;
-    return {
-      canView: isLoggedIn,
-      canLearnFull: isLoggedIn,
-      isPreview: false,
-      previewLimit: null
-    };
+  // Rule 2: Authenticated - Open for logged in users
+  if (levels.authenticated && isLoggedIn) {
+    canView = true;
+    canLearnFull = true;
   }
 
-  // 3.3. AUTHORIZED
-  if (access_level === "authorized") {
-    return {
-      canView: hasAssignment,
-      canLearnFull: hasAssignment,
-      isPreview: false,
-      previewLimit: null
-    };
+  // Rule 3: Authorized - Requires specific assignment and NOT EXPIRED
+  if (levels.authorized && hasAssignment) {
+    canView = true;
+    canLearnFull = true;
   }
 
-  // 3.4. PREVIEW
-  if (access_level === "preview") {
-    if (hasAssignment) {
-      return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
-    }
-    return {
-      canView: true,
-      canLearnFull: false,
-      isPreview: true,
-      previewLimit: preview_word_limit ?? 10
-    };
+  // Rule 4: Preview - Show limited words if not already full access
+  if (levels.preview && !canLearnFull) {
+    canView = true;
+    // canLearnFull stays false
   }
+
+  return {
+    canView,
+    canLearnFull,
+    isPreview: levels.preview && !canLearnFull,
+    previewLimit: preview_word_limit ?? 10
+  };
 
   // Mặc định: Từ chối
   return { canView: false, canLearnFull: false, isPreview: false, previewLimit: null };

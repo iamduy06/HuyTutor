@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     admin
       .from("decks")
       .select("id, title, description, level, access_level")
-      .in("access_level", ["public", "authenticated"])
+      .or("access_level->public.eq.true,access_level->authenticated.eq.true")
       .order("created_at", { ascending: true }),
   ]);
 
@@ -114,11 +114,12 @@ export default async function DashboardPage() {
 
             {/* ── Assigned decks ── */}
             {(userDecks ?? []).map((ud: any) => {
-              const deck      = ud.deck as any;
+              const deck = ud.deck as any;
               const expired_at = ud.expired_at as string | null;
-              const isFree    = deck?.access_level === "public" || deck?.access_level === "authenticated";
+              const levels = deck?.access_level ?? {};
+              const isFree = levels.public || levels.authenticated;
               // Free decks luôn active; restricted check expired_at
-              const active    = isFree || hasFullAccess(expired_at);
+              const active = isFree || hasFullAccess(expired_at);
               const words     = wordCountMap[ud.deck_id as string] ?? 0;
               if (!deck) return null;
  
@@ -181,7 +182,8 @@ function DeckCard({
   title, description, accessLevel, active, words, streak,
   progressPercent, expiredAt, deckId, showExpiry,
 }: DeckCardProps) {
-  const isFree = accessLevel === "public" || accessLevel === "authenticated";
+  const levels = (accessLevel as any) ?? {};
+  const isFree = levels.public || levels.authenticated;
   return (
     <div className={`bg-white rounded-2xl border-2 p-5 flex flex-col transition-all hover:shadow-md ${
       active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"
@@ -197,7 +199,7 @@ function DeckCard({
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           {isFree
             ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
-                🌐 {accessLevel === "public" ? "Miễn phí" : accessLevel === "authenticated" ? "Thành viên" : accessLevel}
+                🌐 {levels.public ? "Miễn phí" : "Thành viên"}
               </span>
             : <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                 {active ? "Còn hạn" : "Hết hạn"}

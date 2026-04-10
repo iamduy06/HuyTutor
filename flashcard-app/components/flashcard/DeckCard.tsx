@@ -28,13 +28,14 @@ export function DeckCard({ deck, href, ctaLabel = "Học thử", showProgress, p
             </span>
           )}
            {showPublicBadge && (
-            deck.access_level === "public"
-              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>
-              : deck.access_level === "authenticated"
-              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">🔑 Auth</span>
-              : deck.access_level === "preview"
-              ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">👁️ Preview</span>
-              : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
+            <div className="flex gap-1 flex-wrap justify-end">
+              {(deck.access_level as any).public && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">🌐 Public</span>}
+              {(deck.access_level as any).authenticated && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">🔑 Auth</span>}
+              {(deck.access_level as any).preview && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">👁️ Preview</span>}
+              {!(deck.access_level as any).public && !(deck.access_level as any).authenticated && !(deck.access_level as any).authorized && !(deck.access_level as any).preview && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">🔒 Private</span>
+              )}
+            </div>
           )}
         </div>
       </div>

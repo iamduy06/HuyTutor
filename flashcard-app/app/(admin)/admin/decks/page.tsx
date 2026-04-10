@@ -92,7 +92,12 @@ export default function AdminDecksPage() {
     description: "", 
     level_min: "", 
     level_max: "", 
-    access_level: "authenticated" as "public" | "authenticated" | "authorized" | "preview",
+    access_level: {
+      public: false,
+      authenticated: false,
+      authorized: true,
+      preview: false
+    },
     preview_word_limit: 10,
     group_id: "" as string
   });
@@ -293,7 +298,7 @@ export default function AdminDecksPage() {
       description: "", 
       level_min: "", 
       level_max: "", 
-      access_level: "authenticated",
+      access_level: { public: false, authenticated: false, authorized: true, preview: false },
       preview_word_limit: 10,
       group_id: ""
     }); 
@@ -302,10 +307,15 @@ export default function AdminDecksPage() {
   function openEditDeck(deck: Deck) {
     setEditingDeck(deck);
     
-    // Mapping legacy is_public to access_level if access_level is null/undefined
-    let al = deck.access_level;
-    if (!al) {
-      al = (deck as any).is_public ? "public" : "authenticated";
+    let al = deck.access_level as any;
+    // Migration helper: if it's still a string in old data
+    if (typeof al === "string") {
+      al = {
+        public: al === "public",
+        authenticated: al === "authenticated",
+        authorized: al === "authorized" || al === "preview",
+        preview: al === "preview"
+      };
     }
 
     setDeckForm({ 
@@ -370,15 +380,12 @@ export default function AdminDecksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-[#1a1a2e]">{deck.title}</span>
                       {deck.level && <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">{deck.level}</span>}
-                      {deck.access_level === "public" ? (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">🌐 Công khai</span>
-                      ) : deck.access_level === "authenticated" ? (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">🔑 Đăng nhập</span>
-                      ) : deck.access_level === "preview" ? (
-                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">👁️ Xem trước ({deck.preview_word_limit} từ)</span>
-                      ) : (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">🔒 Cần quyền</span>
-                      )}
+                      <div className="flex gap-1">
+                        {(deck.access_level as any).public && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">🌐 PUBLIC</span>}
+                        {(deck.access_level as any).authenticated && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">🔑 AUTH</span>}
+                        {(deck.access_level as any).authorized && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">🔒 PAID</span>}
+                        {(deck.access_level as any).preview && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">👁️ PREVIEW</span>}
+                      </div>
                       <span className="text-xs text-muted-foreground">({(deck as any).word_count ?? 0} từ)</span>
                     </div>
                     {deck.description && <p className="text-sm text-muted-foreground mt-0.5 truncate">{deck.description}</p>}
@@ -553,30 +560,51 @@ export default function AdminDecksPage() {
             </div>
             <div className="space-y-4 p-4 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
               <div>
-                <Label className="text-[#1a1a2e] font-bold">Quyền truy cập</Label>
-                <div className="mt-2 text-xs text-muted-foreground mb-3">
-                  {deckForm.access_level === "public" && "🌐 Công khai: Ai cũng xem được, không cần đăng nhập."}
-                  {deckForm.access_level === "authenticated" && "🔑 Đăng nhập: Phải đăng nhập mới xem được toàn bộ."}
-                  {deckForm.access_level === "authorized" && "🔒 Cần quyền: Phải có quyền trong user_decks mới xem được."}
-                  {deckForm.access_level === "preview" && "👁️ Xem trước: Xem thử một số từ, muốn xem hết cần đăng nhập/quyền."}
+                <Label className="text-[#1a1a2e] font-bold block mb-3">Quyền truy cập</Label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={deckForm.access_level.public}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, public: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">🌐 Public</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={deckForm.access_level.authenticated}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, authenticated: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">🔑 Auth</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={deckForm.access_level.authorized}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, authorized: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">🔒 Paid</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={deckForm.access_level.preview}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, preview: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">👁️ Preview</span>
+                  </label>
                 </div>
-                <Select
-                  value={deckForm.access_level}
-                  onValueChange={(v: any) => setDeckForm({ ...deckForm, access_level: v })}
-                >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Chọn quyền truy cập" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Công khai (Public)</SelectItem>
-                    <SelectItem value="authenticated">Cần đăng nhập (Authenticated)</SelectItem>
-                    <SelectItem value="authorized">Cần quyền (Authorized)</SelectItem>
-                    <SelectItem value="preview">Xem trước (Preview)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="mt-4 text-[10px] text-muted-foreground bg-white/50 p-2 rounded border border-dashed border-[#f0e0e7]">
+                  💡 <strong>Public</strong>: Ai cũng xem được. <strong>Auth</strong>: Cần đăng nhập. <strong>Paid</strong>: Cần mua/cấp quyền. <strong>Preview</strong>: Xem thử một số từ.
+                </div>
               </div>
 
-              {deckForm.access_level === "preview" && (
+              {deckForm.access_level.preview && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                   <Label className="text-orange-700 font-bold">Giới hạn từ xem trước *</Label>
                   <Input 

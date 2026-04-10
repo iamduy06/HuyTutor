@@ -11,7 +11,7 @@ export default async function DecksPage() {
   const { data: decks } = await supabase
     .from("decks")
     .select("id, title, description, level, access_level, created_at")
-    .in("access_level", ["public", "preview"])
+    .or("access_level->public.eq.true,access_level->preview.eq.true")
     .order("created_at", { ascending: true });
 
   const { data: cards } = await supabase

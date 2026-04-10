@@ -45,7 +45,12 @@ export interface Deck {
   level_min?: string | null;
   /** Max CEFR level (e.g. "C2") */
   level_max?: string | null;
-  access_level: "public" | "authenticated" | "authorized" | "preview";
+  access_level: {
+    public: boolean;
+    authenticated: boolean;
+    authorized: boolean;
+    preview: boolean;
+  };
   preview_word_limit?: number;
   group_id?: string | null;
   created_at: string;

@@ -54,13 +54,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const { title, description, level_min, level_max, access_level, preview_word_limit, group_id } = body;
   const levelStr = computeLevelStr(body.level_min ?? null, body.level_max ?? null);
 
-  if (access_level && !["public", "authenticated", "authorized", "preview"].includes(access_level)) {
-    return NextResponse.json({ error: "Invalid access_level" }, { status: 400 });
-  }
-
   const limitNum = parseInt(preview_word_limit);
-  if (access_level === 'preview' && (isNaN(limitNum) || limitNum <= 0)) {
-    return NextResponse.json({ error: "preview_word_limit must be > 0 when access_level is preview" }, { status: 400 });
+  if (access_level?.preview === true && (isNaN(limitNum) || limitNum <= 0)) {
+    return NextResponse.json({ error: "preview_word_limit must be > 0 when preview access is enabled" }, { status: 400 });
   }
 
   const supabase = createAdminClient();
@@ -74,7 +70,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       level_max: level_max ?? null,
       group_id: group_id === undefined ? undefined : (group_id || null),
       ...(access_level ? { access_level } : {}),
-      ...(access_level === 'preview' ? { preview_word_limit: limitNum } : {}),
+      ...(preview_word_limit !== undefined ? { preview_word_limit: limitNum } : {}),
     })
     .eq("id", params.id).select().single();
 

@@ -23,8 +23,7 @@ CREATE TABLE IF NOT EXISTS public.decks (
   level              TEXT,
   level_min          TEXT DEFAULT NULL,
   level_max          TEXT DEFAULT NULL,
-  access_level       TEXT NOT NULL DEFAULT 'authorized' 
-                       CHECK (access_level IN ('public', 'authenticated', 'authorized', 'preview')),
+  access_level       JSONB NOT NULL DEFAULT '{"public": false, "authenticated": false, "authorized": true, "preview": false}',
   preview_word_limit INTEGER NOT NULL DEFAULT 10,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

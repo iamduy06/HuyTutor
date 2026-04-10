@@ -55,16 +55,16 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { title, description, level_min, level_max, access_level = 'authorized', preview_word_limit, group_id } = body;
+  const { 
+    title, description, level_min, level_max, 
+    access_level = { public: false, authenticated: false, authorized: true, preview: false }, 
+    preview_word_limit, group_id 
+  } = body;
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
-  if (!["public", "authenticated", "authorized", "preview"].includes(access_level)) {
-    return NextResponse.json({ error: "Invalid access_level" }, { status: 400 });
-  }
-  
   const limitNum = parseInt(preview_word_limit);
-  if (access_level === 'preview' && (isNaN(limitNum) || limitNum <= 0)) {
-    return NextResponse.json({ error: "preview_word_limit must be > 0 when access_level is preview" }, { status: 400 });
+  if (access_level?.preview === true && (isNaN(limitNum) || limitNum <= 0)) {
+    return NextResponse.json({ error: "preview_word_limit must be > 0 when preview access is enabled" }, { status: 400 });
   }
 
   const supabase = createAdminClient();
