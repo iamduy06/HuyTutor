@@ -94,11 +94,11 @@ export default function AdminDecksPage() {
     level_max: "", 
     access_level: {
       public: false,
-      authenticated: false,
-      authorized: true,
-      preview: false
+      auth: false,
+      paid: true,
+      preview: false,
+      preview_word_limit: 10
     },
-    preview_word_limit: 10,
     group_id: "" as string
   });
   const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
@@ -566,31 +566,9 @@ export default function AdminDecksPage() {
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
-                      checked={deckForm.access_level.public}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, public: e.target.checked } })}
+                      checked={(deckForm.access_level as any).public}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, public: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">🌐 Public</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 accent-brand"
-                      checked={deckForm.access_level.authenticated}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, authenticated: e.target.checked } })}
-                    />
-                    <span className="text-sm font-medium">🔑 Auth</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 accent-brand"
-                      checked={deckForm.access_level.authorized}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, authorized: e.target.checked } })}
-                    />
-                    <span className="text-sm font-medium">🔒 Paid</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
                       checked={deckForm.access_level.preview}

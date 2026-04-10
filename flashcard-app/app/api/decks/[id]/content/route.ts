@@ -20,23 +20,7 @@ export async function GET(
 
   if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  let fullAccess = deck.access_level === "public";
-
   // 2. Kiểm tra quyền dùng getDeckAccess
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: userProfile } = user 
-    ? await adminSupabase.from("users").select("role").eq("id", user.id).single()
-    : { data: null };
-
-  const { data: userDeck } = user
-    ? await adminSupabase
-        .from("user_decks")
-        .select("expired_at")
-        .eq("user_id", user.id)
-        .eq("deck_id", params.id)
-        .maybeSingle()
-    : { data: null };
-
   const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
   if (!access.canLearnFull) {

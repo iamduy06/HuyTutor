@@ -29,18 +29,17 @@ export default async function DashboardPage() {
       .select("id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, access_level)")
       .eq("user_id", user.id)
       .order("deck_id"),
-    // Tất cả deck public hoặc authenticated — user chưa được assign cũng thấy
+    // Decks công khai hoặc dành cho thành viên (auth)
     admin
       .from("decks")
       .select("id, title, description, level, access_level")
-      .or("access_level->public.eq.true,access_level->authenticated.eq.true")
+      .or("access_level->public.eq.true,access_level->auth.eq.true")
       .order("created_at", { ascending: true }),
   ]);
 
-  // Gộp: assigned decks + public decks chưa được assign
+  // Gộp: assigned decks + public/auth decks chưa được assign
   const assignedDeckIds = new Set((userDecks ?? []).map((ud: any) => ud.deck_id as string));
 
-  // Public decks chưa có trong user_decks → hiển thị thêm
   const extraPublicDecks = (publicDecks ?? []).filter(d => !assignedDeckIds.has(d.id));
 
   // Word count cho tất cả deck cần hiển thị
@@ -186,6 +185,8 @@ function DeckCard({
   progressPercent, expiredAt, deckId, showExpiry, isAssigned
 }: DeckCardProps) {
   const levels = accessLevel ?? {};
+  const isFree = levels.public === true || levels.auth === true;
+
   return (
     <div className={`bg-white rounded-2xl border-2 p-5 flex flex-col transition-all hover:shadow-md ${active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"
       }`}>
@@ -198,7 +199,7 @@ function DeckCard({
           {title}
         </h3>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          {isAssigned ? (
+          {isAssigned && levels.paid === true ? (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
               {active ? "Còn hạn" : "Hết hạn"}
             </span>

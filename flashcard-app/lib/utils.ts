@@ -50,12 +50,31 @@ export interface DeckAccess {
   previewLimit: number | null;
 }
 
+export interface Deck {
+  id: string;
+  title: string;
+  description: string | null;
+  level: string | null;
+  level_min: string | null;
+  level_max: string | null;
+  access_level: {
+    public: boolean;
+    auth: boolean;
+    paid: boolean;
+    preview: boolean;
+    preview_word_limit: number;
+  };
+  group_id: string | null;
+  created_at: string;
+  word_count?: number;
+}
+
 /**
  * Hàm kiểm tra quyền truy cập bộ đề trung tâm
  */
 export function getDeckAccess(
   user: { role: string } | null,
-  deck: { access_level: string; preview_word_limit?: number },
+  deck: { access_level: any },
   userDeck: { expired_at: string | null } | null
 ): DeckAccess {
   // Admin có toàn quyền
@@ -63,50 +82,40 @@ export function getDeckAccess(
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
-  const { access_level, preview_word_limit } = deck as any;
-  const levels = typeof access_level === "string" 
-    ? { public: access_level === "public", authenticated: access_level === "authenticated", authorized: access_level === "authorized", preview: access_level === "preview" }
-    : access_level;
-
+  const levels = deck.access_level || {};
   const hasAssignment = userDeck !== null && !isExpired(userDeck.expired_at);
   const isLoggedIn = user !== null;
 
   let canView = false;
   let canLearnFull = false;
 
-  // Rule 1: Public - Open for everyone
-  if (levels.public) {
+  // Rule 1: Public - Không cần đăng nhập
+  if (levels.public === true) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 2: Authenticated - Open for logged in users
-  if (levels.authenticated && isLoggedIn) {
+  // Rule 2: Auth - Dành cho thành viên đăng nhập
+  else if (levels.auth === true && isLoggedIn) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 3: Authorized - Requires specific assignment and NOT EXPIRED
-  if (levels.authorized && hasAssignment) {
+  // Rule 3: Paid - Dành cho người mua và CÒN HẠN
+  else if (levels.paid === true && hasAssignment) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 4: Preview - Show limited words if not already full access
-  if (levels.preview && !canLearnFull) {
+  // Rule 4: Preview - Cho phép xem thử một phần
+  else if (levels.preview === true) {
     canView = true;
-    // canLearnFull stays false
+    // canLearnFull remains false
   }
 
   return {
     canView,
     canLearnFull,
-    isPreview: levels.preview && !canLearnFull,
-    previewLimit: preview_word_limit ?? 10
+    isPreview: levels.preview === true && !canLearnFull,
+    previewLimit: levels.preview_word_limit ?? 10
   };
-
-  // Mặc định: Từ chối
-  return { canView: false, canLearnFull: false, isPreview: false, previewLimit: null };
 }
 
 export function getCefrColor(cefr: string): string {
@@ -175,6 +184,14 @@ export function countWords(row: FlashcardRow): number {
  *   "word1, word2" → ["word1", "word2"]
  *   ["word1", "word2"] → ["word1", "word2"]
  */
+export function toArray(val: string | string[] | undefined | null): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean);
+  return val.split(",").map(s => s.trim()).filter(Boolean);
+}
+ * "word1, word2" →["word1", "word2"]
+  * ["word1", "word2"] →["word1", "word2"]
+    */
 export function toArray(val: string | string[] | undefined | null): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);

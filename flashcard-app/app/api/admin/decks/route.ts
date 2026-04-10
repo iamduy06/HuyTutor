@@ -75,8 +75,8 @@ export async function POST(request: NextRequest) {
     .insert({ 
        title, description, level: levelStr, 
        level_min: level_min ?? null, level_max: level_max ?? null, 
-       access_level, preview_word_limit: limitNum || 10,
-       group_id: group_id || null
+       group_id: group_id === undefined ? undefined : (group_id || null),
+       ...(access_level ? { access_level } : {}),
     })
     .select()
     .single();

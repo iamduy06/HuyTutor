@@ -39,20 +39,17 @@ export interface Deck {
   id: string;
   title: string;
   description: string | null;
-  /** Cefr range: "B1-C2", "A1-A2", "B2" etc — computed from level_min+level_max */
   level: string | null;
-  /** Min CEFR level (e.g. "B1") */
-  level_min?: string | null;
-  /** Max CEFR level (e.g. "C2") */
-  level_max?: string | null;
+  level_min: string | null;
+  level_max: string | null;
   access_level: {
     public: boolean;
-    authenticated: boolean;
-    authorized: boolean;
+    auth: boolean;
+    paid: boolean;
     preview: boolean;
+    preview_word_limit: number;
   };
-  preview_word_limit?: number;
-  group_id?: string | null;
+  group_id: string | null;
   created_at: string;
   word_count?: number;
 }

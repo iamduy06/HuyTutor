@@ -70,7 +70,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       level_max: level_max ?? null,
       group_id: group_id === undefined ? undefined : (group_id || null),
       ...(access_level ? { access_level } : {}),
-      ...(preview_word_limit !== undefined ? { preview_word_limit: limitNum } : {}),
     })
     .eq("id", params.id).select().single();
 

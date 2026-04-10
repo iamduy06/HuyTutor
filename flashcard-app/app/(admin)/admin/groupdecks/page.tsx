@@ -72,11 +72,11 @@ export default function GroupDecksPage() {
     level_max: "",
     access_level: {
       public: false,
-      authenticated: false,
-      authorized: true,
-      preview: false
+      auth: false,
+      paid: true,
+      preview: false,
+      preview_word_limit: 10
     },
-    preview_word_limit: 10,
     group_id: "" as string
   });
 
@@ -228,7 +228,6 @@ export default function GroupDecksPage() {
       level_min: deck.level_min ?? "",
       level_max: deck.level_max ?? "",
       access_level: al,
-      preview_word_limit: deck.preview_word_limit ?? 10,
       group_id: deck.group_id ?? ""
     });
     setShowDeckDlg(true);
@@ -445,8 +444,8 @@ export default function GroupDecksPage() {
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
-                      checked={(deckForm.access_level as any).authenticated}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, authenticated: e.target.checked } })}
+                      checked={(deckForm.access_level as any).auth}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, auth: e.target.checked } })}
                     />
                     <span className="text-sm font-medium">🔑 Auth</span>
                   </label>
@@ -454,10 +453,10 @@ export default function GroupDecksPage() {
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
-                      checked={(deckForm.access_level as any).authorized}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, authorized: e.target.checked } })}
+                      checked={(deckForm.access_level as any).paid}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, paid: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">🔒 Paid</span>
+                    <span className="text-sm font-medium">💰 Paid</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -547,8 +546,8 @@ function DeckRow({ deck, onMove, onEdit, onDelete, onImport }: {
           <div className="flex gap-1 items-center mt-1 flex-wrap">
             <span className="text-[10px] text-muted-foreground mr-1">{deck.word_count ?? 0} từ</span>
             {(deck.access_level as any).public && <span className="text-[8px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-bold">🌐 PUBLIC</span>}
-            {(deck.access_level as any).authenticated && <span className="text-[8px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold">🔑 AUTH</span>}
-            {(deck.access_level as any).authorized && <span className="text-[8px] bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold">🔒 PAID</span>}
+            {(deck.access_level as any).auth && <span className="text-[8px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold">🔑 AUTH</span>}
+            {(deck.access_level as any).paid && <span className="text-[8px] bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold">💰 PAID</span>}
             {(deck.access_level as any).preview && <span className="text-[8px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded font-bold">👁️ PREVIEW</span>}
           </div>
         </div>

@@ -134,8 +134,16 @@ export async function middleware(request: NextRequest) {
         .eq("id", deckId)
         .single();
 
-      if (deck?.access_level === "public" || deck?.access_level === "authenticated") {
-        // Deck open to logged in users → vào learning trực tiếp
+      const levels = (deck?.access_level as any) || {};
+
+      if (levels.public === true) {
+        // Public deck: Nếu đã đăng nhập thì vào learning, chưa thì vào decks
+        const targetPath = user ? `/learning/${deckId}` : `/decks/${deckId}`;
+        return NextResponse.redirect(new URL(targetPath, request.url));
+      }
+
+      if (levels.auth === true) {
+        // Auth deck -> go to learning directly (yêu cầu đăng nhập nên middleware sẽ tự handle login ở bước trước nếu cần)
         return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
       }
 

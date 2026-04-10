@@ -89,7 +89,7 @@ export default async function DeckDetailPage({ params }: Props) {
     <div className="flex flex-col flex-1">
       {isPreview && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2.5 text-center text-sm text-yellow-800 flex items-center justify-center gap-3 flex-wrap">
-          <span>🎯 Bản xem trước — tối đa {deck.preview_word_limit} từ.</span>
+          <span>🎯 Bản xem trước — tối đa {access.previewLimit} từ.</span>
           <Button variant="brand" size="sm" asChild className="rounded-full h-7 text-xs px-3">
             <Link href="/login">Đăng nhập để học đầy đủ</Link>
           </Button>
