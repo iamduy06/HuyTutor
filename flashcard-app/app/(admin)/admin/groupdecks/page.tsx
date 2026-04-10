@@ -438,7 +438,7 @@ export default function GroupDecksPage() {
                       checked={(deckForm.access_level as any).public}
                       onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, public: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">🌐 Public</span>
+                    <span className="text-sm font-medium">🌐 public</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -447,7 +447,7 @@ export default function GroupDecksPage() {
                       checked={(deckForm.access_level as any).auth}
                       onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, auth: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">🔑 Auth</span>
+                    <span className="text-sm font-medium">🔑 auth</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -456,7 +456,7 @@ export default function GroupDecksPage() {
                       checked={(deckForm.access_level as any).paid}
                       onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, paid: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">💰 Paid</span>
+                    <span className="text-sm font-medium">💰 paid</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -465,14 +465,25 @@ export default function GroupDecksPage() {
                       checked={(deckForm.access_level as any).preview}
                       onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, preview: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">👁️ Preview</span>
+                    <span className="text-sm font-medium">👁️ preview</span>
                   </label>
                 </div>
               </div>
               {(deckForm.access_level as any).preview && (
-                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                  <Label>Giới hạn từ xem trước</Label>
-                  <Input type="number" value={deckForm.preview_word_limit} onChange={e => setDeckForm({ ...deckForm, preview_word_limit: parseInt(e.target.value) || 1 })} className="mt-1 bg-white" />
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200 pt-3 border-t border-[#f0e0e7]">
+                  <Label>preview_word_limit</Label>
+                  <Input 
+                    type="number" 
+                    value={(deckForm.access_level as any).preview_word_limit} 
+                    onChange={e => setDeckForm({ 
+                      ...deckForm, 
+                      access_level: { 
+                        ...deckForm.access_level as any, 
+                        preview_word_limit: Math.max(1, parseInt(e.target.value) || 10) 
+                      } 
+                    })} 
+                    className="mt-1 bg-white" 
+                  />
                 </div>
               )}
             </div>

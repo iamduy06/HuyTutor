@@ -569,30 +569,54 @@ export default function AdminDecksPage() {
                       checked={(deckForm.access_level as any).public}
                       onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, public: e.target.checked } })}
                     />
+                    <span className="text-sm font-medium">🌐 public</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
                       type="checkbox" 
                       className="w-4 h-4 accent-brand"
-                      checked={deckForm.access_level.preview}
-                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level, preview: e.target.checked } })}
+                      checked={(deckForm.access_level as any).auth}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, auth: e.target.checked } })}
                     />
-                    <span className="text-sm font-medium">👁️ Preview</span>
+                    <span className="text-sm font-medium">🔑 auth</span>
                   </label>
-                </div>
-                <div className="mt-4 text-[10px] text-muted-foreground bg-white/50 p-2 rounded border border-dashed border-[#f0e0e7]">
-                  💡 <strong>Public</strong>: Ai cũng xem được. <strong>Auth</strong>: Cần đăng nhập. <strong>Paid</strong>: Cần mua/cấp quyền. <strong>Preview</strong>: Xem thử một số từ.
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={(deckForm.access_level as any).paid}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, paid: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">💰 paid</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 accent-brand"
+                      checked={(deckForm.access_level as any).preview}
+                      onChange={e => setDeckForm({ ...deckForm, access_level: { ...deckForm.access_level as any, preview: e.target.checked } })}
+                    />
+                    <span className="text-sm font-medium">👁️ preview</span>
+                  </label>
                 </div>
               </div>
 
-              {deckForm.access_level.preview && (
-                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                  <Label className="text-orange-700 font-bold">Giới hạn từ xem trước *</Label>
+              {(deckForm.access_level as any).preview && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-200 pt-3 border-t border-[#f0e0e7]">
+                  <Label className="text-orange-700 font-bold">preview_word_limit</Label>
                   <Input 
                     type="number" 
                     min={1} 
-                    value={deckForm.preview_word_limit} 
-                    onChange={e => setDeckForm({ ...deckForm, preview_word_limit: Math.max(1, parseInt(e.target.value) || 0) })} 
+                    value={(deckForm.access_level as any).preview_word_limit} 
+                    onChange={e => setDeckForm({ 
+                      ...deckForm, 
+                      access_level: { 
+                        ...deckForm.access_level as any, 
+                        preview_word_limit: Math.max(1, parseInt(e.target.value) || 0) 
+                      } 
+                    })} 
                     className="mt-1 bg-white"
                   />
-                  <p className="text-[10px] text-orange-600 mt-1">Lưu ý: Chỉ cho phép học X từ đầu tiên nếu chưa có quyền.</p>
                 </div>
               )}
             </div>
