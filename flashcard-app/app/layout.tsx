@@ -28,12 +28,33 @@ export default async function RootLayout({
   // Đọc session từ cookie server-side → truyền xuống client
   // Không có round-trip → không flash
   const supabase = createClient();
-  // Profile sẽ được fetch ở client bởi UserContext
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+
+  let initialUser = null;
+  if (authUser) {
+    const { data: profile } = await supabase
+      .from("users").select("*").eq("id", authUser.id).single();
+    
+    if (profile) {
+      const { data: groupSub } = await supabase
+        .from("group_users")
+        .select("id")
+        .eq("user_id", authUser.id)
+        .eq("is_subadmin", true)
+        .limit(1)
+        .maybeSingle();
+
+      initialUser = {
+        ...profile,
+        is_subadmin: !!groupSub
+      };
+    }
+  }
 
   return (
     <html lang="vi">
       <body className={`${bricolage.variable} font-sans antialiased`}>
-        <Providers>
+        <Providers initialUser={initialUser}>
           {children}
           <Toaster />
         </Providers>

@@ -44,7 +44,7 @@ export async function GET() {
       .from("group_users")
       .select("user_id")
       .in("group_id", groupIds);
-
+    
     const memberIds = Array.from(new Set((groupMemberIds ?? []).map(m => m.user_id)));
     userQuery = userQuery.in("id", memberIds);
   }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   if (me.role !== "ADMIN") {
     const { data: group } = await admin.from("groups").select("max_users").eq("id", targetGroupId).single();
     const { count } = await admin.from("group_users").select("*", { count: "exact", head: true }).eq("group_id", targetGroupId);
-
+    
     if (group && count !== null && count >= group.max_users) {
       return NextResponse.json({ error: "Nhóm đã đạt giới hạn thành viên tối đa" }, { status: 403 });
     }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     email,
     password,
     email_confirm: true,
-    user_metadata: {
+    user_metadata: { 
       role,
       skip_system_group: true
     }
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
   // 4. Upsert Profile và Group Membership
   const userId = authUser.user.id;
-
+  
   await Promise.all([
     admin.from("users").upsert({ id: userId, email, role }, { onConflict: "id" }),
     admin.from("group_users").insert({ group_id: targetGroupId, user_id: userId, is_subadmin: false })

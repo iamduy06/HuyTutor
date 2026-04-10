@@ -8,9 +8,10 @@ import type { UserProfile } from "@/types";
 
 interface ProvidersProps {
   children: React.ReactNode;
+  initialUser?: UserProfile | null;  // từ server-side read
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, initialUser }: ProvidersProps) {
   const [queryClient] = useState(
     () => new QueryClient({
       defaultOptions: { queries: { staleTime: 60 * 1000, retry: 1 } },
@@ -19,7 +20,7 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <UserProvider>
+      <UserProvider initialUser={initialUser ?? null}>
         <NavigationProgressWrapper />
         {children}
       </UserProvider>

@@ -15,14 +15,14 @@ async function checkSubAdmin() {
 async function canManage(me: any, targetId: string) {
   if (me.role === "ADMIN") return true;
   const admin = createAdminClient();
-
+  
   // Kiểm tra xem targetId có nằm trong bất kỳ nhóm nào mà me.id là subadmin không
   const { data } = await admin
     .from("group_users")
     .select("group_id")
     .eq("user_id", me.id)
     .eq("is_subadmin", true);
-
+  
   const myGroupIds = (data ?? []).map(g => g.group_id);
   if (myGroupIds.length === 0) return false;
 
@@ -103,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       learned_count: 0,
       streak: 0,
     }, { onConflict: "user_id,deck_id" });
-
+    
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ success: true });
   }
