@@ -205,7 +205,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
     };
 
     // 1. Kiểm tra Cache trước
-    const cachedUrl = (!text && vocab) ? audioUrls.current.get(vocab.word) : null;
+    const cachedUrl = !text ? audioUrls.current.get(vocab.word) : null;
     
     if (cachedUrl) {
       const audio = new Audio(cachedUrl);
