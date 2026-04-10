@@ -255,6 +255,7 @@ function DeckCard({
               Học ngay →
             </Link>
           : <a href={FACEBOOK_URL} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-1 py-2 px-4 rounded-lg border-2 border-[#f0e0e7] text-sm font-semibold hover:border-brand hover:text-brand transition-colors">
+              💬 Gia hạn (Facebook)
             </a>
         }
       </div>
