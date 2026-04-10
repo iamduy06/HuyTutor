@@ -40,7 +40,7 @@ export async function GET(
   const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
   if (!access.canLearnFull) {
-    return NextResponse.json({ error: "Forbidden: Full access required" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden: Full access required or expired" }, { status: 403 });
   }
 
   // 3. Trả về full content

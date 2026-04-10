@@ -55,7 +55,7 @@ export interface DeckAccess {
  */
 export function getDeckAccess(
   user: { role: string } | null,
-  deck: { access_level: string; preview_word_limit?: number },
+  deck: { access_level: any; preview_word_limit?: number },
   userDeck: { expired_at: string | null } | null
 ): DeckAccess {
   // Admin có toàn quyền
@@ -63,10 +63,8 @@ export function getDeckAccess(
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
-  const { access_level, preview_word_limit } = deck as any;
-  const levels = typeof access_level === "string" 
-    ? { public: access_level === "public", authenticated: access_level === "authenticated", authorized: access_level === "authorized", preview: access_level === "preview" }
-    : access_level;
+  const levels = deck.access_level || {};
+  const preview_word_limit = deck.preview_word_limit;
 
   const hasAssignment = userDeck !== null && !isExpired(userDeck.expired_at);
   const isLoggedIn = user !== null;
@@ -74,26 +72,23 @@ export function getDeckAccess(
   let canView = false;
   let canLearnFull = false;
 
-  // Rule 1: Public - Open for everyone
-  if (levels.public) {
+  // Rule 1: Public - Mở cho tất cả mọi người
+  if (levels.public === true) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 2: Authenticated - Open for logged in users
-  if (levels.authenticated && isLoggedIn) {
+  // Rule 2: Authenticated - Mở cho tất cả user đã đăng nhập
+  else if (levels.authenticated === true && isLoggedIn) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 3: Authorized - Requires specific assignment and NOT EXPIRED
-  if (levels.authorized && hasAssignment) {
+  // Rule 3: Authorized - Đòi hỏi được gán và CHƯA HẾT HẠN
+  else if (levels.authorized === true && hasAssignment) {
     canView = true;
     canLearnFull = true;
   }
-
-  // Rule 4: Preview - Show limited words if not already full access
-  if (levels.preview && !canLearnFull) {
+  // Rule 4: Preview - Chỉ hiện một số lượng từ nhất định
+  else if (levels.preview === true) {
     canView = true;
     // canLearnFull stays false
   }
@@ -101,12 +96,9 @@ export function getDeckAccess(
   return {
     canView,
     canLearnFull,
-    isPreview: levels.preview && !canLearnFull,
+    isPreview: levels.preview === true && !canLearnFull,
     previewLimit: preview_word_limit ?? 10
   };
-
-  // Mặc định: Từ chối
-  return { canView: false, canLearnFull: false, isPreview: false, previewLimit: null };
 }
 
 export function getCefrColor(cefr: string): string {

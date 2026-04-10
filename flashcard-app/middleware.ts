@@ -134,7 +134,9 @@ export async function middleware(request: NextRequest) {
         .eq("id", deckId)
         .single();
 
-      if (deck?.access_level === "public" || deck?.access_level === "authenticated") {
+      const levels = (deck?.access_level as any) || {};
+
+      if (levels.public === true || levels.authenticated === true) {
         // Deck open to logged in users → vào learning trực tiếp
         return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
       }
