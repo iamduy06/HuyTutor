@@ -12,7 +12,6 @@ import Link from "next/link";
 interface Props {
   deckId?: string;   // undefined = demo mode, không save progress
   tabs: Tab[];
-  totalWords?: number; // Tổng số từ toàn bộ deck (để tính progress)
   deckTitle: string;
   deckDesc?: string;
   isDemo?: boolean;
@@ -21,11 +20,9 @@ interface Props {
 // ── TTS ─────────────────────────────────────────────────────────
 
 async function fetchDictAudio(word: string): Promise<string | null> {
-  const cleanWord = word.split("/")[0].replace(/[()]/g, "").trim();
-  if (!cleanWord) return null;
   try {
     const res = await fetch(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -44,20 +41,16 @@ async function fetchDictAudio(word: string): Promise<string | null> {
 function browserTTS(text: string) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const raw = text.split("/")[0].replace(/[()]/g, "").trim();
-  const u = new SpeechSynthesisUtterance(raw);
+  const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US"; u.rate = 0.8;
   window.speechSynthesis.speak(u);
 }
 
 // ── Component ────────────────────────────────────────────────────
 
-export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo, deckId }: Props) {
+export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: Props) {
   const [currentTab,   setCurrentTab]   = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [activeVocab,  setActiveVocab]  = useState<VocabItem[]>([]);
-  const [loadingVocab, setLoadingVocab] = useState(false);
-
   const [isFlipped,    setIsFlipped]    = useState(false);
   const [isFirstLoad,  setIsFirstLoad]  = useState(true);
   const [audioLoading, setAudioLoading] = useState(false);
@@ -67,76 +60,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
 
   const { mode } = useUIStore();
   const seenCards = useRef<Set<string>>(new Set());
-  const audioUrls = useRef<Map<string, string>>(new Map()); // Word -> Audio URL Cache
-  const prefetchToken = useRef(0);
-
-  // ── Lazy Loading Vocab ──
-  useEffect(() => {
-    let active = true;
-    async function loadTabVocab() {
-      if (!deckId || isDemo) return; // Demo mode might already have vocab in tabs if short
-      
-      // Nếu đã có sẵn trong tabs (ví dụ demo), dùng luôn
-      if (tabs[currentTab]?.vocabulary?.length) {
-        setActiveVocab(tabs[currentTab].vocabulary!);
-        return;
-      }
-
-      setLoadingVocab(true);
-      setActiveVocab([]); // Xóa dữ liệu cũ của Unit trước
-      try {
-        const res = await fetch(`/api/decks/${deckId}/tabs/${currentTab}/vocab`);
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        if (active) {
-          setActiveVocab(data.vocabulary || []);
-          setLoadingVocab(false);
-        }
-      } catch {
-        if (active) setLoadingVocab(false);
-      }
-    }
-    loadTabVocab();
-    return () => { active = false; };
-  }, [currentTab, deckId, isDemo, tabs]);
-
-  // ── Audio Prefetcher ──
-  useEffect(() => {
-    if (activeVocab.length === 0) return;
-    const token = ++prefetchToken.current;
-
-    async function prefetchUnit() {
-      // 1. Ưu tiên từ đầu tiên/hiện tại
-      const first = activeVocab[currentIndex];
-      if (first && !audioUrls.current.has(first.word)) {
-        const url = await fetchDictAudio(first.word);
-        if (url) {
-          audioUrls.current.set(first.word, url);
-          new Audio(url).load(); // Trigger browser cache
-        }
-      }
-
-      // 2. Chạy ngầm toàn bộ Unit
-      for (const item of activeVocab) {
-        if (token !== prefetchToken.current) break;
-        if (audioUrls.current.has(item.word)) continue;
-        
-        // Nghỉ một chút giữa các request để tránh rate limit
-        await new Promise(r => setTimeout(r, 500));
-        if (token !== prefetchToken.current) break;
-
-        const url = await fetchDictAudio(item.word);
-        if (url) {
-          audioUrls.current.set(item.word, url);
-          const audio = new Audio(url);
-          audio.preload = "auto";
-          audio.load();
-        }
-      }
-    }
-
-    prefetchUnit();
-  }, [activeVocab, currentIndex]);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track seen vocabulary items (word + tab combo)
   const markSeen = useCallback((tabIdx: number, cardIdx: number) => {
@@ -147,10 +71,11 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
   // Save progress to DB (debounced, every 3 card navigations or on unmount)
   const saveProgress = useCallback(async () => {
     if (!deckId || isDemo) return;
-    const total = totalWords || 1; 
+    const totalCards = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+    if (totalCards === 0) return;
 
     const learnedCount   = seenCards.current.size;
-    const progressPercent = Math.round((learnedCount / total) * 100);
+    const progressPercent = Math.round((learnedCount / totalCards) * 100);
 
     try {
       await fetch("/api/progress", {
@@ -163,7 +88,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
         }),
       });
     } catch { /* silent — non-critical */ }
-  }, [deckId, isDemo, totalWords]);
+  }, [deckId, isDemo, tabs]);
 
   // Save on unmount
   useEffect(() => {
@@ -176,12 +101,13 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tokenRef = useRef(0);
 
-  const vocab = activeVocab[currentIndex];
+  const vocabulary: VocabItem[] = tabs[currentTab]?.vocabulary ?? [];
 
   // Mark first card as seen on mount
   useEffect(() => {
-    if (activeVocab.length > 0) markSeen(currentTab, currentIndex);
-  }, [activeVocab, currentIndex, currentTab, markSeen]);
+    if (vocabulary.length > 0) markSeen(currentTab, 0);
+  }, []); // eslint-disable-line
+  const vocab = vocabulary[currentIndex];
 
   // ── TTS ──
   const speakWord = useCallback(async (text?: string) => {
@@ -190,24 +116,13 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
 
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     window.speechSynthesis?.cancel();
-    
+    setAudioLoading(true);
     const token = ++tokenRef.current;
+
     const fallback = () => {
       if (token === tokenRef.current) { setAudioLoading(false); browserTTS(raw); }
     };
 
-    // 1. Kiểm tra Cache trước
-    const cachedUrl = !text ? audioUrls.current.get(vocab.word) : null;
-    
-    if (cachedUrl) {
-      const audio = new Audio(cachedUrl);
-      audioRef.current = audio;
-      audio.play().catch(fallback);
-      return;
-    }
-
-    // 2. Nếu chưa có cache (hoặc là text ví dụ), mới đi lấy
-    setAudioLoading(true);
     try {
       const url = await Promise.race([
         fetchDictAudio(raw),
@@ -232,14 +147,12 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
 
   useEffect(() => {
     if (isFirstLoad) { setIsFirstLoad(false); return; }
-    if (loadingVocab) return;
     const t = setTimeout(() => speakWord(), 300);
     return () => clearTimeout(t);
-  }, [currentIndex, currentTab, loadingVocab]); // eslint-disable-line
+  }, [currentIndex, currentTab]); // eslint-disable-line
 
   function nextCard() {
-    if (activeVocab.length === 0) return;
-    const next = (currentIndex + 1) % activeVocab.length;
+    const next = (currentIndex + 1) % vocabulary.length;
     markSeen(currentTab, next);
     setIsFlipped(false);
     setTimeout(() => setCurrentIndex(next), 50);
@@ -247,15 +160,14 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
     if ((seenCards.current.size % 5) === 0) saveProgress();
   }
   function prevCard() {
-    if (activeVocab.length === 0) return;
-    const prev = (currentIndex - 1 + activeVocab.length) % activeVocab.length;
+    const prev = (currentIndex - 1 + vocabulary.length) % vocabulary.length;
     markSeen(currentTab, prev);
     setIsFlipped(false);
     setTimeout(() => setCurrentIndex(prev), 50);
   }
   function jumpToCard() {
     const n = parseInt(jumpValue);
-    if (n >= 1 && n <= activeVocab.length) {
+    if (n >= 1 && n <= vocabulary.length) {
       markSeen(currentTab, n - 1);
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex(n - 1), 50);
@@ -265,6 +177,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
   function switchTab(idx: number) {
     saveProgress(); // save khi đổi tab
     setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(true);
+    markSeen(idx, 0); // mark first card of new tab
   }
 
   if (!vocab) {
@@ -310,9 +223,9 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
                   : "bg-gray-200 text-gray-600"
               )}>{i + 1}</span>
               <span className="truncate">{tab.label ?? `Unit ${i + 1}`}</span>
-              {(tab as any).word_count && (
-                 <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
-                  {(tab as any).word_count} từ
+              {tab.vocabulary && (
+                <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
+                  {tab.vocabulary.length} từ
                 </span>
               )}
             </button>
@@ -559,14 +472,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
               "text-center font-semibold mt-4",
               isKid ? "kid-counter" : "text-lg text-[#495057]"
             )}>
-              {loadingVocab ? (
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang nạp từ vựng...</span>
-                </div>
-              ) : (
-                isKid ? `🃏 Thẻ ${currentIndex + 1} / ${activeVocab.length}` : `Thẻ ${currentIndex + 1} / ${activeVocab.length}`
-              )}
+              {isKid ? `🃏 Thẻ ${currentIndex + 1} / ${vocabulary.length}` : `Thẻ ${currentIndex + 1} / ${vocabulary.length}`}
             </div>
 
             {/* Jump */}
@@ -578,7 +484,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
                 {isKid ? "🔢 Đến thẻ số:" : "Đi đến thẻ:"}
               </label>
               <input
-                type="number" min={1} max={activeVocab.length}
+                type="number" min={1} max={vocabulary.length}
                 value={jumpValue} placeholder="..."
                 onChange={e => setJumpValue(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") jumpToCard(); }}
@@ -639,9 +545,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
 
         {!rightCollapsed && (
           <div className="overflow-y-auto flex-1 p-3">
-            {loadingVocab ? (
-              <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand" /></div>
-            ) : activeVocab.map((v, i) => (
+            {vocabulary.map((v, i) => (
               <div key={i}
                 onClick={() => { setIsFlipped(false); setTimeout(() => setCurrentIndex(i), 50); }}
                 className={cn(
@@ -689,9 +593,7 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
           <span className="text-brand text-xs">▼</span>
         </summary>
         <div className="border-t border-[#f0e0e7] max-h-52 overflow-y-auto divide-y divide-[#f0e0e7]">
-          {loadingVocab ? (
-             <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-brand" /></div>
-          ) : activeVocab.map((v, i) => (
+          {vocabulary.map((v, i) => (
             <button key={i}
               onClick={() => { setIsFlipped(false); setTimeout(() => setCurrentIndex(i), 50); }}
               className={cn(

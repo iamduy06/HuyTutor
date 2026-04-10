@@ -43,17 +43,9 @@ export async function GET(
     .eq("deck_id", params.id)
     .order("created_at", { ascending: true });
 
-  const allTabs = (rows ?? []).flatMap(r =>
+  const allTabs: Tab[] = (rows ?? []).flatMap(r =>
     extractTabs((r as unknown as FlashcardRow).content)
   );
-
-  // Optimize: Remove vocabulary from metadata response to save bandwidth
-  const metaTabs = allTabs.map(t => ({
-    id: t.id,
-    label: t.label,
-    desc: t.desc,
-    word_count: t.vocabulary?.length ?? 0
-  }));
 
   return NextResponse.json({ 
     deck: {
@@ -61,8 +53,8 @@ export async function GET(
       title: deck.title,
       description: deck.description
     },
-    tabs: metaTabs, 
+    tabs: allTabs, 
     isDemo: false,
-    totalWords: metaTabs.reduce((s, t) => s + t.word_count, 0)
+    totalWords: allTabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0)
   });
 }

@@ -81,7 +81,6 @@ export function Workspace({ deckId }: WorkspaceProps) {
     <FlashcardPlayer
       deckId={deckId}
       tabs={tabs}
-      totalWords={data.totalWords}
       deckTitle={data.deck.title}
       deckDesc={data.deck.description ?? undefined}
       isDemo={data.isDemo}
