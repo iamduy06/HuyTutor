@@ -79,7 +79,7 @@ export interface Tab {
   id?: string;
   label?: string;
   desc?: string;
-  vocabulary: VocabItem[];
+  vocabulary?: VocabItem[];
 }
 
 export interface DeckContent {
