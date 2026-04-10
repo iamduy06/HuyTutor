@@ -189,11 +189,3 @@ export function toArray(val: string | string[] | undefined | null): string[] {
   if (Array.isArray(val)) return val.filter(Boolean);
   return val.split(",").map(s => s.trim()).filter(Boolean);
 }
- * "word1, word2" →["word1", "word2"]
-  * ["word1", "word2"] →["word1", "word2"]
-    */
-export function toArray(val: string | string[] | undefined | null): string[] {
-  if (!val) return [];
-  if (Array.isArray(val)) return val.filter(Boolean);
-  return val.split(",").map(s => s.trim()).filter(Boolean);
-}
