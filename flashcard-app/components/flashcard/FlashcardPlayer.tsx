@@ -57,7 +57,6 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeVocab,  setActiveVocab]  = useState<VocabItem[]>([]);
   const [loadingVocab, setLoadingVocab] = useState(false);
-  const [errorVocab,   setErrorVocab]   = useState<string | null>(null);
 
   const [isFlipped,    setIsFlipped]    = useState(false);
   const [isFirstLoad,  setIsFirstLoad]  = useState(true);
@@ -75,33 +74,26 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
   useEffect(() => {
     let active = true;
     async function loadTabVocab() {
-      if (!deckId || isDemo) return; 
+      if (!deckId || isDemo) return; // Demo mode might already have vocab in tabs if short
       
+      // Nếu đã có sẵn trong tabs (ví dụ demo), dùng luôn
       if (tabs[currentTab]?.vocabulary?.length) {
         setActiveVocab(tabs[currentTab].vocabulary!);
-        setErrorVocab(null);
         return;
       }
 
       setLoadingVocab(true);
-      setErrorVocab(null);
-      setActiveVocab([]); 
+      setActiveVocab([]); // Xóa dữ liệu cũ của Unit trước
       try {
         const res = await fetch(`/api/decks/${deckId}/tabs/${currentTab}/vocab`);
-        if (!res.ok) {
-           const errData = await res.json().catch(() => ({}));
-           throw new Error(errData.error || `Lỗi ${res.status} khi nạp từ vựng`);
-        }
+        if (!res.ok) throw new Error();
         const data = await res.json();
         if (active) {
           setActiveVocab(data.vocabulary || []);
           setLoadingVocab(false);
         }
-      } catch (err: any) {
-        if (active) {
-          setErrorVocab(err.message || "Không thể nạp dữ liệu. Vui lòng thử lại.");
-          setLoadingVocab(false);
-        }
+      } catch {
+        if (active) setLoadingVocab(false);
       }
     }
     loadTabVocab();
@@ -275,31 +267,10 @@ export function FlashcardPlayer({ tabs, totalWords, deckTitle, deckDesc, isDemo,
     setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(true);
   }
 
-  if (loadingVocab) {
-    return (
-      <div className={cn("flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground", isKid && "kid-mode")}>
-        <Loader2 className="w-10 h-10 animate-spin text-brand" />
-        <p className="font-medium">Đang nạp từ vựng Unit {currentTab + 1}...</p>
-      </div>
-    );
-  }
-
-  if (errorVocab) {
-    return (
-      <div className={cn("flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground", isKid && "kid-mode")}>
-        <AlertCircle className="w-10 h-10 text-destructive" />
-        <p className="font-medium text-destructive">{errorVocab}</p>
-        <Button variant="outline" size="sm" onClick={() => switchTab(currentTab)}>
-          Thử lại
-        </Button>
-      </div>
-    );
-  }
-
   if (!vocab) {
     return (
       <div className={cn("flex items-center justify-center py-20 text-muted-foreground", isKid && "kid-mode")}>
-        Không có từ vựng nào trong Unit này.
+        Không có từ vựng nào trong bộ Flashcard này.
       </div>
     );
   }

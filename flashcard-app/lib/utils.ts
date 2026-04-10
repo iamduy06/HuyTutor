@@ -95,14 +95,12 @@ export function getDeckAccess(
     canLearnFull = true;
   }
   // Rule 2: Auth - Dành cho thành viên đăng nhập
-  const isAuth = levels.auth === true || levels.authenticated === true;
-  if (isAuth && isLoggedIn) {
+  else if (levels.auth === true && isLoggedIn) {
     canView = true;
     canLearnFull = true;
   }
   // Rule 3: Paid - Dành cho người mua và CÒN HẠN
-  const isPaid = levels.paid === true || levels.authorized === true;
-  if (isPaid && hasAssignment) {
+  else if (levels.paid === true && hasAssignment) {
     canView = true;
     canLearnFull = true;
   }
@@ -144,15 +142,6 @@ export function getCefrColor(cefr: string): string {
 
 export function extractTabs(raw: FlashcardRow["content"]): Tab[] {
   if (!raw) return [];
-
-  // Nếu raw là string (do import CSV or legacy), thử parse JSON
-  if (typeof raw === "string") {
-    try {
-      raw = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
 
   // Format A: { tabs: [...] }
   if (!Array.isArray(raw) && "tabs" in raw && Array.isArray((raw as DeckContent).tabs)) {
