@@ -5,8 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, FolderPlus, BookOpen, MoreVertical,
-  ArrowRightLeft
+  ArrowRightLeft, FileJson, Upload
 } from "lucide-react";
+import { CEFR_LEVELS } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +61,24 @@ export default function GroupDecksPage() {
   const [showMoveDlg, setShowMoveDlg] = useState<{ deckId: string; currentGroupId: string | null } | null>(null);
   const [moveGroupId, setMoveGroupId] = useState<string>("__none__");
 
+  const [showDeckDlg, setShowDeckDlg] = useState(false);
+  const [showBulkTabsDlg, setShowBulkTabsDlg] = useState<string | null>(null); // deckId
+  const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
+
+  const [deckForm, setDeckForm] = useState({
+    title: "",
+    description: "",
+    level_min: "",
+    level_max: "",
+    access_level: "authenticated" as "public" | "authenticated" | "authorized" | "preview",
+    preview_word_limit: 10,
+    group_id: "" as string
+  });
+
+  const [bulkTabsText, setBulkTabsText] = useState("");
+  const [bulkTabsFile, setBulkTabsFile] = useState<File | null>(null);
+  const [bulkTabsMode, setBulkTabsMode] = useState<"file" | "paste">("file");
+
   // ── Group CRUD ─────────────────────────────────────────────────────────────
   const saveGroup = useMutation({
     mutationFn: async () => {
@@ -107,6 +126,66 @@ export default function GroupDecksPage() {
     },
   });
 
+  const saveDeck = useMutation({
+    mutationFn: async () => {
+      const url = editingDeck ? `/api/admin/decks/${editingDeck.id}` : "/api/admin/decks";
+      const method = editingDeck ? "PUT" : "POST";
+      const payload = {
+        title: deckForm.title,
+        description: deckForm.description,
+        level_min: deckForm.level_min || null,
+        level_max: deckForm.level_max || null,
+        access_level: deckForm.access_level,
+        preview_word_limit: deckForm.access_level === "preview" ? deckForm.preview_word_limit : null,
+        group_id: deckForm.group_id || null,
+      };
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-decks"] });
+      setShowDeckDlg(false); setEditingDeck(null);
+      toast({ title: editingDeck ? "Cập nhật Flashcard thành công" : "Tạo Flashcard thành công" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const deleteDeck = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/decks/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-decks"] }); toast({ title: "Đã xóa Flashcard" }); },
+  });
+
+  async function handleBulkTabsImport(deckId: string) {
+    let jsonStr = bulkTabsText.trim();
+    if (bulkTabsMode === "file" && bulkTabsFile) {
+      jsonStr = await bulkTabsFile.text();
+    }
+    if (!jsonStr) {
+      toast({ title: "Chưa có dữ liệu JSON", variant: "destructive" }); return;
+    }
+    let parsed: any;
+    try { parsed = JSON.parse(jsonStr); }
+    catch { toast({ title: "JSON không hợp lệ", variant: "destructive" }); return; }
+
+    const res = await fetch(`/api/admin/decks/${deckId}/tabs`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast({ title: `✅ Import thành công ${data.tabsAdded} tab(s)` });
+      qc.invalidateQueries({ queryKey: ["admin-decks"] });
+      setShowBulkTabsDlg(null);
+    } else {
+      toast({ title: data.error ?? "Import thất bại", variant: "destructive" });
+    }
+  }
+
   // ── Helpers ──
   function toggleGroup(id: string) {
     setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
@@ -122,6 +201,25 @@ export default function GroupDecksPage() {
     setEditingGroup(group);
     setGroupForm({ name: group.name, description: group.description ?? "" });
     setShowGroupDlg(true);
+  }
+
+  function openEditDeck(deck: Deck) {
+    setEditingDeck(deck);
+    setDeckForm({
+      title: deck.title,
+      description: deck.description ?? "",
+      level_min: deck.level_min ?? "",
+      level_max: deck.level_max ?? "",
+      access_level: deck.access_level || "authenticated",
+      preview_word_limit: deck.preview_word_limit ?? 10,
+      group_id: deck.group_id ?? ""
+    });
+    setShowDeckDlg(true);
+  }
+
+  function openBulkImport(deckId: string) {
+    setBulkTabsText(""); setBulkTabsFile(null); setBulkTabsMode("file");
+    setShowBulkTabsDlg(deckId);
   }
 
   const groupedDecks = groups.reduce((acc, group) => {
@@ -183,10 +281,17 @@ export default function GroupDecksPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">Nhóm này chưa có bộ đề nào.</p>
                 ) : (
                   groupedDecks[group.id]?.map(deck => (
-                    <DeckRow key={deck.id} deck={deck} onMove={() => {
-                      setMoveGroupId(deck.group_id ?? "__none__");
-                      setShowMoveDlg({ deckId: deck.id, currentGroupId: deck.group_id ?? null });
-                    }} />
+                    <DeckRow 
+                      key={deck.id} 
+                      deck={deck} 
+                      onMove={() => {
+                        setMoveGroupId(deck.group_id ?? "__none__");
+                        setShowMoveDlg({ deckId: deck.id, currentGroupId: deck.group_id ?? null });
+                      }}
+                      onEdit={() => openEditDeck(deck)}
+                      onDelete={() => { if (confirm("Xóa bộ Flashcard này?")) deleteDeck.mutate(deck.id); }}
+                      onImport={() => openBulkImport(deck.id)}
+                    />
                   ))
                 )}
               </div>
@@ -211,10 +316,17 @@ export default function GroupDecksPage() {
                 <p className="text-sm text-muted-foreground text-center py-8">Tất cả bộ đề đều đã được phân loại.</p>
               ) : (
                 uncategorizedDecks.map(deck => (
-                  <DeckRow key={deck.id} deck={deck} onMove={() => {
+                  <DeckRow 
+                  key={deck.id} 
+                  deck={deck} 
+                  onMove={() => {
                     setMoveGroupId("__none__");
                     setShowMoveDlg({ deckId: deck.id, currentGroupId: null });
-                  }} />
+                  }} 
+                  onEdit={() => openEditDeck(deck)}
+                  onDelete={() => { if (confirm("Xóa bộ Flashcard này?")) deleteDeck.mutate(deck.id); }}
+                  onImport={() => openBulkImport(deck.id)}
+                />
                 ))
               )}
             </div>
@@ -273,11 +385,115 @@ export default function GroupDecksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ════ Dialog: Sửa Deck ════ */}
+      <Dialog open={showDeckDlg} onOpenChange={setShowDeckDlg}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Sửa Flashcard</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Tên Flashcard *</Label>
+              <Input value={deckForm.title} onChange={e => setDeckForm({ ...deckForm, title: e.target.value })} className="mt-1" />
+            </div>
+            <div><Label>Mô tả</Label>
+              <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <Label>Nhóm bộ đề</Label>
+              <Select value={deckForm.group_id || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, group_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Không phân loại" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Không phân loại</SelectItem>
+                  {groups.map((g: any) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-4 p-4 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
+              <div>
+                <Label className="text-[#1a1a2e] font-bold">Quyền truy cập</Label>
+                <Select value={deckForm.access_level} onValueChange={(v: any) => setDeckForm({ ...deckForm, access_level: v })}>
+                  <SelectTrigger className="bg-white mt-2">
+                    <SelectValue placeholder="Chọn quyền truy cập" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Công khai (Public)</SelectItem>
+                    <SelectItem value="authenticated">Cần đăng nhập (Authenticated)</SelectItem>
+                    <SelectItem value="authorized">Cần quyền (Authorized)</SelectItem>
+                    <SelectItem value="preview">Xem trước (Preview)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {deckForm.access_level === "preview" && (
+                <div>
+                  <Label>Giới hạn từ xem trước</Label>
+                  <Input type="number" value={deckForm.preview_word_limit} onChange={e => setDeckForm({ ...deckForm, preview_word_limit: parseInt(e.target.value) || 1 })} className="mt-1 bg-white" />
+                </div>
+              )}
+            </div>
+            <div>
+              <Label>Cấp độ CEFR</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <Select value={deckForm.level_min || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, level_min: v === "__none__" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="Từ" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Không</SelectItem>
+                    {CEFR_LEVELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={deckForm.level_max || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, level_max: v === "__none__" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="Đến" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Không</SelectItem>
+                    {CEFR_LEVELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeckDlg(false)}>Hủy</Button>
+            <Button variant="brand" disabled={saveDeck.isPending || !deckForm.title} onClick={() => saveDeck.mutate()}>
+              {saveDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ Dialog: Import JSON ════ */}
+      <Dialog open={!!showBulkTabsDlg} onOpenChange={() => setShowBulkTabsDlg(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Import JSON (Nhiều Tabs)</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button variant={bulkTabsMode === "file" ? "brand" : "outline"} className="flex-1" onClick={() => setBulkTabsMode("file")}>File</Button>
+              <Button variant={bulkTabsMode === "paste" ? "brand" : "outline"} className="flex-1" onClick={() => setBulkTabsMode("paste")}>Dán mã</Button>
+            </div>
+            {bulkTabsMode === "file" ? (
+              <Input type="file" accept=".json" onChange={e => setBulkTabsFile(e.target.files?.[0] ?? null)} />
+            ) : (
+              <Textarea value={bulkTabsText} onChange={e => setBulkTabsText(e.target.value)} placeholder="Dán JSON vào đây..." className="min-h-[200px]" />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkTabsDlg(null)}>Hủy</Button>
+            <Button variant="brand" onClick={() => showBulkTabsDlg && handleBulkTabsImport(showBulkTabsDlg)}>Import</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function DeckRow({ deck, onMove }: { deck: Deck; onMove: () => void }) {
+function DeckRow({ deck, onMove, onEdit, onDelete, onImport }: { 
+  deck: Deck; 
+  onMove: () => void; 
+  onEdit: () => void;
+  onDelete: () => void;
+  onImport: () => void;
+}) {
   return (
     <div className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] transition-colors">
       <div className="flex items-center gap-3">
@@ -291,9 +507,20 @@ function DeckRow({ deck, onMove }: { deck: Deck; onMove: () => void }) {
           </div>
         </div>
       </div>
-      <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onMove}>
-        <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển nhóm
-      </Button>
+      <div className="flex items-center gap-1.5 font-sans">
+        <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Chuyển nhóm" onClick={onMove}>
+           <ArrowRightLeft className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Import JSON" onClick={onImport}>
+           <FileJson className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Sửa" onClick={onEdit}>
+           <Pencil className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-red-500" title="Xóa" onClick={onDelete}>
+           <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
