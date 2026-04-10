@@ -382,8 +382,8 @@ export default function AdminDecksPage() {
                       {deck.level && <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">{deck.level}</span>}
                       <div className="flex gap-1">
                         {(deck.access_level as any).public && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">🌐 PUBLIC</span>}
-                        {(deck.access_level as any).authenticated && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">🔑 AUTH</span>}
-                        {(deck.access_level as any).authorized && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">🔒 PAID</span>}
+                        {(deck.access_level as any).auth && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">🔑 AUTH</span>}
+                        {(deck.access_level as any).paid && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">💰 PAID</span>}
                         {(deck.access_level as any).preview && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">👁️ PREVIEW</span>}
                       </div>
                       <span className="text-xs text-muted-foreground">({(deck as any).word_count ?? 0} từ)</span>

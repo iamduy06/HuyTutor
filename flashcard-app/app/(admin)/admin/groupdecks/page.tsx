@@ -556,10 +556,10 @@ function DeckRow({ deck, onMove, onEdit, onDelete, onImport }: {
           <span className="font-semibold text-sm text-[#1a1a2e]">{deck.title}</span>
           <div className="flex gap-1 items-center mt-1 flex-wrap">
             <span className="text-[10px] text-muted-foreground mr-1">{deck.word_count ?? 0} từ</span>
-            {(deck.access_level as any).public && <span className="text-[8px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-bold">🌐 PUBLIC</span>}
-            {(deck.access_level as any).auth && <span className="text-[8px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold">🔑 AUTH</span>}
-            {(deck.access_level as any).paid && <span className="text-[8px] bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold">💰 PAID</span>}
-            {(deck.access_level as any).preview && <span className="text-[8px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded font-bold">👁️ PREVIEW</span>}
+            {(deck.access_level as any).public && <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">🌐 PUBLIC</span>}
+            {(deck.access_level as any).auth && <span className="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">🔑 AUTH</span>}
+            {(deck.access_level as any).paid && <span className="text-[8px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">💰 PAID</span>}
+            {(deck.access_level as any).preview && <span className="text-[8px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">👁️ PREVIEW</span>}
           </div>
         </div>
       </div>
