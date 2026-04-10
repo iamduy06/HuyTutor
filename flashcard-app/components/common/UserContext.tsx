@@ -28,18 +28,17 @@ interface UserContextValue {
 const UserContext = createContext<UserContextValue>({
   user: null,
   loading: false,
-  refresh: async () => {},
+  refresh: async () => { },
 });
 
 interface UserProviderProps {
   children: ReactNode;
-  initialUser: UserProfile | null;
 }
 
-export function UserProvider({ children, initialUser }: UserProviderProps) {
-  const [user,    setUser]    = useState<UserProfile | null>(initialUser);
+export function UserProvider({ children }: UserProviderProps) {
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
-  
+
   // Dùng ref để track request ID mới nhất, tránh race condition
   const fetchRequestId = useRef(0);
   // Dùng ref để track timeout ID cho fail-safe
@@ -62,11 +61,11 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     const supabase = getSupabaseClient();
-    
+
     // Fetch profile chính
     const { data: profile } = await supabase
       .from("users").select("*").eq("id", userId).single();
-      
+
     if (!profile) return null;
 
     // Kiểm tra xem có là subadmin của bất kỳ nhóm nào không
@@ -88,7 +87,7 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
     const currentId = ++fetchRequestId.current;
     setLoading(true);
     startFailSafe();
-    
+
     try {
       const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
       if (authUser) {
@@ -117,7 +116,7 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
       async (event, session) => {
         const currentId = ++fetchRequestId.current;
         console.log(`[USER_CONTEXT] Auth event: ${event} (ID:${currentId})`);
-        
+
         switch (event) {
           case "SIGNED_IN":
           case "TOKEN_REFRESHED":
@@ -179,7 +178,7 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
       subscription.unsubscribe();
       clearFailSafe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
