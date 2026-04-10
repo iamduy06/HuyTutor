@@ -29,11 +29,9 @@ export function formatDate(dateStr: string): string {
  * KHÔNG hết hạn khi:
  *   - expired_at là NULL → học mãi mãi
  */
-export function isExpired(expiredAt: string | null | undefined): boolean {
-  if (!expiredAt) return false;           // ← NULL/undefined = không bao giờ hết hạn
-  const expiryDate = new Date(expiredAt);
-  if (isNaN(expiryDate.getTime())) return false; // Tránh lỗi ngày tháng không hợp lệ
-  return expiryDate < new Date();
+export function isExpired(expiredAt: string | null): boolean {
+  if (!expiredAt) return false;           // ← NULL = không hết hạn
+  return new Date(expiredAt) <= new Date();
 }
 
 /**
@@ -57,7 +55,7 @@ export interface DeckAccess {
  */
 export function getDeckAccess(
   user: { role: string } | null,
-  deck: { access_level: any; preview_word_limit?: number },
+  deck: { access_level: string; preview_word_limit?: number },
   userDeck: { expired_at: string | null } | null
 ): DeckAccess {
   // Admin có toàn quyền
@@ -65,20 +63,12 @@ export function getDeckAccess(
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
-  // Chấp nhận cả string (legacy) hoặc object (JSONB)
-  const al = deck.access_level;
-  const levels = typeof al === "string"
-    ? { public: al === "public", authenticated: al === "authenticated", authorized: al === "authorized", preview: al === "preview" }
-    : {
-        public: !!al?.public,
-        authenticated: !!al?.authenticated,
-        authorized: !!al?.authorized,
-        preview: !!al?.preview
-      };
+  const { access_level, preview_word_limit } = deck as any;
+  const levels = typeof access_level === "string" 
+    ? { public: access_level === "public", authenticated: access_level === "authenticated", authorized: access_level === "authorized", preview: access_level === "preview" }
+    : access_level;
 
-  const preview_word_limit = deck.preview_word_limit;
-  const hasAssignment = userDeck !== null;
-  const assignmentExpired = hasAssignment && isExpired(userDeck.expired_at);
+  const hasAssignment = userDeck !== null && !isExpired(userDeck.expired_at);
   const isLoggedIn = user !== null;
 
   let canView = false;
@@ -96,19 +86,16 @@ export function getDeckAccess(
     canLearnFull = true;
   }
 
-  // Rule 3: Authorized - Requires assignment and NOT EXPIRED
-  if (levels.authorized && hasAssignment && !assignmentExpired) {
+  // Rule 3: Authorized - Requires specific assignment and NOT EXPIRED
+  if (levels.authorized && hasAssignment) {
     canView = true;
     canLearnFull = true;
   }
 
-  // CAUTION: Nếu có assignment nhưng HẾT HẠN, và deck KHÔNG phải public/auth, 
-  // thì dù có preview:true cũng không được học full.
-  
   // Rule 4: Preview - Show limited words if not already full access
   if (levels.preview && !canLearnFull) {
     canView = true;
-    // logic isPreview sẽ được dùng ở page để quyết định render gì
+    // canLearnFull stays false
   }
 
   return {
@@ -117,6 +104,9 @@ export function getDeckAccess(
     isPreview: levels.preview && !canLearnFull,
     previewLimit: preview_word_limit ?? 10
   };
+
+  // Mặc định: Từ chối
+  return { canView: false, canLearnFull: false, isPreview: false, previewLimit: null };
 }
 
 export function getCefrColor(cefr: string): string {
