@@ -528,7 +528,7 @@ export default function AdminDecksPage() {
 
       {/* ════ Dialog: Tạo/Sửa Deck ════ */}
       <Dialog open={showDeckDlg} onOpenChange={setShowDeckDlg}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingDeck ? "Sửa Flashcard" : "Tạo Flashcard mới"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Tên Flashcard *</Label>
@@ -634,7 +634,7 @@ export default function AdminDecksPage() {
 
       {/* ════ Dialog: Thêm Tab ════ */}
       <Dialog open={!!showTabDlg} onOpenChange={() => setShowTabDlg(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Thêm Tab / Unit mới</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>ID (ví dụ: de1, unit-1)</Label>
@@ -732,7 +732,7 @@ export default function AdminDecksPage() {
 
       {/* ════ Dialog: Sửa Tab ════ */}
       <Dialog open={!!showEditTabDlg} onOpenChange={() => setShowEditTabDlg(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>✏️ Sửa Tab / Unit</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>ID</Label>

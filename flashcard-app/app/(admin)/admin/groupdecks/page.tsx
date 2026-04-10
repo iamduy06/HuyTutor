@@ -336,7 +336,7 @@ export default function GroupDecksPage() {
 
       {/* ════ Dialog: Tạo/Sửa Nhóm ════ */}
       <Dialog open={showGroupDlg} onOpenChange={setShowGroupDlg}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingGroup ? "Sửa Nhóm" : "Tạo Nhóm Mới"}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
@@ -359,7 +359,7 @@ export default function GroupDecksPage() {
 
       {/* ════ Dialog: Chuyển Nhóm ════ */}
       <Dialog open={!!showMoveDlg} onOpenChange={() => setShowMoveDlg(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Chuyển vào Nhóm</DialogTitle></DialogHeader>
           <div className="py-4">
             <Select value={moveGroupId} onValueChange={setMoveGroupId}>
@@ -388,7 +388,7 @@ export default function GroupDecksPage() {
 
       {/* ════ Dialog: Sửa Deck ════ */}
       <Dialog open={showDeckDlg} onOpenChange={setShowDeckDlg}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Sửa Flashcard</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Tên Flashcard *</Label>
@@ -464,7 +464,7 @@ export default function GroupDecksPage() {
 
       {/* ════ Dialog: Import JSON ════ */}
       <Dialog open={!!showBulkTabsDlg} onOpenChange={() => setShowBulkTabsDlg(null)}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Import JSON (Nhiều Tabs)</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
