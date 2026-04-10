@@ -136,6 +136,7 @@ export default async function DashboardPage() {
                   expiredAt={isFree ? null : expired_at}  // public không show hạn
                   deckId={deck.id}
                   showExpiry={!isFree}
+                  isAssigned={true}
                 />
               );
             })}
@@ -154,6 +155,7 @@ export default async function DashboardPage() {
                 expiredAt={null}
                 deckId={deck.id}
                 showExpiry={false}
+                isAssigned={false}
               />
             ))}
 
@@ -168,7 +170,7 @@ export default async function DashboardPage() {
 interface DeckCardProps {
   title: string;
   description: string | null;
-  accessLevel: string;
+  accessLevel: any; // update to any for flexibility
   active: boolean;
   words: number;
   streak: number;
@@ -176,14 +178,14 @@ interface DeckCardProps {
   expiredAt: string | null;
   deckId: string;
   showExpiry: boolean;
+  isAssigned: boolean;
 }
  
 function DeckCard({
   title, description, accessLevel, active, words, streak,
-  progressPercent, expiredAt, deckId, showExpiry,
+  progressPercent, expiredAt, deckId, showExpiry, isAssigned
 }: DeckCardProps) {
-  const levels = (accessLevel as any) ?? {};
-  const isFree = levels.public || levels.authenticated;
+  const levels = accessLevel ?? {};
   return (
     <div className={`bg-white rounded-2xl border-2 p-5 flex flex-col transition-all hover:shadow-md ${
       active ? "border-[#f0e0e7] hover:border-brand" : "border-red-200"
@@ -197,14 +199,15 @@ function DeckCard({
           {title}
         </h3>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          {isFree
-            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
-                🌐 {levels.public ? "Miễn phí" : "Thành viên"}
-              </span>
-            : <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                {active ? "Còn hạn" : "Hết hạn"}
-              </span>
-          }
+          {isAssigned ? (
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+              {active ? "Còn hạn" : "Hết hạn"}
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
+              🌐 Miễn phí
+            </span>
+          )}
         </div>
       </div>
 
@@ -227,13 +230,21 @@ function DeckCard({
           </div>
         )}
 
-        {showExpiry && expiredAt && (
-          <div className={`text-xs font-medium ${active ? "text-green-600" : "text-red-500"}`}>
-            {active ? "✅" : "⛔"} Hạn: {new Date(expiredAt).toLocaleDateString("vi-VN")}
+        {isAssigned && !active ? (
+          <div className="text-xs text-red-500 font-bold bg-red-50 p-2 rounded-lg border border-red-100">
+            ⚠️ Đã hết hạn. Vui lòng liên hệ page Facebook để gia hạn.
           </div>
-        )}
-        {showExpiry && !expiredAt && (
-          <div className="text-xs text-green-600 font-medium">♾️ Không giới hạn thời gian</div>
+        ) : (
+          <>
+            {showExpiry && expiredAt && (
+              <div className={`text-xs font-medium ${active ? "text-green-600" : "text-red-500"}`}>
+                {active ? "✅" : "⛔"} Hạn: {new Date(expiredAt).toLocaleDateString("vi-VN")}
+              </div>
+            )}
+            {showExpiry && !expiredAt && (
+              <div className="text-xs text-green-600 font-medium">♾️ Không giới hạn thời gian</div>
+            )}
+          </>
         )}
       </div>
 
@@ -244,7 +255,6 @@ function DeckCard({
               Học ngay →
             </Link>
           : <a href={FACEBOOK_URL} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-1 py-2 px-4 rounded-lg border-2 border-[#f0e0e7] text-sm font-semibold hover:border-brand hover:text-brand transition-colors">
-              💬 Gia hạn
             </a>
         }
       </div>
