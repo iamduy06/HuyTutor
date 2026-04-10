@@ -119,6 +119,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ success: true });
   }
 
+  // Bulk update expiry for all assigned decks
+  if (body.action === "bulk_update_expiry") {
+    const { expired_at } = body;
+    const expiredAtValue: string | null = expired_at?.trim() ? expired_at : null;
+
+    const { error } = await supabase.from("user_decks")
+      .update({ expired_at: expiredAtValue })
+      .eq("user_id", params.id);
+    
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
 

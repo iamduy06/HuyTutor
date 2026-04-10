@@ -316,7 +316,22 @@ export default function AdminUsersPage() {
     },
     onError: () => toast({ title: "Thất bại", variant: "destructive" }),
   });
+  const bulkUpdateExpiry = useMutation({
+    mutationFn: async ({ userId, expiredAt }: { userId: string; expiredAt: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk_update_expiry", expired_at: expiredAt || null }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Đã cập nhật hạn dùng cho tất cả Flashcards" });
+    },
+    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+  });
 
+  const [bulkExp, setBulkExp] = useState("");
 
   // ── CSV Upload ─────────────
   const handleCsvUpload = async () => {
@@ -359,6 +374,7 @@ export default function AdminUsersPage() {
     if (type === "DECKS") {
       setAssignDeckIds(new Set());
       setAssignExpiry("");
+      setBulkExp("");
     }
     if (type === "DEVICES") {
       setEditMaxDevices(user.max_devices?.toString() || "");
@@ -699,39 +715,44 @@ export default function AdminUsersPage() {
                       onRevoke={() => { if(confirm("Thu hồi Flashcard này? Tiến trình học sẽ mất.")) revokeDeck.mutate({ userId: currentUserData.id, deckId: ud.deck_id }) }}
                     />
                   ))}
+
+                  {/* Bulk Action: Expiry */}
+                  {currentUserData.user_decks.length > 1 && (
+                    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                      <Label className="text-orange-800 text-xs font-bold uppercase mb-2 block">Thao tác tập trung (Bulk Edit)</Label>
+                      <div className="flex gap-2">
+                        <Input type="datetime-local" className="flex-1 bg-white" 
+                          value={bulkExp} onChange={e => setBulkExp(e.target.value)} />
+                        <Button variant="brand" size="sm" 
+                           className="flex-shrink-0"
+                          onClick={() => { if(confirm("Cập nhật hạn mới cho TẤT CẢ các bộ Flashcard đã gán?")) bulkUpdateExpiry.mutate({ userId: currentUserData.id, expiredAt: bulkExp }) }}>
+                          Cập nhật tất cả
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-orange-600 mt-1.5">* Sẽ ghi đè hạn dùng của mọi bộ thẻ hiện tại của người dùng này.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Assign new deck */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div className="bg-[#f8f9fa] border-2 border-[#f0e0e7] rounded-xl p-4">
                <h3 className="font-semibold mb-3">Giao Flashcard mới</h3>
-               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-3 divide-y">
-                 {decks.map(d => {
-                    const alreadyHas = currentUserData?.user_decks?.some(ud => ud.deck_id === d.id);
-                    if (alreadyHas) return null;
-                    const checked = assignDeckIds.has(d.id);
-                    return (
-                      <label key={d.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-brand-light transition">
-                         <input type="checkbox" checked={checked} onChange={e => {
-                           const next = new Set(assignDeckIds);
-                           if (e.target.checked) next.add(d.id); else next.delete(d.id);
-                           setAssignDeckIds(next);
-                         }} className="accent-brand flex-shrink-0" />
-                         <div className="flex-1 min-w-0">
-                           <div className={`text-sm ${checked ? "font-bold text-brand" : ""}`}>{d.title}</div>
-                         </div>
-                      </label>
-                    )
-                 })}
-               </div>
-               <div>
+               <AdminAssignDeckList 
+                decks={decks} 
+                currentUserData={currentUserData} 
+                assignDeckIds={assignDeckIds} 
+                setAssignDeckIds={setAssignDeckIds} 
+               />
+               <div className="mt-4">
                  <Label>Ngày hết hạn (Tuỳ chọn)</Label>
                  <Input type="datetime-local" value={assignExpiry} onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
                </div>
-               <Button className="mt-3 w-full" variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
+               <Button className="mt-4 w-full" variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
                  onClick={() => assignDeck.mutate({ userId: currentUserData!.id, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
-                 Giao {assignDeckIds.size} Flashcard đã chọn
+                 {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                 Xác nhận giao {assignDeckIds.size} Flashcard đã chọn
                </Button>
             </div>
           </div>
@@ -853,4 +874,51 @@ function DeckProgressEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUp
       </div>
     </div>
   )
+}
+
+function AdminAssignDeckList({ decks, currentUserData, assignDeckIds, setAssignDeckIds }: any) {
+  const assignable = decks.filter((d: any) =>
+    !currentUserData?.user_decks?.some((ud: any) => ud.deck_id === d.id)
+  );
+  const allSelected = assignable.length > 0 && assignable.every((d: any) => assignDeckIds.has(d.id));
+
+  function toggleAll() {
+    const next = new Set(assignDeckIds);
+    if (allSelected) { assignable.forEach((d: any) => next.delete(d.id)); }
+    else             { assignable.forEach((d: any) => next.add(d.id)); }
+    setAssignDeckIds(next);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <Label className="text-xs text-muted-foreground">Danh sách chưa giao</Label>
+        {assignable.length > 0 && (
+          <button type="button" onClick={toggleAll}
+            className="text-xs font-bold text-brand hover:underline">
+            {allSelected ? "✕ Bỏ chọn tất cả" : "✓ Chọn tất cả"}
+          </button>
+        )}
+      </div>
+      <div className="max-h-48 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl bg-white divide-y divide-[#f0e0e7]">
+        {assignable.length === 0 ? (
+          <p className="text-xs text-muted-foreground p-4 text-center italic">Đã giao toàn bộ bộ thẻ hiện có.</p>
+        ) : assignable.map((d: any) => {
+          const checked = assignDeckIds.has(d.id);
+          return (
+            <label key={d.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors hover:bg-brand-light ${checked ? "bg-brand-light/50" : ""}`}>
+              <input type="checkbox" checked={checked} onChange={e => {
+                const next = new Set(assignDeckIds);
+                if (e.target.checked) next.add(d.id); else next.delete(d.id);
+                setAssignDeckIds(next);
+              }} className="w-4 h-4 accent-brand flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm truncate ${checked ? "font-bold text-brand" : "text-[#1a1a2e]"}`}>{d.title}</div>
+              </div>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  );
 }

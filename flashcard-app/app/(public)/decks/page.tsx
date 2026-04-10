@@ -14,15 +14,17 @@ export default async function DecksPage() {
     .or("access_level->public.eq.true,access_level->preview.eq.true")
     .order("created_at", { ascending: true });
 
-  const { data: cards } = await supabase
-    .from("flashcards")
-    .select("deck_id, content");
-
+  // Fetch only cards for the visible decks to be efficient and avoid Supabase limits
+  const deckIds = (decks ?? []).map(d => d.id);
+  const { data: cards } = deckIds.length > 0 
+    ? await supabase.from("flashcards").select("deck_id, content").in("deck_id", deckIds)
+    : { data: [] };
+  
   const wordMap: Record<string, number> = {};
   (cards ?? []).forEach((r: any) => {
     wordMap[r.deck_id] = (wordMap[r.deck_id] ?? 0) + countWords(r as unknown as FlashcardRow);
   });
-
+  
   const formatted = (decks ?? []).map(d => ({ ...d, word_count: wordMap[d.id] ?? 0 }));
 
   return (
