@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Volume2, 
-  Loader2, 
-  AlertCircle 
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, getCefrColor, toArray } from "@/lib/utils";
 import type { Tab, VocabItem } from "@/types";
