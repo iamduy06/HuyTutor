@@ -37,14 +37,19 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: true }),
   ]);
 
-  // Gộp: assigned decks + public/auth decks chưa được assign
-  const assignedDeckIds = new Set((userDecks ?? []).map((ud: any) => ud.deck_id as string));
+  // Lọc userDecks dựa trên access_level (chỉ hiện nếu có public, auth hoặc paid)
+  const filteredUserDecks = (userDecks ?? []).filter((ud: any) => {
+    const levels = ud.deck?.access_level ?? {};
+    return levels.public === true || levels.auth === true || levels.paid === true;
+  });
 
+  // Gộp: assigned decks + public/auth decks chưa được assign
+  const assignedDeckIds = new Set(filteredUserDecks.map((ud: any) => ud.deck_id as string));
   const extraPublicDecks = (publicDecks ?? []).filter(d => !assignedDeckIds.has(d.id));
 
   // Word count cho tất cả deck cần hiển thị
   const allDeckIds = [
-    ...(userDecks ?? []).map((ud: any) => ud.deck_id as string),
+    ...filteredUserDecks.map((ud: any) => ud.deck_id as string),
     ...extraPublicDecks.map(d => d.id),
   ];
 
@@ -60,16 +65,17 @@ export default async function DashboardPage() {
   });
 
   // Stats: count active = assigned có hạn + tất cả public
-  const maxStreak = (userDecks ?? []).reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
-  const totalLearned = (userDecks ?? []).reduce((s: number, ud: any) => s + ((ud.learned_count as number) ?? 0), 0);
-  const activeAssigned = (userDecks ?? []).filter((ud: any) => {
-    const deck = ud.deck as any;
-    if (deck?.access_level === "public" || deck?.access_level === "authenticated") return true;
+  const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
+  const totalLearned = filteredUserDecks.reduce((s: number, ud: any) => s + ((ud.learned_count as number) ?? 0), 0);
+  
+  const activeAssigned = filteredUserDecks.filter((ud: any) => {
+    const levels = ud.deck?.access_level ?? {};
+    if (levels.public === true || levels.auth === true) return true;
     return hasFullAccess(ud.expired_at as string | null);
   }).length;
-  const activeCount = activeAssigned + extraPublicDecks.length;
 
-  const totalDecks = (userDecks ?? []).length + extraPublicDecks.length;
+  const activeCount = activeAssigned + extraPublicDecks.length;
+  const totalDecks = filteredUserDecks.length + extraPublicDecks.length;
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-[5%] py-10">
@@ -112,11 +118,11 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
             {/* ── Assigned decks ── */}
-            {(userDecks ?? []).map((ud: any) => {
+            {filteredUserDecks.map((ud: any) => {
               const deck = ud.deck as any;
               const expired_at = ud.expired_at as string | null;
               const levels = deck?.access_level ?? {};
-              const isFree = levels.public || levels.authenticated;
+              const isFree = levels.public || levels.auth;
               // Free decks luôn active; restricted check expired_at
               const active = isFree || hasFullAccess(expired_at);
               const words = wordCountMap[ud.deck_id as string] ?? 0;
