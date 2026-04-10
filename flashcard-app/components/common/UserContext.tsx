@@ -141,10 +141,19 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
             break;
 
           case "SIGNED_OUT":
+            // Double check: Đôi khi Supabase phát SIGNED_OUT giả khi đang refresh token
+            // hoặc khi tab bị ngủ. Ta không xoá user ngay mà check thực tế.
             if (currentId === fetchRequestId.current) {
-              setUser(null);
-              setLoading(false);
-              clearFailSafe();
+              getSupabaseClient().auth.getSession().then(({ data: { session: currentSession } }) => {
+                if (!currentSession && currentId === fetchRequestId.current) {
+                  console.log(`[USER_CONTEXT] Sign out confirmed (ID:${currentId})`);
+                  setUser(null);
+                  setLoading(false);
+                  clearFailSafe();
+                } else {
+                  console.log(`[USER_CONTEXT] Ignored SIGNED_OUT event (session still exists) (ID:${currentId})`);
+                }
+              });
             }
             break;
 
