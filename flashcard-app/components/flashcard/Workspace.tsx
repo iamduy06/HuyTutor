@@ -13,6 +13,7 @@ interface DeckData {
   deck: { id: string; title: string; description: string | null };
   tabs: Tab[];
   isDemo: boolean;
+  previewLimit?: number;
   totalWords: number;
 }
 
@@ -84,6 +85,7 @@ export function Workspace({ deckId }: WorkspaceProps) {
       deckTitle={data.deck.title}
       deckDesc={data.deck.description ?? undefined}
       isDemo={data.isDemo}
+      previewLimit={data.previewLimit}
     />
   );
 }
