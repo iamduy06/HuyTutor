@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { getDeckAccess } from "@/lib/utils";
 import { Workspace } from "@/components/flashcard/Workspace";
+import { AccessDeniedView } from "@/components/flashcard/AccessDeniedView";
 
 interface Props { params: { deckId: string } }
 
@@ -19,7 +20,7 @@ export default async function LearningPage({ params }: Props) {
     { data: userProfile },
     { data: userDeck }
   ] = await Promise.all([
-    adminSupabase.from("decks").select("id, access_level, preview_word_limit").eq("id", params.deckId).single(),
+    adminSupabase.from("decks").select("id, title, access_level, preview_word_limit").eq("id", params.deckId).single(),
     adminSupabase.from("users").select("role").eq("id", user.id).single(),
     adminSupabase.from("user_decks").select("expired_at").eq("user_id", user.id).eq("deck_id", params.deckId).maybeSingle()
   ]);
@@ -35,8 +36,8 @@ export default async function LearningPage({ params }: Props) {
       // Nếu là preview, đẩy ra trang giới thiệu để học thử
       redirect(`/decks/${params.deckId}`);
     } else {
-      // Nếu không có quyền gì cả, đẩy về dashboard
-      redirect("/dashboard");
+      // Nếu không có quyền (vd: Hết hạn), hiển thị màn hình báo lỗi đếm ngược
+      return <AccessDeniedView deckTitle={deck.title} />;
     }
   }
 
