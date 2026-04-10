@@ -103,6 +103,7 @@ export default async function DeckDetailPage({ params }: Props) {
         deckTitle={deck.title}
         deckDesc={deck.description ?? undefined}
         isDemo={isPreview}
+        previewLimit={access.previewLimit ?? 10}
         deckId={access.canLearnFull ? deck.id : undefined}
       />
     </div>

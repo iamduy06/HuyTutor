@@ -32,11 +32,11 @@ export async function GET(
 
   const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
-  if (!access.canLearnFull) {
-    return NextResponse.json({ error: "Forbidden: Full access required" }, { status: 403 });
+  if (!access.canLearnFull && !access.isPreview) {
+    return NextResponse.json({ error: "Forbidden: Access required" }, { status: 403 });
   }
 
-  // 3. Trả về full content
+  // 3. Lấy data
   const { data: rows } = await adminSupabase
     .from("flashcards")
     .select("content, created_at")
@@ -47,14 +47,31 @@ export async function GET(
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
+  let finalTabs = allTabs;
+  let isDemo = false;
+
+  if (!access.canLearnFull && access.isPreview) {
+    const limit = access.previewLimit || 10;
+    let seen = 0;
+    finalTabs = allTabs.map(tab => {
+      const remaining = limit - seen;
+      if (remaining <= 0) return null;
+      const vocab = (tab.vocabulary ?? []).slice(0, remaining);
+      seen += vocab.length;
+      return { ...tab, vocabulary: vocab };
+    }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
+    isDemo = true;
+  }
+
   return NextResponse.json({ 
     deck: {
       id: deck.id,
       title: deck.title,
       description: deck.description
     },
-    tabs: allTabs, 
-    isDemo: false,
-    totalWords: allTabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0)
+    tabs: finalTabs, 
+    isDemo: isDemo,
+    previewLimit: access.previewLimit,
+    totalWords: allTabs.reduce((s, t) => s + t.vocabulary.length, 0)
   });
 }

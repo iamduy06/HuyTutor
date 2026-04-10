@@ -15,6 +15,7 @@ interface Props {
   deckTitle: string;
   deckDesc?: string;
   isDemo?: boolean;
+  previewLimit?: number;
 }
 
 // ── TTS ─────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ function browserTTS(text: string) {
 
 // ── Component ────────────────────────────────────────────────────
 
-export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: Props) {
+export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimit, deckId }: Props) {
   const [currentTab,   setCurrentTab]   = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped,    setIsFlipped]    = useState(false);
@@ -301,7 +302,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, deckId }: P
                 ? "bg-yellow-50 border-2 border-yellow-300 text-yellow-700 font-bold text-base"
                 : "bg-yellow-50 border border-yellow-200 text-yellow-700")}>
               {isKid ? "🎁 Bản thử — " : "🎯 Bản demo — "}
-              tối đa 10 từ.{" "}
+              tối đa {previewLimit ?? 10} từ.{" "}
               <Link href="/login" className={cn("font-bold underline", isKid ? "text-purple-600" : "text-brand")}>
                 Đăng nhập
               </Link>{" "}để học đầy đủ.
