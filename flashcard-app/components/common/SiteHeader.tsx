@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser, getSupabaseClient } from "@/components/common/UserContext";
@@ -9,8 +10,12 @@ import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 
 export function SiteHeader() {
+  const pathname = usePathname();
   const { user, loading } = useUser();
   const { toast } = useToast();
+
+  const isLearningPage = pathname.startsWith("/learning/") || pathname.startsWith("/decks/");
+  const showModeToggle = isLearningPage && pathname.split("/").length >= 3;
 
   async function handleLogout() {
     try {
@@ -61,7 +66,7 @@ export function SiteHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        <UIModeToggle />
+        {showModeToggle && <UIModeToggle />}
 
         {loading && !user ? (
           <div className="w-10 h-8 flex items-center justify-center">
