@@ -7,17 +7,29 @@ import { Menu, X, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
+import { 
+  LayoutDashboard, Users, BookOpen, 
+  BarChart3, ArrowLeftRight, Monitor, Shield 
+} from "lucide-react";
+
 interface NavItem {
   href: string;
   label: string;
   icon: any;
 }
 
-interface AdminSidebarProps {
-  navItems: NavItem[];
-}
+const navItems: NavItem[] = [
+  { href: "/admin",               label: "Tổng quan",     icon: LayoutDashboard },
+  { href: "/admin/users",         label: "Người dùng",    icon: Users           },
+  { href: "/admin/subadmins",     label: "SubAdmin",      icon: Shield          },
+  { href: "/admin/decks",         label: "Flashcard",    icon: BookOpen        },
+  { href: "/admin/groupdecks",    label: "Nhóm bộ đề",    icon: ArrowLeftRight  },
+  { href: "/admin/devices",       label: "Thiết bị",      icon: Monitor         },
+  { href: "/admin/analytics",     label: "Thống kê",      icon: BarChart3       },
+  { href: "/admin/import-export", label: "Import/Export", icon: ArrowLeftRight  },
+];
 
-export function AdminSidebar({ navItems }: AdminSidebarProps) {
+export function AdminSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
