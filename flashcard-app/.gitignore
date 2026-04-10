@@ -3,6 +3,7 @@
 /.pnp
 .pnp.js
 
+/supbase/db
 /prompt
 
 # testing
