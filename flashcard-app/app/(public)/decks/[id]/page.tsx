@@ -17,7 +17,7 @@ export default async function DeckDetailPage({ params }: Props) {
   // 1. Fetch Metadata
   const { data: deck } = await adminSupabase
     .from("decks")
-    .select("id, title, description, level, access_level, preview_word_limit")
+    .select("id, title, description, level, access_level")
     .eq("id", params.id)
     .single();
 

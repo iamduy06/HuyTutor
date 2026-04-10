@@ -13,7 +13,7 @@ export async function GET(
 
   const { data: deck, error } = await adminSupabase
     .from("decks")
-    .select("id, title, description, level, access_level, preview_word_limit")
+    .select("id, title, description, level, access_level")
     .eq("id", params.id)
     .single();
 

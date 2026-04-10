@@ -19,7 +19,7 @@ export default async function LearningPage({ params }: Props) {
     { data: userProfile },
     { data: userDeck }
   ] = await Promise.all([
-    adminSupabase.from("decks").select("id, access_level, preview_word_limit").eq("id", params.deckId).single(),
+    adminSupabase.from("decks").select("id, access_level").eq("id", params.deckId).single(),
     adminSupabase.from("users").select("role").eq("id", user.id).single(),
     adminSupabase.from("user_decks").select("expired_at").eq("user_id", user.id).eq("deck_id", params.deckId).maybeSingle()
   ]);

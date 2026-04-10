@@ -12,15 +12,14 @@ export async function GET(
   // 1. Lấy thông tin deck và giới hạn preview
   const { data: deck, error: deckError } = await adminSupabase
     .from("decks")
-    .select("id, preview_word_limit")
+    .select("id, access_level")
     .eq("id", params.id)
     .single();
 
-  if (deckError || !deck) {
-    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
-  }
+  if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const limit = deck.preview_word_limit || 10;
+  const levels = (deck.access_level as any) || {};
+  const limit = levels.preview_word_limit || 10;
 
   // 2. Lấy content
   const { data: rows } = await adminSupabase

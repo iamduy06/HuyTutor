@@ -51,11 +51,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { title, description, level_min, level_max, access_level, preview_word_limit, group_id } = body;
+  const { title, description, level_min, level_max, access_level, group_id } = body;
   const levelStr = computeLevelStr(body.level_min ?? null, body.level_max ?? null);
 
-  const limitNum = parseInt(preview_word_limit);
-  if (access_level?.preview === true && (isNaN(limitNum) || limitNum <= 0)) {
+  const levels = access_level || {};
+  if (levels.preview === true && (!levels.preview_word_limit || levels.preview_word_limit <= 0)) {
     return NextResponse.json({ error: "preview_word_limit must be > 0 when preview access is enabled" }, { status: 400 });
   }
 

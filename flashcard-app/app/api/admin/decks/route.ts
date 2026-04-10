@@ -25,7 +25,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("decks")
-    .select("id, title, description, level, level_min, level_max, access_level, preview_word_limit, group_id, created_at")
+    .select("id, title, description, level, level_min, level_max, access_level, group_id, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,15 +55,11 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { 
-    title, description, level_min, level_max, 
-    access_level = { public: false, authenticated: false, authorized: true, preview: false }, 
-    preview_word_limit, group_id 
-  } = body;
+  const { title, description, level_min, level_max, access_level, group_id } = body;
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
-  const limitNum = parseInt(preview_word_limit);
-  if (access_level?.preview === true && (isNaN(limitNum) || limitNum <= 0)) {
+  const levels = access_level || {};
+  if (levels.preview === true && (!levels.preview_word_limit || levels.preview_word_limit <= 0)) {
     return NextResponse.json({ error: "preview_word_limit must be > 0 when preview access is enabled" }, { status: 400 });
   }
 

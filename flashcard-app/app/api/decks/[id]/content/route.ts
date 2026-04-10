@@ -14,7 +14,7 @@ export async function GET(
   // 1. Lấy thông tin deck
   const { data: deck } = await adminSupabase
     .from("decks")
-    .select("id, title, description, access_level, preview_word_limit")
+    .select("id, title, description, access_level")
     .eq("id", params.id)
     .single();
 
