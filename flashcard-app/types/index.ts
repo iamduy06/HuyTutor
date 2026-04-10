@@ -47,8 +47,16 @@ export interface Deck {
   level_max?: string | null;
   access_level: "public" | "authenticated" | "authorized" | "preview";
   preview_word_limit?: number;
+  group_id?: string | null;
   created_at: string;
   word_count?: number;
+}
+
+export interface DeckGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
 }
 
 // ─── JSONB Content ─────────────────────────────────────────────────────────

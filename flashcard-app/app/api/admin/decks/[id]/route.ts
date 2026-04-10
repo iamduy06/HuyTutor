@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { title, description, level_min, level_max, access_level, preview_word_limit } = body;
+  const { title, description, level_min, level_max, access_level, preview_word_limit, group_id } = body;
   const levelStr = computeLevelStr(body.level_min ?? null, body.level_max ?? null);
 
   if (access_level && !["public", "authenticated", "authorized", "preview"].includes(access_level)) {
@@ -72,6 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       level: levelStr,
       level_min: level_min ?? null,
       level_max: level_max ?? null,
+      group_id: group_id === undefined ? undefined : (group_id || null),
       ...(access_level ? { access_level } : {}),
       ...(access_level === 'preview' ? { preview_word_limit: limitNum } : {}),
     })

@@ -40,6 +40,12 @@ async function fetchAdminDecks(): Promise<Deck[]> {
   return (await res.json()).decks ?? [];
 }
 
+async function fetchDeckGroups(): Promise<DeckGroup[]> {
+  const res = await fetch("/api/admin/deck-groups");
+  const data = await res.json();
+  return data.groups ?? [];
+}
+
 async function fetchDeckDetail(deckId: string): Promise<DeckDetail> {
   const res  = await fetch(`/api/admin/decks/${deckId}`);
   const data = await res.json();
@@ -59,6 +65,10 @@ export default function AdminDecksPage() {
 
   const { data: decks = [], isLoading } = useQuery({
     queryKey: ["admin-decks"], queryFn: fetchAdminDecks,
+  });
+
+  const { data: groups = [] } = useQuery({
+    queryKey: ["admin-deck-groups"], queryFn: fetchDeckGroups,
   });
 
   const [expandedDeck, setExpandedDeck] = useState<string | null>(null);
@@ -83,7 +93,8 @@ export default function AdminDecksPage() {
     level_min: "", 
     level_max: "", 
     access_level: "authenticated" as "public" | "authenticated" | "authorized" | "preview",
-    preview_word_limit: 10
+    preview_word_limit: 10,
+    group_id: "" as string
   });
   const [tabForm,  setTabForm]  = useState({ id: "", label: "", desc: "" });
   const [wordForm, setWordForm] = useState(EMPTY_WORD);
@@ -122,6 +133,7 @@ export default function AdminDecksPage() {
         level_max: deckForm.level_max || null,
         access_level: deckForm.access_level,
         preview_word_limit: deckForm.access_level === "preview" ? deckForm.preview_word_limit : null,
+        group_id: deckForm.group_id || null,
       };
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -282,7 +294,8 @@ export default function AdminDecksPage() {
       level_min: "", 
       level_max: "", 
       access_level: "authenticated",
-      preview_word_limit: 10
+      preview_word_limit: 10,
+      group_id: ""
     }); 
     setShowDeckDlg(true);
   }
@@ -301,7 +314,8 @@ export default function AdminDecksPage() {
       level_min: deck.level_min ?? "", 
       level_max: deck.level_max ?? "", 
       access_level: al,
-      preview_word_limit: deck.preview_word_limit ?? 10
+      preview_word_limit: deck.preview_word_limit ?? 10,
+      group_id: deck.group_id ?? ""
     });
     setShowDeckDlg(true);
   }
@@ -522,6 +536,20 @@ export default function AdminDecksPage() {
             </div>
             <div><Label>Mô tả</Label>
               <Textarea value={deckForm.description} onChange={e => setDeckForm({ ...deckForm, description: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <Label>Nhóm bộ đề</Label>
+              <Select value={deckForm.group_id || "__none__"} onValueChange={v => setDeckForm({ ...deckForm, group_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Không phân loại" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Không phân loại</SelectItem>
+                  {groups.map((g: any) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-4 p-4 bg-[#f8f9fa] rounded-xl border border-[#f0e0e7]">
               <div>
