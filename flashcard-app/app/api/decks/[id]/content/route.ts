@@ -21,6 +21,15 @@ export async function GET(
   if (!deck) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // 2. Kiểm tra quyền dùng getDeckAccess
+  const { data: { user } } = await supabase.auth.getUser();
+  const [
+    { data: userProfile },
+    { data: userDeck }
+  ] = await Promise.all([
+    user ? adminSupabase.from("users").select("role").eq("id", user.id).single() : Promise.resolve({ data: null }),
+    user ? adminSupabase.from("user_decks").select("expired_at").eq("user_id", user.id).eq("deck_id", params.id).maybeSingle() : Promise.resolve({ data: null })
+  ]);
+
   const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
   if (!access.canLearnFull) {
