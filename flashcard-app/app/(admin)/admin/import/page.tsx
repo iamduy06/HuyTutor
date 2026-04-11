@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { 
   Upload, Download, FileJson, FileSpreadsheet, 
   CheckCircle, XCircle, AlertCircle, Loader2, 
-  Copy, Check, Info
+  Copy, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,9 @@ export default function ImportPage() {
   const [activeTab, setActiveTab] = useState<ImportType>("groups");
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualType, setManualType] = useState<"json" | "csv">("json");
+  const [manualData, setManualData] = useState("");
 
   const templates = {
     groups: {
@@ -107,7 +109,6 @@ export default function ImportPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Instructions Card */}
           <div className="md:col-span-2 bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 md:p-6 shadow-sm">
              <h3 className="font-bold text-base md:text-lg mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-brand" /> Hướng dẫn Import
@@ -152,7 +153,6 @@ export default function ImportPage() {
              </div>
           </div>
 
-          {/* Upload Card / Manual Input */}
           <div className={`bg-white rounded-2xl border-2 p-6 shadow-md flex flex-col items-center transition-all ${manualMode ? "border-brand-light ring-2 ring-brand-light/20" : "border-brand"}`}>
             {!manualMode ? (
               <>
@@ -161,7 +161,6 @@ export default function ImportPage() {
                 </div>
                 <h4 className="font-bold mb-2 text-sm md:text-base">Tải tệp lên</h4>
                 <p className="text-[10px] md:text-xs text-muted-foreground mb-6">Chọn file CSV hoặc JSON.</p>
-                
                 <label className="w-full cursor-pointer">
                   <input ref={fileRef} type="file" accept=".json,.csv" className="hidden" onChange={handleFileUpload} disabled={importing} />
                   <div className={`py-2.5 px-4 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2
@@ -173,16 +172,10 @@ export default function ImportPage() {
             ) : (
               <div className="w-full h-full flex flex-col">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-bold text-brand">CHỌN ĐỊNH DẠNG:</span>
+                  <span className="text-xs font-bold text-brand">ĐỊNH DẠNG:</span>
                   <div className="flex bg-gray-100 rounded-lg p-0.5">
-                    <button 
-                      onClick={() => setManualType("json")}
-                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "json" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}
-                    >JSON</button>
-                    <button 
-                      onClick={() => setManualType("csv")}
-                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "csv" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}
-                    >CSV</button>
+                    <button onClick={() => setManualType("json")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "json" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}>JSON</button>
+                    <button onClick={() => setManualType("csv")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "csv" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}>CSV</button>
                   </div>
                 </div>
                 <textarea 
@@ -191,11 +184,7 @@ export default function ImportPage() {
                   value={manualData}
                   onChange={(e) => setManualData(e.target.value)}
                 />
-                <Button 
-                  className="w-full mt-4 bg-brand hover:bg-brand-dark text-white rounded-xl py-5"
-                  disabled={!manualData.trim() || importing}
-                  onClick={() => processData(manualData, manualType)}
-                >
+                <Button className="w-full mt-4 bg-brand hover:bg-brand-dark text-white rounded-xl py-5" disabled={!manualData.trim() || importing} onClick={() => processData(manualData, manualType)}>
                   {importing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : "Thực hiện Import"}
                 </Button>
               </div>
@@ -203,7 +192,6 @@ export default function ImportPage() {
           </div>
         </div>
 
-        {/* Results Section */}
         {results && (
           <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 md:p-6 shadow-sm overflow-hidden auto-scroll-mt">
              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
@@ -213,14 +201,13 @@ export default function ImportPage() {
                    <span className="text-red-600">LỖI: {results.filter(r => r.status === "error").length}</span>
                 </div>
              </div>
-
              <div className="overflow-x-auto rounded-xl border border-[#f0e0e7]">
                 <table className="w-full text-sm">
                    <thead className="bg-gray-50 border-b border-[#f0e0e7]">
                       <tr>
                          <th className="text-left p-4 font-bold text-[#1a1a2e]">Định danh</th>
                          <th className="text-left p-4 font-bold text-[#1a1a2e]">Trạng thái</th>
-                         <th className="text-left p-4 font-bold text-[#1a1a2e]">Chi tiết / Mật khẩu</th>
+                         <th className="text-left p-4 font-bold text-[#1a1a2e]">Chi tiết</th>
                       </tr>
                    </thead>
                    <tbody>
@@ -228,41 +215,16 @@ export default function ImportPage() {
                         <tr key={i} className="border-b border-[#f0e0e7] last:border-0 hover:bg-gray-50 transition-colors">
                            <td className="p-4 font-medium">{r.id || r.email || "N/A"}</td>
                            <td className="p-4">
-                              {r.status === "success" && (
-                                <span className="flex items-center gap-1.5 text-green-700 font-bold text-[10px] bg-green-50 px-2 py-1 rounded-full uppercase">
-                                  <CheckCircle className="w-3.5 h-3.5" /> Thành công
-                                </span>
-                              )}
-                              {r.status === "partial" && (
-                                <span className="flex items-center gap-1.5 text-yellow-700 font-bold text-[10px] bg-yellow-50 px-2 py-1 rounded-full uppercase">
-                                  <AlertCircle className="w-3.5 h-3.5" /> Một phần
-                                </span>
-                              )}
-                              {r.status === "error" && (
-                                <span className="flex items-center gap-1.5 text-red-700 font-bold text-[10px] bg-red-50 px-2 py-1 rounded-full uppercase">
-                                  <XCircle className="w-3.5 h-3.5" /> Thất bại
-                                </span>
-                              )}
+                              {r.status === "success" && <span className="text-green-700 font-bold text-[10px] bg-green-50 px-2 py-1 rounded-full uppercase">Thành công</span>}
+                              {r.status === "error" && <span className="text-red-700 font-bold text-[10px] bg-red-50 px-2 py-1 rounded-full uppercase">Thất bại</span>}
                            </td>
                            <td className="p-4">
                               <div className="flex flex-col gap-1">
-                                <span className={`text-xs ${r.status === "error" ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
-                                  {r.message || r.error || "—"}
-                                </span>
+                                <span className="text-xs text-muted-foreground">{r.message || r.error || "—"}</span>
                                 {r.tempPassword && (
                                   <div className="flex items-center gap-2 mt-1">
-                                    <code className="bg-brand-light text-brand font-mono text-[10px] px-2 py-0.5 rounded-md font-bold">
-                                      {r.tempPassword}
-                                    </code>
-                                    <button 
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(r.tempPassword);
-                                        toast({ title: "Đã copy mật khẩu" });
-                                      }}
-                                       className="text-brand hover:text-brand-dark"
-                                    >
-                                      <Copy className="w-3.5 h-3.5" />
-                                    </button>
+                                    <code className="bg-brand-light text-brand font-mono text-[10px] px-2 py-0.5 rounded-md font-bold">{r.tempPassword}</code>
+                                    <button onClick={() => { navigator.clipboard.writeText(r.tempPassword); toast({ title: "Đã copy mật khẩu" }); }} className="text-brand hover:text-brand-dark"><Copy className="w-3.5 h-3.5" /></button>
                                   </div>
                                 )}
                               </div>
