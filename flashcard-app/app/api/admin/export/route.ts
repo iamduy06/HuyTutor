@@ -84,10 +84,14 @@ export async function GET(request: NextRequest) {
         user: g.users.map((u: any) => u.email),
         deck: g.decks.map((d: any) => d.id)
       }));
-      return NextResponse.json(mini);
+      return new Response(JSON.stringify(mini, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    return NextResponse.json(exportData);
+    return new Response(JSON.stringify(exportData, null, 2), {
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   // 2. EXPORT DECKS
@@ -101,15 +105,21 @@ export async function GET(request: NextRequest) {
 
     if (format === "json_mini") {
       const mini = (decks ?? []).map(d => ({ id: d.id, name: d.title }));
-      return NextResponse.json(mini);
+      return new Response(JSON.stringify(mini, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     if (format === "json_ids") {
       const ids = (decks ?? []).map(d => d.id);
-      return NextResponse.json({ id: ids });
+      return new Response(JSON.stringify({ id: ids }, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    return NextResponse.json(decks);
+    return new Response(JSON.stringify(decks, null, 2), {
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   // 3. EXPORT USERS
@@ -155,10 +165,14 @@ export async function GET(request: NextRequest) {
         email: u.email,
         deck: u.decks.map((d: any) => ({ id: d.id }))
       }));
-      return NextResponse.json(mini);
+      return new Response(JSON.stringify(mini, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    return NextResponse.json(exportData);
+    return new Response(JSON.stringify(exportData, null, 2), {
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   return NextResponse.json({ error: "Invalid type" }, { status: 400 });
