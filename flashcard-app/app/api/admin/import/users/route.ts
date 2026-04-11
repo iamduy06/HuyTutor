@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   for (const row of rows) {
     const email       = row.email;
-    const password    = row.password || generatePassword(10);
+    const password    = row.password || "goidangkyflashcard";
     const groupId     = row.group_id || DEFAULT_GROUP_ID;
     const role        = (row.role || "USER").toUpperCase();
     const deckList    = parseStringArray(row.deck);

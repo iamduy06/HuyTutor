@@ -31,8 +31,8 @@ export default function ImportPage() {
       json: [{ id: "DECK_ID", user: ["email1", "id2"], expire_at: "31/12/2025" }]
     },
     users: {
-      csv: "email,password,group_id,role,deck,expire_at\nuser@test.com,pass123,GROUP_ID,USER,\"deck1, deck2\",31/12/2025",
-      json: [{ email: "user@test.com", password: "p1", group_id: "GID", role: "USER", deck: ["d1", "d2"], expire_at: "31/12/2025" }]
+      csv: "email,password,group_id,role,deck,expire_at\nuser@test.com,goidangkyflashcard,GROUP_ID,USER,\"deck1, deck2\",31/12/2025",
+      json: [{ email: "user@test.com", password: "goidangkyflashcard", group_id: "GID", role: "USER", deck: ["d1", "d2"], expire_at: "31/12/2025" }]
     }
   };
 
@@ -130,7 +130,7 @@ export default function ImportPage() {
                 {activeTab === "users" && (
                   <ul className="list-disc pl-5 space-y-1">
                     <li><b>email:</b> Bắt buộc. Nếu user đã tồn tại sẽ cập nhật quyền.</li>
-                    <li><b>password:</b> Để trống để tự động tạo mật khẩu ngẫu nhiên.</li>
+                    <li><b>password:</b> Để trống để tự động gán mật khẩu mặc định: <code>goidangkyflashcard</code></li>
                     <li><b>group_id:</b> Mặc định hệ thống gán vào nhóm Guest nếu bỏ trống.</li>
                     <li><b>deck:</b> Danh sách ID bộ đề gán trực tiếp cho người dùng.</li>
                   </ul>
