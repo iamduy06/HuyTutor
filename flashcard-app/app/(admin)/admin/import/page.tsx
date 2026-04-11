@@ -50,25 +50,16 @@ export default function ImportPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  async function processData(text: string, format: "json" | "csv") {
     setImporting(true);
     setResults(null);
-
     try {
       let data: any[] = [];
-      const text = await file.text();
-
-      if (file.name.endsWith(".json")) {
+      if (format === "json") {
         data = JSON.parse(text);
-      } else if (file.name.endsWith(".csv")) {
-        data = csvToObjects(text);
       } else {
-        throw new Error("Định dạng file không hỗ trợ (.csv hoặc .json)");
+        data = csvToObjects(text);
       }
-
       if (!Array.isArray(data)) data = [data];
 
       const res = await fetch(`/api/admin/import/${activeTab}`, {
@@ -79,98 +70,145 @@ export default function ImportPage() {
 
       const resultData = await res.json();
       setResults(resultData);
-      
       const successCount = resultData.filter((r: any) => r.status === "success").length;
-      toast({ title: `✅ Đã xử lý xong. ${successCount}/${resultData.length} thành công.` });
+      toast({ title: `✅ Xong. ${successCount}/${resultData.length} thành công.` });
+      if (manualMode) setManualData(""); 
     } catch (err: any) {
       toast({ title: "Lỗi Import", description: err.message, variant: "destructive" });
     } finally {
       setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const format = file.name.endsWith(".json") ? "json" : "csv";
+    const text = await file.text();
+    await processData(text, format);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
         <Upload className="w-8 h-8 text-brand" />
-        <h1 className="text-2xl font-extrabold text-[#1a1a2e]">📦 Nhập dữ liệu nâng cao</h1>
+        <h1 className="text-xl md:text-2xl font-extrabold text-[#1a1a2e]">📦 Nhập dữ liệu nâng cao</h1>
       </div>
-      <p className="text-muted-foreground text-sm mb-8">Hỗ trợ gán dữ liệu hàng loạt cho Nhóm, Bộ đề và Người dùng.</p>
+      <p className="text-muted-foreground text-xs md:text-sm mb-6 md:mb-8">Hỗ trợ gán dữ liệu hàng loạt cho Nhóm, Bộ đề và Người dùng.</p>
 
       <Tabs defaultValue="groups" onValueChange={(v) => setActiveTab(v as ImportType)} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-[#f0e0e7] p-1 h-auto rounded-xl mb-8">
-          <TabsTrigger value="groups" className="rounded-lg py-3 font-bold data-[state=active]:bg-white data-[state=active]:text-brand">1. Nhóm (Groups)</TabsTrigger>
-          <TabsTrigger value="decks" className="rounded-lg py-3 font-bold data-[state=active]:bg-white data-[state=active]:text-brand">2. Bộ đề (Decks)</TabsTrigger>
-          <TabsTrigger value="users" className="rounded-lg py-3 font-bold data-[state=active]:bg-white data-[state=active]:text-brand">3. Người dùng (Users)</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2 mb-6 scrollbar-hide">
+          <TabsList className="flex w-max min-w-full bg-[#f0e0e7] p-1 h-auto rounded-xl">
+            <TabsTrigger value="groups" className="flex-1 rounded-lg py-2 md:py-3 px-4 md:px-6 font-bold text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:text-brand whitespace-nowrap">1. Nhóm (Groups)</TabsTrigger>
+            <TabsTrigger value="decks" className="flex-1 rounded-lg py-2 md:py-3 px-4 md:px-6 font-bold text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:text-brand whitespace-nowrap">2. Bộ đề (Decks)</TabsTrigger>
+            <TabsTrigger value="users" className="flex-1 rounded-lg py-2 md:py-3 px-4 md:px-6 font-bold text-xs md:text-sm data-[state=active]:bg-white data-[state=active]:text-brand whitespace-nowrap">3. Người dùng (Users)</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Instructions Card */}
-          <div className="md:col-span-2 bg-white rounded-2xl border-2 border-[#f0e0e7] p-6 shadow-sm">
-             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <Info className="w-5 h-5 text-brand" /> Hướng dẫn Import {activeTab === "groups" ? "Nhóm" : activeTab === "decks" ? "Bộ đề" : "Người dùng"}
+          <div className="md:col-span-2 bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 md:p-6 shadow-sm">
+             <h3 className="font-bold text-base md:text-lg mb-4 flex items-center gap-2">
+                <Info className="w-5 h-5 text-brand" /> Hướng dẫn Import
              </h3>
-             <div className="space-y-3 text-sm text-[#495057]">
+             <div className="space-y-3 text-xs md:text-sm text-[#495057]">
                 {activeTab === "groups" && (
                   <ul className="list-disc pl-5 space-y-1">
-                    <li><b>ID:</b> Phải là ID của nhóm đã tồn tại trong hệ thống.</li>
-                    <li><b>users & decks:</b> Hỗ trợ Email hoặc ID, ngăn cách bằng dấu phẩy.</li>
-                    <li><b>expire_at:</b> Định dạng dd/mm/yyyy hoặc dd-mm-yyyy.</li>
-                    <li><b>assign_all:</b> TRUE để tự động gán bộ đề cho từng user trong nhóm.</li>
+                    <li><b>ID:</b> Phải là ID của nhóm đã tồn tại.</li>
+                    <li><b>users & decks:</b> Email hoặc ID, ngăn cách bằng dấu phẩy.</li>
+                    <li><b>assign_all:</b> TRUE để tự động gán.</li>
                   </ul>
                 )}
                 {activeTab === "decks" && (
                   <ul className="list-disc pl-5 space-y-1">
-                    <li><b>ID:</b> ID của Flashcard (Bộ đề) đã tồn tại.</li>
-                    <li><b>user:</b> Danh sách Email hoặc ID người dùng cần gán.</li>
-                    <li><b>expire_at:</b> Hạn sử dụng bộ đề (mặc định vĩnh viễn nếu bỏ trống).</li>
+                    <li><b>ID:</b> ID của Bộ đề đã tồn tại.</li>
+                    <li><b>user:</b> Danh sách Email hoặc ID người dùng.</li>
                   </ul>
                 )}
                 {activeTab === "users" && (
                   <ul className="list-disc pl-5 space-y-1">
-                    <li><b>email:</b> Bắt buộc. Nếu user đã tồn tại sẽ cập nhật quyền.</li>
-                    <li><b>password:</b> Để trống để tự động gán mật khẩu mặc định: <code>goidangkyflashcard</code></li>
-                    <li><b>group_id:</b> Mặc định hệ thống gán vào nhóm Guest nếu bỏ trống.</li>
-                    <li><b>deck:</b> Danh sách ID bộ đề gán trực tiếp cho người dùng.</li>
+                    <li><b>email:</b> Bắt buộc.</li>
+                    <li><b>password:</b> Trống = <code>goidangkyflashcard</code></li>
                   </ul>
                 )}
              </div>
 
-             <div className="flex gap-3 mt-8">
-                <Button variant="outline" size="sm" className="gap-2 border-brand text-brand hover:bg-brand-light" onClick={() => downloadTemplate("csv")}>
-                  <FileSpreadsheet className="w-4 h-4" /> Tải mẫu CSV
+             <div className="flex flex-wrap gap-2 mt-6">
+                <Button variant="outline" size="sm" className="gap-2 border-brand text-brand hover:bg-brand-light text-xs" onClick={() => downloadTemplate("csv")}>
+                  <FileSpreadsheet className="w-4 h-4" /> Mẫu CSV
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2 border-brand text-brand hover:bg-brand-light" onClick={() => downloadTemplate("json")}>
-                  <FileJson className="w-4 h-4" /> Tải mẫu JSON
+                <Button variant="outline" size="sm" className="gap-2 border-brand text-brand hover:bg-brand-light text-xs" onClick={() => downloadTemplate("json")}>
+                  <FileJson className="w-4 h-4" /> Mẫu JSON
+                </Button>
+                <Button 
+                  variant={manualMode ? "default" : "outline"} 
+                  size="sm" 
+                  className={`gap-2 text-xs ${manualMode ? "bg-brand" : "border-brand text-brand"}`} 
+                  onClick={() => setManualMode(!manualMode)}
+                >
+                  {manualMode ? "Đóng nhập liệu" : "Dán dữ liệu trực tiếp"}
                 </Button>
              </div>
           </div>
 
-          {/* Upload Card */}
-          <div className="bg-white rounded-2xl border-2 border-brand p-6 shadow-md flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-full bg-brand-light flex items-center justify-center mb-4">
-               <Upload className="w-8 h-8 text-brand" />
-            </div>
-            <h4 className="font-bold mb-2">Tải tệp lên</h4>
-            <p className="text-xs text-muted-foreground mb-6">Chọn file CSV hoặc JSON đã chuẩn bị theo mẫu.</p>
-            
-            <label className="w-full cursor-pointer">
-              <input ref={fileRef} type="file" accept=".json,.csv" className="hidden" onChange={handleFileUpload} disabled={importing} />
-              <div className={`py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                ${importing ? "bg-gray-100 text-gray-400" : "bg-brand text-white hover:bg-brand-dark shadow-lg shadow-brand/20"}`}>
-                {importing ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang tải...</> : "Chọn tệp tin"}
+          {/* Upload Card / Manual Input */}
+          <div className={`bg-white rounded-2xl border-2 p-6 shadow-md flex flex-col items-center transition-all ${manualMode ? "border-brand-light ring-2 ring-brand-light/20" : "border-brand"}`}>
+            {!manualMode ? (
+              <>
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-brand-light flex items-center justify-center mb-4">
+                  <Upload className="w-6 h-6 md:w-8 md:h-8 text-brand" />
+                </div>
+                <h4 className="font-bold mb-2 text-sm md:text-base">Tải tệp lên</h4>
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-6">Chọn file CSV hoặc JSON.</p>
+                
+                <label className="w-full cursor-pointer">
+                  <input ref={fileRef} type="file" accept=".json,.csv" className="hidden" onChange={handleFileUpload} disabled={importing} />
+                  <div className={`py-2.5 px-4 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2
+                    ${importing ? "bg-gray-100 text-gray-400" : "bg-brand text-white hover:bg-brand-dark shadow-lg shadow-brand/20"}`}>
+                    {importing ? <><Loader2 className="w-4 h-4 animate-spin" /> ...</> : "Chọn tệp tin"}
+                  </div>
+                </label>
+              </>
+            ) : (
+              <div className="w-full h-full flex flex-col">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-bold text-brand">CHỌN ĐỊNH DẠNG:</span>
+                  <div className="flex bg-gray-100 rounded-lg p-0.5">
+                    <button 
+                      onClick={() => setManualType("json")}
+                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "json" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}
+                    >JSON</button>
+                    <button 
+                      onClick={() => setManualType("csv")}
+                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${manualType === "csv" ? "bg-white text-brand shadow-sm" : "text-gray-500"}`}
+                    >CSV</button>
+                  </div>
+                </div>
+                <textarea 
+                  className="flex-1 w-full min-h-[120px] p-3 text-xs font-mono border-2 border-gray-100 rounded-xl focus:border-brand focus:ring-0 resize-none bg-gray-50"
+                  placeholder={manualType === "json" ? '[{ "id": "...", ... }]' : "id,users,decks..."}
+                  value={manualData}
+                  onChange={(e) => setManualData(e.target.value)}
+                />
+                <Button 
+                  className="w-full mt-4 bg-brand hover:bg-brand-dark text-white rounded-xl py-5"
+                  disabled={!manualData.trim() || importing}
+                  onClick={() => processData(manualData, manualType)}
+                >
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : "Thực hiện Import"}
+                </Button>
               </div>
-            </label>
+            )}
           </div>
         </div>
 
         {/* Results Section */}
         {results && (
-          <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-6 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-             <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-lg">📊 Kết quả xử lý ({results.length} bản ghi)</h3>
-                <div className="flex gap-4 text-xs font-bold">
+          <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 md:p-6 shadow-sm overflow-hidden auto-scroll-mt">
+             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
+                <h3 className="font-bold text-base md:text-lg">📊 Kết quả xử lý ({results.length})</h3>
+                <div className="flex gap-4 text-[10px] md:text-xs font-bold">
                    <span className="text-green-600">THÀNH CÔNG: {results.filter(r => r.status === "success").length}</span>
                    <span className="text-red-600">LỖI: {results.filter(r => r.status === "error").length}</span>
                 </div>
