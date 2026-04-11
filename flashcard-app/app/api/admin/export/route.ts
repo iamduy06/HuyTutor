@@ -75,7 +75,12 @@ export async function GET(request: NextRequest) {
 
     if (format === "csv") {
       const csv = jsonToCsv(exportData, ["id", "name", "user_emails", "deck_titles", "created_at"]);
-      return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="groups.csv"' } });
+      return new Response("\ufeff" + csv, { 
+        headers: { 
+          "Content-Type": "text/csv; charset=utf-8", 
+          "Content-Disposition": 'attachment; filename="groups.csv"' 
+        } 
+      });
     }
 
     if (format === "json_mini") {
@@ -100,7 +105,12 @@ export async function GET(request: NextRequest) {
     
     if (format === "csv") {
       const csv = jsonToCsv(decks ?? [], ["id", "title", "description", "level", "level_min", "level_max", "access_level", "created_at"]);
-      return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="decks.csv"' } });
+      return new Response("\ufeff" + csv, { 
+        headers: { 
+          "Content-Type": "text/csv; charset=utf-8", 
+          "Content-Disposition": 'attachment; filename="decks.csv"' 
+        } 
+      });
     }
 
     if (format === "json_mini") {
@@ -156,7 +166,12 @@ export async function GET(request: NextRequest) {
 
     if (format === "csv") {
       const csv = jsonToCsv(exportData, ["id", "email", "role", "max_device", "deck_ids_str", "device_names"]);
-      return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="users.csv"' } });
+      return new Response("\ufeff" + csv, { 
+        headers: { 
+          "Content-Type": "text/csv; charset=utf-8", 
+          "Content-Disposition": 'attachment; filename="users.csv"' 
+        } 
+      });
     }
 
     if (format === "json_mini") {

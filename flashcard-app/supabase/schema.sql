@@ -216,12 +216,42 @@ CREATE POLICY "Admin: user_devices full" ON public.user_devices FOR ALL USING (p
 -- ── 6. TRIGGERS ────────────────────────────────────────────────
 
 -- Tự động tạo record trong public.users khi có user signup tại auth.users
+-- Tự động tạo record trong public.users và phân nhóm hệ thống khi có user signup tại auth.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_group_id UUID;
+  v_role TEXT;
+  v_is_admin_created BOOLEAN;
+  v_skip_system BOOLEAN;
 BEGIN
+  -- Lấy role và các flag từ metadata
+  v_role := COALESCE(NEW.raw_user_meta_data->>'role', 'USER');
+  v_is_admin_created := (NEW.raw_user_meta_data->>'created_by_admin')::BOOLEAN;
+  v_skip_system := (NEW.raw_user_meta_data->>'skip_system_group')::BOOLEAN;
+
+  -- A. Insert profile vào public.users
   INSERT INTO public.users (id, email, role)
-  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'role', 'USER'))
-  ON CONFLICT (id) DO NOTHING;
+  VALUES (NEW.id, NEW.email, v_role)
+  ON CONFLICT (id) DO UPDATE 
+  SET email = EXCLUDED.email;
+
+  -- B. Tự động phân nhóm (Bỏ qua nếu có flag skip_system_group)
+  IF v_skip_system IS TRUE THEN
+    v_group_id := NULL;
+  ELSIF v_is_admin_created = true THEN
+    SELECT id INTO v_group_id FROM public.groups WHERE name = 'SYSTEM_ADMIN_CREATED' LIMIT 1;
+  ELSE
+    SELECT id INTO v_group_id FROM public.groups WHERE name = 'SYSTEM_REGISTERED' LIMIT 1;
+  END IF;
+
+  -- C. Insert vào group_users cho các nhóm hệ thống
+  IF v_group_id IS NOT NULL THEN
+    INSERT INTO public.group_users (group_id, user_id, is_subadmin)
+    VALUES (v_group_id, NEW.id, false)
+    ON CONFLICT (group_id, user_id) DO NOTHING;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -237,5 +267,15 @@ INSERT INTO public.app_settings (key, value)
 VALUES ('global_max_devices', '3')
 ON CONFLICT (key) DO NOTHING;
 
--- Ghi chú: Subadmin tạo user qua app sẽ tự gán role='USER' vào metadata 
--- và app sẽ chịu trách nhiệm gán group_users ngay sau khi tạo thành công.
+-- Khởi tạo các nhóm hệ thống
+INSERT INTO public.groups (name, description, max_users)
+VALUES 
+  ('SYSTEM_ADMIN_CREATED', 'Nhóm hệ thống chứa người dùng do Admin tạo', 999999),
+  ('SYSTEM_REGISTERED', 'Nhóm hệ thống chứa người dùng tự đăng ký', 999999)
+ON CONFLICT (name) DO NOTHING;
+
+-- Ghi chú: 
+-- 1. User đăng ký tự do sẽ vào nhóm SYSTEM_REGISTERED
+-- 2. Admin tạo user (có created_by_admin=true) sẽ vào nhóm SYSTEM_ADMIN_CREATED
+-- 3. Subadmin tạo user hoặc Admin chọn nhóm cụ thể (có skip_system_group=true) sẽ không vào nhóm hệ thống.
+
