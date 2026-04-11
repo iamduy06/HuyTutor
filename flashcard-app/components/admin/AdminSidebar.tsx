@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 
 import { 
   LayoutDashboard, Users, BookOpen, 
-  BarChart3, ArrowLeftRight, Monitor, Shield 
+  BarChart3, ArrowLeftRight, Monitor, Shield,
+  Upload, Download
 } from "lucide-react";
 
 interface NavItem {
@@ -26,7 +27,8 @@ const navItems: NavItem[] = [
   { href: "/admin/groupdecks",    label: "Nhóm bộ đề",    icon: ArrowLeftRight  },
   { href: "/admin/devices",       label: "Thiết bị",      icon: Monitor         },
   { href: "/admin/analytics",     label: "Thống kê",      icon: BarChart3       },
-  { href: "/admin/import-export", label: "Import/Export", icon: ArrowLeftRight  },
+  { href: "/admin/import",        label: "Import",        icon: Upload          },
+  { href: "/admin/export",        label: "Export",        icon: Download        },
 ];
 
 export function AdminSidebar() {
