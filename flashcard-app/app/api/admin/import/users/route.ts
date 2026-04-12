@@ -77,7 +77,13 @@ export async function POST(request: NextRequest) {
       await supabase.from("users").update({ role }).eq("id", userId);
     } else {
       const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-        email, password, email_confirm: true
+        email, 
+        password, 
+        email_confirm: true,
+        user_metadata: {
+          created_by_admin: true,
+          skip_system_group: true
+        }
       });
       if (authErr || !authUser.user) {
         results.push({ email, status: "error", error: authErr?.message || "Lỗi tạo tài khoản" });
