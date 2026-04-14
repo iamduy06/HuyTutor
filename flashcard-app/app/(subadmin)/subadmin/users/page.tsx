@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, RefreshCw, Trash2, BookOpen, Loader2,
-  Copy, Check, Shield, Shuffle
+  Copy, Check, Shield, Shuffle, Key,
+  ChevronDown, ChevronUp, TrendingUp, BarChart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,15 @@ import { useToast } from "@/hooks/use-toast";
 interface UserDevice { id: string; device_id: string; device_name: string | null; ip_address: string | null; last_seen: string; }
 interface ManagedGroup { group_id: string; groups: { id: string; name: string; max_users: number; max_device_per_user: number; } }
 interface DeckItem { id: string; title: string; level?: string; word_count?: number; group_expired_at?: string | null; }
-interface UserDeckItem { id: string; deck_id: string; expired_at: string | null; deck?: { title: string } }
+interface UserDeckItem {
+  id: string;
+  deck_id: string;
+  expired_at: string | null;
+  learned_count?: number;
+  progress_percent?: number;
+  streak?: number;
+  deck?: { title: string }
+}
 interface UserData {
   id: string; email: string; role: string; created_at: string; max_devices?: number;
   user_decks?: UserDeckItem[];
@@ -43,32 +52,50 @@ async function fetchData() {
   return {
     users: (usersJson.users ?? []) as UserData[],
     managedGroups: (usersJson.managed_groups ?? []) as ManagedGroup[],
-    me:    usersJson.me    as MeInfo,
+    me: usersJson.me as MeInfo,
     decks: (decksJson.decks ?? []) as DeckItem[],
   };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function SubAdminUsersPage() {
-  const qc      = useQueryClient();
+  const qc = useQueryClient();
   const { toast } = useToast();
 
-  const [search,       setSearch]       = useState("");
-  const [showCreate,   setShowCreate]   = useState(false);
-  const [newEmail,     setNewEmail]     = useState("");
-  const [newRole,      setNewRole]      = useState("USER");
-  const [newPassword,  setNewPassword]  = useState("");
+  const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState("USER");
+  const [newPassword, setNewPassword] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
-  const [tempPw,       setTempPw]       = useState("");
-  const [copied,       setCopied]       = useState(false);
+  const [tempPw, setTempPw] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const [showAssign,     setShowAssign]     = useState<string | null>(null);
-  const [assignDeckIds,  setAssignDeckIds]  = useState<Set<string>>(new Set());
-  const [assignExpiry,   setAssignExpiry]   = useState("");
+  const [showAssign, setShowAssign] = useState<string | null>(null);
+  const [assignDeckIds, setAssignDeckIds] = useState<Set<string>>(new Set());
+  const [assignExpiry, setAssignExpiry] = useState("");
 
-  const [showResetDlg,   setShowResetDlg]  = useState(false);
-  const [resetResult,    setResetResult]   = useState<{ email: string; pw: string } | null>(null);
-  const [resetCopied,    setResetCopied]   = useState(false);
+  const [showResetDlg, setShowResetDlg] = useState(false);
+  const [resetResult, setResetResult] = useState<{ email: string; pw: string } | null>(null);
+  const [resetCopied, setResetCopied] = useState(false);
+
+  // Progress & Flashcard Expansion State
+  const [expandedProgress, setExpandedProgress] = useState<Set<string>>(new Set());
+  const [expandedFlashcards, setExpandedFlashcards] = useState<Set<string>>(new Set());
+
+  const toggleProgress = (userId: string) => {
+    const next = new Set(expandedProgress);
+    if (next.has(userId)) next.delete(userId);
+    else next.add(userId);
+    setExpandedProgress(next);
+  };
+
+  const toggleFlashcards = (userId: string) => {
+    const next = new Set(expandedFlashcards);
+    if (next.has(userId)) next.delete(userId);
+    else next.add(userId);
+    setExpandedFlashcards(next);
+  };
 
   // Device Management State
   const [showDevices, setShowDevices] = useState<UserData | null>(null);
@@ -82,7 +109,7 @@ export default function SubAdminUsersPage() {
   const users = data?.users ?? [];
   const decks = data?.decks ?? [];
   const managedGroups = data?.managedGroups ?? [];
-  const me    = data?.me;
+  const me = data?.me;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createUser = useMutation({
@@ -209,11 +236,11 @@ export default function SubAdminUsersPage() {
   });
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const filtered     = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
   const assignedUser = users.find(u => u.id === showAssign);
-  const maxUsers     = me?.max_managed_users ?? 10;
-  const isAdmin      = me?.role === "ADMIN";
-  const atLimit      = !isAdmin && (me?.current_managed ?? 0) >= maxUsers;
+  const maxUsers = me?.max_managed_users ?? 10;
+  const isAdmin = me?.role === "ADMIN";
+  const atLimit = !isAdmin && (me?.current_managed ?? 0) >= maxUsers;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -232,10 +259,10 @@ export default function SubAdminUsersPage() {
         <Button variant="brand"
           disabled={atLimit}
           title={atLimit ? `Đã đạt giới hạn ${maxUsers} tài khoản` : ""}
-          onClick={() => { 
-            setShowCreate(true); 
-            setTempPw(""); 
-            setNewEmail(""); 
+          onClick={() => {
+            setShowCreate(true);
+            setTempPw("");
+            setNewEmail("");
             setNewRole("USER");
             setSelectedGroup(managedGroups[0]?.group_id || "");
           }}>
@@ -267,14 +294,15 @@ export default function SubAdminUsersPage() {
       ) : (
         <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed min-w-[1050px]">
               <thead>
                 <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa]">
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Email</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Role</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Ngày tạo</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Flashcard</th>
-                  <th className="text-left p-3 font-bold text-[#1a1a2e]">Thao tác</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[20%]">Email</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[8%]">Role</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[10%]">Ngày tạo</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[12%]">Flashcard</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[38%]">Tiến độ học tập</th>
+                  <th className="text-left p-3 font-bold text-[#1a1a2e] w-[12%]">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -282,64 +310,143 @@ export default function SubAdminUsersPage() {
                   <tr key={u.id} className="border-b border-[#f0e0e7] hover:bg-[#f8f9fa]">
                     <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px] truncate">{u.email}</td>
                     <td className="p-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        u.role === "ADMIN"    ? "bg-purple-100 text-purple-700" :
-                        u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
-                                               "bg-brand-light text-brand"
-                      }`}>{u.role}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
+                          u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
+                            "bg-brand-light text-brand"
+                        }`}>{u.role}</span>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
                       {new Date(u.created_at).toLocaleDateString("vi-VN")}
                     </td>
-                    <td className="p-3 text-xs text-muted-foreground max-w-[180px]">
-                      {(u.user_decks ?? []).length > 0
-                        ? (u.user_decks ?? []).map(ud => (
-                          <span key={ud.id}
-                            className="inline-flex items-center gap-1 bg-brand-light text-brand rounded px-1.5 py-0.5 mr-1 mb-1 text-xs font-semibold">
-                            {ud.deck?.title ?? "?"}
+                    <td className="p-3 text-xs text-muted-foreground align-middle">
+                      {(() => {
+                        const decks = u.user_decks ?? [];
+                        const isExpanded = expandedFlashcards.has(u.id);
+
+                        if (decks.length === 0) return <span className="italic opacity-60">Chưa có</span>;
+
+                        return (
+                          <div className="flex flex-col gap-1.5">
                             <button
-                              onClick={() => revokeDeck.mutate({ userId: u.id, deckId: ud.deck_id })}
-                              className="hover:text-red-500 transition-colors ml-0.5"
-                              title="Thu hồi">×</button>
-                          </span>
-                        ))
-                        : <span className="text-muted-foreground">Chưa có</span>
-                      }
+                              onClick={() => toggleFlashcards(u.id)}
+                              className="flex items-center gap-1.5 text-brand font-bold hover:underline bg-brand-light/50 px-2 py-1 rounded-lg w-fit"
+                            >
+                              <BookOpen className="w-3.5 h-3.5" />
+                              <span>{decks.length} bộ đề</span>
+                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="flex flex-wrap gap-1 mt-1 p-2 bg-gray-50 rounded-xl border border-dashed border-brand/30">
+                                {decks.map(ud => (
+                                  <span key={ud.id}
+                                    className="inline-flex items-center gap-1 bg-white text-brand rounded px-1.5 py-0.5 text-[10px] font-bold border border-brand/20 shadow-sm">
+                                    <span className="truncate max-w-[90px]">{ud.deck?.title ?? "?"}</span>
+                                    <button
+                                      onClick={() => revokeDeck.mutate({ userId: u.id, deckId: ud.deck_id })}
+                                      className="hover:text-red-500 transition-colors ml-0.5 flex-shrink-0"
+                                      title="Thu hồi">×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3 align-middle">
+                      {/* Summary Section */}
+                      <div className="flex items-center gap-4 bg-gray-50/50 p-2 rounded-xl border border-gray-100 mb-1">
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-brand/10">
+                          <BarChart className="w-3.5 h-3.5 text-brand" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground leading-none">Tổng từ học được</span>
+                            <span className="text-sm font-extrabold text-brand">
+                              {u.user_decks?.reduce((s, ud) => s + (ud.learned_count ?? 0), 0) ?? 0}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-orange-100">
+                          <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground leading-none">Streak cao nhất</span>
+                            <span className="text-sm font-extrabold text-orange-600">
+                              {Math.max(0, ...(u.user_decks?.map(ud => ud.streak ?? 0) ?? [0]))} 🔥
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs font-bold text-brand hover:bg-brand-light ml-auto"
+                          onClick={() => toggleProgress(u.id)}
+                        >
+                          {expandedProgress.has(u.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {expandedProgress.has(u.id) ? "Đóng" : "Chi tiết"}
+                        </Button>
+                      </div>
+
+                      {/* Expanded Section: Learned Decks (learned_count > 0) */}
+                      {expandedProgress.has(u.id) && (
+                        <div className="mt-2 space-y-1.5 border-2 border-brand-light/50 p-3 bg-white rounded-2xl shadow-inner animate-in slide-in-from-top-2 duration-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <BarChart className="w-3 h-3 text-brand" />
+                            <h4 className="text-[10px] font-black text-brand uppercase tracking-widest">Tiến độ từng bộ đề</h4>
+                          </div>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {(u.user_decks ?? []).filter(ud => (ud.learned_count ?? 0) > 0).length > 0 ? (
+                              (u.user_decks ?? [])
+                                .filter(ud => (ud.learned_count ?? 0) > 0)
+                                .map(ud => (
+                                  <div key={ud.id} className="text-[11px] flex justify-between items-center p-2 bg-brand-light/20 rounded-lg border border-brand/5">
+                                    <span className="font-bold text-[#1a1a2e] truncate">{ud.deck?.title}</span>
+                                    <span className="bg-white px-2 py-0.5 rounded-full border border-brand/20 text-brand font-black whitespace-nowrap">
+                                      {ud.learned_count} từ · {ud.streak} 🔥
+                                    </span>
+                                  </div>
+                                ))
+                            ) : (
+                              <p className="text-[10px] italic text-muted-foreground text-center py-2">Chưa có tiến độ học tập nào</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td className="p-3">
                       <div className="flex gap-1.5 flex-wrap">
                         {/* Giao đề */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" title="Giao Flashcard"
                           onClick={() => { setShowAssign(u.id); setAssignDeckIds(new Set()); setAssignExpiry(""); }}>
-                          <BookOpen className="w-3 h-3" /> Giao đề
+                          <BookOpen className="w-4 h-4" />
                         </Button>
                         {/* Thiết bị */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-purple-700 hover:bg-purple-50"
-                          onClick={() => { setEditMaxDevicesLocal(u.max_devices?.toString()||""); setShowDevices(u); }}>
-                          <Shield className="w-3 h-3" /> Thiết bị
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-purple-700 hover:bg-purple-50" title="Quản lý thiết bị"
+                          onClick={() => { setEditMaxDevicesLocal(u.max_devices?.toString() || ""); setShowDevices(u); }}>
+                          <Shield className="w-4 h-4" />
                         </Button>
                         {/* Toggle role USER ↔ SUBADMIN */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                          title={u.role === "SUBADMIN" ? "Hạ xuống USER" : "Nâng lên SubAdmin (Nội bộ nhóm)"}
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0"
+                          title={u.role === "SUBADMIN" ? "Hạ xuống USER" : "Nâng lên SubAdmin"}
                           disabled={changeRole.isPending}
                           onClick={() => {
                             const newR = u.role === "SUBADMIN" ? "USER" : "SUBADMIN";
-                            if (confirm(`Đổi quyền ${u.email} → ${newR}? (Quyền Subadmin mới chỉ có tác dụng trong nhóm của họ)`))
+                            if (confirm(`Đổi quyền ${u.email} → ${newR}?`))
                               changeRole.mutate({ userId: u.id, role: newR });
                           }}>
-                          <RefreshCw className="w-3 h-3" />
-                          {u.role === "SUBADMIN" ? "→ User" : "→ Sub"}
+                          <RefreshCw className="w-4 h-4" />
                         </Button>
                         {/* Reset PW */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0" title="Reset mật khẩu"
                           disabled={resetPw.isPending}
                           onClick={() => resetPw.mutate({ userId: u.id, email: u.email })}>
-                          <Copy className="w-3 h-3" />
+                          <Key className="w-4 h-4" />
                         </Button>
                         {/* Delete */}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500 hover:text-red-600 font-bold"
-                          onClick={() => { if (confirm(`CẢNH BÁO: Bạn chắc chắn muốn XÓA HOÀN TOÀN tài khoản ${u.email} khỏi hệ thống? \nThao tác này KHÔNG THỂ khôi phục.`)) deleteUser.mutate(u.id); }}>
-                          <Trash2 className="w-3 h-3" />
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-red-500 hover:text-red-600" title="Xóa người dùng"
+                          onClick={() => { if (confirm(`Xóa tài khoản ${u.email}?`)) deleteUser.mutate(u.id); }}>
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </td>
@@ -512,9 +619,9 @@ export default function SubAdminUsersPage() {
                 ))
               )}
             </div>
-            
+
             <Button variant="destructive" className="w-full" disabled={!showDevices?.user_devices?.length}
-              onClick={() => { if(confirm("Đăng xuất user khỏi tất cả thiết bị?")) updateDeviceInfo.mutate({ userId: showDevices!.id, action: "reset_devices" }); }}>
+              onClick={() => { if (confirm("Đăng xuất user khỏi tất cả thiết bị?")) updateDeviceInfo.mutate({ userId: showDevices!.id, action: "reset_devices" }); }}>
               Reset & Đăng xuất mọi nơi
             </Button>
           </div>
@@ -568,7 +675,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
   function toggleAll() {
     const next = new Set(assignDeckIds);
     if (allSelected) { assignable.forEach(d => next.delete(d.id)); }
-    else             { assignable.forEach(d => next.add(d.id)); }
+    else { assignable.forEach(d => next.add(d.id)); }
     setAssignDeckIds(next);
   }
 

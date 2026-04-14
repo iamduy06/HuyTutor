@@ -35,7 +35,7 @@ export async function GET() {
   // 2. Lấy tất cả user thuộc các group này
   let userQuery = admin
     .from("users")
-    .select("id, email, role, created_at, max_devices, user_decks(id, deck_id, expired_at, deck:decks(title))")
+    .select("id, email, role, created_at, max_devices, user_decks(id, deck_id, expired_at, learned_count, progress_percent, streak, deck:decks(title))")
     .order("created_at", { ascending: false });
 
   if (me.role !== "ADMIN") {
