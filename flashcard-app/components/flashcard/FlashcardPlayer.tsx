@@ -62,6 +62,8 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   const { mode } = useUIStore();
   const seenCards = useRef<Set<string>>(new Set());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioCache = useRef<Map<string, string>>(new Map());
+  const prefetching = useRef<Set<string>>(new Set());
 
   // Track seen vocabulary items (word + tab combo)
   const markSeen = useCallback((tabIdx: number, cardIdx: number) => {
@@ -110,6 +112,19 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   }, []); // eslint-disable-line
   const vocab = vocabulary[currentIndex];
 
+  const prefetchAudio = useCallback(async (word: string) => {
+    const raw = word.split("/")[0].replace(/[()]/g, "").trim();
+    if (!raw || audioCache.current.has(raw) || prefetching.current.has(raw)) return;
+    
+    prefetching.current.add(raw);
+    try {
+      const url = await fetchDictAudio(raw);
+      if (url) audioCache.current.set(raw, url);
+    } catch {} finally {
+      prefetching.current.delete(raw);
+    }
+  }, []);
+
   // ── TTS ──
   const speakWord = useCallback(async (text?: string) => {
     const raw = (text ?? vocab?.word ?? "").split("/")[0].replace(/[()]/g, "").trim();
@@ -117,6 +132,17 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
 
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     window.speechSynthesis?.cancel();
+
+    // 1. Try Cache
+    const cachedUrl = audioCache.current.get(raw);
+    if (cachedUrl) {
+      const audio = new Audio(cachedUrl);
+      audioRef.current = audio;
+      audio.play().catch(() => browserTTS(raw));
+      return;
+    }
+
+    // 2. Fetch if not in cache
     setAudioLoading(true);
     const token = ++tokenRef.current;
 
@@ -127,10 +153,13 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
     try {
       const url = await Promise.race([
         fetchDictAudio(raw),
-        new Promise(r => setTimeout(() => r(null), 4000)),
+        new Promise<string | null>(r => setTimeout(() => r(null), 4000)),
       ]);
       if (token !== tokenRef.current) return;
       if (!url) { fallback(); return; }
+
+      // Save to cache
+      audioCache.current.set(raw, url);
 
       const audio = new Audio(url);
       audioRef.current = audio;
@@ -148,9 +177,16 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
 
   useEffect(() => {
     if (isFirstLoad) { setIsFirstLoad(false); return; }
-    const t = setTimeout(() => speakWord(), 300);
+    const t = setTimeout(() => speakWord(), 100);
+
+    // Prefetch next 2 cards
+    for (let i = 1; i <= 2; i++) {
+      const nextIdx = (currentIndex + i) % vocabulary.length;
+      if (vocabulary[nextIdx]) prefetchAudio(vocabulary[nextIdx].word);
+    }
+
     return () => clearTimeout(t);
-  }, [currentIndex, currentTab]); // eslint-disable-line
+  }, [currentIndex, currentTab, vocabulary, prefetchAudio, speakWord]); // eslint-disable-line
 
   function nextCard() {
     const next = (currentIndex + 1) % vocabulary.length;
