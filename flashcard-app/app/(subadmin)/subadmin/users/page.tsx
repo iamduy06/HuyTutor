@@ -311,8 +311,8 @@ export default function SubAdminUsersPage() {
                     <td className="p-3 font-medium text-[#1a1a2e] max-w-[200px] truncate">{u.email}</td>
                     <td className="p-3">
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
-                          u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
-                            "bg-brand-light text-brand"
+                        u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" :
+                          "bg-brand-light text-brand"
                         }`}>{u.role}</span>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
@@ -717,7 +717,7 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
                     {alreadyHas ? "✓ " : ""}{d.title}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {[d.level, d.word_count ? `${d.word_count} từ` : ""].filter(Boolean).join(" · ")}
+                    {d.level || ""}
                   </div>
                 </div>
               </label>
