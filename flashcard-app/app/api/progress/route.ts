@@ -31,22 +31,30 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Lấy streak hiện tại
-  const { data: existing } = await admin
-    .from("user_decks")
-    .select("streak, last_studied_at")
-    .eq("user_id", user.id)
-    .eq("deck_id", deck_id)
-    .maybeSingle();
+  // Kiểm tra quyền: lấy deck access_level và record user_decks hiện tại song song
+  const [{ data: deck }, { data: existing }] = await Promise.all([
+    admin.from("decks").select("access_level").eq("id", deck_id).single(),
+    admin.from("user_decks").select("streak, last_studied_at").eq("user_id", user.id).eq("deck_id", deck_id).maybeSingle(),
+  ]);
 
-  const now        = new Date();
+  if (!deck) return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+
+  const levels = (deck.access_level ?? {}) as { public?: boolean; auth?: boolean; paid?: boolean };
+  const isFreeAccess = levels.public === true || levels.auth === true;
+  const isPaidOnly = levels.paid === true && !isFreeAccess;
+
+  // Nếu là paid-only deck và user chưa có record (chưa được cấp quyền) → từ chối
+  if (isPaidOnly && !existing) {
+    return NextResponse.json({ error: "Forbidden: no access" }, { status: 403 });
+  }
+
+  const now = new Date();
   const lastStudied = existing?.last_studied_at ? new Date(existing.last_studied_at) : null;
-  let streak       = existing?.streak ?? 0;
+  let streak = existing?.streak ?? 0;
 
   if (lastStudied) {
-    // Reset về UTC midnight để so sánh ngày
     const todayDay = new Date(now.toDateString()).getTime();
-    const lastDay  = new Date(lastStudied.toDateString()).getTime();
+    const lastDay = new Date(lastStudied.toDateString()).getTime();
     const diffDays = (todayDay - lastDay) / (1000 * 60 * 60 * 24);
 
     if (diffDays === 0) {
@@ -59,17 +67,16 @@ export async function POST(request: NextRequest) {
       streak = 1;
     }
   } else {
-    // Lần đầu học
     streak = 1;
   }
 
   const { error } = await admin.from("user_decks").upsert({
-    user_id:          user.id,
+    user_id: user.id,
     deck_id,
-    learned_count:    Math.max(learned_count ?? 0, existing ? 0 : 0), // không giảm xuống
+    learned_count: Math.max(learned_count ?? 0, existing ? 0 : 0),
     progress_percent: progress_percent ?? 0,
     streak,
-    last_studied_at:  now.toISOString(),
+    last_studied_at: now.toISOString(),
   }, { onConflict: "user_id,deck_id" });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
