@@ -56,7 +56,7 @@ export default function GroupDecksPage() {
   // ── Dialogs ──
   const [showGroupDlg, setShowGroupDlg] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DeckGroup | null>(null);
-  const [groupForm, setGroupForm] = useState({ name: "", description: "" });
+  const [groupForm, setGroupForm] = useState({ name: "", description: "", order_index: 0 });
 
   const [showMoveDlg, setShowMoveDlg] = useState<{ deckId: string; currentGroupId: string | null } | null>(null);
   const [moveGroupId, setMoveGroupId] = useState<string>("__none__");
@@ -198,13 +198,13 @@ export default function GroupDecksPage() {
 
   function openCreateGroup() {
     setEditingGroup(null);
-    setGroupForm({ name: "", description: "" });
+    setGroupForm({ name: "", description: "", order_index: 0 });
     setShowGroupDlg(true);
   }
 
   function openEditGroup(group: DeckGroup) {
     setEditingGroup(group);
-    setGroupForm({ name: group.name, description: group.description ?? "" });
+    setGroupForm({ name: group.name, description: group.description ?? "", order_index: group.order_index ?? 0 });
     setShowGroupDlg(true);
   }
 
@@ -267,7 +267,10 @@ export default function GroupDecksPage() {
                 </button>
                 <div>
                   <h3 className="font-bold text-[#1a1a2e]">{group.name}</h3>
-                  {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
+                  <div className="flex items-center gap-2">
+                    {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
+                    <span className="text-[10px] bg-gray-100 px-1 rounded text-gray-500 font-mono">#{group.order_index}</span>
+                  </div>
                 </div>
                 <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
                   {groupedDecks[group.id]?.length ?? 0} bộ đề
@@ -362,6 +365,10 @@ export default function GroupDecksPage() {
             <div>
               <Label>Mô tả</Label>
               <Textarea value={groupForm.description} onChange={e => setGroupForm({ ...groupForm, description: e.target.value })} className="mt-1" placeholder="Nhóm này chứa các bộ đề ôn luyện..." />
+            </div>
+            <div>
+              <Label>Thứ tự hiển thị (càng nhỏ càng hiện trước)</Label>
+              <Input type="number" value={groupForm.order_index} onChange={e => setGroupForm({ ...groupForm, order_index: parseInt(e.target.value) || 0 })} className="mt-1" />
             </div>
           </div>
           <DialogFooter>

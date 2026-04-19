@@ -18,12 +18,12 @@ export async function PATCH(
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { name, description } = body;
+  const { name, description, order_index } = body;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("deck_groups")
-    .update({ name, description })
+    .update({ name, description, order_index })
     .eq("id", params.id)
     .select()
     .single();

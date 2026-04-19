@@ -58,6 +58,7 @@ export interface DeckGroup {
   id: string;
   name: string;
   description: string | null;
+  order_index: number;
   created_at: string;
 }
 

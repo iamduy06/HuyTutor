@@ -18,6 +18,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("deck_groups")
     .select("*")
+    .order("order_index", { ascending: true })
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -29,13 +30,13 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { name, description } = body;
+  const { name, description, order_index } = body;
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("deck_groups")
-    .insert({ name, description })
+    .insert({ name, description, order_index: order_index ?? 0 })
     .select()
     .single();
 
