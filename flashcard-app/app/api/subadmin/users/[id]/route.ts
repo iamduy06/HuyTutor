@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // 1. Reset Password
   if (body.action === "reset_password") {
-    const pw = generatePassword(8);
+    const pw = "goidangkyflashcard";
     const { error } = await admin.auth.admin.updateUserById(params.id, { password: pw });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ tempPassword: pw });

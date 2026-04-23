@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const password = customPw?.trim() || generatePassword(10);
+  const password = customPw?.trim() || "goidangkyflashcard";
 
   // 3. Tạo Auth User
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({

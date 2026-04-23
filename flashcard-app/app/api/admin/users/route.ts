@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   const { email, role = "USER", max_devices, group_id } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  const password = body.password?.trim() || generatePassword(10);
+  const password = body.password?.trim() || "goidangkyflashcard";
   const supabase = createAdminClient();
 
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({

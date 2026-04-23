@@ -555,8 +555,8 @@ export default function AdminUsersPage() {
               <div>
                 <Label>Mật khẩu</Label>
                 <div className="flex gap-2 mt-1">
-                  <Input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Để trống tự tạo ngẫu nhiên" className="flex-1 font-mono" />
-                  <Button type="button" variant="outline" size="sm" onClick={() => setNewPassword(generatePassword(10))}><Shuffle className="w-4 h-4" /></Button>
+                  <Input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mặc định: goidangkyflashcard" className="flex-1 font-mono" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewPassword("goidangkyflashcard")}><Shuffle className="w-4 h-4" /></Button>
                 </div>
               </div>
               <div>

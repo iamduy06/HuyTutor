@@ -493,21 +493,21 @@ export default function SubAdminUsersPage() {
                   placeholder="user@example.com" className="mt-1" />
               </div>
               <div>
-                <Label>Mật khẩu (để trống = tự tạo ngẫu nhiên)</Label>
+                <Label>Mật khẩu (Mặc định: goidangkyflashcard)</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
                     type="text"
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
-                    placeholder="Để trống hoặc nhập mật khẩu"
+                    placeholder="Để trống dùng mặc định"
                     className="flex-1 font-mono"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    title="Tạo mật khẩu ngẫu nhiên"
-                    onClick={() => setNewPassword(Math.random().toString(36).slice(-8))}
+                    title="Dùng mật khẩu mặc định"
+                    onClick={() => setNewPassword("goidangkyflashcard")}
                     className="flex-shrink-0"
                   >
                     <Shuffle className="w-4 h-4" />
