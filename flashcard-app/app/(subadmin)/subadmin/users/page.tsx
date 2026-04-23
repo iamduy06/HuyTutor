@@ -506,8 +506,8 @@ export default function SubAdminUsersPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    title="Dùng mật khẩu mặc định"
-                    onClick={() => setNewPassword("goidangkyflashcard")}
+                    title="Tạo mật khẩu ngẫu nhiên"
+                    onClick={() => setNewPassword(Math.random().toString(36).slice(-8))}
                     className="flex-shrink-0"
                   >
                     <Shuffle className="w-4 h-4" />

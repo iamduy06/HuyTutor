@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // Reset password
   if (body.action === "reset_password") {
-    const newPassword = "goidangkyflashcard";
+    const newPassword = generatePassword(8);
     const { error } = await supabase.auth.admin.updateUserById(params.id, { password: newPassword });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ tempPassword: newPassword });
