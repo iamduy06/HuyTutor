@@ -8,7 +8,15 @@ import { Button } from "@/components/ui/button";
 import { FACEBOOK_URL } from "@/lib/constants";
 import type { FlashcardRow } from "@/types";
 
+const GAMES = [
+  { href: "/game/listening",       icon: "🎧", title: "Nghe & Viết",       desc: "Nghe phát âm, gõ lại từ tiếng Anh" },
+  { href: "/game/multiple-choice", icon: "📝", title: "Chọn Nghĩa",        desc: "4 đáp án, chọn nghĩa đúng nhất" },
+  { href: "/game/matching",        icon: "🔗", title: "Nối Từ",            desc: "Nối từ tiếng Anh với nghĩa" },
+  { href: "/game/syn-ant",         icon: "↔️", title: "Đồng/Trái Nghĩa",  desc: "Nối từ đồng nghĩa, trái nghĩa" },
+] as const;
+
 export const dynamic = "force-dynamic";
+
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -114,6 +122,35 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <>
+          {/* ── Mục I: Luyện tập (Game modes) ── */}
+          {filteredUserDecks.length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-xl font-extrabold text-[#1a1a2e] mb-5">🎮 Luyện tập</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {GAMES.map(game => (
+                  <Link
+                    key={game.href}
+                    href={game.href}
+                    className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5 flex flex-col gap-3
+                               hover:border-brand hover:shadow-md transition-all group"
+                  >
+                    <div className="text-4xl">{game.icon}</div>
+                    <div>
+                      <div className="font-extrabold text-[#1a1a2e] text-sm group-hover:text-brand transition-colors">
+                        {game.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{game.desc}</div>
+                    </div>
+                    <div className="mt-auto text-xs font-bold text-brand group-hover:underline">
+                      Chơi ngay →
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Mục II: Học từ vựng ── */}
           <h2 className="text-xl font-extrabold text-[#1a1a2e] mb-5">📖 Bộ Flashcard của tôi</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 

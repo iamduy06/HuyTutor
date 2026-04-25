@@ -32,7 +32,8 @@ export async function middleware(request: NextRequest) {
   if (
     path.startsWith("/dashboard") ||
     path.startsWith("/profile") ||
-    path.startsWith("/learning")
+    path.startsWith("/learning") ||
+    path.startsWith("/game")
   ) {
     if (!user) {
       const url = request.nextUrl.clone();

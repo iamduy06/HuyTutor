@@ -8,6 +8,7 @@ import type { Tab, VocabItem } from "@/types";
 import { useUIStore } from "@/features/auth/store";
 import { FACEBOOK_URL } from "@/lib/constants";
 import Link from "next/link";
+import { fetchDictAudio, browserTTS } from "@/lib/audio";
 
 interface Props {
   deckId?: string;   // undefined = demo mode, không save progress
@@ -18,34 +19,7 @@ interface Props {
   previewLimit?: number;
 }
 
-// ── TTS ─────────────────────────────────────────────────────────
-
-async function fetchDictAudio(word: string): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    for (const entry of data) {
-      for (const ph of entry.phonetics ?? []) {
-        if (ph.audio?.includes("us")) return ph.audio;
-      }
-      for (const ph of entry.phonetics ?? []) {
-        if (ph.audio?.trim()) return ph.audio;
-      }
-    }
-  } catch {}
-  return null;
-}
-
-function browserTTS(text: string) {
-  if (!("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US"; u.rate = 0.8;
-  window.speechSynthesis.speak(u);
-}
+// ── TTS — imported from @/lib/audio ─────────────────────────────
 
 // ── Component ────────────────────────────────────────────────────
 
