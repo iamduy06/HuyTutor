@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { LayoutDashboard, Users, Shield } from "lucide-react";
+import { createAdminClient } from "@/services/supabase/admin";
+import { LayoutDashboard, Users, Shield, Paintbrush2 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 
-const navItems = [
-  { href: "/subadmin",       label: "Tổng quan",   icon: LayoutDashboard },
-  { href: "/subadmin/users", label: "Người dùng",  icon: Users },
+const baseNavItems = [
+  { href: "/subadmin",       label: "Tổng quan",  icon: LayoutDashboard },
+  { href: "/subadmin/users", label: "Người dùng", icon: Users },
 ];
 
 export default async function SubAdminLayout({ children }: { children: React.ReactNode }) {
@@ -20,8 +21,10 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
     .eq("id", user.id)
     .single();
 
+  let hasBrandingAccess = false;
+
   if (profile?.role === "ADMIN") {
-    // Admin bypass subadmin check
+    hasBrandingAccess = true;
   } else if (profile?.role === "SUBADMIN") {
     const { data: groupSub, error: groupErr } = await supabase
       .from("group_users")
@@ -32,12 +35,38 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
       .maybeSingle();
 
     if (groupErr || !groupSub) {
-      console.warn("[SUBADMIN_LAYOUT] Fail:", groupErr?.message, !!groupSub);
       redirect("/dashboard");
+    }
+
+    // Kiểm tra xem có nhóm nào được cấp quyền branding không
+    const { data: managedGroups } = await supabase
+      .from("group_users")
+      .select("group_id")
+      .eq("user_id", user.id)
+      .eq("is_subadmin", true);
+
+    if (managedGroups && managedGroups.length > 0) {
+      const groupIds = managedGroups.map((g: any) => g.group_id);
+      const adminClient = createAdminClient();
+      const { data: brandingGroups } = await adminClient
+        .from("groups")
+        .select("branding")
+        .in("id", groupIds);
+
+      hasBrandingAccess = (brandingGroups ?? []).some(
+        (g: any) => g.branding?.allow_custom_branding === true
+      );
     }
   } else {
     redirect("/dashboard");
   }
+
+  const navItems = [
+    ...baseNavItems,
+    ...(hasBrandingAccess
+      ? [{ href: "/subadmin/branding", label: "Branding", icon: Paintbrush2 }]
+      : []),
+  ];
 
   const { SubAdminGuard } = await import("@/components/auth/SubAdminGuard");
 

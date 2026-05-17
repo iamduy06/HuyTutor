@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Settings, BookOpen, Plus, Shield, 
   ChevronDown, ChevronRight, UserCog, Trash2, 
-  Users, ShieldCheck, Smartphone
+  Users, ShieldCheck, Smartphone, Paintbrush2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +32,18 @@ interface GroupMember {
   user_decks: UserDeckItem[];
   decks: { id: string, title: string }[];
 }
+interface GroupBrandingData {
+  allow_custom_branding: boolean;
+  show_header: boolean;
+  show_footer: boolean;
+  header_logo_text: string | null;
+}
 interface GroupData {
   id: string; name: string; max_users: number; max_device_per_user: number;
   user_count: number;
   group_decks: GroupDeck[];
   group_users: GroupMember[];
+  branding?: GroupBrandingData;
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -159,6 +166,18 @@ export default function AdminSubAdminsPage() {
        if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); setShowDeleteGroup(null); toast({ title: "Đã xoá nhóm" }); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const updateBranding = useMutation({
+    mutationFn: async ({ id, branding }: { id: string, branding: GroupBrandingData }) => {
+      const res = await fetch(`/api/admin/subadmins/groups/${id}/branding`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branding }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); toast({ title: "Đã cập nhật cài đặt Branding" }); },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
@@ -437,7 +456,7 @@ export default function AdminSubAdminsPage() {
       {/* ════ MODALS: GROUP ACTIONS ════ */}
       
       <Dialog open={!!editGroup} onOpenChange={() => setEditGroup(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="flex items-center gap-2 text-brand"><Settings className="w-5 h-5"/> Cài đặt Nhóm: {editGroup?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
@@ -471,6 +490,64 @@ export default function AdminSubAdminsPage() {
                 Lưu cấu hình nhóm
               </Button>
             </DialogFooter>
+
+            {/* ─── BRANDING SECTION ─── */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Paintbrush2 className="w-4 h-4 text-purple-600" />
+                <Label className="text-sm font-bold text-purple-700 uppercase tracking-wide">Branding theo nhóm</Label>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox"
+                    className="w-4 h-4 accent-purple-600"
+                    checked={editGroup?.branding?.allow_custom_branding ?? false}
+                    onChange={e => setEditGroup(prev => prev ? { ...prev, branding: { allow_custom_branding: e.target.checked, show_header: prev.branding?.show_header ?? true, show_footer: prev.branding?.show_footer ?? true, header_logo_text: prev.branding?.header_logo_text ?? null } } : null)}
+                  />
+                  <span className="text-sm font-bold text-purple-900">Cho phép nhóm này tuỳ chỉnh Header/Footer</span>
+                </label>
+
+                {editGroup?.branding?.allow_custom_branding && (
+                  <div className="space-y-3 pl-2 border-l-2 border-purple-200">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox"
+                        className="w-4 h-4 accent-brand"
+                        checked={editGroup?.branding?.show_header ?? true}
+                        onChange={e => setEditGroup(prev => prev ? { ...prev, branding: { ...prev.branding!, show_header: e.target.checked } } : null)}
+                      />
+                      <span className="text-sm font-semibold text-gray-700">Hiển thị SiteHeader</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox"
+                        className="w-4 h-4 accent-brand"
+                        checked={editGroup?.branding?.show_footer ?? true}
+                        onChange={e => setEditGroup(prev => prev ? { ...prev, branding: { ...prev.branding!, show_footer: e.target.checked } } : null)}
+                      />
+                      <span className="text-sm font-semibold text-gray-700">Hiển thị SiteFooter</span>
+                    </label>
+                    <div>
+                      <Label className="text-xs font-bold uppercase text-gray-500">Thay logo header bằng text (tuỳ chọn)</Label>
+                      <Input
+                        className="mt-1 bg-white"
+                        placeholder="Vd: Lớp 10A1 — HuyTutor"
+                        value={editGroup?.branding?.header_logo_text ?? ""}
+                        onChange={e => setEditGroup(prev => prev ? { ...prev, branding: { ...prev.branding!, header_logo_text: e.target.value || null } } : null)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  className="w-full border-purple-300 text-purple-700 hover:bg-purple-100 font-bold"
+                  disabled={updateBranding.isPending || !editGroup?.branding}
+                  onClick={() => editGroup && updateBranding.mutate({ id: editGroup.id, branding: editGroup.branding! })}
+                >
+                  {updateBranding.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Lưu cài đặt Branding
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

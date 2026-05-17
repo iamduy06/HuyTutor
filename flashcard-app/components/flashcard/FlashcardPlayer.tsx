@@ -523,16 +523,6 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <footer className="text-center py-4 px-4 text-[#adb5bd] text-xs border-t-2 border-[#f0e0e7] bg-white/80">
-          © Bản quyền thuộc về <strong className="text-[#1a1a2e]">Huy Tutor</strong>
-          &nbsp;|&nbsp;
-          <a href="https://www.huytutor.io.vn/" target="_blank" rel="noreferrer"
-            className="text-brand font-semibold hover:underline">
-            www.huytutor.io.vn
-          </a>
-        </footer>
       </div>
 
       {/* ── RIGHT SIDEBAR ── */}

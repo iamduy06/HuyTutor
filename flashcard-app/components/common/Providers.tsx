@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { UserProvider } from "@/components/common/UserContext";
 import { NavigationProgressWrapper } from "@/components/common/NavigationProgressWrapper";
+import { BrandingProvider } from "@/components/common/BrandingContext";
 import type { UserProfile } from "@/types";
 
 interface ProvidersProps {
@@ -21,8 +22,10 @@ export function Providers({ children, initialUser }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider initialUser={initialUser ?? null}>
-        <NavigationProgressWrapper />
-        {children}
+        <BrandingProvider>
+          <NavigationProgressWrapper />
+          {children}
+        </BrandingProvider>
       </UserProvider>
     </QueryClientProvider>
   );
