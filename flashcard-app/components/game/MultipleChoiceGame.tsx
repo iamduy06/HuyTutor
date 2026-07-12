@@ -147,14 +147,22 @@ function MultipleChoiceInner({ vocab }: { vocab: VocabItem[] }) {
 }
 
 export function MultipleChoiceGame({ userDecks }: { userDecks: DeckOption[] }) {
-  const { selectedDeckId } = useGameStore();
+  const { selectedDeckId, questionCount, startGame, resetGame } = useGameStore();
   const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+
+  const handleReplay = () => {
+    if (!data?.vocab) return;
+    resetGame();
+    const q = shuffle(data.vocab).slice(0, Math.min(questionCount, data.vocab.length));
+    startGame(q);
+  };
 
   return (
     <GameShell
       title="Chọn Nghĩa Đúng" icon="📝" minWords={4}
       minWordsMessage="Cần ít nhất 4 từ để tạo đủ đáp án nhiễu."
       userDecks={userDecks}
+      onReplay={handleReplay}
     >
       {data && <MultipleChoiceInner vocab={data.vocab} />}
     </GameShell>

@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
   const deckId = searchParams.get("deckId") ?? "all";
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+  
+  const tabIdsParam = searchParams.get("tabIds");
+  const selectedTabIds = tabIdsParam ? tabIdsParam.split(",") : [];
 
   const admin = createAdminClient();
 
@@ -74,7 +77,10 @@ export async function GET(request: NextRequest) {
 
   // 5. Extract + flatten vocab
   const allVocab: VocabItem[] = (flashcards ?? []).flatMap((row: any) => {
-    const tabs = extractTabs((row as unknown as FlashcardRow).content);
+    let tabs = extractTabs((row as unknown as FlashcardRow).content);
+    if (selectedTabIds.length > 0) {
+      tabs = tabs.filter(t => selectedTabIds.includes(t.id));
+    }
     return tabs.flatMap(t => t.vocabulary ?? []);
   });
 

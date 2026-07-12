@@ -22,7 +22,7 @@ interface LineCoord {
 }
 
 function MatchingInner({ vocab }: { vocab: VocabItem[] }) {
-  const { pairCount, setPairCount } = useGameStore();
+  const { pairCount, setPairCount, isStarted, isFinished, startGame, finishGame, resetGame } = useGameStore();
   const [round, setRound]       = useState(0);
   const [pairs, setPairs]       = useState<VocabItem[]>([]);
   const [rightItems, setRight]  = useState<{ id: string; meaning: string; wordKey: string }[]>([]);
@@ -32,8 +32,6 @@ function MatchingInner({ vocab }: { vocab: VocabItem[] }) {
   const [results, setResults]   = useState<Map<string, boolean>>(new Map());
   const [score, setScore]       = useState(0);
   const [total, setTotal]       = useState(0);
-  const [finished, setFinished] = useState(false);
-  const [started, setStarted]   = useState(false);
   const [lines, setLines]       = useState<LineCoord[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,9 +72,16 @@ function MatchingInner({ vocab }: { vocab: VocabItem[] }) {
   }
 
   function handleStart() {
-    setScore(0); setTotal(0); setFinished(false); setStarted(true);
+    setScore(0); setTotal(0);
+    startGame([]); // just to toggle isStarted
     startRound(pickPairs(vocab, pairCount));
   }
+
+  useEffect(() => {
+    if (isStarted && pairs.length === 0) {
+      handleStart();
+    }
+  }, [isStarted]);
 
   function connect(leftKey: string, rightId: string) {
     const m = new Map(connections);
@@ -119,25 +124,30 @@ function MatchingInner({ vocab }: { vocab: VocabItem[] }) {
 
   function handleNext() {
     const rem = vocab.filter(v => !pairs.some(p => p.word === v.word));
-    if (rem.length < 2) { setFinished(true); return; }
+    if (rem.length < 2) { finishGame(); return; }
     setRound(r => r + 1);
     startRound(pickPairs(rem.length >= pairCount ? rem : vocab, pairCount));
   }
 
-  if (finished) {
+  if (isFinished) {
     const pct = total > 0 ? Math.round((score / total) * 100) : 0;
     return (
       <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 flex flex-col gap-4 items-center text-center">
         <div className="text-5xl">{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</div>
         <p className="text-2xl font-extrabold text-brand">{score} / {total} ({pct}%)</p>
-        <Button variant="brand" onClick={() => { setStarted(false); setFinished(false); }} className="gap-2">
-          <RotateCcw className="w-4 h-4" /> Chơi lại
-        </Button>
+        <div className="flex gap-3 mt-2">
+          <Button variant="brand" onClick={handleStart} className="gap-2">
+            <RotateCcw className="w-4 h-4" /> Chơi lại
+          </Button>
+          <Button variant="outline" onClick={() => resetGame()} className="gap-2">
+            Chọn lại Decks/Tabs
+          </Button>
+        </div>
       </div>
     );
   }
 
-  if (!started) {
+  if (!isStarted) {
     return (
       <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 flex flex-col gap-5 items-center text-center">
         <div className="text-5xl">🔗</div>
@@ -302,13 +312,23 @@ function MatchingInner({ vocab }: { vocab: VocabItem[] }) {
 }
 
 export function MatchingGame({ userDecks }: { userDecks: DeckOption[] }) {
-  const { selectedDeckId } = useGameStore();
+  const { selectedDeckId, startGame, resetGame } = useGameStore();
   const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+  const [replayKey, setReplayKey] = useState(0);
+
+  const handleReplay = () => {
+    resetGame();
+    startGame([]); 
+    setReplayKey(k => k + 1); 
+  };
+
   return (
     <GameShell title="Nối Từ" icon="🔗" minWords={2}
       minWordsMessage="Cần ít nhất 2 từ để chơi Nối Từ."
-      userDecks={userDecks} showProgress={false}>
-      {data && <MatchingInner vocab={data.vocab} />}
+      userDecks={userDecks} showProgress={false}
+      onReplay={handleReplay}
+    >
+      {data && <MatchingInner key={replayKey} vocab={data.vocab} />}
     </GameShell>
   );
 }

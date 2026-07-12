@@ -25,11 +25,9 @@ interface LineCoord {
 }
 
 function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
-  const { pairCount, setPairCount } = useGameStore();
+  const { pairCount, setPairCount, isStarted, isFinished, startGame, finishGame, resetGame } = useGameStore();
   const eligible = filterVocabWithSynAnt(vocab);
 
-  const [started, setStarted]   = useState(false);
-  const [finished, setFinished] = useState(false);
   const [pairs, setPairs]       = useState<VocabItem[]>([]);
   const [rightItems, setRight]  = useState<SynAntRightItem[]>([]);
   const [connections, setConns] = useState<SynAntConns>(new Map());
@@ -79,9 +77,16 @@ function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
   }
 
   function handleStart() {
-    setScore(0); setTotal(0); setFinished(false); setStarted(true);
+    setScore(0); setTotal(0); 
+    startGame([]); // just to toggle isStarted
     startRound(pickPairs(eligible, Math.min(pairCount, eligible.length)));
   }
+
+  useEffect(() => {
+    if (isStarted && pairs.length === 0) {
+      handleStart();
+    }
+  }, [isStarted]);
 
   // Toggle nối: leftWord ↔ rightId
   function toggleConnect(leftWord: string, rightId: string) {
@@ -149,20 +154,25 @@ function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
     );
   }
 
-  if (finished) {
+  if (isFinished) {
     const pct = total > 0 ? Math.round((score / total) * 100) : 0;
     return (
       <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 flex flex-col gap-4 items-center text-center">
         <div className="text-5xl">{pct >= 80 ? "🎉" : pct >= 50 ? "👍" : "💪"}</div>
         <p className="text-2xl font-extrabold text-brand">{score} / {total} ({pct}%)</p>
-        <Button variant="brand" onClick={() => { setStarted(false); setFinished(false); }} className="gap-2">
-          <RotateCcw className="w-4 h-4" /> Chơi lại
-        </Button>
+        <div className="flex gap-3 mt-2">
+          <Button variant="brand" onClick={handleStart} className="gap-2">
+            <RotateCcw className="w-4 h-4" /> Chơi lại
+          </Button>
+          <Button variant="outline" onClick={() => resetGame()} className="gap-2">
+            Chọn lại Decks/Tabs
+          </Button>
+        </div>
       </div>
     );
   }
 
-  if (!started) {
+  if (!isStarted) {
     return (
       <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 flex flex-col gap-5 items-center text-center">
         <div className="text-5xl">↔️</div>
@@ -314,7 +324,7 @@ function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
             {totalConns === 0 ? "Hãy nối ít nhất 1 cặp" : "✅ Xác nhận"}
           </Button>
         ) : (
-          <Button variant="brand" className="flex-1 gap-2" onClick={() => setFinished(true)}>
+          <Button variant="brand" className="flex-1 gap-2" onClick={() => finishGame()}>
             Xem kết quả →
           </Button>
         )}
@@ -324,13 +334,23 @@ function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
 }
 
 export function SynAntGame({ userDecks }: { userDecks: DeckOption[] }) {
-  const { selectedDeckId } = useGameStore();
+  const { selectedDeckId, startGame, resetGame } = useGameStore();
   const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+  const [replayKey, setReplayKey] = useState(0);
+
+  const handleReplay = () => {
+    resetGame();
+    startGame([]); // Toggle isStarted to true so SynAntInner auto-starts
+    setReplayKey(k => k + 1); // Remount SynAntInner to reset its local states completely
+  };
+
   return (
     <GameShell title="Đồng / Trái Nghĩa" icon="↔️" minWords={2}
       minWordsMessage="Cần ít nhất 2 từ có synonyms/antonyms."
-      userDecks={userDecks} showProgress={false}>
-      {data && <SynAntInner vocab={data.vocab} />}
+      userDecks={userDecks} showProgress={false}
+      onReplay={handleReplay}
+    >
+      {data && <SynAntInner key={replayKey} vocab={data.vocab} />}
     </GameShell>
   );
 }

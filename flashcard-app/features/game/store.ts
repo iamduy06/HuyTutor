@@ -13,6 +13,7 @@ export interface AnswerRecord {
 interface GameStore {
   // ── Config ──
   selectedDeckId: string | null;   // null = "all"
+  selectedTabIds: string[];        // [] = "all tabs of the deck"
   gameType: GameType | null;
   pairCount: number;               // số cặp cho Matching/SynAnt (5–20)
   questionCount: number;           // số câu cho Listening/MC (5–30)
@@ -27,6 +28,8 @@ interface GameStore {
 
   // ── Actions ──
   setDeck: (deckId: string | null) => void;
+  setSelectedTabIds: (tabIds: string[]) => void;
+  toggleTab: (tabId: string) => void;
   setGameType: (type: GameType) => void;
   setPairCount: (n: number) => void;
   setQuestionCount: (n: number) => void;
@@ -42,6 +45,7 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   // Config defaults
   selectedDeckId: null,
+  selectedTabIds: [],
   gameType: null,
   pairCount: 5,
   questionCount: 10,
@@ -55,7 +59,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isStarted: false,
 
   // Actions
-  setDeck: (deckId) => set({ selectedDeckId: deckId }),
+  setDeck: (deckId) => set({ selectedDeckId: deckId, selectedTabIds: [] }),
+  setSelectedTabIds: (tabIds) => set({ selectedTabIds: tabIds }),
+  toggleTab: (tabId) => set(state => {
+    const isSelected = state.selectedTabIds.includes(tabId);
+    if (isSelected) {
+      return { selectedTabIds: state.selectedTabIds.filter(id => id !== tabId) };
+    } else {
+      return { selectedTabIds: [...state.selectedTabIds, tabId] };
+    }
+  }),
   setGameType: (type) => set({ gameType: type }),
   setPairCount: (n) => set({ pairCount: Math.min(Math.max(n, 5), 20) }),
   setQuestionCount: (n) => set({ questionCount: Math.min(Math.max(n, 5), 30) }),

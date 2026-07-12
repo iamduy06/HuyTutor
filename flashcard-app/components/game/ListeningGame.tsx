@@ -221,8 +221,15 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 export function ListeningGame({ userDecks }: ListeningGameProps) {
-  const { selectedDeckId, questionCount } = useGameStore();
+  const { selectedDeckId, questionCount, startGame, resetGame } = useGameStore();
   const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+
+  const handleReplay = () => {
+    if (!data?.vocab) return;
+    resetGame();
+    const q = shuffle(data.vocab).slice(0, questionCount);
+    startGame(q);
+  };
 
   return (
     <GameShell
@@ -231,6 +238,7 @@ export function ListeningGame({ userDecks }: ListeningGameProps) {
       minWords={3}
       minWordsMessage="Cần ít nhất 3 từ để chơi chế độ này."
       userDecks={userDecks}
+      onReplay={handleReplay}
     >
       {data && (
         <ListeningInner vocab={data.vocab} allVocab={data.vocab} />

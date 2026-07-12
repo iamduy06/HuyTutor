@@ -1,10 +1,11 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeckSelector } from "@/components/game/DeckSelector";
+import { TabSelector } from "@/components/game/TabSelector";
 import { ProgressBar } from "@/components/game/ProgressBar";
 import { useGameStore } from "@/features/game/store";
 import { useGameVocab } from "@/features/game/useGameVocab";
@@ -14,6 +15,7 @@ interface DeckOption {
   deck_id: string;
   title: string;
   wordCount?: number;
+  tabs?: { id: string; label: string; wordCount: number }[];
 }
 
 interface GameShellProps {
@@ -26,18 +28,27 @@ interface GameShellProps {
   vocabLimit?: number;
   onVocabReady?: (vocab: import("@/types").VocabItem[]) => void;
   showProgress?: boolean; // default true
+  onReplay?: () => void;
 }
 
 export function GameShell({
   title, icon, minWords, minWordsMessage,
   children, userDecks, vocabLimit, onVocabReady,
   showProgress = true,
+  onReplay
 }: GameShellProps) {
-  const { selectedDeckId, setDeck, currentIndex, questions, isStarted, isFinished } = useGameStore();
-  const { data, isLoading, error, refetch } = useGameVocab(
+  const { selectedDeckId, selectedTabIds, setSelectedTabIds, setDeck, currentIndex, questions, isStarted, isFinished, resetGame } = useGameStore();
+  const { data, isLoading, isFetching, error, refetch } = useGameVocab(
     selectedDeckId === undefined ? null : selectedDeckId,
-    vocabLimit
+    vocabLimit,
+    selectedTabIds
   );
+
+  // Reset session when entering or leaving the game page
+  useEffect(() => {
+    resetGame();
+    return () => resetGame();
+  }, [resetGame]);
 
   // Expose refetch so parent can re-trigger after deck change
   const handleDeckChange = (id: string | null) => {
@@ -45,6 +56,8 @@ export function GameShell({
   };
 
   const hasEnoughWords = (data?.vocab.length ?? 0) >= minWords;
+  const currentDeck = userDecks.find(d => d.deck_id === selectedDeckId);
+  const availableTabs = currentDeck?.tabs ?? [];
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-6">
@@ -58,21 +71,50 @@ export function GameShell({
         <h1 className="font-extrabold text-[#1a1a2e] text-xl flex items-center gap-2">
           <span className="text-2xl">{icon}</span> {title}
         </h1>
+
+        {isStarted && !isFinished && onReplay && (
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => resetGame()} className="text-xs h-8">
+              Chọn lại Decks/Tabs
+            </Button>
+            <Button size="sm" variant="brand" onClick={onReplay} className="text-xs h-8 gap-1">
+              Chơi lại
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Deck Selector */}
-      <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 flex items-center gap-4 flex-wrap">
-        <span className="text-sm font-semibold text-muted-foreground">Chọn bộ deck:</span>
-        <DeckSelector
-          decks={userDecks}
-          value={selectedDeckId ?? null}
-          onChange={handleDeckChange}
-          disabled={isLoading}
-        />
-        {data && (
-          <span className="text-xs text-muted-foreground ml-auto">
-            {data.vocab.length} từ{vocabLimit ? ` (giới hạn ${vocabLimit})` : ""}
-          </span>
+      {/* Setup Area */}
+      <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-4 flex flex-col gap-4">
+        {/* Deck Selector */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm font-semibold text-muted-foreground">Chọn bộ deck:</span>
+          <DeckSelector
+            decks={userDecks}
+            value={selectedDeckId ?? null}
+            onChange={handleDeckChange}
+            disabled={isLoading || isStarted}
+          />
+          <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            {isFetching && <Loader2 className="w-3.5 h-3.5 animate-spin text-brand" />}
+            {data && (
+              <span>
+                {data.vocab.length} từ{vocabLimit ? ` (giới hạn ${vocabLimit})` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Selector */}
+        {selectedDeckId && availableTabs.length > 0 && !isStarted && (
+          <div className="pt-4 border-t-2 border-[#f0e0e7]/50 mt-2">
+            <TabSelector
+              tabs={availableTabs}
+              selectedTabIds={selectedTabIds}
+              onChange={setSelectedTabIds}
+              disabled={isLoading || isStarted}
+            />
+          </div>
         )}
       </div>
 

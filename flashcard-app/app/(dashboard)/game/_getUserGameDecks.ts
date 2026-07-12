@@ -44,16 +44,31 @@ export async function getUserGameDecks() {
     .in("deck_id", deckIds);
 
   const wordCountMap: Record<string, number> = {};
+  const tabsMap: Record<string, { id: string; label: string; wordCount: number }[]> = {};
+
   (flashcards ?? []).forEach((r: any) => {
     const tabs = extractTabs((r as unknown as FlashcardRow).content);
     const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
     wordCountMap[r.deck_id] = (wordCountMap[r.deck_id] ?? 0) + count;
+    
+    if (!tabsMap[r.deck_id]) tabsMap[r.deck_id] = [];
+    tabs.forEach(t => {
+      const vCount = t.vocabulary?.length ?? 0;
+      if (vCount > 0) {
+        tabsMap[r.deck_id].push({
+          id: t.id,
+          label: t.label || t.id,
+          wordCount: vCount,
+        });
+      }
+    });
   });
 
   const deckOptions = accessible.map((ud: any) => ({
     deck_id: ud.deck_id as string,
     title: (ud.deck as any)?.title ?? ud.deck_id,
     wordCount: wordCountMap[ud.deck_id as string] ?? 0,
+    tabs: tabsMap[ud.deck_id as string] ?? [],
   }));
 
   return deckOptions;

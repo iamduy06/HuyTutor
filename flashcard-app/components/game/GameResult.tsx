@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Trophy, RotateCcw, ArrowLeft, XCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VocabItem } from "@/types";
+import { useGameStore } from "@/features/game/store";
 
 interface AnswerRecord {
   userAnswer: string;
@@ -67,6 +68,15 @@ export function GameResult({
       <div className="flex gap-3 justify-center flex-wrap">
         <Button onClick={onReplay} variant="brand" className="gap-2">
           <RotateCcw className="w-4 h-4" /> Chơi lại
+        </Button>
+        <Button 
+          variant="outline" 
+          className="gap-2"
+          onClick={() => {
+            useGameStore.getState().resetGame();
+          }}
+        >
+          Chọn lại Decks/Tabs
         </Button>
         <Button asChild variant="brand-outline" className="gap-2">
           <Link href={backHref}>
