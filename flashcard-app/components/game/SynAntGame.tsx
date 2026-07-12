@@ -334,8 +334,8 @@ function SynAntInner({ vocab }: { vocab: VocabItem[] }) {
 }
 
 export function SynAntGame({ userDecks }: { userDecks: DeckOption[] }) {
-  const { selectedDeckId, startGame, resetGame } = useGameStore();
-  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+  const { selectedDeckId, selectedTabIds, startGame, resetGame } = useGameStore();
+  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId, undefined, selectedTabIds);
   const [replayKey, setReplayKey] = useState(0);
 
   const handleReplay = () => {

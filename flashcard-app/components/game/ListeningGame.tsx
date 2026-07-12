@@ -221,8 +221,8 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 export function ListeningGame({ userDecks }: ListeningGameProps) {
-  const { selectedDeckId, questionCount, startGame, resetGame } = useGameStore();
-  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+  const { selectedDeckId, selectedTabIds, questionCount, startGame, resetGame } = useGameStore();
+  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId, undefined, selectedTabIds);
 
   const handleReplay = () => {
     if (!data?.vocab) return;

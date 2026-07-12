@@ -147,8 +147,8 @@ function MultipleChoiceInner({ vocab }: { vocab: VocabItem[] }) {
 }
 
 export function MultipleChoiceGame({ userDecks }: { userDecks: DeckOption[] }) {
-  const { selectedDeckId, questionCount, startGame, resetGame } = useGameStore();
-  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId);
+  const { selectedDeckId, selectedTabIds, questionCount, startGame, resetGame } = useGameStore();
+  const { data } = useGameVocab(selectedDeckId === undefined ? null : selectedDeckId, undefined, selectedTabIds);
 
   const handleReplay = () => {
     if (!data?.vocab) return;
