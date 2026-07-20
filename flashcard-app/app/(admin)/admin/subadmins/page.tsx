@@ -604,7 +604,7 @@ export default function AdminSubAdminsPage() {
 
               <div>
                  <Label className="text-[10px] font-bold uppercase text-gray-500">Hết hạn (Tuỳ chọn)</Label>
-                 <Input type="datetime-local" value={groupDecksExpiry} onChange={e=>setGroupDecksExpiry(e.target.value)} className="mt-1 bg-white h-9" />
+                 <Input type="date" value={groupDecksExpiry} onChange={e=>setGroupDecksExpiry(e.target.value)} className="mt-1 bg-white h-9" />
               </div>
 
               <div className="flex items-center gap-2 pt-1">
@@ -619,7 +619,7 @@ export default function AdminSubAdminsPage() {
                   action: "assign_group_deck", 
                   payload: { 
                     deck_ids: Array.from(selectedGroupDecksIds), 
-                    expired_at: groupDecksExpiry,
+                    expired_at: groupDecksExpiry ? groupDecksExpiry + "T23:59:59Z" : "",
                     assign_all_users: assignAllUsers
                   } 
                 })}>
@@ -749,10 +749,10 @@ export default function AdminSubAdminsPage() {
                </div>
                <div>
                  <Label className="text-xs">Hết hạn (Tuỳ chọn)</Label>
-                 <Input type="datetime-local" value={manageDecksExpiry} onChange={e=>setManageDecksExpiry(e.target.value)} className="mt-1 bg-white" />
+                 <Input type="date" value={manageDecksExpiry} onChange={e=>setManageDecksExpiry(e.target.value)} className="mt-1 bg-white" />
                </div>
                <Button className="w-full" variant="brand" disabled={manageDecksIds.size === 0 || assignUserDeck.isPending}
-                 onClick={() => assignUserDeck.mutate({ userId: showingUserDecks!.id, deckIds: Array.from(manageDecksIds), expiredAt: manageDecksExpiry })}>
+                 onClick={() => assignUserDeck.mutate({ userId: showingUserDecks!.id, deckIds: Array.from(manageDecksIds), expiredAt: manageDecksExpiry ? manageDecksExpiry + "T23:59:59Z" : "" })}>
                  Giao {manageDecksIds.size} Flashcard đã chọn
                </Button>
             </div>
@@ -894,16 +894,9 @@ function Separator({ className }: { className?: string }) {
 function UserDeckEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUpdate: (a: any) => void, onRevoke: () => void }) {
   const [editing, setEditing] = useState(false);
   
-  const toLocalInput = (iso: string | null) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
-
-  const [exp, setExp] = useState(toLocalInput(ud.expired_at));
-  const [prog, setProg] = useState((ud.progress_percent || 0).toString());
-  const [learn, setLearn] = useState((ud.learned_count || 0).toString());
+  const [exp, setExp] = useState(ud.expired_at ? new Date(ud.expired_at).toISOString().slice(0, 10) : "");
+  const [prog, setProg] = useState(ud.progress_percent?.toString() || "0");
+  const [learn, setLearn] = useState(ud.learned_count?.toString() || "0");
 
   const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
 
@@ -943,13 +936,13 @@ function UserDeckEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUpdate
       <div>
         <Label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Hết hạn</Label>
         <div className="flex items-center gap-2 mt-1">
-          <Input type="datetime-local" value={exp} onChange={e=>setExp(e.target.value)} className="flex-1 h-8 bg-white"/>
+          <Input type="date" value={exp} onChange={e=>setExp(e.target.value)} className="flex-1 h-8 bg-white"/>
           <Button variant="outline" size="sm" className="h-8 text-xs bg-white text-gray-500" onClick={()=>setExp("")}>Bỏ hạn</Button>
         </div>
       </div>
       <div className="flex gap-2 pt-2 border-t border-blue-100">
         <Button size="sm" variant="brand" className="h-8 flex-1" onClick={() => {
-          onUpdate({ progress_percent: parseInt(prog)||0, learned_count: parseInt(learn)||0, expiredAt: exp||null });
+          onUpdate({ progress_percent: parseInt(prog)||0, learned_count: parseInt(learn)||0, expiredAt: exp ? exp + "T23:59:59Z" : "" });
           setEditing(false);
         }}>Lưu thay đổi</Button>
         <Button size="sm" variant="ghost" className="h-8 text-gray-500 hover:bg-gray-200" onClick={() => setEditing(false)}>Hủy</Button>

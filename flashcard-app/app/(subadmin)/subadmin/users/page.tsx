@@ -576,7 +576,7 @@ export default function SubAdminUsersPage() {
             />
             <div>
               <Label>Ngày hết hạn</Label>
-              <Input type="datetime-local" value={assignExpiry}
+              <Input type="date" value={assignExpiry}
                 onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
               <p className="text-xs text-muted-foreground mt-1 text-red-500 font-semibold italic">Không được vượt quá hạn của nhóm (nếu có)</p>
             </div>
@@ -585,7 +585,7 @@ export default function SubAdminUsersPage() {
             <Button variant="outline" onClick={() => setShowAssign(null)}>Hủy</Button>
             <Button variant="brand"
               disabled={assignDeckIds.size === 0 || assignDeck.isPending}
-              onClick={() => assignDeck.mutate({ userId: showAssign!, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
+              onClick={() => assignDeck.mutate({ userId: showAssign!, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry ? assignExpiry + "T23:59:59Z" : "" })}>
               {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Giao {assignDeckIds.size > 0 ? `${assignDeckIds.size} đề` : ""}
             </Button>

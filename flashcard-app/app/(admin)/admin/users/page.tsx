@@ -21,7 +21,7 @@ import { generatePassword } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeckItem { id: string; title: string; level?: string; word_count?: number; }
-interface GroupItem { id: string; name: string; }
+interface GroupItem { id: string; name: string; max_expired_at?: string; }
 interface UserDeckItem {
   id: string; deck_id: string; expired_at: string | null;
   progress_percent: number; learned_count: number;
@@ -837,11 +837,11 @@ export default function AdminUsersPage() {
                     <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
                       <Label className="text-orange-800 text-xs font-bold uppercase mb-2 block">Thao tác tập trung (Bulk Edit)</Label>
                       <div className="flex gap-2">
-                        <Input type="datetime-local" className="flex-1 bg-white" 
+                        <Input type="date" className="flex-1 bg-white" 
                           value={bulkExp} onChange={e => setBulkExp(e.target.value)} />
                         <Button variant="brand" size="sm" 
                            className="flex-shrink-0"
-                          onClick={() => { if(confirm("Cập nhật hạn mới cho TẤT CẢ các bộ Flashcard đã gán?")) bulkUpdateExpiry.mutate({ userId: currentUserData.id, expiredAt: bulkExp }) }}>
+                          onClick={() => { if(confirm("Cập nhật hạn mới cho TẤT CẢ các bộ Flashcard đã gán?")) bulkUpdateExpiry.mutate({ userId: currentUserData.id, expiredAt: bulkExp ? bulkExp + "T23:59:59Z" : "" }) }}>
                           Cập nhật tất cả
                         </Button>
                       </div>
@@ -863,10 +863,10 @@ export default function AdminUsersPage() {
                />
                <div className="mt-4">
                  <Label>Ngày hết hạn (Tuỳ chọn)</Label>
-                 <Input type="datetime-local" value={assignExpiry} onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
+                 <Input type="date" value={assignExpiry} onChange={e => setAssignExpiry(e.target.value)} className="mt-1" />
                </div>
                <Button className="mt-4 w-full" variant="brand" disabled={assignDeckIds.size === 0 || assignDeck.isPending}
-                 onClick={() => assignDeck.mutate({ userId: currentUserData!.id, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry })}>
+                 onClick={() => assignDeck.mutate({ userId: currentUserData!.id, deckIds: Array.from(assignDeckIds), expiredAt: assignExpiry ? assignExpiry + "T23:59:59Z" : "" })}>
                  {assignDeck.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                  Xác nhận giao {assignDeckIds.size} Flashcard đã chọn
                </Button>
@@ -930,16 +930,9 @@ export default function AdminUsersPage() {
 function DeckProgressEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUpdate: (a: any) => void, onRevoke: () => void }) {
   const [editing, setEditing] = useState(false);
   
-  const toLocalInput = (iso: string | null) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
-
-  const [exp, setExp] = useState(toLocalInput(ud.expired_at));
-  const [prog, setProg] = useState(ud.progress_percent.toString());
-  const [learn, setLearn] = useState(ud.learned_count.toString());
+  const [exp, setExp] = useState(ud.expired_at ? new Date(ud.expired_at).toISOString().slice(0, 10) : "");
+  const [prog, setProg] = useState(ud.progress_percent?.toString() || "0");
+  const [learn, setLearn] = useState(ud.learned_count?.toString() || "0");
 
   const isExp = ud.expired_at ? new Date(ud.expired_at) < new Date() : false;
 
@@ -977,13 +970,13 @@ function DeckProgressEditor({ ud, onUpdate, onRevoke }: { ud: UserDeckItem, onUp
       <div>
         <Label className="text-xs">Thời hạn truy cập</Label>
         <div className="flex items-center gap-2">
-          <Input type="datetime-local" value={exp} onChange={e=>setExp(e.target.value)} className="flex-1"/>
+          <Input type="date" value={exp} onChange={e=>setExp(e.target.value)} className="flex-1"/>
           <Button variant="outline" size="sm" onClick={()=>setExp("")}>Bỏ hạn</Button>
         </div>
       </div>
       <div className="flex gap-2 pt-2">
         <Button size="sm" variant="brand" className="flex-1" onClick={() => {
-          onUpdate({ progress_percent: parseInt(prog)||0, learned_count: parseInt(learn)||0, expiredAt: exp||null });
+          onUpdate({ progress_percent: parseInt(prog)||0, learned_count: parseInt(learn)||0, expiredAt: exp ? exp + "T23:59:59Z" : "" });
           setEditing(false);
         }}>Lưu thay đổi</Button>
         <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Hủy</Button>
