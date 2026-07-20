@@ -47,7 +47,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // Assign Group
   if (body.action === "assign_group") {
-    const { group_id } = body;
+    const { group_id, revoke_old_decks, assign_new_decks } = body;
+
+    let oldGroupId = null;
+    if (revoke_old_decks) {
+      // Find old group before deleting
+      const { data: oldGroup } = await supabase.from("group_users").select("group_id").eq("user_id", params.id).single();
+      if (oldGroup) oldGroupId = oldGroup.group_id;
+    }
+
     // First remove existing group(because a user belongs to 1 group max based on requirements)
     await supabase.from("group_users").delete().eq("user_id", params.id);
     if (group_id) {
@@ -58,6 +66,32 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    if (revoke_old_decks && oldGroupId) {
+      // Find decks of the old group
+      const { data: oldDecks } = await supabase.from("group_decks").select("deck_id").eq("group_id", oldGroupId);
+      if (oldDecks && oldDecks.length > 0) {
+        const deckIdsToRemove = oldDecks.map((d: any) => d.deck_id);
+        await supabase.from("user_decks").delete().eq("user_id", params.id).in("deck_id", deckIdsToRemove);
+      }
+    }
+
+    if (assign_new_decks && group_id) {
+      // Find decks of the new group
+      const { data: newDecks } = await supabase.from("group_decks").select("deck_id, expired_at").eq("group_id", group_id);
+      if (newDecks && newDecks.length > 0) {
+        const deckInserts = newDecks.map((d: any) => ({
+          user_id: params.id,
+          deck_id: d.deck_id,
+          expired_at: d.expired_at,
+          progress_percent: 0,
+          learned_count: 0,
+          streak: 0
+        }));
+        await supabase.from("user_decks").upsert(deckInserts, { onConflict: "user_id,deck_id" });
+      }
+    }
+
     return NextResponse.json({ success: true });
   }
 

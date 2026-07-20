@@ -89,6 +89,7 @@ export default function AdminUsersPage() {
   const [newGroupId, setNewGroupId] = useState("none");
   const [newMaxDevices, setNewMaxDevices] = useState("");
   const [tempPw, setTempPw] = useState("");
+  const [autoAssignGroupDecks, setAutoAssignGroupDecks] = useState(false);
 
   // Create Group Input State
   const [newGroupName, setNewGroupName] = useState("");
@@ -107,6 +108,8 @@ export default function AdminUsersPage() {
 
   // Group Dialog State
   const [editGroupId, setEditGroupId] = useState<string>("none");
+  const [revokeOldDecks, setRevokeOldDecks] = useState(false);
+  const [assignNewDecks, setAssignNewDecks] = useState(false);
 
   // Decks Dialog State
   const [assignDeckIds, setAssignDeckIds] = useState<Set<string>>(new Set());
@@ -158,10 +161,11 @@ export default function AdminUsersPage() {
   });
 
   const createUser = useMutation({
-    mutationFn: async (params: { email: string; role: string; password: string; group_id: string; max_devices: string }) => {
+    mutationFn: async (params: { email: string; role: string; password: string; group_id: string; max_devices: string; auto_assign_group_decks: boolean }) => {
       const payload: any = { email: params.email, role: params.role, password: params.password };
-      if (params.group_id !== "none") payload.group_id = params.group_id;
+      if (params.group_id !== "none" && params.group_id !== "create_new") payload.group_id = params.group_id;
       if (params.max_devices) payload.max_devices = params.max_devices;
+      if (params.auto_assign_group_decks) payload.auto_assign_group_decks = params.auto_assign_group_decks;
 
       const res = await fetch("/api/admin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -224,10 +228,10 @@ export default function AdminUsersPage() {
   });
 
   const assignGroup = useMutation({
-    mutationFn: async ({ id, group_id }: { id: string, group_id: string | null }) => {
+    mutationFn: async ({ id, group_id, revoke_old_decks, assign_new_decks }: { id: string, group_id: string | null, revoke_old_decks: boolean, assign_new_decks: boolean }) => {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign_group", group_id })
+        body: JSON.stringify({ action: "assign_group", group_id, revoke_old_decks, assign_new_decks })
       });
       if (!res.ok) throw new Error("Failed");
     },
@@ -370,6 +374,8 @@ export default function AdminUsersPage() {
     if (type === "GROUP") {
       setEditGroupId(user.group_users?.[0]?.group_id || "none");
       setNewGroupName("");
+      setRevokeOldDecks(false);
+      setAssignNewDecks(false);
     }
     if (type === "DECKS") {
       setAssignDeckIds(new Set());
@@ -398,6 +404,10 @@ export default function AdminUsersPage() {
 
   const currentUserData = getFreshEditingUser();
 
+  const originalGroupId = currentUserData?.group_users?.[0]?.group_id || "none";
+  const isMovingFromGroup = originalGroupId !== "none" && editGroupId !== originalGroupId;
+  const isMovingToGroup = editGroupId !== "none" && editGroupId !== "create_new" && editGroupId !== originalGroupId;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-[1400px] mx-auto">
@@ -423,7 +433,7 @@ export default function AdminUsersPage() {
           </Button>
 
           <Button variant="brand"
-            onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); setNewRole("USER"); setNewGroupId("none"); setNewMaxDevices(""); setNewGroupName(""); }}>
+            onClick={() => { setShowCreate(true); setTempPw(""); setNewEmail(""); setNewPassword(""); setNewRole("USER"); setNewGroupId("none"); setNewMaxDevices(""); setNewGroupName(""); setAutoAssignGroupDecks(false); }}>
             <Plus className="w-4 h-4 mr-1.5" /> Tạo user
           </Button>
         </div>
@@ -580,15 +590,32 @@ export default function AdminUsersPage() {
                     {groups.map(g => (
                       <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                     ))}
+                    <SelectItem value="create_new" className="text-brand font-semibold">+ Tạo nhóm mới...</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
-                   <div className="flex-1">
-                     <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Chọn ngay</Label>
-                     <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
-                   </div>
-                   <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
-                </div>
+                {newGroupId === "create_new" && (
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
+                     <div className="flex-1">
+                       <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Chọn ngay</Label>
+                       <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
+                     </div>
+                     <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
+                  </div>
+                )}
+                {newGroupId !== "none" && newGroupId !== "create_new" && (
+                  <div className="mt-3 flex items-center space-x-2 bg-brand-light/30 p-2 rounded-md">
+                    <input 
+                      type="checkbox" 
+                      id="autoAssignDecks" 
+                      className="w-4 h-4 text-brand rounded border-gray-300 cursor-pointer"
+                      checked={autoAssignGroupDecks}
+                      onChange={(e) => setAutoAssignGroupDecks(e.target.checked)}
+                    />
+                    <Label htmlFor="autoAssignDecks" className="text-sm font-medium cursor-pointer">
+                      Tự động cấp quyền tất cả Flashcard của nhóm này cho tài khoản mới
+                    </Label>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -599,7 +626,7 @@ export default function AdminUsersPage() {
               <DialogFooter className="pt-2 border-t">
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={!newEmail || createUser.isPending}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, group_id: newGroupId, max_devices: newMaxDevices })}>
+                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, group_id: newGroupId, max_devices: newMaxDevices, auto_assign_group_decks: autoAssignGroupDecks })}>
                   {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tạo Tài Khoản"}
                 </Button>
               </DialogFooter>
@@ -675,21 +702,57 @@ export default function AdminUsersPage() {
                    {groups.map(g => (
                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                    ))}
+                   <SelectItem value="create_new" className="text-brand font-semibold">+ Tạo nhóm mới...</SelectItem>
                  </SelectContent>
                </Select>
             </div>
             
-            <div className="bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
-               <div className="flex-1">
-                 <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Gán ngay</Label>
-                 <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
-               </div>
-               <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
-            </div>
+            {editGroupId === "create_new" && (
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 flex gap-2 items-end">
+                 <div className="flex-1">
+                   <Label className="text-xs text-muted-foreground mb-1 block">Tạo nhóm trống mới & Gán ngay</Label>
+                   <Input placeholder="Tên nhóm mới..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="h-8 text-sm" />
+                 </div>
+                 <Button variant="outline" size="sm" className="h-8" disabled={!newGroupName || createGroup.isPending} onClick={() => createGroup.mutate(newGroupName)}>Tạo Nhóm</Button>
+              </div>
+            )}
+            
+            {(isMovingFromGroup || isMovingToGroup) && (
+              <div className="mt-4 p-3 bg-brand-light/20 border border-brand/20 rounded-xl space-y-3">
+                {isMovingFromGroup && (
+                  <div className="flex flex-start space-x-2">
+                    <input 
+                      type="checkbox" 
+                      id="revokeOldDecks" 
+                      className="w-4 h-4 mt-0.5 text-brand rounded border-gray-300 cursor-pointer"
+                      checked={revokeOldDecks}
+                      onChange={(e) => setRevokeOldDecks(e.target.checked)}
+                    />
+                    <Label htmlFor="revokeOldDecks" className="text-sm font-medium cursor-pointer leading-tight">
+                      Thu hồi tất cả Flashcards thuộc nhóm cũ ({currentUserData?.group_users?.[0]?.group?.name}) khỏi người dùng này.
+                    </Label>
+                  </div>
+                )}
+                {isMovingToGroup && (
+                  <div className="flex flex-start space-x-2">
+                    <input 
+                      type="checkbox" 
+                      id="assignNewDecks" 
+                      className="w-4 h-4 mt-0.5 text-brand rounded border-gray-300 cursor-pointer"
+                      checked={assignNewDecks}
+                      onChange={(e) => setAssignNewDecks(e.target.checked)}
+                    />
+                    <Label htmlFor="assignNewDecks" className="text-sm font-medium cursor-pointer leading-tight">
+                      Giao tất cả Flashcards thuộc nhóm mới cho người dùng này.
+                    </Label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter className="mt-4 border-t pt-4">
             <DialogClose asChild><Button variant="outline">Hủy</Button></DialogClose>
-            <Button variant="brand" onClick={() => assignGroup.mutate({ id: editingUser!.id, group_id: editGroupId === "none" ? null : editGroupId })} disabled={assignGroup.isPending}>Cập Nhật Nhóm (Lưu)</Button>
+            <Button variant="brand" onClick={() => assignGroup.mutate({ id: editingUser!.id, group_id: editGroupId === "none" ? null : editGroupId, revoke_old_decks: revokeOldDecks, assign_new_decks: assignNewDecks })} disabled={assignGroup.isPending}>Cập Nhật Nhóm (Lưu)</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

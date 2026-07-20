@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const { email, role = "USER", max_devices, group_id } = body;
+  const { email, role = "USER", max_devices, group_id, auto_assign_group_decks } = body;
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
   const password = body.password?.trim() || "goidangkyflashcard";
@@ -73,6 +73,21 @@ export async function POST(request: NextRequest) {
       user_id: authUser.user.id,
       is_subadmin: false
     });
+
+    if (auto_assign_group_decks) {
+      const { data: groupDecks } = await supabase.from("group_decks").select("deck_id, expired_at").eq("group_id", group_id);
+      if (groupDecks && groupDecks.length > 0) {
+        const deckInserts = groupDecks.map((d: any) => ({
+          user_id: authUser.user.id,
+          deck_id: d.deck_id,
+          expired_at: d.expired_at,
+          progress_percent: 0,
+          learned_count: 0
+        }));
+        const { error: assignError } = await supabase.from("user_decks").insert(deckInserts);
+        if (assignError) console.error("Auto assign decks error:", assignError.message);
+      }
+    }
   }
 
   return NextResponse.json({ user: authUser.user, tempPassword: password });
