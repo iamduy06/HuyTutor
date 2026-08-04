@@ -93,8 +93,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bạn không quản lý nhóm nào để thêm thành viên" }, { status: 403 });
   }
 
-  // 2. Kiểm tra giới hạn của nhóm
+  // 2. Kiểm tra quyền và giới hạn của nhóm
   if (me.role !== "ADMIN") {
+    // Check if subadmin actually manages targetGroupId
+    const { data: isManaged } = await admin
+      .from("group_users")
+      .select("id")
+      .eq("user_id", me.id)
+      .eq("group_id", targetGroupId)
+      .eq("is_subadmin", true)
+      .maybeSingle();
+
+    if (!isManaged) {
+      return NextResponse.json({ error: "Bạn không có quyền quản lý nhóm này" }, { status: 403 });
+    }
+
     const { data: group } = await admin.from("groups").select("max_users").eq("id", targetGroupId).single();
     const { count } = await admin.from("group_users").select("*", { count: "exact", head: true }).eq("group_id", targetGroupId);
     

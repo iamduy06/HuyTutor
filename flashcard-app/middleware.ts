@@ -44,8 +44,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Protected admin routes ─────────────────────────────────────────────
-  if (path.startsWith("/admin")) {
+  if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
     if (!user) {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);
@@ -60,13 +63,19 @@ export async function middleware(request: NextRequest) {
     });
 
     if (profile?.role !== "ADMIN") {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
   // ── Protected subadmin routes ──────────────────────────────────────────
-  if (path.startsWith("/subadmin")) {
+  if (path.startsWith("/subadmin") || path.startsWith("/api/subadmin")) {
     if (!user) {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);
@@ -98,9 +107,15 @@ export async function middleware(request: NextRequest) {
       });
       
       if (!groupSub) {
+        if (path.startsWith("/api/")) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     } else {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
