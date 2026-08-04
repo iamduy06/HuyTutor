@@ -26,10 +26,45 @@ export async function fetchDictAudio(word: string): Promise<string | null> {
 export function browserTTS(text: string) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US";
-  u.rate = 0.8;
-  window.speechSynthesis.speak(u);
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = 0.8;
+    window.speechSynthesis.speak(u);
+  }, 50);
+}
+
+let sharedAudio: HTMLAudioElement | null = null;
+let isUnlocked = false;
+
+export function getSharedAudio(): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudio) {
+    sharedAudio = new Audio();
+  }
+  return sharedAudio;
+}
+
+export function unlockSharedAudio() {
+  if (isUnlocked) return;
+  const audio = getSharedAudio();
+  if (audio) {
+    audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+    audio.play().then(() => {
+      audio.pause();
+      isUnlocked = true;
+    }).catch(() => {});
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const unlockFn = () => {
+    unlockSharedAudio();
+    document.removeEventListener('click', unlockFn);
+    document.removeEventListener('touchstart', unlockFn);
+  };
+  document.addEventListener('click', unlockFn);
+  document.addEventListener('touchstart', unlockFn);
 }
 
 /**
@@ -55,9 +90,12 @@ export async function speakWordWithCache(
   // 1. Cache hit
   const cachedUrl = cache.get(raw);
   if (cachedUrl) {
-    const audio = new Audio(cachedUrl);
-    audioRef.current = audio;
-    audio.play().catch(() => browserTTS(raw));
+    const audio = getSharedAudio();
+    if (audio) {
+      audio.src = cachedUrl;
+      audioRef.current = audio;
+      audio.play().catch(() => browserTTS(raw));
+    }
     return;
   }
 
@@ -77,7 +115,9 @@ export async function speakWordWithCache(
     if (!url) { fallback(); return; }
 
     cache.set(raw, url);
-    const audio = new Audio(url);
+    const audio = getSharedAudio();
+    if (!audio) return;
+    audio.src = url;
     audioRef.current = audio;
     const t = setTimeout(fallback, 4000);
 

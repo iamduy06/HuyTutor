@@ -8,7 +8,7 @@ import type { Tab, VocabItem } from "@/types";
 import { useUIStore } from "@/features/auth/store";
 import { FACEBOOK_URL } from "@/lib/constants";
 import Link from "next/link";
-import { fetchDictAudio, browserTTS } from "@/lib/audio";
+import { fetchDictAudio, browserTTS, getSharedAudio } from "@/lib/audio";
 
 interface Props {
   deckId?: string;   // undefined = demo mode, không save progress
@@ -110,9 +110,12 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
     // 1. Try Cache
     const cachedUrl = audioCache.current.get(raw);
     if (cachedUrl) {
-      const audio = new Audio(cachedUrl);
-      audioRef.current = audio;
-      audio.play().catch(() => browserTTS(raw));
+      const audio = getSharedAudio();
+      if (audio) {
+        audio.src = cachedUrl;
+        audioRef.current = audio;
+        audio.play().catch(() => browserTTS(raw));
+      }
       return;
     }
 
@@ -135,7 +138,9 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
       // Save to cache
       audioCache.current.set(raw, url);
 
-      const audio = new Audio(url);
+      const audio = getSharedAudio();
+      if (!audio) return;
+      audio.src = url;
       audioRef.current = audio;
       const t = setTimeout(fallback, 4000);
 

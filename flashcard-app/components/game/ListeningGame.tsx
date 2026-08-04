@@ -12,7 +12,7 @@ import {
   checkListeningAnswer,
   normalizeWordForAudio,
 } from "@/features/game/gameUtils";
-import { fetchDictAudio, browserTTS } from "@/lib/audio";
+import { fetchDictAudio, browserTTS, getSharedAudio } from "@/lib/audio";
 import type { VocabItem } from "@/types";
 
 interface DeckOption { deck_id: string; title: string; wordCount?: number; }
@@ -49,8 +49,13 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
 
     const cached = cacheRef.current.get(raw);
     if (cached) {
-      const a = new Audio(cached); audioRef.current = a;
-      a.play().catch(() => browserTTS(raw)); return;
+      const a = getSharedAudio();
+      if (a) {
+        a.src = cached;
+        audioRef.current = a;
+        a.play().catch(() => browserTTS(raw));
+      }
+      return;
     }
 
     setAudioLoading(true);
@@ -62,7 +67,10 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
       if (token !== tokenRef.current) return;
       if (!url) { fallback(); return; }
       cacheRef.current.set(raw, url);
-      const a = new Audio(url); audioRef.current = a;
+      const a = getSharedAudio();
+      if (!a) return;
+      a.src = url;
+      audioRef.current = a;
       const t = setTimeout(fallback, 4000);
       a.oncanplaythrough = () => { if (token !== tokenRef.current) { clearTimeout(t); return; } clearTimeout(t); setAudioLoading(false); a.play().catch(fallback); };
       a.onerror = () => { clearTimeout(t); fallback(); };
