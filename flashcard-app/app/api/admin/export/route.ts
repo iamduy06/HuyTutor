@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
+import * as XLSX from "xlsx";
 
 async function checkAdmin() {
   const supabase = createClient();
@@ -25,6 +26,22 @@ function jsonToCsv(items: any[], columns: string[]): string {
     }).join(",");
   });
   return [header, ...rows].join("\n");
+}
+
+/**
+ * Helper to convert JSON array to XLSX Response
+ */
+function xlsxResponse(items: any[], filename: string): Response {
+  const worksheet = XLSX.utils.json_to_sheet(items);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  return new Response(buf, {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}.xlsx"`,
+    },
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -187,6 +204,111 @@ export async function GET(request: NextRequest) {
 
     return new Response(JSON.stringify(exportData, null, 2), {
       headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // 4. EXPORT EMAILS
+  if (type === "emails") {
+    const subtype = request.nextUrl.searchParams.get("subtype");
+
+    if (subtype === "all") {
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, email, role, created_at")
+        .order("created_at", { ascending: false });
+
+      const rows = (users ?? []).map((u, i) => ({
+        "STT": i + 1,
+        "Email": u.email,
+        "Role": u.role,
+        "Created At": u.created_at
+      }));
+
+      if (format === "csv") {
+        const csv = jsonToCsv(rows, ["STT", "Email", "Role", "Created At"]);
+        return new Response("\ufeff" + csv, {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="all_emails.csv"'
+          }
+        });
+      }
+
+      if (format === "xlsx") {
+        return xlsxResponse(rows, "all_emails");
+      }
+
+      return new Response(JSON.stringify(users ?? [], null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (subtype === "by_group") {
+      const { data: groups } = await supabase
+        .from("groups")
+        .select("id, name, created_at, group_users(user_id, is_subadmin, users(id, email, role, created_at))")
+        .order("created_at", { ascending: false });
+
+      const rows: any[] = [];
+      (groups ?? []).forEach(g => {
+        (g.group_users ?? []).forEach((gu: any) => {
+          rows.push({
+            "Group ID": g.id,
+            "Group Name": g.name,
+            "User Email": gu.users?.email ?? "",
+            "Role In Group": gu.is_subadmin ? "SUBADMIN" : "MEMBER",
+            "Account Role": gu.users?.role ?? "",
+            "Created At": gu.users?.created_at ?? ""
+          });
+        });
+      });
+
+      if (format === "csv") {
+        const csv = jsonToCsv(rows, ["Group ID", "Group Name", "User Email", "Role In Group", "Account Role", "Created At"]);
+        return new Response("\ufeff" + csv, {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="emails_by_group.csv"'
+          }
+        });
+      }
+
+      if (format === "xlsx") {
+        return xlsxResponse(rows, "emails_by_group");
+      }
+
+      return new Response(JSON.stringify(rows, null, 2), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // Default or full json: return combined emails & groups data
+    const [{ data: users }, { data: groups }] = await Promise.all([
+      supabase.from("users").select("id, email, role, created_at").order("created_at", { ascending: false }),
+      supabase.from("groups").select("id, name, created_at, group_users(user_id, is_subadmin, users(id, email, role, created_at))").order("created_at", { ascending: false })
+    ]);
+
+    const formattedGroups = (groups ?? []).map(g => {
+      const groupUsers = (g.group_users ?? []).map((gu: any) => ({
+        id: gu.users?.id,
+        email: gu.users?.email,
+        role: gu.users?.role,
+        is_subadmin: gu.is_subadmin
+      }));
+      return {
+        id: g.id,
+        name: g.name,
+        created_at: g.created_at,
+        user_count: groupUsers.length,
+        emails: groupUsers.map(u => u.email).filter(Boolean),
+        users: groupUsers
+      };
+    });
+
+    return NextResponse.json({
+      all_emails: (users ?? []).map(u => u.email).filter(Boolean),
+      users: users ?? [],
+      groups: formattedGroups
     });
   }
 
