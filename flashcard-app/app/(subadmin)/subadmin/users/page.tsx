@@ -68,6 +68,8 @@ export default function SubAdminUsersPage() {
   const [newRole, setNewRole] = useState("USER");
   const [newPassword, setNewPassword] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [assignAllDecks, setAssignAllDecks] = useState(false);
+  const [createAssignExpiry, setCreateAssignExpiry] = useState("");
   const [tempPw, setTempPw] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -113,10 +115,19 @@ export default function SubAdminUsersPage() {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createUser = useMutation({
-    mutationFn: async ({ email, role, password, groupId }: { email: string; role: string; password?: string, groupId?: string }) => {
+    mutationFn: async ({ email, role, password, groupId, assignAllDecks, expiredAt }: {
+      email: string; role: string; password?: string; groupId?: string; assignAllDecks?: boolean; expiredAt?: string;
+    }) => {
       const res = await fetch("/api/subadmin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role, password: password?.trim() || undefined, group_id: groupId }),
+        body: JSON.stringify({
+          email,
+          role,
+          password: password?.trim() || undefined,
+          group_id: groupId,
+          assign_all_decks: assignAllDecks,
+          expired_at: expiredAt ? expiredAt + "T23:59:59Z" : ""
+        }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
@@ -464,7 +475,14 @@ export default function SubAdminUsersPage() {
       )}
 
       {/* ════ Dialog: Create User ════ */}
-      <Dialog open={showCreate} onOpenChange={v => { setShowCreate(v); if (!v) setTempPw(""); }}>
+      <Dialog open={showCreate} onOpenChange={v => {
+        setShowCreate(v);
+        if (!v) {
+          setTempPw("");
+          setAssignAllDecks(false);
+          setCreateAssignExpiry("");
+        }
+      }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Tạo người dùng mới</DialogTitle></DialogHeader>
           {tempPw ? (
@@ -483,7 +501,7 @@ export default function SubAdminUsersPage() {
                   {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                 </Button>
               </div>
-              <Button className="w-full" variant="brand" onClick={() => { setShowCreate(false); setTempPw(""); }}>Đóng</Button>
+              <Button className="w-full" variant="brand" onClick={() => { setShowCreate(false); setTempPw(""); setAssignAllDecks(false); setCreateAssignExpiry(""); }}>Đóng</Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -528,7 +546,7 @@ export default function SubAdminUsersPage() {
                 </div>
               )}
               <div>
-                <Label>Quyền Phẩn Mềm</Label>
+                <Label>Quyền Phần Mềm</Label>
                 <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -537,10 +555,46 @@ export default function SubAdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="pt-2 border-t space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="assignAllGroupDecks"
+                    checked={assignAllDecks}
+                    onChange={e => setAssignAllDecks(e.target.checked)}
+                    className="w-4 h-4 accent-brand cursor-pointer rounded"
+                  />
+                  <label htmlFor="assignAllGroupDecks" className="text-sm font-medium cursor-pointer select-none">
+                    Gán tất cả Flashcard hiện có của nhóm
+                  </label>
+                </div>
+                {assignAllDecks && (
+                  <div className="pl-6 space-y-1">
+                    <Label htmlFor="createAssignExpiry" className="text-xs font-medium">Ngày hết hạn Flashcard</Label>
+                    <Input
+                      id="createAssignExpiry"
+                      type="date"
+                      value={createAssignExpiry}
+                      onChange={e => setCreateAssignExpiry(e.target.value)}
+                      className="mt-1"
+                    />
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Để trống sẽ dùng thời gian mặc định của Flashcard nhóm được giao. Ngày được chọn là hạn tối đa (không vượt quá hạn nhóm).
+                    </p>
+                  </div>
+                )}
+              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Hủy</Button>
                 <Button variant="brand" disabled={!newEmail || createUser.isPending}
-                  onClick={() => createUser.mutate({ email: newEmail, role: newRole, password: newPassword, groupId: selectedGroup })}>
+                  onClick={() => createUser.mutate({
+                    email: newEmail,
+                    role: newRole,
+                    password: newPassword,
+                    groupId: selectedGroup,
+                    assignAllDecks,
+                    expiredAt: createAssignExpiry,
+                  })}>
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
                 </Button>
               </DialogFooter>

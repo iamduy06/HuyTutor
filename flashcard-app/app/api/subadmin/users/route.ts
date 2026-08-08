@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   const me = await checkSubAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { email, role = "USER", password: customPw, group_id } = await request.json();
+  const { email, role = "USER", password: customPw, group_id, assign_all_decks, expired_at } = await request.json();
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
   const admin = createAdminClient();
@@ -138,6 +138,37 @@ export async function POST(request: NextRequest) {
     admin.from("users").upsert({ id: userId, email, role }, { onConflict: "id" }),
     admin.from("group_users").insert({ group_id: targetGroupId, user_id: userId, is_subadmin: false })
   ]);
+
+  // 5. Nếu chọn gán tất cả flashcard của nhóm cho user mới
+  if (assign_all_decks && targetGroupId) {
+    const { data: groupDecks } = await admin
+      .from("group_decks")
+      .select("deck_id, expired_at")
+      .eq("group_id", targetGroupId);
+
+    if (groupDecks && groupDecks.length > 0) {
+      const userDeckRows = groupDecks.map(gd => {
+        let finalExpiry = gd.expired_at;
+        if (expired_at) {
+          const chosenTime = new Date(expired_at.includes("T") ? expired_at : expired_at + "T23:59:59Z").getTime();
+          if (gd.expired_at) {
+            const groupTime = new Date(gd.expired_at).getTime();
+            // Đảm bảo không vượt quá thời gian tối đa của flashcard nhóm được cấp
+            finalExpiry = chosenTime < groupTime ? new Date(chosenTime).toISOString() : gd.expired_at;
+          } else {
+            finalExpiry = new Date(chosenTime).toISOString();
+          }
+        }
+        return {
+          user_id: userId,
+          deck_id: gd.deck_id,
+          expired_at: finalExpiry,
+        };
+      });
+
+      await admin.from("user_decks").upsert(userDeckRows, { onConflict: "user_id,deck_id" });
+    }
+  }
 
   return NextResponse.json({ user: authUser.user, tempPassword: password });
 }
