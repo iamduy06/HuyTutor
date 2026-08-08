@@ -15,20 +15,39 @@ export default function HomePage() {
         </div>
         <div className="stats">
           <div className="stat">
-            <div className="stat-num">1000+</div>
-            <div className="stat-label">Cụm từ & Từ vựng</div>
+            <div className="stat-num">30 000+</div>
+            <div className="stat-label">Thẻ lật</div>
           </div>
           <div className="stat">
             <div className="stat-num">B1–C2</div>
             <div className="stat-label">Phân cấp CEFR</div>
           </div>
           <div className="stat">
-            <div className="stat-num">90+</div>
+            <div className="stat-num">150+</div>
             <div className="stat-label">Bảng từ đề thi</div>
           </div>
           <div className="stat">
             <div className="stat-num">100%</div>
             <div className="stat-label">Chuẩn mực & Chi tiết</div>
+          </div>
+        </div>
+      </section>
+
+      {/* VIDEO DEMO */}
+      <section className="py-12 md:py-16 px-[5%] bg-gradient-to-b from-white to-[#fff8fb] border-b border-[--border]">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="section-label mb-2">Giới Thiệu Trang Web</div>
+          <div className="section-title mb-3">
+            Tổng quan <span className="text-[--red]">giao diện & tính năng</span> Web Flashcard
+          </div>
+          <div className="relative w-full aspect-video rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border-2 border-[--border] bg-black">
+            <iframe
+              src="https://www.youtube.com/embed/aQ6MI9SfUKQ?rel=0&modestbranding=1&iv_load_policy=3&playsinline=1"
+              title="Video giới thiệu website Huy Tutor Flashcard"
+              className="absolute top-0 left-0 w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
           </div>
         </div>
       </section>
