@@ -40,6 +40,9 @@ export default function HomePage() {
           <div className="section-title mb-3">
             Tổng quan <span className="text-[--red]">giao diện & tính năng</span> Web Flashcard
           </div>
+          <p className="text-[--muted] text-sm md:text-base max-w-xl mx-auto mb-8">
+          </p>
+
           <div className="relative w-full aspect-video rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border-2 border-[--border] bg-black">
             <iframe
               src="https://www.youtube.com/embed/aQ6MI9SfUKQ?rel=0&modestbranding=1&iv_load_policy=3&playsinline=1"
