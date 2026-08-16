@@ -11,7 +11,14 @@ interface PublicDecksResponse {
 
 export default async function DecksPage() {
   // All DB queries go through the Express API server (no auth needed for this endpoint)
-  const { decks, groups } = await serverApiClient.get<PublicDecksResponse>("/decks");
+  let decksData: PublicDecksResponse = { decks: [], groups: [] };
+  try {
+    decksData = await serverApiClient.get<PublicDecksResponse>("/decks");
+  } catch (err: any) {
+    console.error("[DecksPage] Failed to fetch decks:", err);
+  }
+
+  const { decks = [], groups = [] } = decksData;
 
   // Group logic (moved from Supabase SSR to client-side grouping after API call)
   const groupMap: Record<string, Deck[]> = {};
