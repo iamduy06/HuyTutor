@@ -1,12 +1,12 @@
-import { createAdminClient } from "@/services/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { countWords } from "@/lib/utils";
 import type { Deck, DeckGroup, FlashcardRow } from "@/types";
 import { PublicGroupedDecks } from "@/components/flashcard/PublicGroupedDecks";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function DecksPage() {
-  const supabase = createAdminClient();
+  const supabase = createClient();
 
   // 1. Fetch groups and preview decks
   const [groupsRes, decksRes] = await Promise.all([

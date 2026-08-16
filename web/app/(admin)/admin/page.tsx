@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { createAdminClient } from "@/services/supabase/admin";
 import { Users, BookOpen, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
