@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth, requireSubAdmin } from "../../middleware/auth";
 import { createAdminClient } from "../../lib/supabase";
+import { extractTabs, FlashcardRow } from "../../lib/utils";
 
 const router = Router();
 
@@ -40,7 +41,9 @@ router.get("/", requireAuth, requireSubAdmin, async (req: Request, res: Response
     const { data: cards } = await admin.from("flashcards").select("deck_id, content").in("deck_id", deckIds);
     const wordMap: Record<string, number> = {};
     (cards ?? []).forEach((c: any) => {
-      wordMap[c.deck_id] = (wordMap[c.deck_id] ?? 0) + 1;
+      const tabs = extractTabs((c as unknown as FlashcardRow).content);
+      const count = tabs.reduce((s: number, t) => s + (t.vocabulary?.length ?? 0), 0);
+      wordMap[c.deck_id] = (wordMap[c.deck_id] ?? 0) + count;
     });
 
     const decks = (groupDecks ?? []).map((gd: any) => ({

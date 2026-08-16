@@ -8,24 +8,25 @@ const router = Router();
 
 /**
  * GET /api/decks
- * Public: list public/preview decks
+ * Public: list public/preview decks + deck_groups for grouped layout
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
     const supabase = createAdminClient();
-    const { data: decks, error } = await supabase
-      .from("decks")
-      .select("id, title, description, level, level_min, level_max, access_level, created_at")
-      .in("access_level->public", [true])
-      .order("created_at", { ascending: true });
 
-    // Fallback: use a raw filter for jsonb
-    const { data: decksAll, error: err2 } = await supabase
-      .from("decks")
-      .select("id, title, description, level, level_min, level_max, access_level, created_at")
-      .order("created_at", { ascending: true });
+    // Fetch all decks (with group_id) and deck_groups in parallel
+    const [{ data: decksAll, error }, { data: deckGroups }] = await Promise.all([
+      supabase
+        .from("decks")
+        .select("id, title, description, level, level_min, level_max, access_level, created_at, group_id")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("deck_groups")
+        .select("*")
+        .order("order_index", { ascending: true }),
+    ]);
 
-    if (err2) return res.status(500).json({ error: err2.message });
+    if (error) return res.status(500).json({ error: error.message });
 
     // Filter public or preview
     const filtered = (decksAll ?? []).filter((d: any) => {
@@ -33,13 +34,20 @@ router.get("/", async (req: Request, res: Response) => {
       return al.public === true || al.preview === true;
     });
 
-    const { data: cards } = await supabase.from("flashcards").select("deck_id, content");
-    const wordCountMap: Record<string, number> = {};
-    (cards ?? []).forEach((c: any) => {
-      const tabs = extractTabs((c as unknown as FlashcardRow).content);
-      const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
-      wordCountMap[c.deck_id] = (wordCountMap[c.deck_id] ?? 0) + count;
-    });
+    // Word counts only for filtered decks
+    const filteredIds = filtered.map((d: any) => d.id);
+    let wordCountMap: Record<string, number> = {};
+    if (filteredIds.length > 0) {
+      const { data: cards } = await supabase
+        .from("flashcards")
+        .select("deck_id, content")
+        .in("deck_id", filteredIds);
+      (cards ?? []).forEach((c: any) => {
+        const tabs = extractTabs((c as unknown as FlashcardRow).content);
+        const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+        wordCountMap[c.deck_id] = (wordCountMap[c.deck_id] ?? 0) + count;
+      });
+    }
 
     const result = filtered.map((d: any) => ({
       ...d,
@@ -47,12 +55,13 @@ router.get("/", async (req: Request, res: Response) => {
       level: computeLevelStr(d.level_min, d.level_max) ?? d.level,
     }));
 
-    return res.json({ decks: result });
+    return res.json({ decks: result, groups: deckGroups ?? [] });
   } catch (err: any) {
     console.error("[GET /api/decks]", err.message);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 /**
  * GET /api/decks/:id

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
+import { serverApiClient } from "@/lib/server-api-client";
 import { LayoutDashboard, Users, Shield, Paintbrush2 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 
@@ -10,55 +10,33 @@ const baseNavItems = [
   { href: "/subadmin/users", label: "Người dùng", icon: Users },
 ];
 
+interface SubAdminBrandingResponse {
+  groups: { id: string; name: string; branding: any }[];
+  isAdmin: boolean;
+}
+
 export default async function SubAdminLayout({ children }: { children: React.ReactNode }) {
+  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
+  // All DB access goes through the Express API server
   let hasBrandingAccess = false;
-
-  if (profile?.role === "ADMIN") {
-    hasBrandingAccess = true;
-  } else if (profile?.role === "SUBADMIN") {
-    const { data: groupSub, error: groupErr } = await supabase
-      .from("group_users")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("is_subadmin", true)
-      .limit(1)
-      .maybeSingle();
-
-    if (groupErr || !groupSub) {
-      redirect("/dashboard");
-    }
-
-    // Kiểm tra xem có nhóm nào được cấp quyền branding không
-    const { data: managedGroups } = await supabase
-      .from("group_users")
-      .select("group_id")
-      .eq("user_id", user.id)
-      .eq("is_subadmin", true);
-
-    if (managedGroups && managedGroups.length > 0) {
-      const groupIds = managedGroups.map((g: any) => g.group_id);
-      const adminClient = createAdminClient();
-      const { data: brandingGroups } = await adminClient
-        .from("groups")
-        .select("branding")
-        .in("id", groupIds);
-
-      hasBrandingAccess = (brandingGroups ?? []).some(
-        (g: any) => g.branding?.allow_custom_branding === true
+  try {
+    const brandingData = await serverApiClient.get<SubAdminBrandingResponse>("/subadmin/branding");
+    if (brandingData.isAdmin) {
+      hasBrandingAccess = true;
+    } else {
+      hasBrandingAccess = (brandingData.groups ?? []).some(
+        (g) => g.branding?.allow_custom_branding === true
       );
     }
-  } else {
-    redirect("/dashboard");
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("403") || msg.includes("401")) redirect("/dashboard");
+    // For layout errors, fallback to no branding access rather than crashing
+    hasBrandingAccess = false;
   }
 
   const navItems = [

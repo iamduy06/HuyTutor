@@ -15,30 +15,35 @@ router.get("/", requireAuth, requireAdmin, async (req: Request, res: Response) =
       { count: totalDecks },
       { data: deckStats },
       { data: progressStats },
+      { data: streakData },
     ] = await Promise.all([
       admin.from("users").select("*", { count: "exact", head: true }),
       admin.from("decks").select("*", { count: "exact", head: true }),
-      admin.from("user_decks").select("deck_id, deck:decks(title), progress_percent").order("deck_id"),
+      admin.from("user_decks").select("deck_id, deck:decks(title), progress_percent, learned_count").order("deck_id"),
       admin.from("user_decks").select("progress_percent"),
+      admin.from("user_decks").select("streak").order("streak", { ascending: false }).limit(1),
     ]);
 
     const avgProgress = progressStats?.length
       ? Math.round(progressStats.reduce((s: number, r: any) => s + (r.progress_percent || 0), 0) / progressStats.length)
       : 0;
 
-    const deckMap: Record<string, { title: string; count: number; avgProgress: number; totalProgress: number }> = {};
+    const maxStreak = (streakData?.[0] as any)?.streak ?? 0;
+
+    const deckMap: Record<string, { title: string; userCount: number; totalLearned: number; avgProgress: number; totalProgress: number }> = {};
     (deckStats ?? []).forEach((r: any) => {
       const id = r.deck_id;
-      if (!deckMap[id]) deckMap[id] = { title: r.deck?.title ?? id, count: 0, avgProgress: 0, totalProgress: 0 };
-      deckMap[id].count++;
+      if (!deckMap[id]) deckMap[id] = { title: r.deck?.title ?? id, userCount: 0, totalLearned: 0, avgProgress: 0, totalProgress: 0 };
+      deckMap[id].userCount++;
       deckMap[id].totalProgress += r.progress_percent || 0;
+      deckMap[id].totalLearned += r.learned_count || 0;
     });
     const popularDecks = Object.values(deckMap)
-      .map((d) => ({ ...d, avgProgress: d.count ? Math.round(d.totalProgress / d.count) : 0 }))
-      .sort((a, b) => b.count - a.count)
+      .map((d) => ({ ...d, avgProgress: d.userCount ? Math.round(d.totalProgress / d.userCount) : 0, totalProgress: undefined }))
+      .sort((a, b) => b.userCount - a.userCount)
       .slice(0, 5);
 
-    return res.json({ totalUsers, totalDecks, avgProgress, popularDecks });
+    return res.json({ totalUsers, totalDecks, avgProgress, maxStreak, popularDecks });
   } catch (err: any) {
     return res.status(500).json({ error: "Internal Server Error" });
   }

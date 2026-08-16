@@ -15,10 +15,13 @@ router.get("/", requireAuth, requireAdmin, async (req: Request, res: Response) =
       supabase.from("groups").select("id, name").order("name"),
     ]);
 
+    if (decksRes.error || groupsRes.error) {
+      return res.status(500).json({ error: (decksRes.error || groupsRes.error)?.message ?? "Query error" });
+    }
+
     return res.json({
       decks: decksRes.data ?? [],
       groups: groupsRes.data ?? [],
-      error: decksRes.error || groupsRes.error,
     });
   } catch (err: any) {
     return res.status(500).json({ error: "Internal Server Error" });

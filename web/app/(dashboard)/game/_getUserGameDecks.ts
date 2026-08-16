@@ -1,75 +1,35 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
-import { extractTabs } from "@/lib/utils";
-import type { FlashcardRow } from "@/types";
+import { serverApiClient } from "@/lib/server-api-client";
+
+interface GameDeck {
+  deck_id: string;
+  title: string;
+  wordCount: number;
+  tabs: { id: string; label: string; wordCount: number }[];
+}
+
+interface GameDecksResponse {
+  decks: GameDeck[];
+}
 
 /**
  * Lấy danh sách deck mà user có quyền truy cập (từ user_decks).
  * Dùng chung cho tất cả game pages.
  * Redirect về /login nếu chưa đăng nhập.
+ *
+ * All DB queries go through the Express API server (GET /api/me/game-decks).
  */
-export async function getUserGameDecks() {
+export async function getUserGameDecks(): Promise<GameDeck[]> {
+  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
+  // All DB access goes through the Express API server
+  const { decks } = await serverApiClient.get<GameDecksResponse>("/me/game-decks");
 
-  // Lấy user_decks kèm deck title
-  const { data: userDecks } = await admin
-    .from("user_decks")
-    .select("deck_id, expired_at, deck:decks(id, title, access_level)")
-    .eq("user_id", user.id);
+  if (!decks || decks.length === 0) redirect("/dashboard");
 
-  // Lọc deck còn quyền
-  const accessible = (userDecks ?? []).filter((ud: any) => {
-    const levels = ud.deck?.access_level ?? {};
-    if (levels.public || levels.auth) return true;
-    if (levels.paid) {
-      if (!ud.expired_at) return true;
-      return new Date(ud.expired_at) > new Date();
-    }
-    return false;
-  });
-
-  if (accessible.length === 0) redirect("/dashboard");
-
-  const deckIds = accessible.map((ud: any) => ud.deck_id as string);
-
-  // Đếm số từ mỗi deck
-  const { data: flashcards } = await admin
-    .from("flashcards")
-    .select("deck_id, content")
-    .in("deck_id", deckIds);
-
-  const wordCountMap: Record<string, number> = {};
-  const tabsMap: Record<string, { id: string; label: string; wordCount: number }[]> = {};
-
-  (flashcards ?? []).forEach((r: any) => {
-    const tabs = extractTabs((r as unknown as FlashcardRow).content);
-    const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
-    wordCountMap[r.deck_id] = (wordCountMap[r.deck_id] ?? 0) + count;
-    
-    if (!tabsMap[r.deck_id]) tabsMap[r.deck_id] = [];
-    tabs.forEach(t => {
-      const vCount = t.vocabulary?.length ?? 0;
-      if (vCount > 0) {
-        tabsMap[r.deck_id].push({
-          id: t.id,
-          label: t.label || t.id,
-          wordCount: vCount,
-        });
-      }
-    });
-  });
-
-  const deckOptions = accessible.map((ud: any) => ({
-    deck_id: ud.deck_id as string,
-    title: (ud.deck as any)?.title ?? ud.deck_id,
-    wordCount: wordCountMap[ud.deck_id as string] ?? 0,
-    tabs: tabsMap[ud.deck_id as string] ?? [],
-  }));
-
-  return deckOptions;
+  return decks;
 }

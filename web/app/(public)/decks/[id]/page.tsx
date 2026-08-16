@@ -1,77 +1,43 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createAdminClient } from "@/services/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { serverApiClient } from "@/lib/server-api-client";
 import { FACEBOOK_URL } from "@/lib/constants";
-import { getDeckAccess, extractTabs } from "@/lib/utils";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
 import { Button } from "@/components/ui/button";
-import type { Tab, FlashcardRow } from "@/types";
+import type { Tab } from "@/types";
 
 interface Props { params: { id: string } }
 
+interface DeckContentResponse {
+  deck: { id: string; title: string; description: string | null };
+  tabs: Tab[];
+  isDemo: boolean;
+  previewLimit?: number;
+  totalWords: number;
+}
+
 export default async function DeckDetailPage({ params }: Props) {
-  const adminSupabase = createAdminClient();
-  const supabase = createClient();
+  // All data goes through the Express API server
+  // GET /api/decks/:id/content handles auth check, access control, and content fetching
+  let contentData: DeckContentResponse | null = null;
+  let isForbidden = false;
 
-  // 1. Fetch Metadata
-  const { data: deck } = await adminSupabase
-    .from("decks")
-    .select("id, title, description, level, access_level")
-    .eq("id", params.id)
-    .single();
+  try {
+    contentData = await serverApiClient.get<DeckContentResponse>(`/decks/${params.id}/content`);
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("403") || msg.toLowerCase().includes("forbidden")) {
+      isForbidden = true;
+    } else if (msg.includes("404")) {
+      notFound();
+    } else {
+      // Re-throw unexpected errors
+      throw err;
+    }
+  }
 
-  if (!deck) notFound();
-
-  // 2. Determine Access using unified logic
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: userProfile } = user 
-    ? await adminSupabase.from("users").select("role").eq("id", user.id).single()
-    : { data: null };
-
-  const { data: userDeck } = user
-    ? await adminSupabase
-        .from("user_decks")
-        .select("expired_at")
-        .eq("user_id", user.id)
-        .eq("deck_id", params.id)
-        .maybeSingle()
-    : { data: null };
-
-  const access = getDeckAccess(userProfile as any, deck as any, userDeck);
-
-  // 3. Fetch Content based on access
-  let tabs: Tab[] = [];
-  let isPreview = false;
-
-  if (access.canLearnFull) {
-    const { data: rows } = await adminSupabase
-      .from("flashcards")
-      .select("content, created_at")
-      .eq("deck_id", params.id)
-      .order("created_at", { ascending: true });
-    
-    tabs = (rows ?? []).flatMap(r => extractTabs((r as unknown as FlashcardRow).content));
-  } else if (access.isPreview) {
-    const limit = access.previewLimit || 10;
-    const { data: rows } = await adminSupabase
-      .from("flashcards")
-      .select("content, created_at")
-      .eq("deck_id", params.id)
-      .order("created_at", { ascending: true });
-
-    const allTabs = (rows ?? []).flatMap(r => extractTabs((r as unknown as FlashcardRow).content));
-    let seen = 0;
-    tabs = allTabs.map(tab => {
-      const remaining = limit - seen;
-      if (remaining <= 0) return null;
-      const vocab = (tab.vocabulary ?? []).slice(0, remaining);
-      seen += vocab.length;
-      return { ...tab, vocabulary: vocab };
-    }).filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
-    isPreview = true;
-  } else {
-    // No access at all (authorized or authenticated/not-logged-in)
+  // No access at all
+  if (isForbidden || !contentData) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center">
         <div className="text-6xl mb-6">🔒</div>
@@ -85,11 +51,13 @@ export default async function DeckDetailPage({ params }: Props) {
     );
   }
 
+  const { deck, tabs, isDemo: isPreview, previewLimit } = contentData;
+
   return (
     <div className="flex flex-col flex-1">
       {isPreview && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2.5 text-center text-sm text-yellow-800 flex items-center justify-center gap-3 flex-wrap">
-          <span>🎯 Bản xem trước — tối đa {access.previewLimit} từ.</span>
+          <span>🎯 Bản xem trước — tối đa {previewLimit} từ.</span>
           <Button variant="brand" size="sm" asChild className="rounded-full h-7 text-xs px-3">
             <Link href="/login">Đăng nhập để học đầy đủ</Link>
           </Button>
@@ -103,8 +71,8 @@ export default async function DeckDetailPage({ params }: Props) {
         deckTitle={deck.title}
         deckDesc={deck.description ?? undefined}
         isDemo={isPreview}
-        previewLimit={access.previewLimit ?? 10}
-        deckId={access.canLearnFull ? deck.id : undefined}
+        previewLimit={previewLimit ?? 10}
+        deckId={isPreview ? undefined : deck.id}
       />
     </div>
   );
