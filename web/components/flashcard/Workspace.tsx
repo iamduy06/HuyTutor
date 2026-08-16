@@ -8,7 +8,6 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
 import { useLearningStore } from "@/features/learning/store";
-import { apiClient } from "@/lib/api-client";
 import type { Tab } from "@/types";
 
 interface DeckData {
@@ -24,14 +23,13 @@ class ForbiddenError extends Error {
 }
 
 async function fetchDeck(deckId: string): Promise<DeckData> {
-  try {
-    return await apiClient.get<DeckData>(`/decks/${deckId}/content`);
-  } catch (err: any) {
-    if (err?.message?.includes("403") || err?.message?.toLowerCase().includes("forbidden")) {
-      throw new ForbiddenError();
-    }
-    throw err;
+  const res = await fetch(`/api/decks/${deckId}/content`);
+  if (res.status === 403) throw new ForbiddenError();
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
   }
+  return res.json();
 }
 
 
