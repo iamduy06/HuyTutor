@@ -15,7 +15,7 @@ export function createClient() {
       setAll(list: { name: string; value: string; options?: CookieOptions }[]) {
         try {
           list.forEach(({ name, value, options }) =>
-            store.set(name, value, options)
+            store.set(name, value, { path: "/", sameSite: "lax", httpOnly: true, ...options })
           );
         } catch { /* Server Component writes ignored */ }
       },

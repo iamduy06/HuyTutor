@@ -11,16 +11,14 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+        getAll() { return request.cookies.getAll(); },
+        setAll(list: { name: string; value: string; options?: CookieOptions }[]) {
+          list.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request: { headers: request.headers } });
+          list.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, {
+              path: "/", sameSite: "lax", httpOnly: true, ...options,
+            })
           );
         },
       },

@@ -48,10 +48,6 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
       }
     } catch (err: any) {
       console.error("[DashboardClient] Fetch error:", err);
-      if (err?.message?.includes("401") || err?.message?.toLowerCase().includes("unauthorized") || err?.message?.toLowerCase().includes("jwt")) {
-        window.location.href = "/login";
-        return;
-      }
       setError(err?.message || "Không thể tải dữ liệu.");
     } finally {
       setLoading(false);
