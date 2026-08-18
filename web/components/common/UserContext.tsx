@@ -5,7 +5,6 @@ import {
   useState, useCallback, useRef, type ReactNode,
 } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { apiClient } from "@/lib/api-client";
 import type { UserProfile } from "@/types";
 
 // ── Singleton browser client ──────────────────────────────────────────────────
@@ -61,14 +60,28 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
     }, 5000);
   };
 
-  const fetchProfile = useCallback(async (_userId: string): Promise<UserProfile | null> => {
-    try {
-      // All DB queries go through the Express API server — never directly from browser
-      const data = await apiClient.get<{ profile: UserProfile & { is_subadmin: boolean } }>("/me/profile");
-      return data.profile ?? null;
-    } catch {
-      return null;
-    }
+  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
+    const supabase = getSupabaseClient();
+    
+    // Fetch profile chính
+    const { data: profile } = await supabase
+      .from("users").select("*").eq("id", userId).single();
+      
+    if (!profile) return null;
+
+    // Kiểm tra xem có là subadmin của bất kỳ nhóm nào không
+    const { data: groupSub } = await supabase
+      .from("group_users")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_subadmin", true)
+      .limit(1)
+      .maybeSingle();
+
+    return {
+      ...(profile as UserProfile),
+      is_subadmin: !!groupSub
+    };
   }, []);
 
   const refresh = useCallback(async () => {

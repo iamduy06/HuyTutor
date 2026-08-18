@@ -1,23 +1,21 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { serverApiClient } from "@/lib/server-api-client";
+import {
+  Shield
+} from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // All DB access goes through the Express API server
-  try {
-    const { profile } = await serverApiClient.get<{ profile: { role: string } }>("/me/profile");
-    if (profile?.role !== "ADMIN") redirect("/dashboard");
-  } catch (err: any) {
-    // Unauthorized / Forbidden from the API means no access
-    redirect("/dashboard");
-  }
+  const { data: profile } = await supabase
+    .from("users").select("role").eq("id", user.id).single();
+  if (profile?.role !== "ADMIN") redirect("/dashboard");
 
   return (
     <div className="min-h-screen flex flex-col">

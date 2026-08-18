@@ -1,39 +1,42 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { serverApiClient } from "@/lib/server-api-client";
+import { createAdminClient } from "@/services/supabase/admin";
 import SubAdminBrandingClient from "./client";
 
-interface BrandingData {
-  groups: { id: string; name: string; branding: any }[];
-  isAdmin: boolean;
-}
-
 export default async function SubAdminBrandingPage() {
-  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // All DB access goes through the Express API server
-  let brandingData: BrandingData | null = null;
-  try {
-    brandingData = await serverApiClient.get<BrandingData>("/subadmin/branding");
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("403") || msg.includes("401")) redirect("/subadmin");
-    throw err;
-  }
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single();
 
-  if (!brandingData) redirect("/subadmin");
-
-  // Admin always has access
-  if (brandingData.isAdmin) {
+  if (profile?.role === "ADMIN") {
     return <SubAdminBrandingClient />;
   }
 
-  // Subadmin: check if any managed group has allow_custom_branding
-  const hasAccess = (brandingData.groups ?? []).some(
-    (g) => g.branding?.allow_custom_branding === true
+  if (profile?.role !== "SUBADMIN") redirect("/subadmin");
+
+  const { data: managedGroups } = await supabase
+    .from("group_users")
+    .select("group_id")
+    .eq("user_id", user.id)
+    .eq("is_subadmin", true);
+
+  if (!managedGroups || managedGroups.length === 0) redirect("/subadmin");
+
+  const groupIds = managedGroups.map((g: any) => g.group_id);
+  const adminClient = createAdminClient();
+  const { data: brandingGroups } = await adminClient
+    .from("groups")
+    .select("branding")
+    .in("id", groupIds);
+
+  const hasAccess = (brandingGroups ?? []).some(
+    (g: any) => g.branding?.allow_custom_branding === true
   );
 
   if (!hasAccess) redirect("/subadmin");

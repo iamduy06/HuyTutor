@@ -85,18 +85,12 @@ router.get("/:id", requireAuth, requireAdmin, async (req: Request, res: Response
       .from("flashcards").select("*").eq("deck_id", req.params.id)
       .order("created_at", { ascending: true });
 
-    // Build tabs with row tracking: each tab knows which row it came from
-    type TabWithRow = Tab & { _sourceRowId: string };
-    const tabsWithRow: TabWithRow[] = (rows ?? []).flatMap((r: any) =>
-      extractTabs((r as unknown as FlashcardRow).content).map(t => ({
-        ...t,
-        _sourceRowId: r.id as string,
-      }))
+    const tabs: Tab[] = (rows ?? []).flatMap((r: any) =>
+      extractTabs((r as unknown as FlashcardRow).content)
     );
-    const tabs: Tab[] = tabsWithRow.map(({ _sourceRowId: _ignored, ...t }) => t);
-    const cards = tabsWithRow.flatMap((tab, tabIdx) =>
+    const cards = tabs.flatMap((tab, tabIdx) =>
       (tab.vocabulary ?? []).map((v) => ({
-        _rowId: tab._sourceRowId,
+        _rowId: rows?.[0]?.id ?? "",
         _tabIndex: tabIdx,
         _tabLabel: tab.label ?? `Unit ${tabIdx + 1}`,
         content: v,

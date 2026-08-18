@@ -4,7 +4,6 @@ import "./globals.css";
 import { Providers } from "@/components/common/Providers";
 import { Toaster } from "@/components/ui/toaster";
 import { createClient } from "@/lib/supabase/server";
-import { serverApiClient } from "@/lib/server-api-client";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -26,19 +25,29 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Auth check only — no DB query (just session cookie)
+  // Đọc session từ cookie server-side → truyền xuống client
+  // Không có round-trip → không flash
   const supabase = createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
 
   let initialUser = null;
   if (authUser) {
-    try {
-      // All DB access goes through the Express API server
-      const { profile } = await serverApiClient.get<{ profile: any }>("/me/profile");
-      initialUser = profile ?? null;
-    } catch {
-      // If API fails (e.g. server not reachable), fall back to null — graceful degradation
-      initialUser = null;
+    const { data: profile } = await supabase
+      .from("users").select("*").eq("id", authUser.id).single();
+    
+    if (profile) {
+      const { data: groupSub } = await supabase
+        .from("group_users")
+        .select("id")
+        .eq("user_id", authUser.id)
+        .eq("is_subadmin", true)
+        .limit(1)
+        .maybeSingle();
+
+      initialUser = {
+        ...profile,
+        is_subadmin: !!groupSub
+      };
     }
   }
 

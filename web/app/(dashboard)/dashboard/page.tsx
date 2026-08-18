@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { serverApiClient } from "@/lib/server-api-client";
-import { hasFullAccess, formatDate } from "@/lib/utils";
+import { createAdminClient } from "@/services/supabase/admin";
+import { hasFullAccess, formatDate, extractTabs } from "@/lib/utils";
 import { Flame, BookOpen, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FACEBOOK_URL } from "@/lib/constants";
+import type { FlashcardRow } from "@/types";
 
 const GAMES = [
   { href: "/game/listening",       icon: "🎧", title: "Nghe & Viết",       desc: "Nghe phát âm, gõ lại từ tiếng Anh" },
@@ -16,27 +17,65 @@ const GAMES = [
 
 export const dynamic = "force-dynamic";
 
-interface DashboardApiData {
-  profile: any;
-  userDecks: any[];
-  extraPublicDecks: any[];
-  wordCounts: Record<string, number>;
-}
 
 export default async function DashboardPage() {
-  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // All DB data goes through the Express API server
-  const data = await serverApiClient.get<DashboardApiData>("/me/dashboard");
-  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCounts: wordCountMap } = data;
+  const admin = createAdminClient();
 
-  // Stats
+  // Lấy song song: profile + assigned decks + ALL public decks
+  const [
+    { data: profile },
+    { data: userDecks },
+    { data: publicDecks },
+  ] = await Promise.all([
+    admin.from("users").select("*").eq("id", user.id).single(),
+    admin
+      .from("user_decks")
+      .select("id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, access_level)")
+      .eq("user_id", user.id)
+      .order("deck_id"),
+    // Decks công khai hoặc dành cho thành viên (auth)
+    admin
+      .from("decks")
+      .select("id, title, description, level, access_level")
+      .or("access_level->public.eq.true,access_level->auth.eq.true")
+      .order("created_at", { ascending: true }),
+  ]);
+
+  // Lọc userDecks dựa trên access_level (chỉ hiện nếu có public, auth hoặc paid)
+  const filteredUserDecks = (userDecks ?? []).filter((ud: any) => {
+    const levels = ud.deck?.access_level ?? {};
+    return levels.public === true || levels.auth === true || levels.paid === true;
+  });
+
+  // Gộp: assigned decks + public/auth decks chưa được assign
+  const assignedDeckIds = new Set(filteredUserDecks.map((ud: any) => ud.deck_id as string));
+  const extraPublicDecks = (publicDecks ?? []).filter(d => !assignedDeckIds.has(d.id));
+
+  // Word count cho tất cả deck cần hiển thị
+  const allDeckIds = [
+    ...filteredUserDecks.map((ud: any) => ud.deck_id as string),
+    ...extraPublicDecks.map(d => d.id),
+  ];
+
+  const { data: flashcardRows } = allDeckIds.length > 0
+    ? await admin.from("flashcards").select("deck_id, content").in("deck_id", allDeckIds)
+    : { data: [] };
+
+  const wordCountMap: Record<string, number> = {};
+  (flashcardRows ?? []).forEach((r: any) => {
+    const tabs = extractTabs((r as unknown as FlashcardRow).content);
+    const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+    wordCountMap[r.deck_id as string] = (wordCountMap[r.deck_id as string] ?? 0) + count;
+  });
+
+  // Stats: count active = assigned có hạn + tất cả public
   const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
   const totalLearned = filteredUserDecks.reduce((s: number, ud: any) => s + ((ud.learned_count as number) ?? 0), 0);
-
+  
   const activeAssigned = filteredUserDecks.filter((ud: any) => {
     const levels = ud.deck?.access_level ?? {};
     if (levels.public === true || levels.auth === true) return true;
@@ -121,6 +160,7 @@ export default async function DashboardPage() {
               const expired_at = ud.expired_at as string | null;
               const levels = deck?.access_level ?? {};
               const isFree = levels.public || levels.auth;
+              // Free decks luôn active; restricted check expired_at
               const active = isFree || hasFullAccess(expired_at);
               const words = wordCountMap[ud.deck_id as string] ?? 0;
               if (!deck) return null;
@@ -135,7 +175,7 @@ export default async function DashboardPage() {
                   words={words}
                   streak={(ud.streak as number) ?? 0}
                   progressPercent={(ud.progress_percent as number) ?? 0}
-                  expiredAt={isFree ? null : expired_at}
+                  expiredAt={isFree ? null : expired_at}  // public không show hạn
                   deckId={deck.id}
                   showExpiry={!isFree}
                   isAssigned={true}
@@ -144,7 +184,7 @@ export default async function DashboardPage() {
             })}
 
             {/* ── Extra public decks (chưa được assign) ── */}
-            {extraPublicDecks.map((deck: any) => (
+            {extraPublicDecks.map(deck => (
               <DeckCard
                 key={deck.id}
                 title={deck.title}
@@ -172,7 +212,7 @@ export default async function DashboardPage() {
 interface DeckCardProps {
   title: string;
   description: string | null;
-  accessLevel: any;
+  accessLevel: any; // update to any for flexibility
   active: boolean;
   words: number;
   streak: number;

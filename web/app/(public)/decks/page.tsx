@@ -1,26 +1,46 @@
-import { serverApiClient } from "@/lib/server-api-client";
-import type { Deck, DeckGroup } from "@/types";
+import { createClient } from "@/lib/supabase/server";
+import { countWords } from "@/lib/utils";
+import type { Deck, DeckGroup, FlashcardRow } from "@/types";
 import { PublicGroupedDecks } from "@/components/flashcard/PublicGroupedDecks";
 
 export const dynamic = "force-dynamic";
 
-interface PublicDecksResponse {
-  decks: (Deck & { word_count: number; group_id: string | null })[];
-  groups: DeckGroup[];
-}
-
 export default async function DecksPage() {
-  // All DB queries go through the Express API server (no auth needed for this endpoint)
-  const { decks, groups } = await serverApiClient.get<PublicDecksResponse>("/decks");
+  const supabase = createClient();
 
-  // Group logic (moved from Supabase SSR to client-side grouping after API call)
+  // 1. Fetch groups and preview decks
+  const [groupsRes, decksRes] = await Promise.all([
+    supabase.from("deck_groups").select("*").order("order_index", { ascending: true }),
+    supabase.from("decks")
+      .select("id, title, description, level, level_min, level_max, access_level, created_at, group_id")
+      .eq("access_level->preview", true)
+      .order("created_at", { ascending: true })
+  ]);
+
+  const groups: DeckGroup[] = groupsRes.data ?? [];
+  const decks: Deck[] = decksRes.data ?? [];
+
+  // 2. Fetch word counts
+  const deckIds = decks.map(d => d.id);
+  const { data: cards } = deckIds.length > 0
+    ? await supabase.from("flashcards").select("deck_id, content").in("deck_id", deckIds)
+    : { data: [] };
+
+  const wordMap: Record<string, number> = {};
+  (cards ?? []).forEach((r: any) => {
+    wordMap[r.deck_id] = (wordMap[r.deck_id] ?? 0) + countWords(r as unknown as FlashcardRow);
+  });
+
+  const formattedDecks = decks.map(d => ({ ...d, word_count: wordMap[d.id] ?? 0 }));
+
+  // 3. Grouping logic
   const groupMap: Record<string, Deck[]> = {};
   const ungroupedDecks: Deck[] = [];
 
-  decks.forEach(deck => {
-    if ((deck as any).group_id) {
-      if (!groupMap[(deck as any).group_id]) groupMap[(deck as any).group_id] = [];
-      groupMap[(deck as any).group_id].push(deck);
+  formattedDecks.forEach(deck => {
+    if (deck.group_id) {
+      if (!groupMap[deck.group_id]) groupMap[deck.group_id] = [];
+      groupMap[deck.group_id].push(deck);
     } else {
       ungroupedDecks.push(deck);
     }
@@ -35,6 +55,7 @@ export default async function DecksPage() {
     .map(g => ({ group: g, decks: groupMap[g.id] || [] }))
     .filter(g => g.decks.length > 0);
 
+  // Thêm nhóm "Chưa phân loại" nếu có deck ungrouped
   if (ungroupedDecks.length > 0) {
     finalGroups.push({ group: null, decks: ungroupedDecks });
   }
@@ -62,3 +83,4 @@ export default async function DecksPage() {
     </div>
   );
 }
+

@@ -1,34 +1,33 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { serverApiClient } from "@/lib/server-api-client";
+import { createAdminClient } from "@/services/supabase/admin";
+import { getDeckAccess } from "@/lib/utils";
 import { Workspace } from "@/components/flashcard/Workspace";
 
 interface Props { params: { deckId: string } }
 
-interface DeckAccessResponse {
-  canLearnFull: boolean;
-  isPreview: boolean;
-  previewLimit?: number;
-  canView: boolean;
-}
-
 export default async function LearningPage({ params }: Props) {
-  // Auth check only — no DB query
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // All DB access goes through the Express API server
-  let access: DeckAccessResponse | null = null;
-  try {
-    access = await serverApiClient.get<DeckAccessResponse>(`/me/deck-access/${params.deckId}`);
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("404")) redirect("/dashboard");
-    throw err;
-  }
+  const adminSupabase = createAdminClient();
 
-  if (!access) redirect("/dashboard");
+  // 1. Lấy thông tin cần thiết để check access
+  const [
+    { data: deck },
+    { data: userProfile },
+    { data: userDeck }
+  ] = await Promise.all([
+    adminSupabase.from("decks").select("id, access_level").eq("id", params.deckId).single(),
+    adminSupabase.from("users").select("role").eq("id", user.id).single(),
+    adminSupabase.from("user_decks").select("expired_at").eq("user_id", user.id).eq("deck_id", params.deckId).maybeSingle()
+  ]);
+
+  if (!deck) redirect("/dashboard");
+
+  // 2. Chạy logic check quyền trung tâm
+  const access = getDeckAccess(userProfile as any, deck as any, userDeck);
 
   // Nếu không thể học đầy đủ:
   if (!access.canLearnFull) {

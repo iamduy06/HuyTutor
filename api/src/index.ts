@@ -12,7 +12,6 @@ import meRouter from "./routes/me";
 
 // Admin routes
 import adminAnalyticsRouter from "./routes/admin/analytics";
-import adminDashboardRouter from "./routes/admin/dashboard";
 import adminDecksRouter from "./routes/admin/decks";
 import adminUsersRouter from "./routes/admin/users";
 import adminGroupsRouter from "./routes/admin/groups";
@@ -28,7 +27,6 @@ import adminDeckGroupsRouter from "./routes/admin/deck-groups";
 import subadminUsersRouter from "./routes/subadmin/users";
 import subadminDecksRouter from "./routes/subadmin/decks";
 import subadminBrandingRouter from "./routes/subadmin/branding";
-import subadminDashboardRouter from "./routes/subadmin/dashboard";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
@@ -56,7 +54,6 @@ app.use("/api/me", meRouter);
 
 // Admin
 app.use("/api/admin/analytics", adminAnalyticsRouter);
-app.use("/api/admin/dashboard", adminDashboardRouter);
 app.use("/api/admin/decks", adminDecksRouter);
 app.use("/api/admin/users", adminUsersRouter);
 app.use("/api/admin/groups", adminGroupsRouter);
@@ -69,7 +66,6 @@ app.use("/api/admin/subadmins", adminSubadminsRouter);
 app.use("/api/admin/deck-groups", adminDeckGroupsRouter);
 
 // Subadmin
-app.use("/api/subadmin/dashboard", subadminDashboardRouter);
 app.use("/api/subadmin/users", subadminUsersRouter);
 app.use("/api/subadmin/decks", subadminDecksRouter);
 app.use("/api/subadmin/branding", subadminBrandingRouter);
