@@ -17,15 +17,11 @@ export function generatePassword(length = 8): string {
   ).join("");
 }
 
-export function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return "Chưa cập nhật";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "Chưa cập nhật";
-  return d.toLocaleDateString("vi-VN", {
+export function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("vi-VN", {
     year: "numeric", month: "long", day: "numeric",
   });
 }
-
 
 /**
  * Hết hạn khi:

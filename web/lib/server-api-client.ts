@@ -31,7 +31,7 @@ async function getServerToken(): Promise<string | null> {
   }
 }
 
-async function serverFetch<T>(path: string, options?: RequestInit, retries = 2): Promise<T> {
+async function serverFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getServerToken();
   const baseUrl = getBaseApiUrl();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -44,62 +44,27 @@ async function serverFetch<T>(path: string, options?: RequestInit, retries = 2):
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(fullUrl, {
+      ...options,
+      headers: { ...headers, ...(options?.headers as Record<string, string> ?? {}) },
+      cache: "no-store",
+    });
 
-    try {
-      const res = await fetch(fullUrl, {
-        ...options,
-        headers: { ...headers, ...(options?.headers as Record<string, string> ?? {}) },
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        let errorMessage = `HTTP ${res.status}`;
-        try {
-          const body = await res.json();
-          errorMessage = body?.error || body?.message || errorMessage;
-        } catch { /* ignore */ }
-
-        // If 401 or 403, don't retry as it's an authorization issue
-        if (res.status === 401 || res.status === 403 || res.status === 404) {
-          throw new Error(`[${res.status}] ${errorMessage} (${fullUrl})`);
-        }
-
-        // For 5xx errors, retry if attempts remain
-        if (attempt < retries) {
-          console.warn(`[serverApiClient] Attempt ${attempt + 1} got ${res.status} from ${fullUrl}. Retrying in 1s...`);
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
-
-        throw new Error(`[${res.status}] ${errorMessage} (${fullUrl})`);
-      }
-
-      return await res.json() as T;
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-
-      // Don't retry auth errors
-      if (err?.message?.includes("[401]") || err?.message?.includes("[403]") || err?.message?.includes("[404]")) {
-        throw err;
-      }
-
-      if (attempt < retries) {
-        console.warn(`[serverApiClient] Attempt ${attempt + 1} failed for ${fullUrl} (${err?.message}). Retrying in 1s...`);
-        await new Promise(r => setTimeout(r, 1000));
-        continue;
-      }
-
-      console.error(`[serverApiClient] Request to ${fullUrl} failed after ${retries + 1} attempts:`, err?.message || err);
-      throw err;
+    if (!res.ok) {
+      let errorMessage = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        errorMessage = body?.error || body?.message || errorMessage;
+      } catch { /* ignore */ }
+      throw new Error(`[${res.status}] ${errorMessage} (${fullUrl})`);
     }
-  }
 
-  throw new Error(`[serverApiClient] Failed to fetch ${fullUrl}`);
+    return res.json() as T;
+  } catch (err: any) {
+    console.error(`[serverApiClient] Request to ${fullUrl} failed:`, err?.message || err);
+    throw err;
+  }
 }
 
 export const serverApiClient = {
@@ -121,4 +86,3 @@ export const serverApiClient = {
   patch: <T = any>(path: string, body?: any) =>
     serverFetch<T>(path, { method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined }),
 };
-
