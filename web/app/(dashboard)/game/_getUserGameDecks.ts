@@ -27,16 +27,9 @@ export async function getUserGameDecks(): Promise<GameDeck[]> {
   if (!user) redirect("/login");
 
   // All DB access goes through the Express API server
-  let decks: GameDeck[] = [];
-  try {
-    const res = await serverApiClient.get<GameDecksResponse>("/me/game-decks");
-    decks = res.decks ?? [];
-  } catch (err: any) {
-    console.error("[getUserGameDecks] API error:", err);
-    if (err?.message?.includes("401")) redirect("/login");
-  }
+  const { decks } = await serverApiClient.get<GameDecksResponse>("/me/game-decks");
 
-  if (decks.length === 0) redirect("/dashboard");
+  if (!decks || decks.length === 0) redirect("/dashboard");
 
   return decks;
 }

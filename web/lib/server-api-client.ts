@@ -11,10 +11,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-const getBaseApiUrl = () => {
-  const url = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://flashcard-api-dudg.onrender.com";
-  return url.replace(/\/+$/, "");
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**
  * Get the current user's Supabase access token from the server-side session.
@@ -25,18 +22,13 @@ async function getServerToken(): Promise<string | null> {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token ?? null;
-  } catch (err) {
-    console.error("[serverApiClient] Failed to get session token:", err);
+  } catch {
     return null;
   }
 }
 
 async function serverFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getServerToken();
-  const baseUrl = getBaseApiUrl();
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  const fullUrl = `${baseUrl}/api${cleanPath}`;
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -44,27 +36,23 @@ async function serverFetch<T>(path: string, options?: RequestInit): Promise<T> {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  try {
-    const res = await fetch(fullUrl, {
-      ...options,
-      headers: { ...headers, ...(options?.headers as Record<string, string> ?? {}) },
-      cache: "no-store",
-    });
+  const res = await fetch(`${API_URL}/api${path}`, {
+    ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string> ?? {}) },
+    // Disable Next.js fetch cache for all server-side API calls
+    cache: "no-store",
+  });
 
-    if (!res.ok) {
-      let errorMessage = `HTTP ${res.status}`;
-      try {
-        const body = await res.json();
-        errorMessage = body?.error || body?.message || errorMessage;
-      } catch { /* ignore */ }
-      throw new Error(`[${res.status}] ${errorMessage} (${fullUrl})`);
-    }
-
-    return res.json() as T;
-  } catch (err: any) {
-    console.error(`[serverApiClient] Request to ${fullUrl} failed:`, err?.message || err);
-    throw err;
+  if (!res.ok) {
+    let errorMessage = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      errorMessage = body?.error || body?.message || errorMessage;
+    } catch { /* ignore */ }
+    throw new Error(errorMessage);
   }
+
+  return res.json() as T;
 }
 
 export const serverApiClient = {

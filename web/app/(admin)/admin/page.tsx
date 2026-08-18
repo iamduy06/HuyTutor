@@ -13,19 +13,7 @@ interface DashboardData {
 }
 
 export default async function AdminPage() {
-  let data: DashboardData = {
-    totalUsers: 0,
-    totalDecks: 0,
-    avgProgress: 0,
-    totalAssignments: 0,
-    recentUsers: [],
-  };
-
-  try {
-    data = await serverApiClient.get<DashboardData>("/admin/dashboard");
-  } catch (err: any) {
-    console.error("[AdminPage] Failed to fetch dashboard data:", err);
-  }
+  const data: DashboardData = await serverApiClient.get<DashboardData>("/admin/dashboard");
 
   return (
     <div className="p-6 max-w-5xl">

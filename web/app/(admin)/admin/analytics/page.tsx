@@ -18,19 +18,7 @@ interface AnalyticsData {
 }
 
 export default async function AdminAnalyticsPage() {
-  let data: AnalyticsData = {
-    totalUsers: 0,
-    totalDecks: 0,
-    avgProgress: 0,
-    maxStreak: 0,
-    popularDecks: [],
-  };
-
-  try {
-    data = await serverApiClient.get<AnalyticsData>("/admin/analytics");
-  } catch (err: any) {
-    console.error("[AdminAnalyticsPage] Failed to fetch analytics data:", err);
-  }
+  const data = await serverApiClient.get<AnalyticsData>("/admin/analytics");
 
   return (
     <div className="p-6 max-w-5xl">

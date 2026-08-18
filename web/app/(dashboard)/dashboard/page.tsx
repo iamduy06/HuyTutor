@@ -30,23 +30,8 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   // All DB data goes through the Express API server
-  let data: DashboardApiData = {
-    profile: null,
-    userDecks: [],
-    extraPublicDecks: [],
-    wordCounts: {},
-  };
-
-  try {
-    data = await serverApiClient.get<DashboardApiData>("/me/dashboard");
-  } catch (err: any) {
-    console.error("[DashboardPage] API fetch error:", err?.message || err);
-    if (err?.message?.includes("401") || err?.message?.toLowerCase().includes("unauthorized")) {
-      redirect("/login");
-    }
-  }
-
-  const { profile, userDecks: filteredUserDecks = [], extraPublicDecks = [], wordCounts: wordCountMap = {} } = data;
+  const data = await serverApiClient.get<DashboardApiData>("/me/dashboard");
+  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCounts: wordCountMap } = data;
 
   // Stats
   const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
