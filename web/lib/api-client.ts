@@ -12,20 +12,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-export class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.API_URL ||
-  "https://flashcard-api-dudg.onrender.com"
-).replace(/\/+$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
 // Get current Supabase access token from browser session
 async function getAccessToken(): Promise<string | null> {
@@ -63,7 +50,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
     } catch {
       // ignore JSON parse error
     }
-    throw new ApiError(errorMessage, res.status);
+    throw new Error(errorMessage);
   }
 
   // Some responses may be binary (xlsx, csv)
