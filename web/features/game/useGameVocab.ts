@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import type { VocabItem } from "@/types";
 
 export interface GameVocabResponse {
@@ -15,12 +16,7 @@ async function fetchGameVocab(deckId: string | null, limit?: number, tabIds?: st
   if (limit) params.set("limit", String(limit));
   if (tabIds && tabIds.length > 0) params.set("tabIds", tabIds.join(","));
 
-  const res = await fetch(`/api/game/vocab?${params.toString()}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
+  return apiClient.get<GameVocabResponse>(`/game/vocab?${params.toString()}`);
 }
 
 /**
