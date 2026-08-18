@@ -1,28 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 
-export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
-  const method = req.method;
-  const path = req.originalUrl || req.url;
-
+export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
   // CORS errors
   if (err.message?.startsWith("CORS:")) {
-    console.warn(`⚠️ [CORS_ERROR] ${method} ${path} - ${err.message}`);
     return res.status(403).json({ error: err.message });
   }
-
-  console.error(`💥 [UNHANDLED_ERROR] ${method} ${path}:`, err?.message || err);
-  if (err?.stack) {
-    console.error(err.stack);
-  }
-
-  const statusCode = typeof err?.status === "number" && err.status >= 400 && err.status < 600
-    ? err.status
-    : 500;
-
+  console.error("[ERROR]", err?.message || err);
+  // Never expose stack traces or internal details in production
   const message = process.env.NODE_ENV === "production"
-    ? (err?.publicMessage || "Internal Server Error")
-    : (err?.message || "Internal Server Error");
-
-  res.status(statusCode).json({ error: message });
+    ? "Internal Server Error"
+    : err?.message || "Internal Server Error";
+  res.status(err?.status || 500).json({ error: message });
 }
-

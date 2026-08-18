@@ -19,13 +19,11 @@ declare global {
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
-    console.warn(`🔒 [AUTH_FAIL] ${req.method} ${req.originalUrl || req.url}: Missing Bearer token`);
     return res.status(401).json({ error: "Unauthorized: missing Bearer token" });
   }
   const token = authHeader.slice(7);
   const user = await verifyToken(token);
   if (!user) {
-    console.warn(`🔒 [AUTH_FAIL] ${req.method} ${req.originalUrl || req.url}: Invalid or expired token`);
     return res.status(401).json({ error: "Unauthorized: invalid token" });
   }
   req.user = user;
@@ -41,7 +39,6 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   const admin = createAdminClient();
   const { data } = await admin.from("users").select("role").eq("id", req.user.id).single();
   if (data?.role !== "ADMIN") {
-    console.warn(`⛔ [FORBIDDEN] ${req.method} ${req.originalUrl || req.url}: User ${req.user.email || req.user.id} has role '${data?.role}', ADMIN required`);
     return res.status(403).json({ error: "Forbidden: ADMIN role required" });
   }
   req.userProfile = data;
@@ -57,10 +54,8 @@ export async function requireSubAdmin(req: Request, res: Response, next: NextFun
   const admin = createAdminClient();
   const { data } = await admin.from("users").select("*").eq("id", req.user.id).single();
   if (!data || (data.role !== "SUBADMIN" && data.role !== "ADMIN")) {
-    console.warn(`⛔ [FORBIDDEN] ${req.method} ${req.originalUrl || req.url}: User ${req.user.email || req.user.id} has role '${data?.role}', SUBADMIN/ADMIN required`);
     return res.status(403).json({ error: "Forbidden: SUBADMIN role required" });
   }
   req.userProfile = data;
   next();
 }
-

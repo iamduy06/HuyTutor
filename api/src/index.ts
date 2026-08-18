@@ -2,10 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { corsMiddleware } from "./middleware/cors";
 import { errorHandler } from "./middleware/errorHandler";
-import { requestLogger } from "./middleware/logger";
 
 // Routes
-
 import decksRouter from "./routes/decks";
 import progressRouter from "./routes/progress";
 import authRouter from "./routes/auth";
@@ -39,8 +37,6 @@ const PORT = parseInt(process.env.PORT || "4000", 10);
 app.use(corsMiddleware);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
-app.use(requestLogger);
-
 
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
