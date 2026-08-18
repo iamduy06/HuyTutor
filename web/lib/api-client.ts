@@ -24,7 +24,7 @@ export class ApiError extends Error {
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
-  "https://flashcard-api.huytutor.edu.vn"
+  "https://flashcard-api-dudg.onrender.com"
 ).replace(/\/+$/, "");
 
 // Get current Supabase access token from browser session

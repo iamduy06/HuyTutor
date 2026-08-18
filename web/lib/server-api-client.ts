@@ -12,7 +12,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 const getBaseApiUrl = () => {
-  const url = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://flashcard-api.huytutor.edu.vn";
+  const url = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://flashcard-api-dudg.onrender.com";
   return url.replace(/\/+$/, "");
 };
 
