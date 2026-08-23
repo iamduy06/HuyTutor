@@ -34,9 +34,10 @@ export async function POST(request: NextRequest) {
   const results = [];
 
   for (const row of rows) {
-    const email       = row.email;
+    const email       = typeof row.email === "string" ? row.email.trim() : (row.email || "");
     const password    = row.password || "goidangkyflashcard";
-    const groupId     = row.group_id || DEFAULT_GROUP_ID;
+    const rawGroupId  = typeof row.group_id === "string" ? row.group_id.trim() : row.group_id;
+    const groupId     = rawGroupId || DEFAULT_GROUP_ID;
     const role        = (row.role || "USER").toUpperCase();
     const deckList    = parseStringArray(row.deck);
     const expireAt    = parseDateToISO(row.expire_at);

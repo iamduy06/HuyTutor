@@ -11,6 +11,7 @@ import { getSupabaseClient } from "@/components/common/UserContext";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { csvToObjects } from "@/lib/import-utils";
@@ -22,6 +23,13 @@ export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ImportType>("groups");
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+    batchIndex: number;
+    totalBatches: number;
+  } | null>(null);
   const [results, setResults] = useState<any[] | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [manualType, setManualType] = useState<"json" | "csv">("json");
@@ -99,6 +107,8 @@ export default function ImportPage() {
   async function processData(text: string, format: "json" | "csv") {
     setImporting(true);
     setResults(null);
+    setImportProgress(null);
+
     try {
       let data: any[] = [];
       if (format === "json") {
@@ -108,21 +118,97 @@ export default function ImportPage() {
       }
       if (!Array.isArray(data)) data = [data];
 
-      const res = await fetch(`/api/admin/import/${activeTab}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      if (data.length === 0) {
+        toast({ title: "Không có dữ liệu", description: "Dữ liệu nhập không chứa bản ghi nào.", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
 
-      const resultData = await res.json();
-      setResults(resultData);
-      const successCount = resultData.filter((r: any) => r.status === "success").length;
-      toast({ title: `✅ Xong. ${successCount}/${resultData.length} thành công.` });
-      if (manualMode) setManualData(""); 
+      // Batch size 5 to ensure processing stays well under Vercel 10s timeout
+      const BATCH_SIZE = 5;
+      const totalItems = data.length;
+      const totalBatches = Math.ceil(totalItems / BATCH_SIZE);
+      const allResults: any[] = [];
+
+      for (let i = 0; i < totalBatches; i++) {
+        const start = i * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, totalItems);
+        const batch = data.slice(start, end);
+        const percent = Math.round(((i + 1) / totalBatches) * 100);
+
+        setImportProgress({
+          current: end,
+          total: totalItems,
+          percent,
+          batchIndex: i + 1,
+          totalBatches,
+        });
+
+        try {
+          const res = await fetch(`/api/admin/import/${activeTab}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(batch),
+          });
+
+          if (!res.ok) {
+            let errorMsg = `Lỗi máy chủ (${res.status})`;
+            try {
+              const errJson = await res.json();
+              errorMsg = errJson.error || errJson.message || errorMsg;
+            } catch {
+              if (res.status === 504) errorMsg = "Máy chủ phản hồi quá hạn (504 Timeout)";
+              else if (res.status === 500) errorMsg = "Lỗi máy chủ nội bộ (500)";
+              else if (res.status === 403) errorMsg = "Không có quyền thực hiện (403 Forbidden)";
+            }
+
+            const failedItems = batch.map((item: any) => ({
+              id: item.id || item.email || "N/A",
+              email: item.email,
+              status: "error",
+              error: errorMsg,
+            }));
+            allResults.push(...failedItems);
+            continue;
+          }
+
+          const batchResult = await res.json();
+          if (Array.isArray(batchResult)) {
+            allResults.push(...batchResult);
+          } else {
+            allResults.push(batchResult);
+          }
+        } catch (batchErr: any) {
+          const failedItems = batch.map((item: any) => ({
+            id: item.id || item.email || "N/A",
+            email: item.email,
+            status: "error",
+            error: batchErr.message || "Lỗi kết nối khi gửi dữ liệu",
+          }));
+          allResults.push(...failedItems);
+        }
+      }
+
+      setResults(allResults);
+      const successCount = allResults.filter((r: any) => r.status === "success").length;
+      const errorCount = allResults.length - successCount;
+
+      if (errorCount === 0) {
+        toast({ title: `✅ Hoàn thành: ${successCount}/${allResults.length} bản ghi nhập thành công.` });
+      } else {
+        toast({ 
+          title: `⚠️ Hoàn tất import: ${successCount} thành công, ${errorCount} thất bại.`, 
+          description: "Xem chi tiết lỗi trong bảng kết quả bên dưới.",
+          variant: errorCount === allResults.length ? "destructive" : "default" 
+        });
+      }
+
+      if (manualMode && errorCount === 0) setManualData(""); 
     } catch (err: any) {
-      toast({ title: "Lỗi Import", description: err.message, variant: "destructive" });
+      toast({ title: "Lỗi định dạng dữ liệu", description: err.message, variant: "destructive" });
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   }
 
@@ -389,34 +475,94 @@ export default function ImportPage() {
               {!manualMode ? (
                 <div className="w-full flex flex-col items-center text-center justify-center h-full">
                   <div className="w-20 h-20 rounded-[28px] bg-brand-light flex items-center justify-center mb-6 rotate-6 shadow-sm border border-brand/10">
-                    <Upload className="w-10 h-10 text-brand" />
+                    {importing ? (
+                      <Loader2 className="w-10 h-10 text-brand animate-spin" />
+                    ) : (
+                      <Upload className="w-10 h-10 text-brand" />
+                    )}
                   </div>
-                  <h4 className="font-bold text-xl text-[#1a1a2e] mb-2 font-black">Nhập tệp dữ liệu</h4>
-                  <p className="text-xs text-muted-foreground mb-10 max-w-[200px]">Chọn file <b>.CSV</b> hoặc <b>.JSON</b> cho <b>{activeTab.toUpperCase()}</b></p>
-                  <label className="w-full cursor-pointer group">
+                  <h4 className="font-bold text-xl text-[#1a1a2e] mb-2 font-black">
+                    {importing ? "Đang xử lý theo lô..." : "Nhập tệp dữ liệu"}
+                  </h4>
+                  
+                  {importing && importProgress ? (
+                    <div className="w-full max-w-xs space-y-3 mb-6 animate-in fade-in">
+                      <Progress value={importProgress.percent} className="h-3 bg-brand-light/50" />
+                      <div className="flex justify-between text-xs font-bold text-[#1a1a2e]">
+                        <span>{importProgress.current} / {importProgress.total} bản ghi</span>
+                        <span className="text-brand">{importProgress.percent}%</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Đang gửi gói <b>{importProgress.batchIndex}</b> / <b>{importProgress.totalBatches}</b> (mỗi gói 5 bản ghi)...
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mb-10 max-w-[200px]">
+                      Chọn file <b>.CSV</b> hoặc <b>.JSON</b> cho <b>{activeTab.toUpperCase()}</b>
+                    </p>
+                  )}
+
+                  <label className={cn("w-full group", importing ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
                     <input ref={fileRef} type="file" accept=".json,.csv" className="hidden" onChange={handleFileUpload} disabled={importing} />
                     <div className={cn(
                       "py-5 px-6 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-3 tracking-widest uppercase",
                       importing ? "bg-gray-100 text-gray-400" : "bg-brand text-white group-hover:bg-brand-dark shadow-xl shadow-brand/20 group-active:scale-95"
                     )}>
-                      {importing ? <><Loader2 className="w-5 h-5 animate-spin" /> Xử lý...</> : <><Upload className="w-5 h-5" /> CHỌN TỆP TIN</>}
+                      {importing ? (
+                        <><Loader2 className="w-5 h-5 animate-spin" /> ĐANG XỬ LÝ...</>
+                      ) : (
+                        <><Upload className="w-5 h-5" /> CHỌN TỆP TIN</>
+                      )}
                     </div>
                   </label>
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col gap-6 animate-in fade-in zoom-in-95">
+                <div className="w-full h-full flex flex-col gap-5 animate-in fade-in zoom-in-95">
                   <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
-                    <button onClick={() => setManualType("json")} className={cn("flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", manualType === "json" ? "bg-white text-brand shadow-md" : "text-gray-400")}>JSON</button>
-                    <button onClick={() => setManualType("csv")} className={cn("flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", manualType === "csv" ? "bg-white text-brand shadow-md" : "text-gray-400")}>CSV</button>
+                    <button 
+                      disabled={importing}
+                      onClick={() => setManualType("json")} 
+                      className={cn("flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", manualType === "json" ? "bg-white text-brand shadow-md" : "text-gray-400")}
+                    >
+                      JSON
+                    </button>
+                    <button 
+                      disabled={importing}
+                      onClick={() => setManualType("csv")} 
+                      className={cn("flex-1 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", manualType === "csv" ? "bg-white text-brand shadow-md" : "text-gray-400")}
+                    >
+                      CSV
+                    </button>
                   </div>
                   <textarea 
-                    className="flex-1 w-full min-h-[250px] p-6 text-xs font-mono border-2 border-gray-100 rounded-2xl focus:border-brand focus:ring-0 resize-none bg-gray-50/50"
+                    disabled={importing}
+                    className="flex-1 w-full min-h-[220px] p-6 text-xs font-mono border-2 border-gray-100 rounded-2xl focus:border-brand focus:ring-0 resize-none bg-gray-50/50 disabled:opacity-60"
                     placeholder={manualType === "json" ? '[{ "id": "...", ... }]' : "id,users,decks..."}
                     value={manualData}
                     onChange={(e) => setManualData(e.target.value)}
                   />
-                  <Button className="w-full bg-brand hover:bg-brand-dark text-white rounded-2xl h-16 font-black shadow-xl shadow-brand/20 tracking-widest text-xs" disabled={!manualData.trim() || importing} onClick={() => processData(manualData, manualType)}>
-                    {importing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "THỰC HIỆN IMPORT"}
+                  {importing && importProgress && (
+                    <div className="w-full space-y-2 bg-brand-light/30 p-3 rounded-xl border border-brand/10 animate-in fade-in">
+                      <div className="flex justify-between text-[11px] font-bold text-[#1a1a2e]">
+                        <span>Đang xử lý: {importProgress.current}/{importProgress.total}</span>
+                        <span className="text-brand font-black">{importProgress.percent}%</span>
+                      </div>
+                      <Progress value={importProgress.percent} className="h-2 bg-brand-light" />
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        Gói {importProgress.batchIndex}/{importProgress.totalBatches}
+                      </p>
+                    </div>
+                  )}
+                  <Button 
+                    className="w-full bg-brand hover:bg-brand-dark text-white rounded-2xl h-16 font-black shadow-xl shadow-brand/20 tracking-widest text-xs" 
+                    disabled={!manualData.trim() || importing} 
+                    onClick={() => processData(manualData, manualType)}
+                  >
+                    {importing ? (
+                      <><Loader2 className="w-5 h-5 animate-spin mr-2" /> ĐANG XỬ LÝ ({importProgress?.percent || 0}%)...</>
+                    ) : (
+                      "THỰC HIỆN IMPORT"
+                    )}
                   </Button>
                 </div>
               )}
