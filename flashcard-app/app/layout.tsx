@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   title: "Huy Tutor Flashcard",
   description: "Nền tảng học từ vựng tiếng Anh chuyên nghiệp",
   icons: {
-    icon: "https://drive.google.com/thumbnail?id=1kiLsxoJ-i_RMjpvqkj0JNmShY7-O13Re&sz=w200",
-    apple: "https://drive.google.com/thumbnail?id=1kiLsxoJ-i_RMjpvqkj0JNmShY7-O13Re&sz=w200",
+    icon: "/brand/favicon.png",
+    apple: "/brand/favicon.png",
   },
 };
 
