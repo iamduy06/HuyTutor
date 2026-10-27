@@ -12,7 +12,7 @@ import {
   checkListeningAnswer,
   normalizeWordForAudio,
 } from "@/features/game/gameUtils";
-import { fetchDictAudio, browserTTS, getSharedAudio } from "@/lib/audio";
+import { smartPlayWord, preloadAudioBatch } from "@/lib/audio";
 import type { VocabItem } from "@/types";
 
 interface DeckOption { deck_id: string; title: string; wordCount?: number; }
@@ -39,53 +39,32 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
 
   const currentVocab = questions[currentIndex];
 
-  // ── Phát âm ──
-  const speakWord = useCallback(async (word: string) => {
-    const raw = normalizeWordForAudio(word);
-    if (!raw) return;
-
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    window.speechSynthesis?.cancel();
-
-    const cached = cacheRef.current.get(raw);
-    if (cached) {
-      const a = getSharedAudio();
-      if (a) {
-        a.src = cached;
-        audioRef.current = a;
-        a.play().catch(() => browserTTS(raw));
-      }
-      return;
-    }
-
-    setAudioLoading(true);
-    const token = ++tokenRef.current;
-    const fallback = () => { if (token === tokenRef.current) { setAudioLoading(false); browserTTS(raw); } };
-
-    try {
-      const url = await Promise.race([fetchDictAudio(raw), new Promise<null>(r => setTimeout(() => r(null), 4000))]);
-      if (token !== tokenRef.current) return;
-      if (!url) { fallback(); return; }
-      cacheRef.current.set(raw, url);
-      const a = getSharedAudio();
-      if (!a) return;
-      a.src = url;
-      audioRef.current = a;
-      const t = setTimeout(fallback, 4000);
-      a.oncanplaythrough = () => { if (token !== tokenRef.current) { clearTimeout(t); return; } clearTimeout(t); setAudioLoading(false); a.play().catch(fallback); };
-      a.onerror = () => { clearTimeout(t); fallback(); };
-      a.load();
-    } catch { fallback(); }
+  // ── Phát âm tức thì không độ trễ ──
+  const speakWord = useCallback((word: string) => {
+    smartPlayWord(
+      word,
+      audioRef,
+      tokenRef,
+      () => setAudioLoading(true),
+      () => setAudioLoading(false)
+    );
   }, []);
 
-  // Auto-play khi đổi câu
+  // Auto-play khi đổi câu + preload trước các câu tiếp theo
   useEffect(() => {
     if (!currentVocab) return;
     setInputValue(""); setSubmitted(false); setIsCorrect(false); setShowMeaning(false);
-    const t = setTimeout(() => speakWord(currentVocab.word), 300);
+    const t = setTimeout(() => speakWord(currentVocab.word), 150);
     inputRef.current?.focus();
+
+    // Preload trước 5 câu tiếp theo
+    if (questions.length > 0) {
+      const nextWords = questions.slice(currentIndex + 1, currentIndex + 6).map(q => q.word);
+      preloadAudioBatch(nextWords);
+    }
+
     return () => clearTimeout(t);
-  }, [currentIndex, currentVocab, speakWord]);
+  }, [currentIndex, currentVocab, questions, speakWord]);
 
   // ── Handlers ──
   function handleStart() {

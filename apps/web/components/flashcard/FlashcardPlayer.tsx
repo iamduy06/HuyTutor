@@ -8,7 +8,7 @@ import type { Tab, VocabItem } from "@/types";
 import { useUIStore } from "@/features/auth/store";
 import { FACEBOOK_URL } from "@/lib/constants";
 import Link from "next/link";
-import { fetchDictAudio, browserTTS, getSharedAudio } from "@/lib/audio";
+import { smartPlayWord, preloadAudioBatch } from "@/lib/audio";
 
 interface Props {
   deckId?: string;   // undefined = demo mode, không save progress
@@ -86,86 +86,50 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   }, []); // eslint-disable-line
   const vocab = vocabulary[currentIndex];
 
-  const prefetchAudio = useCallback(async (word: string) => {
-    const raw = word.split("/")[0].replace(/[()]/g, "").trim();
-    if (!raw || audioCache.current.has(raw) || prefetching.current.has(raw)) return;
-    
-    prefetching.current.add(raw);
-    try {
-      const url = await fetchDictAudio(raw);
-      if (url) audioCache.current.set(raw, url);
-    } catch {} finally {
-      prefetching.current.delete(raw);
+  // Tải trước 1/2 số lượng từ vựng tiếp theo của tab đó
+  const prefetchNextHalf = useCallback((startIdx: number, list: VocabItem[]) => {
+    if (!list || list.length === 0) return;
+    const halfCount = Math.min(list.length, Math.max(3, Math.ceil(list.length / 2)));
+    const words: string[] = [];
+    for (let i = 1; i <= halfCount; i++) {
+      const idx = (startIdx + i) % list.length;
+      if (list[idx]?.word) words.push(list[idx].word);
     }
+    preloadAudioBatch(words);
   }, []);
 
-  // ── TTS ──
-  const speakWord = useCallback(async (text?: string) => {
-    const raw = (text ?? vocab?.word ?? "").split("/")[0].replace(/[()]/g, "").trim();
+  // ── TTS: Zero-Latency Instant Playback ──
+  const speakWord = useCallback((text?: string) => {
+    const raw = text ?? vocab?.word ?? "";
     if (!raw) return;
+    smartPlayWord(
+      raw,
+      audioRef,
+      tokenRef,
+      () => setAudioLoading(true),
+      () => setAudioLoading(false)
+    );
+  }, [vocab?.word]);
 
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    window.speechSynthesis?.cancel();
-
-    // 1. Try Cache
-    const cachedUrl = audioCache.current.get(raw);
-    if (cachedUrl) {
-      const audio = getSharedAudio();
-      if (audio) {
-        audio.src = cachedUrl;
-        audioRef.current = audio;
-        audio.play().catch(() => browserTTS(raw));
+  useEffect(() => {
+    if (isFirstLoad) {
+      setIsFirstLoad(false);
+      // Nạp trước 1/2 danh sách từ của tab hiện tại ngay khi vừa vào trang
+      if (vocabulary.length > 0) {
+        const halfCount = Math.min(vocabulary.length, Math.max(3, Math.ceil(vocabulary.length / 2)));
+        const words = vocabulary.slice(0, halfCount).map(v => v.word);
+        preloadAudioBatch(words);
       }
       return;
     }
 
-    // 2. Fetch if not in cache
-    setAudioLoading(true);
-    const token = ++tokenRef.current;
+    const t = setTimeout(() => speakWord(), 40);
 
-    const fallback = () => {
-      if (token === tokenRef.current) { setAudioLoading(false); browserTTS(raw); }
-    };
-
-    try {
-      const url = await Promise.race([
-        fetchDictAudio(raw),
-        new Promise<string | null>(r => setTimeout(() => r(null), 4000)),
-      ]);
-      if (token !== tokenRef.current) return;
-      if (!url) { fallback(); return; }
-
-      // Save to cache
-      audioCache.current.set(raw, url);
-
-      const audio = getSharedAudio();
-      if (!audio) return;
-      audio.src = url;
-      audioRef.current = audio;
-      const t = setTimeout(fallback, 4000);
-
-      audio.oncanplaythrough = () => {
-        if (token !== tokenRef.current) { clearTimeout(t); audio.pause(); return; }
-        clearTimeout(t); setAudioLoading(false);
-        audio.play().catch(fallback);
-      };
-      audio.onerror = () => { clearTimeout(t); fallback(); };
-      audio.load();
-    } catch { fallback(); }
-  }, [vocab?.word]);
-
-  useEffect(() => {
-    if (isFirstLoad) { setIsFirstLoad(false); return; }
-    const t = setTimeout(() => speakWord(), 100);
-
-    // Prefetch next 2 cards
-    for (let i = 1; i <= 2; i++) {
-      const nextIdx = (currentIndex + i) % vocabulary.length;
-      if (vocabulary[nextIdx]) prefetchAudio(vocabulary[nextIdx].word);
-    }
+    // Tự động tải trước 1/2 số lượng từ vựng tiếp theo của tab đó
+    prefetchNextHalf(currentIndex, vocabulary);
 
     return () => clearTimeout(t);
-  }, [currentIndex, currentTab, vocabulary, prefetchAudio, speakWord]); // eslint-disable-line
+  }, [currentIndex, currentTab, vocabulary, prefetchNextHalf, speakWord]); // eslint-disable-line
 
   function nextCard() {
     const next = (currentIndex + 1) % vocabulary.length;
@@ -192,9 +156,42 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   }
   function switchTab(idx: number) {
     saveProgress(); // save khi đổi tab
-    setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(true);
+    setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(false);
     markSeen(idx, 0); // mark first card of new tab
+
+    // Nạp trước 1/2 từ của tab mới ngay khi bấm đổi tab
+    const newVocab = tabs[idx]?.vocabulary ?? [];
+    if (newVocab.length > 0) {
+      const halfCount = Math.min(newVocab.length, Math.max(3, Math.ceil(newVocab.length / 2)));
+      const words = newVocab.slice(0, halfCount).map(v => v.word);
+      preloadAudioBatch(words);
+    }
   }
+
+  // Keyboard shortcuts: Space (lật thẻ), ArrowRight (tiếp), ArrowLeft (lùi), R (phát lại âm thanh)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
+
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        nextCard();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        prevCard();
+      } else if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        setIsFlipped(v => !v);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        speakWord();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, currentTab, vocabulary.length, speakWord]); // eslint-disable-line
 
   if (!vocab) {
     return (
