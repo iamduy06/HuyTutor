@@ -44,9 +44,16 @@ export default function ProfilePage() {
     toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
     
     // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+
     const response = await fetch("/api/auth/update-password", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ password: newPw }),
     });
 

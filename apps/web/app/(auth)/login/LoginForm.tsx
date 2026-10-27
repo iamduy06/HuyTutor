@@ -40,9 +40,14 @@ export function LoginForm() {
 
     // Kiểm tra giới hạn thiết bị
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (data.session?.access_token) {
+        headers["Authorization"] = `Bearer ${data.session.access_token}`;
+      }
+
       const deviceCheck = await fetch("/api/auth/register-device", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           device_id:   getDeviceId(),
           device_name: getDeviceName(),

@@ -62,7 +62,13 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
   const fetchProfile = useCallback(async (_userId: string): Promise<UserProfile | null> => {
     try {
-      const res = await fetch("/api/me/profile");
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch("/api/me/profile", { headers });
       if (res.ok) {
         const data = await res.json();
         return data.user as UserProfile;

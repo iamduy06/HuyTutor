@@ -8,11 +8,6 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Bỏ qua các API routes (Express Backend tự xử lý auth qua roleGuard)
-  if (path.startsWith("/api/")) {
-    return response;
-  }
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -37,7 +32,20 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
+
+  // ── Inject Bearer Token cho các API routes chuyển tiếp sang Express Backend ─
+  if (path.startsWith("/api/")) {
+    if (!request.headers.get("authorization") && session?.access_token) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("authorization", `Bearer ${session.access_token}`);
+      return NextResponse.next({
+        request: { headers: requestHeaders },
+      });
+    }
+    return response;
+  }
 
   // ── Protected user routes ──────────────────────────────────────────────
   if (
