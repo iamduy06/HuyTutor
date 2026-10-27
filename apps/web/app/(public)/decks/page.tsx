@@ -16,7 +16,7 @@ export default async function DecksPage() {
   try {
     const res = await fetch(`${apiUrl}/decks/public-grouped`, { 
       next: { revalidate: 60 },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(10000),
     });
     if (res.ok) {
       const data = await res.json();

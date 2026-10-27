@@ -22,7 +22,7 @@ router.get('/decks', async (_req: Request, res: Response) => {
   const { data: decks, error } = await admin
     .from('decks')
     .select('id, title, description, level, level_min, level_max, access_level, created_at')
-    .in('access_level', ['public', 'preview'])
+    .or('access_level->>public.eq.true,access_level->>preview.eq.true')
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -48,7 +48,7 @@ router.get('/decks/public-grouped', async (_req: Request, res: Response) => {
     admin.from('deck_groups').select('*').order('order_index', { ascending: true }),
     admin.from('decks')
       .select('id, title, description, level, level_min, level_max, access_level, created_at, group_id')
-      .eq('access_level->preview', true)
+      .or('access_level->>preview.eq.true,access_level->>public.eq.true')
       .order('created_at', { ascending: true })
   ]);
 
