@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 import { LayoutDashboard, Users, Shield, Paintbrush2 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 
@@ -14,7 +15,7 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/subadmin/overview`, {
     headers: {
       Authorization: `Bearer ${session.access_token}`,

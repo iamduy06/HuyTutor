@@ -17,7 +17,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint for Render monitoring
-app.get('/api/v1/health', (_req: Request, res: Response) => {
+const healthHandler = (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -26,10 +26,13 @@ app.get('/api/v1/health', (_req: Request, res: Response) => {
     version: '2.0.0',
     nodeVersion: process.version,
   });
-});
+};
+app.get('/api/v1/health', healthHandler);
+app.get('/health', healthHandler);
 
-// Main API Router under /api/v1
+// Main API Router under /api/v1 and root fallback
 app.use('/api/v1', apiRouter);
+app.use('/', apiRouter);
 
 // Global Error Handler for Express 5 native async error handling
 app.use(errorHandler);

@@ -1,6 +1,7 @@
 import { createClient } from './supabase/client.js';
+import { getApiUrl } from './apiUrl';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://flashcard-api.huytutor.edu.vn/api/v1';
+const BASE_URL = getApiUrl();
 
 export interface ApiResponse<T> {
   success?: boolean;

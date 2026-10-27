@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 import {
   Shield
 } from "lucide-react";
@@ -12,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/me/profile`, {
     headers: {
       Authorization: `Bearer ${session.access_token}`,
@@ -21,7 +22,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   });
 
   if (!res.ok) {
-    redirect("/login");
+    if (res.status === 401) redirect("/login");
+    redirect("/dashboard");
   }
 
   const { user } = await res.json();

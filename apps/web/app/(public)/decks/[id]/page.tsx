@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 import { FACEBOOK_URL } from "@/lib/constants";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ export default async function DeckDetailPage({ params }: Props) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
 
   let res: globalThis.Response;
   try {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 import SubAdminBrandingClient from "./client";
 
 export default async function SubAdminBrandingPage() {
@@ -7,7 +8,7 @@ export default async function SubAdminBrandingPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/subadmin/overview`, {
     headers: {
       Authorization: `Bearer ${session.access_token}`,

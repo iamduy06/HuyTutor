@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/common/Providers";
 import { Toaster } from "@/components/ui/toaster";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -32,7 +33,7 @@ export default async function RootLayout({
 
   let initialUser = null;
   if (session?.access_token) {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+    const apiUrl = getApiUrl();
     try {
       const res = await fetch(`${apiUrl}/me/profile`, {
         headers: {

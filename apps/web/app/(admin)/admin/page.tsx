@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 import { Users, BookOpen, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
 
@@ -8,7 +9,7 @@ export default async function AdminPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
   let totalUsers = 0;
   let totalDecks = 0;
   let avgProgress = 0;

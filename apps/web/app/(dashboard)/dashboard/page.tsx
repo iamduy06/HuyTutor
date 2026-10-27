@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hasFullAccess, formatDate } from "@/lib/utils";
+import { getApiUrl } from "@/lib/apiUrl";
 import { Flame, BookOpen, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FACEBOOK_URL } from "@/lib/constants";
@@ -21,7 +22,7 @@ export default async function DashboardPage() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/me/dashboard`, {
     headers: {
       Authorization: `Bearer ${session.access_token}`,
@@ -30,7 +31,12 @@ export default async function DashboardPage() {
   });
 
   if (!res.ok) {
-    redirect("/login");
+    if (res.status === 401) {
+      redirect("/login");
+    }
+    const errText = await res.text().catch(() => "");
+    console.error(`[Dashboard] Failed to fetch /me/dashboard: status=${res.status}`, errText);
+    throw new Error(`Không thể tải dữ liệu Dashboard (HTTP ${res.status}). Vui lòng thử lại.`);
   }
 
   const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCountMap } = await res.json();

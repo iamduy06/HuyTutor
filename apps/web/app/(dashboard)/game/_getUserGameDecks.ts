@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getApiUrl } from "@/lib/apiUrl";
 
 /**
  * Lấy danh sách deck mà user có quyền truy cập qua Backend API (Render Express 5).
@@ -11,7 +12,7 @@ export async function getUserGameDecks() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) redirect("/login");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
 
   try {
     const res = await fetch(`${apiUrl}/game/decks`, {

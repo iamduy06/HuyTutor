@@ -1,5 +1,6 @@
 import type { Deck, DeckGroup } from "@/types";
 import { PublicGroupedDecks } from "@/components/flashcard/PublicGroupedDecks";
+import { getApiUrl } from "@/lib/apiUrl";
 
 export const revalidate = 60;
 
@@ -9,7 +10,7 @@ interface GroupData {
 }
 
 export default async function DecksPage() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const apiUrl = getApiUrl();
 
   let finalGroups: GroupData[] = [];
   try {
