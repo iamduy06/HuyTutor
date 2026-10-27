@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
 import { LayoutDashboard, Users, Shield, Paintbrush2 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
 
@@ -12,54 +11,22 @@ const baseNavItems = [
 
 export default async function SubAdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const res = await fetch(`${apiUrl}/subadmin/overview`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    cache: "no-store",
+  });
 
-  let hasBrandingAccess = false;
-
-  if (profile?.role === "ADMIN") {
-    hasBrandingAccess = true;
-  } else if (profile?.role === "SUBADMIN") {
-    const { data: groupSub, error: groupErr } = await supabase
-      .from("group_users")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("is_subadmin", true)
-      .limit(1)
-      .maybeSingle();
-
-    if (groupErr || !groupSub) {
-      redirect("/dashboard");
-    }
-
-    // Kiểm tra xem có nhóm nào được cấp quyền branding không
-    const { data: managedGroups } = await supabase
-      .from("group_users")
-      .select("group_id")
-      .eq("user_id", user.id)
-      .eq("is_subadmin", true);
-
-    if (managedGroups && managedGroups.length > 0) {
-      const groupIds = managedGroups.map((g: any) => g.group_id);
-      const adminClient = createAdminClient();
-      const { data: brandingGroups } = await adminClient
-        .from("groups")
-        .select("branding")
-        .in("id", groupIds);
-
-      hasBrandingAccess = (brandingGroups ?? []).some(
-        (g: any) => g.branding?.allow_custom_branding === true
-      );
-    }
-  } else {
+  if (!res.ok) {
     redirect("/dashboard");
   }
+
+  const { hasBrandingAccess } = await res.json();
 
   const navItems = [
     ...baseNavItems,

@@ -28,26 +28,24 @@ export default async function RootLayout({
   // Đọc session từ cookie server-side → truyền xuống client
   // Không có round-trip → không flash
   const supabase = await createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
 
   let initialUser = null;
-  if (authUser) {
-    const { data: profile } = await supabase
-      .from("users").select("*").eq("id", authUser.id).single();
-    
-    if (profile) {
-      const { data: groupSub } = await supabase
-        .from("group_users")
-        .select("id")
-        .eq("user_id", authUser.id)
-        .eq("is_subadmin", true)
-        .limit(1)
-        .maybeSingle();
-
-      initialUser = {
-        ...profile,
-        is_subadmin: !!groupSub
-      };
+  if (session?.access_token) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+    try {
+      const res = await fetch(`${apiUrl}/me/profile`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        initialUser = data.user;
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile from backend:", err);
     }
   }
 

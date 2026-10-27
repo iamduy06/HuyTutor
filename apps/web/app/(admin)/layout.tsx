@@ -9,12 +9,23 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("users").select("role").eq("id", user.id).single();
-  if (profile?.role !== "ADMIN") redirect("/dashboard");
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const res = await fetch(`${apiUrl}/me/profile`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    redirect("/login");
+  }
+
+  const { user } = await res.json();
+  if (user?.role !== "ADMIN") redirect("/dashboard");
 
   return (
     <div className="min-h-screen flex flex-col">

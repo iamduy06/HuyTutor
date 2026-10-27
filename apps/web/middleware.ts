@@ -82,44 +82,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // ── /decks/[id] — smart redirect dựa trên quyền truy cập ──────────────
-  if (path.startsWith("/decks/") && user) {
-    const parts = path.split("/");
-    if (parts.length === 3) {
-      const deckId = parts[2];
-      const { data: deck } = await supabase
-        .from("decks")
-        .select("access_level")
-        .eq("id", deckId)
-        .single();
-
-      const levels = (deck?.access_level as any) || {};
-
-      if (levels.public === true) {
-        return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
-      }
-
-      if (levels.auth === true) {
-        return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
-      }
-
-      const { data: userDeck } = await supabase
-        .from("user_decks")
-        .select("expired_at")
-        .eq("user_id", user.id)
-        .eq("deck_id", deckId)
-        .maybeSingle();
-
-      if (userDeck) {
-        const expiredAt = userDeck.expired_at;
-        const hasAccess = !expiredAt || new Date(expiredAt) > new Date();
-        if (hasAccess) {
-          return NextResponse.redirect(new URL(`/learning/${deckId}`, request.url));
-        }
-      }
-    }
-  }
-
   return response;
 }
 

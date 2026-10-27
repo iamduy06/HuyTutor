@@ -60,28 +60,18 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
     }, 5000);
   };
 
-  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    const supabase = getSupabaseClient();
-    
-    // Fetch profile chính
-    const { data: profile } = await supabase
-      .from("users").select("*").eq("id", userId).single();
-      
-    if (!profile) return null;
-
-    // Kiểm tra xem có là subadmin của bất kỳ nhóm nào không
-    const { data: groupSub } = await supabase
-      .from("group_users")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("is_subadmin", true)
-      .limit(1)
-      .maybeSingle();
-
-    return {
-      ...(profile as UserProfile),
-      is_subadmin: !!groupSub
-    };
+  const fetchProfile = useCallback(async (_userId: string): Promise<UserProfile | null> => {
+    try {
+      const res = await fetch("/api/me/profile");
+      if (res.ok) {
+        const data = await res.json();
+        return data.user as UserProfile;
+      }
+      return null;
+    } catch (err) {
+      console.error("[USER_CONTEXT] Error fetching profile from backend:", err);
+      return null;
+    }
   }, []);
 
   const refresh = useCallback(async () => {

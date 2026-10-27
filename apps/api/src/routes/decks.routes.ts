@@ -33,6 +33,51 @@ router.get('/decks', async (_req: Request, res: Response) => {
   return res.status(200).json({ decks: result });
 });
 
+// GET /decks/public-grouped - List decks grouped by deck_groups for public view
+router.get('/decks/public-grouped', async (_req: Request, res: Response) => {
+  const admin = getAdminClient();
+
+  const [groupsRes, decksRes] = await Promise.all([
+    admin.from('deck_groups').select('*').order('order_index', { ascending: true }),
+    admin.from('decks')
+      .select('id, title, description, level, level_min, level_max, access_level, created_at, group_id')
+      .eq('access_level->preview', true)
+      .order('created_at', { ascending: true })
+  ]);
+
+  const groups = groupsRes.data ?? [];
+  const decks = decksRes.data ?? [];
+  const wordMap = await getWordCountMap();
+
+  const formattedDecks = decks.map((d: any) => ({
+    ...d,
+    word_count: wordMap[d.id] ?? 0,
+    level: computeLevelStr(d.level_min, d.level_max) ?? d.level,
+  }));
+
+  const groupMap: Record<string, any[]> = {};
+  const ungroupedDecks: any[] = [];
+
+  formattedDecks.forEach((deck: any) => {
+    if (deck.group_id) {
+      if (!groupMap[deck.group_id]) groupMap[deck.group_id] = [];
+      groupMap[deck.group_id].push(deck);
+    } else {
+      ungroupedDecks.push(deck);
+    }
+  });
+
+  const finalGroups = groups
+    .map((g: any) => ({ group: g, decks: groupMap[g.id] || [] }))
+    .filter((g: any) => g.decks.length > 0);
+
+  if (ungroupedDecks.length > 0) {
+    finalGroups.push({ group: null, decks: ungroupedDecks });
+  }
+
+  return res.status(200).json({ groups: finalGroups });
+});
+
 // GET /decks/demo - Free demo words
 router.get('/decks/demo', async (req: Request, res: Response) => {
   const deckId = req.query.deckId as string;

@@ -1,44 +1,41 @@
-import { createAdminClient } from "@/services/supabase/admin";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Users, BookOpen, TrendingUp, Award, Flame } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAnalyticsPage() {
-  const supabase = createAdminClient();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const [
-    { count: totalUsers },
-    { count: totalDecks },
-    { data: progressData },
-    { data: deckStats },
-    { data: streakData },
-  ] = await Promise.all([
-    supabase.from("users").select("*", { count: "exact", head: true }),
-    supabase.from("decks").select("*", { count: "exact", head: true }),
-    supabase.from("user_decks").select("progress_percent"),
-    supabase.from("user_decks").select("deck_id, deck:decks(title), progress_percent, learned_count").order("deck_id"),
-    supabase.from("user_decks").select("streak").order("streak", { ascending: false }).limit(1),
-  ]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  let totalUsers = 0;
+  let totalDecks = 0;
+  let avgProgress = 0;
+  let maxStreak = 0;
+  let popularDecks: any[] = [];
 
-  const avgProgress = progressData?.length
-    ? Math.round(progressData.reduce((s: number, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
-    : 0;
+  try {
+    const res = await fetch(`${apiUrl}/admin/analytics`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
 
-  const maxStreak = (streakData?.[0] as any)?.streak ?? 0;
-
-  // Group by deck
-  const deckMap: Record<string, { title: string; userCount: number; totalProgress: number; totalLearned: number }> = {};
-  (deckStats ?? []).forEach((r: any) => {
-    const id = r.deck_id;
-    if (!deckMap[id]) deckMap[id] = { title: r.deck?.title ?? id, userCount: 0, totalProgress: 0, totalLearned: 0 };
-    deckMap[id].userCount++;
-    deckMap[id].totalProgress += r.progress_percent || 0;
-    deckMap[id].totalLearned += r.learned_count || 0;
-  });
-  const popularDecks = Object.values(deckMap)
-    .map((d) => ({ ...d, avgProgress: d.userCount ? Math.round(d.totalProgress / d.userCount) : 0 }))
-    .sort((a, b) => b.userCount - a.userCount);
+    if (res.ok) {
+      const data = await res.json();
+      totalUsers = data.totalUsers ?? 0;
+      totalDecks = data.totalDecks ?? 0;
+      avgProgress = data.avgProgress ?? 0;
+      maxStreak = data.maxStreak ?? 0;
+      popularDecks = data.popularDecks ?? [];
+    }
+  } catch (err) {
+    console.error("Failed to fetch admin analytics from backend:", err);
+  }
 
   return (
     <div className="p-6 max-w-5xl">

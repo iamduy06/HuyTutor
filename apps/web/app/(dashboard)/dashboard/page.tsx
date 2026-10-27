@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
-import { hasFullAccess, formatDate, extractTabs } from "@/lib/utils";
+import { hasFullAccess, formatDate } from "@/lib/utils";
 import { Flame, BookOpen, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FACEBOOK_URL } from "@/lib/constants";
-import type { FlashcardRow } from "@/types";
 
 const GAMES = [
   { href: "/game/listening",       icon: "🎧", title: "Nghe & Viết",       desc: "Nghe phát âm, gõ lại từ tiếng Anh" },
@@ -20,57 +18,22 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const admin = createAdminClient();
-
-  // Lấy song song: profile + assigned decks + ALL public decks
-  const [
-    { data: profile },
-    { data: userDecks },
-    { data: publicDecks },
-  ] = await Promise.all([
-    admin.from("users").select("*").eq("id", user.id).single(),
-    admin
-      .from("user_decks")
-      .select("id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, access_level)")
-      .eq("user_id", user.id)
-      .order("deck_id"),
-    // Decks công khai hoặc dành cho thành viên (auth)
-    admin
-      .from("decks")
-      .select("id, title, description, level, access_level")
-      .or("access_level->public.eq.true,access_level->auth.eq.true")
-      .order("created_at", { ascending: true }),
-  ]);
-
-  // Lọc userDecks dựa trên access_level (chỉ hiện nếu có public, auth hoặc paid)
-  const filteredUserDecks = (userDecks ?? []).filter((ud: any) => {
-    const levels = ud.deck?.access_level ?? {};
-    return levels.public === true || levels.auth === true || levels.paid === true;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const res = await fetch(`${apiUrl}/me/dashboard`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    cache: "no-store",
   });
 
-  // Gộp: assigned decks + public/auth decks chưa được assign
-  const assignedDeckIds = new Set(filteredUserDecks.map((ud: any) => ud.deck_id as string));
-  const extraPublicDecks = (publicDecks ?? []).filter(d => !assignedDeckIds.has(d.id));
+  if (!res.ok) {
+    redirect("/login");
+  }
 
-  // Word count cho tất cả deck cần hiển thị
-  const allDeckIds = [
-    ...filteredUserDecks.map((ud: any) => ud.deck_id as string),
-    ...extraPublicDecks.map(d => d.id),
-  ];
-
-  const { data: flashcardRows } = allDeckIds.length > 0
-    ? await admin.from("flashcards").select("deck_id, content").in("deck_id", allDeckIds)
-    : { data: [] };
-
-  const wordCountMap: Record<string, number> = {};
-  (flashcardRows ?? []).forEach((r: any) => {
-    const tabs = extractTabs((r as unknown as FlashcardRow).content);
-    const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
-    wordCountMap[r.deck_id as string] = (wordCountMap[r.deck_id as string] ?? 0) + count;
-  });
+  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCountMap } = await res.json();
 
   // Stats: count active = assigned có hạn + tất cả public
   const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
@@ -184,7 +147,7 @@ export default async function DashboardPage() {
             })}
 
             {/* ── Extra public decks (chưa được assign) ── */}
-            {extraPublicDecks.map(deck => (
+            {(extraPublicDecks ?? []).map((deck: any) => (
               <DeckCard
                 key={deck.id}
                 title={deck.title}

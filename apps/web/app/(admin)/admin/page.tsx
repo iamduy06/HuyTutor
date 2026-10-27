@@ -1,29 +1,39 @@
-import { createAdminClient } from "@/services/supabase/admin";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Users, BookOpen, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
 
 export default async function AdminPage() {
-  const supabase = createAdminClient();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const [
-    { count: totalUsers },
-    { count: totalDecks },
-    { data: progressData },
-  ] = await Promise.all([
-    supabase.from("users").select("*", { count: "exact", head: true }),
-    supabase.from("decks").select("*", { count: "exact", head: true }),
-    supabase.from("user_decks").select("progress_percent"),
-  ]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  let totalUsers = 0;
+  let totalDecks = 0;
+  let avgProgress = 0;
+  let totalAssignments = 0;
+  let recentUsers: any[] = [];
 
-  const avgProgress = progressData?.length
-    ? Math.round(progressData.reduce((s, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
-    : 0;
+  try {
+    const res = await fetch(`${apiUrl}/admin/stats`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
 
-  const { data: recentUsers } = await supabase
-    .from("users")
-    .select("id, email, role, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5);
+    if (res.ok) {
+      const data = await res.json();
+      totalUsers = data.totalUsers ?? 0;
+      totalDecks = data.totalDecks ?? 0;
+      avgProgress = data.avgProgress ?? 0;
+      totalAssignments = data.totalAssignments ?? 0;
+      recentUsers = data.recentUsers ?? [];
+    }
+  } catch (err) {
+    console.error("Failed to fetch admin stats from backend:", err);
+  }
 
   return (
     <div className="p-6 max-w-5xl">
@@ -34,7 +44,7 @@ export default async function AdminPage() {
           { label: "Tổng người dùng", value: totalUsers ?? 0, icon: <Users className="w-5 h-5" />, color: "text-blue-500", bg: "bg-blue-50" },
           { label: "Flashcard", value: totalDecks ?? 0, icon: <BookOpen className="w-5 h-5" />, color: "text-brand", bg: "bg-brand-light" },
           { label: "Tiến độ TB", value: `${avgProgress}%`, icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Lượt giao Flashcard", value: progressData?.length ?? 0, icon: <Award className="w-5 h-5" />, color: "text-purple-600", bg: "bg-purple-50" },
+          { label: "Lượt giao Flashcard", value: totalAssignments, icon: <Award className="w-5 h-5" />, color: "text-purple-600", bg: "bg-purple-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-5 flex flex-col gap-2">
             <div className={`w-10 h-10 rounded-xl ${s.bg} ${s.color} flex items-center justify-center`}>{s.icon}</div>

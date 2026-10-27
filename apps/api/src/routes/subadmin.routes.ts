@@ -33,6 +33,48 @@ async function canManage(me: any, targetId: string) {
 
   return !!targetInGroup;
 }
+// GET /subadmin/overview - Subadmin dashboard stats
+router.get('/subadmin/overview', async (req: Request, res: Response) => {
+  const me = req.user!;
+  const admin = getAdminClient();
+
+  const { data: managedGroups } = await admin
+    .from('group_users')
+    .select('group_id, groups(id, name, max_users, branding)')
+    .eq('user_id', me.id)
+    .eq('is_subadmin', true);
+
+  const groupIds = (managedGroups ?? []).map((g: any) => g.group_id);
+
+  if (me.role !== 'ADMIN' && groupIds.length === 0) {
+    return res.status(403).json({ error: 'No managed groups' });
+  }
+
+  const { count: managedCount } = me.role === 'SUBADMIN'
+    ? await admin.from('group_users').select('*', { count: 'exact', head: true }).in('group_id', groupIds)
+    : await admin.from('users').select('*', { count: 'exact', head: true });
+
+  const { data: myDecks } = me.role === 'SUBADMIN'
+    ? await admin.from('group_decks').select('deck:decks(id, title)').in('group_id', groupIds)
+    : await admin.from('decks').select('id, title');
+
+  const totalMaxUsers = me.role === 'SUBADMIN'
+    ? (managedGroups ?? []).reduce((acc: number, g: any) => acc + (g.groups?.max_users ?? 0), 0)
+    : 0;
+
+  const hasBrandingAccess = me.role === 'ADMIN' || (managedGroups ?? []).some(
+    (g: any) => g.groups?.branding?.allow_custom_branding === true
+  );
+
+  return res.status(200).json({
+    me,
+    managedGroups: managedGroups ?? [],
+    managedCount: managedCount ?? 0,
+    myDecks: myDecks ?? [],
+    totalMaxUsers,
+    hasBrandingAccess,
+  });
+});
 
 // GET /subadmin/users
 router.get('/subadmin/users', async (req: Request, res: Response) => {

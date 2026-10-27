@@ -540,7 +540,40 @@ router.get('/admin/export', async (req: Request, res: Response) => {
   return res.status(400).json({ error: 'type required (users, decks, or groups)' });
 });
 
-// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+// ─── STATS & ANALYTICS ────────────────────────────────────────────────────────
+
+// GET /admin/stats - Quick stats overview for admin dashboard
+router.get('/admin/stats', async (_req: Request, res: Response) => {
+  const admin = getAdminClient();
+
+  const [
+    { count: totalUsers },
+    { count: totalDecks },
+    { data: progressData },
+  ] = await Promise.all([
+    admin.from('users').select('*', { count: 'exact', head: true }),
+    admin.from('decks').select('*', { count: 'exact', head: true }),
+    admin.from('user_decks').select('progress_percent'),
+  ]);
+
+  const avgProgress = progressData?.length
+    ? Math.round(progressData.reduce((s: number, r: any) => s + (r.progress_percent || 0), 0) / progressData.length)
+    : 0;
+
+  const { data: recentUsers } = await admin
+    .from('users')
+    .select('id, email, role, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  return res.status(200).json({
+    totalUsers: totalUsers ?? 0,
+    totalDecks: totalDecks ?? 0,
+    avgProgress,
+    totalAssignments: progressData?.length ?? 0,
+    recentUsers: recentUsers ?? [],
+  });
+});
 
 // GET /admin/analytics
 router.get('/admin/analytics', async (_req: Request, res: Response) => {
@@ -586,7 +619,15 @@ router.get('/admin/analytics', async (_req: Request, res: Response) => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  return res.status(200).json({ totalUsers, totalDecks, avgProgress, popularDecks });
+  const { data: streakData } = await admin
+    .from('user_decks')
+    .select('streak')
+    .order('streak', { ascending: false })
+    .limit(1);
+
+  const maxStreak = (streakData?.[0] as any)?.streak ?? 0;
+
+  return res.status(200).json({ totalUsers, totalDecks, avgProgress, maxStreak, popularDecks });
 });
 
 // ─── APP SETTINGS ────────────────────────────────────────────────────────────

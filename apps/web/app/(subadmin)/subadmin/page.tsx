@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/services/supabase/admin";
 import { Users, BookOpen, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,45 +8,22 @@ export const dynamic = "force-dynamic";
 
 export default async function SubAdminPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) redirect("/login");
 
-  const admin = createAdminClient();
- 
-  // 1. Kiểm tra profile và role
-  const { data: me } = await admin
-    .from("users")
-    .select("id, email, role")
-    .eq("id", user.id)
-    .single();
- 
-  if (!me || (me.role !== "SUBADMIN" && me.role !== "ADMIN")) redirect("/dashboard");
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://flashcard-api.huytutor.edu.vn/api/v1";
+  const res = await fetch(`${apiUrl}/subadmin/overview`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    cache: "no-store",
+  });
 
-  // 2. Lấy danh sách nhóm mà user này là subadmin
-  const { data: managedGroups } = await admin
-    .from("group_users")
-    .select("group_id, groups(id, name, max_users)")
-    .eq("user_id", user.id)
-    .eq("is_subadmin", true);
+  if (!res.ok) {
+    redirect("/dashboard");
+  }
 
-  const groupIds = (managedGroups ?? []).map(g => g.group_id);
-
-  if (me.role !== "ADMIN" && groupIds.length === 0) redirect("/dashboard");
-
-  // 3. Đếm số lượng user trong các nhóm quản lý
-  const { count: managedCount } = me.role === "SUBADMIN"
-    ? await admin.from("group_users").select("*", { count: "exact", head: true }).in("group_id", groupIds)
-    : await admin.from("users").select("*", { count: "exact", head: true });
- 
-  // 4. Lấy danh sách bộ đề được gán cho nhóm (group_decks)
-  const { data: myDecks } = me.role === "SUBADMIN"
-    ? await admin.from("group_decks").select("deck:decks(id, title)").in("group_id", groupIds)
-    : await admin.from("decks").select("id, title");
- 
-  const totalMaxUsers = me.role === "SUBADMIN"
-    ? (managedGroups ?? []).reduce((acc, g: any) => acc + (g.groups?.max_users ?? 0), 0)
-    : 0;
-
+  const { me, managedGroups, managedCount, myDecks, totalMaxUsers } = await res.json();
   const isAdmin = me.role === "ADMIN";
 
   return (
