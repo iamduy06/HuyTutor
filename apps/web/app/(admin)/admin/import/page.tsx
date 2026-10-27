@@ -57,8 +57,6 @@ export default function ImportPage() {
         if (!res.ok) throw new Error("API call failed");
         
         const data = await res.json();
-        console.log("[IMPORT_PAGE] API results:", { decks: data.decks?.length, groups: data.groups?.length });
-        
         if (data.error) console.error("[IMPORT_PAGE] API Data error:", data.error);
 
         setDecksRef(data.decks ?? []);
@@ -69,7 +67,6 @@ export default function ImportPage() {
       } finally {
         clearTimeout(timeout);
         setLoadingRef(false);
-        console.log("[IMPORT_PAGE] loadData finished");
       }
     }
     loadData();

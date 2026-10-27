@@ -6,7 +6,7 @@ import { getAdminClient } from '../../config/supabase.js';
 import { parseDateToISO, parseStringArray } from '../../utils/importUtils.js';
 import * as XLSX from 'xlsx';
 import { validate } from '../../middlewares/validate.js';
-import { adminExportQuerySchema, adminAppSettingsSchema } from '@huytutor/shared';
+import { adminExportQuerySchema, adminAppSettingsSchema, generatePassword } from '@huytutor/shared';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -146,7 +146,7 @@ router.post('/admin/import/users', async (req: Request, res: Response) => {
 
   for (const row of rows) {
     const email = typeof row.email === 'string' ? row.email.trim() : row.email || '';
-    const password = row.password || 'goidangkyflashcard';
+    const password = row.password?.trim() || 'goidangkyflashcard';
     const rawGroupId = typeof row.group_id === 'string' ? row.group_id.trim() : row.group_id;
     const groupId = rawGroupId || DEFAULT_GROUP_ID;
     const role = (row.role || 'USER').toUpperCase();
@@ -264,11 +264,11 @@ router.post('/admin/import/decks', async (req: Request, res: Response) => {
     const resolvedUserIds: string[] = [];
     const userErrors = [];
     for (const uItem of userList) {
-      const { data: uData } = await supabase
-        .from('users')
-        .select('id')
-        .or(`email.eq.${uItem},id.eq.${uItem}`)
-        .maybeSingle();
+      const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      const query = cleanItem.includes('@')
+        ? supabase.from('users').select('id').eq('email', cleanItem).maybeSingle()
+        : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
+      const { data: uData } = await query;
       if (uData) resolvedUserIds.push(uData.id);
       else userErrors.push(uItem);
     }
@@ -329,22 +329,24 @@ router.post('/admin/import/groups', async (req: Request, res: Response) => {
 
     const resolvedUserIds: string[] = [];
     for (const uItem of userList) {
-      const { data: uData } = await supabase
-        .from('users')
-        .select('id')
-        .or(`email.eq.${uItem},id.eq.${uItem}`)
-        .maybeSingle();
+      const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      const query = cleanItem.includes('@')
+        ? supabase.from('users').select('id').eq('email', cleanItem).maybeSingle()
+        : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
+      const { data: uData } = await query;
       if (uData) resolvedUserIds.push(uData.id);
     }
 
     const resolvedDeckIds: string[] = [];
     for (const dItem of deckList) {
-      const { data: dData } = await supabase
-        .from('decks')
-        .select('id')
-        .or(`title.eq.${dItem},id.eq.${dItem}`)
-        .maybeSingle();
-      if (dData) resolvedDeckIds.push(dData.id);
+      const cleanDeck = String(dItem).trim().replace(/["'\\]/g, '');
+      const byId = await supabase.from('decks').select('id').eq('id', cleanDeck).maybeSingle();
+      if (byId.data) {
+        resolvedDeckIds.push(byId.data.id);
+      } else {
+        const byTitle = await supabase.from('decks').select('id').eq('title', cleanDeck).maybeSingle();
+        if (byTitle.data) resolvedDeckIds.push(byTitle.data.id);
+      }
     }
 
     if (resolvedUserIds.length > 0) {

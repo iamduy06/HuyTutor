@@ -19,14 +19,6 @@ export default function ProfilePage() {
   const [confirmPw, setConfirmPw] = useState("");
   const [saving,   setSaving]   = useState(false);
 
-  // Debug logic quyền hạn
-  console.log("[PROFILE_DEBUG] User data:", {
-    email: user?.email,
-    role: user?.role,
-    is_subadmin: user?.is_subadmin,
-    effectiveRoleLabel
-  });
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">

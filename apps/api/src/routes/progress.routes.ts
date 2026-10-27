@@ -43,7 +43,7 @@ router.post(
       admin.from('decks').select('access_level').eq('id', deck_id).single(),
       admin
         .from('user_decks')
-        .select('streak, last_studied_at, learned_count')
+        .select('streak, last_studied_at, learned_count, expired_at')
         .eq('user_id', user.id)
         .eq('deck_id', deck_id)
         .maybeSingle(),
@@ -61,8 +61,13 @@ router.post(
     const isFreeAccess = levels.public === true || levels.auth === true;
     const isPaidOnly = levels.paid === true && !isFreeAccess;
 
-    if (isPaidOnly && !existing) {
-      return res.status(403).json({ error: 'Forbidden: no access' });
+    if (isPaidOnly) {
+      if (!existing) {
+        return res.status(403).json({ error: 'Forbidden: no access' });
+      }
+      if (existing.expired_at && new Date(existing.expired_at) < new Date()) {
+        return res.status(403).json({ error: 'Forbidden: Gói học đã hết hạn' });
+      }
     }
 
     const now = new Date();

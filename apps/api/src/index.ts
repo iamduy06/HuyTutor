@@ -22,9 +22,7 @@ const healthHandler = (_req: Request, res: Response) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: `${APP_NAME} API`,
-    runtime: 'Node 22 LTS',
     version: '2.0.0',
-    nodeVersion: process.version,
   });
 };
 app.get('/api/v1/health', healthHandler);

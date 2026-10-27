@@ -70,7 +70,7 @@ router.get('/me/dashboard', requireAuth, async (req: Request, res: Response) => 
     { data: userDecks },
     { data: publicDecks },
   ] = await Promise.all([
-    admin.from('users').select('*').eq('id', user.id).single(),
+    admin.from('users').select('id, email, role, max_devices, created_at').eq('id', user.id).single(),
     admin
       .from('user_decks')
       .select('id, deck_id, progress_percent, learned_count, streak, expired_at, deck:decks(id, title, description, level, access_level)')

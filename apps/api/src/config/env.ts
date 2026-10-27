@@ -10,7 +10,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().default(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'),
   SUPABASE_ANON_KEY: z.string().min(1).default(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).default(process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key'),
-  CORS_ORIGIN: z.string().default(process.env.CORS_ORIGINS || 'http://localhost:3000,https://flashcard.huytutor.edu.vn'),
+  CORS_ORIGIN: z.string().default(process.env.CORS_ORIGINS || 'http://localhost:3000,https://flashcard.huytutor.edu.vn,https://flashcard2.huytutor.edu.vn'),
   CORS_ORIGINS: z.string().optional(),
 });
 

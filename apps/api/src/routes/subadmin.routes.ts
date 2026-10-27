@@ -18,7 +18,20 @@ router.use(requireAuth, requireRole('SUBADMIN', 'ADMIN'));
 
 async function canManage(me: any, targetId: string) {
   if (me.role === 'ADMIN') return true;
+  if (targetId === me.id) return false;
+
   const admin = getAdminClient();
+
+  // Subadmins cannot manage, modify, or delete users with ADMIN or SUBADMIN role
+  const { data: targetUser } = await admin
+    .from('users')
+    .select('role')
+    .eq('id', targetId)
+    .maybeSingle();
+
+  if (!targetUser || targetUser.role === 'ADMIN' || targetUser.role === 'SUBADMIN') {
+    return false;
+  }
 
   const { data } = await admin
     .from('group_users')
