@@ -34,7 +34,7 @@ export async function getWordCountMap(): Promise<Record<string, number>> {
   const map: Record<string, number> = {};
   (cards ?? []).forEach((c: any) => {
     const tabs = extractTabs((c as unknown as FlashcardRow).content);
-    const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+    const count = tabs.reduce((s: number, t: any) => s + (t.vocabulary?.length ?? 0), 0);
     map[c.deck_id] = (map[c.deck_id] ?? 0) + count;
   });
 

@@ -13,7 +13,10 @@ export default async function DecksPage() {
 
   let finalGroups: GroupData[] = [];
   try {
-    const res = await fetch(`${apiUrl}/decks/public-grouped`, { next: { revalidate: 60 } });
+    const res = await fetch(`${apiUrl}/decks/public-grouped`, { 
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(3000),
+    });
     if (res.ok) {
       const data = await res.json();
       finalGroups = data.groups ?? [];

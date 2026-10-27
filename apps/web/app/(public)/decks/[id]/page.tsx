@@ -21,6 +21,7 @@ export default async function DeckDetailPage({ params }: Props) {
     res = await fetch(`${apiUrl}/decks/${id}/content`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       cache: "no-store",
+      signal: AbortSignal.timeout(3000),
     });
   } catch (err) {
     console.error("Failed to fetch deck content from backend:", err);

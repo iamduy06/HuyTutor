@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "npm run build --workspaces",
+    "build:api": "npm run build -w @huytutor/shared && npm run build -w huytutor-api",
+    "start:api": "npm run start -w huytutor-api",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
     "lint": "npm run lint --workspaces"

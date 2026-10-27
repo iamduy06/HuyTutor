@@ -79,9 +79,9 @@ router.get(
   const allVocab: VocabItem[] = (flashcards ?? []).flatMap((row: any) => {
     let tabs = extractTabs((row as unknown as FlashcardRow).content);
     if (selectedTabIds.length > 0) {
-      tabs = tabs.filter(t => t.id && selectedTabIds.includes(t.id));
+      tabs = tabs.filter((t: any) => t.id && selectedTabIds.includes(t.id));
     }
-    return tabs.flatMap(t => t.vocabulary ?? []);
+    return tabs.flatMap((t: any) => t.vocabulary ?? []);
   });
 
   // 6. Deduplicate & shuffle
@@ -137,11 +137,11 @@ router.get('/game/decks', requireAuth, async (req: Request, res: Response) => {
 
   (flashcards ?? []).forEach((r: any) => {
     const tabs = extractTabs((r as unknown as FlashcardRow).content);
-    const count = tabs.reduce((s, t) => s + (t.vocabulary?.length ?? 0), 0);
+    const count = tabs.reduce((s: number, t: any) => s + (t.vocabulary?.length ?? 0), 0);
     wordCountMap[r.deck_id] = (wordCountMap[r.deck_id] ?? 0) + count;
 
     if (!tabsMap[r.deck_id]) tabsMap[r.deck_id] = [];
-    tabs.forEach(t => {
+    tabs.forEach((t: any) => {
       const vCount = t.vocabulary?.length ?? 0;
       if (vCount > 0) {
         tabsMap[r.deck_id].push({

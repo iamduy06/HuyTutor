@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim());
 
 export const corsOptions: CorsOptions = {
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (like mobile apps, Postman, curl or server-to-server)
     if (!origin || allowedOrigins.includes(origin) || env.NODE_ENV === 'development') {
       callback(null, true);
