@@ -132,7 +132,7 @@ export function GameShell({
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <AlertCircle className="w-10 h-10 text-destructive" />
-          <p className="font-medium text-muted-foreground">{error.message}</p>
+          <p className="font-medium text-muted-foreground">{error?.message || String(error)}</p>
           <Button variant="brand" onClick={() => refetch()}>Thử lại</Button>
         </div>
       ) : !hasEnoughWords ? (

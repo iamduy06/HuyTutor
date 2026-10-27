@@ -27,7 +27,11 @@ async function fetchDeck(deckId: string): Promise<DeckData> {
   if (res.status === 403) throw new ForbiddenError();
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    const message =
+      typeof err?.error === "string"
+        ? err.error
+        : err?.error?.message || err?.message || `HTTP ${res.status}`;
+    throw new Error(message);
   }
   return res.json();
 }
