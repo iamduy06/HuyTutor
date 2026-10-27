@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
 import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
-import { generatePassword } from '@huytutor/shared';
+import { validate } from '../../middlewares/validate.js';
+import { generatePassword, adminCreateUserSchema, adminUpdateUserSchema } from '@huytutor/shared';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -26,7 +27,7 @@ router.get('/admin/users', async (_req: Request, res: Response) => {
 });
 
 // POST /admin/users
-router.post('/admin/users', async (req: Request, res: Response) => {
+router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const { email, role = 'USER', max_devices, group_id, auto_assign_group_decks } = body;
   if (!email) return res.status(400).json({ error: 'Email required' });
@@ -86,7 +87,7 @@ router.post('/admin/users', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/users/:id
-router.patch('/admin/users/:id', async (req: Request, res: Response) => {
+router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), async (req: Request, res: Response) => {
   const admin = req.user!;
   const id = req.params.id as string;
   const body = req.body;

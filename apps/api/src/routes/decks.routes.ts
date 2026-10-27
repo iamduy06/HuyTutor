@@ -3,7 +3,14 @@ import type { Request, Response } from 'express';
 import { getAdminClient } from '../config/supabase.js';
 import { optionalAuth } from '../middlewares/auth.js';
 import { getWordCountMap, computeLevelStr } from '../services/deckService.js';
-import { extractTabs, getDeckAccess, DEMO_LIMIT } from '@huytutor/shared';
+import { validate } from '../middlewares/validate.js';
+import { 
+  extractTabs, 
+  getDeckAccess, 
+  DEMO_LIMIT, 
+  getDeckDemoQuerySchema, 
+  deckIdParamSchema 
+} from '@huytutor/shared';
 import type { FlashcardRow, Tab } from '@huytutor/shared';
 
 const router = Router();
@@ -79,7 +86,7 @@ router.get('/decks/public-grouped', async (_req: Request, res: Response) => {
 });
 
 // GET /decks/demo - Free demo words
-router.get('/decks/demo', async (req: Request, res: Response) => {
+router.get('/decks/demo', validate({ query: getDeckDemoQuerySchema }), async (req: Request, res: Response) => {
   const deckId = req.query.deckId as string;
   if (!deckId) {
     return res.status(400).json({ error: 'deckId required' });
@@ -122,7 +129,7 @@ router.get('/decks/demo', async (req: Request, res: Response) => {
 });
 
 // GET /decks/:id/content - Content by user permissions
-router.get('/decks/:id/content', optionalAuth, async (req: Request, res: Response) => {
+router.get('/decks/:id/content', validate({ params: deckIdParamSchema }), optionalAuth, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const admin = getAdminClient();
 
@@ -198,7 +205,7 @@ router.get('/decks/:id/content', optionalAuth, async (req: Request, res: Respons
 });
 
 // GET /decks/:id/preview - Public preview slice
-router.get('/decks/:id/preview', async (req: Request, res: Response) => {
+router.get('/decks/:id/preview', validate({ params: deckIdParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const admin = getAdminClient();
 
@@ -245,7 +252,7 @@ router.get('/decks/:id/preview', async (req: Request, res: Response) => {
 });
 
 // GET /decks/:id - Single deck detail
-router.get('/decks/:id', async (req: Request, res: Response) => {
+router.get('/decks/:id', validate({ params: deckIdParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const admin = getAdminClient();
 

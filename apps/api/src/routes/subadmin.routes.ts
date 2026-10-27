@@ -3,7 +3,13 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import { requireRole } from '../middlewares/roleGuard.js';
 import { getAdminClient } from '../config/supabase.js';
-import { generatePassword } from '@huytutor/shared';
+import { validate } from '../middlewares/validate.js';
+import { 
+  generatePassword, 
+  subadminCreateUserSchema, 
+  subadminUpdateUserSchema, 
+  subadminBrandingSchema 
+} from '@huytutor/shared';
 
 const router = Router();
 
@@ -137,7 +143,7 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
 });
 
 // POST /subadmin/users
-router.post('/subadmin/users', async (req: Request, res: Response) => {
+router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const { email, role = 'USER', password: customPw, group_id, assign_all_decks, expired_at } = req.body;
 
@@ -249,7 +255,7 @@ router.post('/subadmin/users', async (req: Request, res: Response) => {
 });
 
 // PATCH /subadmin/users/:id
-router.patch('/subadmin/users/:id', async (req: Request, res: Response) => {
+router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const id = req.params.id as string;
 
@@ -517,7 +523,7 @@ router.get('/subadmin/branding', async (req: Request, res: Response) => {
 });
 
 // PATCH /subadmin/branding
-router.patch('/subadmin/branding', async (req: Request, res: Response) => {
+router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const admin = getAdminClient();
   const { group_id, branding } = req.body;

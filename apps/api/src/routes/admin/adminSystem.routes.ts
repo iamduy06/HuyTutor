@@ -5,6 +5,8 @@ import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
 import { parseDateToISO, parseStringArray } from '../../utils/importUtils.js';
 import * as XLSX from 'xlsx';
+import { validate } from '../../middlewares/validate.js';
+import { adminExportQuerySchema, adminAppSettingsSchema } from '@huytutor/shared';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -390,7 +392,7 @@ router.post('/admin/import/groups', async (req: Request, res: Response) => {
 // ─── EXPORT ──────────────────────────────────────────────────────────────────
 
 // GET /admin/export
-router.get('/admin/export', async (req: Request, res: Response) => {
+router.get('/admin/export', validate({ query: adminExportQuerySchema }), async (req: Request, res: Response) => {
   const type = req.query.type as string;
   const format = (req.query.format as string) ?? 'json_full';
   const supabase = getAdminClient();
@@ -649,7 +651,7 @@ router.get('/admin/app-settings', async (_req: Request, res: Response) => {
 });
 
 // PATCH /admin/app-settings
-router.patch('/admin/app-settings', async (req: Request, res: Response) => {
+router.patch('/admin/app-settings', validate({ body: adminAppSettingsSchema }), async (req: Request, res: Response) => {
   const { global_max_devices } = req.body;
   if (!global_max_devices) {
     return res.status(400).json({ error: 'Missing value' });

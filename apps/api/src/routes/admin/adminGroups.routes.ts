@@ -3,6 +3,13 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
 import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
+import { validate } from '../../middlewares/validate.js';
+import {
+  adminCreateDeckGroupSchema,
+  adminUpdateDeckGroupSchema,
+  adminCreateGroupSchema,
+  adminUpdateGroupSchema,
+} from '@huytutor/shared';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -23,7 +30,7 @@ router.get('/admin/deck-groups', async (_req: Request, res: Response) => {
 });
 
 // POST /admin/deck-groups
-router.post('/admin/deck-groups', async (req: Request, res: Response) => {
+router.post('/admin/deck-groups', validate({ body: adminCreateDeckGroupSchema }), async (req: Request, res: Response) => {
   const { name, description, order_index } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
 
@@ -39,7 +46,7 @@ router.post('/admin/deck-groups', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/deck-groups/:id
-router.patch('/admin/deck-groups/:id', async (req: Request, res: Response) => {
+router.patch('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, description, order_index } = req.body;
 
@@ -116,7 +123,7 @@ router.get('/admin/groups', async (_req: Request, res: Response) => {
 });
 
 // POST /admin/groups
-router.post('/admin/groups', async (req: Request, res: Response) => {
+router.post('/admin/groups', validate({ body: adminCreateGroupSchema }), async (req: Request, res: Response) => {
   const { name, description } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
@@ -132,7 +139,7 @@ router.post('/admin/groups', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/groups/:id
-router.patch('/admin/groups/:id', async (req: Request, res: Response) => {
+router.patch('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
 

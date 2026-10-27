@@ -3,6 +3,12 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
 import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
+import { validate } from '../../middlewares/validate.js';
+import {
+  adminCreateSubadminGroupSchema,
+  adminUpdateSubadminGroupSchema,
+  adminSubadminGroupActionSchema,
+} from '@huytutor/shared';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -64,7 +70,7 @@ router.get('/admin/subadmins', async (_req: Request, res: Response) => {
 });
 
 // POST /admin/subadmins - Create new group
-router.post('/admin/subadmins', async (req: Request, res: Response) => {
+router.post('/admin/subadmins', validate({ body: adminCreateSubadminGroupSchema }), async (req: Request, res: Response) => {
   const { name, max_users, max_device_per_user, branding } = req.body;
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Tên nhóm không được để trống' });
@@ -108,7 +114,7 @@ router.get('/admin/subadmins/:id/managed', async (req: Request, res: Response) =
 });
 
 // PATCH /admin/subadmins/groups/:id - Update group basic limits
-router.patch('/admin/subadmins/groups/:id', async (req: Request, res: Response) => {
+router.patch('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadminGroupSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, max_users, max_device_per_user } = req.body;
 
@@ -163,7 +169,7 @@ router.delete('/admin/subadmins/groups/:id', async (req: Request, res: Response)
 });
 
 // POST /admin/subadmins/groups/:id/actions - Advanced group operations
-router.post('/admin/subadmins/groups/:id/actions', async (req: Request, res: Response) => {
+router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadminGroupActionSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
   const supabase = getAdminClient();

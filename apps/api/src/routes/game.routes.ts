@@ -1,19 +1,24 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
+import { validate } from '../middlewares/validate.js';
 import { getAdminClient } from '../config/supabase.js';
-import { extractTabs } from '@huytutor/shared';
+import { extractTabs, getGameVocabQuerySchema } from '@huytutor/shared';
 import type { FlashcardRow, VocabItem } from '@huytutor/shared';
 import { shuffle, deduplicateVocab } from '../utils/gameUtils.js';
 
 const router = Router();
 
 // GET /game/vocab
-router.get('/game/vocab', requireAuth, async (req: Request, res: Response) => {
-  const user = req.user!;
-  const deckId = (req.query.deckId as string) ?? 'all';
-  const limitParam = req.query.limit as string;
-  const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+router.get(
+  '/game/vocab',
+  requireAuth,
+  validate({ query: getGameVocabQuerySchema }),
+  async (req: Request, res: Response) => {
+    const user = req.user!;
+    const deckId = (req.query.deckId as string) ?? 'all';
+    const limitParam = req.query.limit as string;
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
   const tabIdsParam = req.query.tabIds as string;
   const selectedTabIds = tabIdsParam ? tabIdsParam.split(',') : [];

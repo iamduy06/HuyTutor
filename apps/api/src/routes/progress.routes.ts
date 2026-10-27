@@ -2,18 +2,20 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
+import { z } from 'zod';
 import { updateProgressSchema } from '@huytutor/shared';
 import { getAdminClient } from '../config/supabase.js';
 
 const router = Router();
 
 // GET /progress?deck_id=<uuid>
-router.get('/progress', requireAuth, async (req: Request, res: Response) => {
-  const user = req.user!;
-  const deckId = req.query.deck_id as string;
-  if (!deckId) {
-    return res.status(400).json({ error: 'deck_id required' });
-  }
+router.get(
+  '/progress',
+  requireAuth,
+  validate({ query: z.object({ deck_id: z.string().min(1, 'deck_id required') }) }),
+  async (req: Request, res: Response) => {
+    const user = req.user!;
+    const deckId = req.query.deck_id as string;
 
   const admin = getAdminClient();
   const { data } = await admin

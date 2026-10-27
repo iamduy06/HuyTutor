@@ -4,7 +4,13 @@ import { requireAuth } from '../../middlewares/auth.js';
 import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
 import { getWordCountMap, computeLevelStr, invalidateWordCountCache } from '../../services/deckService.js';
-import { extractTabs } from '@huytutor/shared';
+import { validate } from '../../middlewares/validate.js';
+import { 
+  extractTabs, 
+  createDeckSchema, 
+  updateDeckSchema, 
+  saveFlashcardContentSchema 
+} from '@huytutor/shared';
 import type { FlashcardRow, Tab, VocabItem } from '@huytutor/shared';
 
 const router = Router();
@@ -68,7 +74,7 @@ router.get('/admin/decks', async (_req: Request, res: Response) => {
 });
 
 // POST /admin/decks
-router.post('/admin/decks', async (req: Request, res: Response) => {
+router.post('/admin/decks', validate({ body: createDeckSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const { title, description, level_min, level_max, access_level, group_id } = body;
   if (!title) return res.status(400).json({ error: 'Title required' });
@@ -108,7 +114,7 @@ router.get('/admin/decks/:id', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/decks/:id
-router.patch('/admin/decks/:id', async (req: Request, res: Response) => {
+router.patch('/admin/decks/:id', validate({ body: updateDeckSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
@@ -152,7 +158,7 @@ router.get('/admin/decks/:id/cards', async (req: Request, res: Response) => {
 });
 
 // POST /admin/decks/:id/cards
-router.post('/admin/decks/:id/cards', async (req: Request, res: Response) => {
+router.post('/admin/decks/:id/cards', validate({ body: saveFlashcardContentSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const { content } = req.body;
   const supabase = getAdminClient();
@@ -169,7 +175,7 @@ router.post('/admin/decks/:id/cards', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/decks/:id/cards/:cardId
-router.patch('/admin/decks/:id/cards/:cardId', async (req: Request, res: Response) => {
+router.patch('/admin/decks/:id/cards/:cardId', validate({ body: saveFlashcardContentSchema }), async (req: Request, res: Response) => {
   const cardId = req.params.cardId as string;
   const { content } = req.body;
   const supabase = getAdminClient();

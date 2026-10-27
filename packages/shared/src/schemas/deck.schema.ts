@@ -14,7 +14,7 @@ export const createDeckSchema = z.object({
   level: z.string().nullable().optional(),
   level_min: z.string().nullable().optional(),
   level_max: z.string().nullable().optional(),
-  group_id: z.string().uuid().nullable().optional(),
+  group_id: z.string().nullable().optional(),
   access_level: accessLevelConfigSchema.default({
     public: false,
     auth: false,
@@ -22,6 +22,14 @@ export const createDeckSchema = z.object({
     preview: false,
     preview_word_limit: 10,
   }),
+});
+
+export const getDeckDemoQuerySchema = z.object({
+  deckId: z.string().uuid("deckId phải là UUID hợp lệ"),
+});
+
+export const deckIdParamSchema = z.object({
+  id: z.string().uuid("id phải là UUID hợp lệ"),
 });
 
 export const updateDeckSchema = createDeckSchema.partial();
