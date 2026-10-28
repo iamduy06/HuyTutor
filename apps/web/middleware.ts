@@ -35,9 +35,6 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", path);
-      if (hasLegacyCookie) {
-        url.searchParams.set("notice", "upgraded");
-      }
       const redirectRes = NextResponse.redirect(url);
       // Clean up legacy cookies on response
       allCookies.forEach(c => {

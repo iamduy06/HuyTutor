@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const isUpgraded = searchParams.get("notice") === "upgraded";
 
   // Option B: Clean Cutover - Clean legacy Supabase storage on mount
   useEffect(() => {
@@ -85,14 +84,6 @@ export function LoginForm() {
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
       <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Đăng nhập</h1>
       <p className="text-muted-foreground text-sm mb-6">Chào mừng trở lại!</p>
-
-      {/* Option B: Security Upgrade Banner */}
-      {isUpgraded && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2.5 text-blue-800 text-xs">
-          <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0" />
-          <span>Hệ thống đã nâng cấp bảo mật toàn diện. Vui lòng đăng nhập lại để tiếp tục.</span>
-        </div>
-      )}
 
       {/* Device blocked message */}
       {blocked && (
