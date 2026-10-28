@@ -44,27 +44,10 @@ export default async function DashboardPage() {
     console.error("[Dashboard] Failed to fetch /me/dashboard:", err);
   }
 
-  if (!dashboardData) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 shadow-sm">
-          <div className="text-4xl mb-4">⏳</div>
-          <h2 className="text-xl font-bold text-[#1a1a2e] mb-2">Đang kết nối lại hệ thống</h2>
-          <p className="text-muted-foreground text-sm mb-6">
-            Máy chủ API đang tải dữ liệu. Vui lòng bấm thử lại để tiếp tục.
-          </p>
-          <a
-            href="/dashboard"
-            className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-bold text-white bg-brand hover:opacity-90 transition-opacity"
-          >
-            Tải lại trang
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCountMap } = dashboardData;
+  const profile = dashboardData?.profile ?? { email: session.user.email };
+  const filteredUserDecks = dashboardData?.userDecks ?? [];
+  const extraPublicDecks = dashboardData?.extraPublicDecks ?? [];
+  const wordCountMap = dashboardData?.wordCountMap ?? {};
 
   // Stats: count active = assigned có hạn + tất cả public
   const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);
