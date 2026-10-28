@@ -68,8 +68,15 @@ export function LoginForm() {
       }
     } catch (err: any) {
       console.error("[DEVICE_CHECK_ERROR]", err);
-      // Nếu API lỗi, tạm thời cho qua hoặc báo lỗi nhẹ tùy chính sách, 
-      // ở đây ta chọn cho qua để không chặn user đăng nhập nếu server device check gặp sự cố nhỏ.
+      // SEC-008: Fail-closed verification to prevent device limit bypass
+      await supabase.auth.signOut();
+      toast({
+        title: "Xác thực thiết bị thất bại",
+        description: "Không thể xác minh thiết bị hoặc tài khoản của bạn. Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
     }
 
     toast({ title: "Đăng nhập thành công 🎉" });

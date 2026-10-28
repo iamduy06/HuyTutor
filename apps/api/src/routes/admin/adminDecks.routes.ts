@@ -9,8 +9,13 @@ import {
   extractTabs, 
   createDeckSchema, 
   updateDeckSchema, 
-  saveFlashcardContentSchema 
+  saveFlashcardContentSchema,
+  bulkTabsInputSchema,
+  patchTabSchema,
+  vocabItemSchema,
+  bulkWordsInputSchema
 } from '@huytutor/shared';
+import { syncDeckWordCount } from '../../services/deckService.js';
 import type { FlashcardRow, Tab, VocabItem } from '@huytutor/shared';
 
 const router = Router();
@@ -49,6 +54,11 @@ async function persistTabs(
   if (extraIds.length) {
     await supabase.from('flashcards').delete().in('id', extraIds);
   }
+
+  // SEC-011: Synchronize word_count to deck directly
+  const totalWords = tabs.reduce((sum, tab) => sum + (tab.vocabulary?.length ?? 0), 0);
+  await supabase.from('decks').update({ word_count: totalWords }).eq('id', deckId);
+
   invalidateWordCountCache();
 }
 
@@ -170,7 +180,7 @@ router.post('/admin/decks/:id/cards', validate({ body: saveFlashcardContentSchem
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
-  invalidateWordCountCache();
+  await syncDeckWordCount(id);
   return res.status(200).json({ card: data });
 });
 
@@ -199,12 +209,13 @@ router.delete('/admin/decks/:id/cards/:cardId', async (req: Request, res: Respon
 
   const { error } = await supabase.from('flashcards').delete().eq('id', cardId);
   if (error) return res.status(500).json({ error: error.message });
-  invalidateWordCountCache();
+  const deckId = req.params.id as string;
+  if (deckId) await syncDeckWordCount(deckId);
   return res.status(200).json({ success: true });
 });
 
-// POST /admin/decks/:id/tabs - Add single tab or bulk import tabs
-router.post('/admin/decks/:id/tabs', async (req: Request, res: Response) => {
+// POST /admin/decks/:id/tabs - Add single tab or bulk import tabs (SEC-010 validated)
+router.post('/admin/decks/:id/tabs', validate({ body: bulkTabsInputSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
@@ -255,8 +266,8 @@ router.post('/admin/decks/:id/tabs', async (req: Request, res: Response) => {
   return res.status(200).json({ success: true, tab: newTab });
 });
 
-// PATCH /admin/decks/:id/tabs/:tabIndex
-router.patch('/admin/decks/:id/tabs/:tabIndex', async (req: Request, res: Response) => {
+// PATCH /admin/decks/:id/tabs/:tabIndex (SEC-010 validated)
+router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ body: patchTabSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const body = req.body;
@@ -302,8 +313,8 @@ router.delete('/admin/decks/:id/tabs/:tabIndex', async (req: Request, res: Respo
   return res.status(200).json({ success: true });
 });
 
-// POST /admin/decks/:id/tabs/:tabIndex/words - Add word
-router.post('/admin/decks/:id/tabs/:tabIndex/words', async (req: Request, res: Response) => {
+// POST /admin/decks/:id/tabs/:tabIndex/words - Add word (SEC-010 validated)
+router.post('/admin/decks/:id/tabs/:tabIndex/words', validate({ body: vocabItemSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const word: VocabItem = req.body;
@@ -322,8 +333,8 @@ router.post('/admin/decks/:id/tabs/:tabIndex/words', async (req: Request, res: R
   return res.status(200).json({ success: true, word });
 });
 
-// PATCH /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Update word
-router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', async (req: Request, res: Response) => {
+// PATCH /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Update word (SEC-010 validated)
+router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ body: vocabItemSchema.partial() }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const wordIndex = parseInt(req.params.wordIndex as string, 10);
@@ -373,8 +384,8 @@ router.delete('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', async (req: Re
   return res.status(200).json({ success: true });
 });
 
-// POST /admin/decks/:id/tabs/:tabIndex/words/bulk - Bulk add words
-router.post('/admin/decks/:id/tabs/:tabIndex/words/bulk', async (req: Request, res: Response) => {
+// POST /admin/decks/:id/tabs/:tabIndex/words/bulk - Bulk add words (SEC-010 validated)
+router.post('/admin/decks/:id/tabs/:tabIndex/words/bulk', validate({ body: bulkWordsInputSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const { words } = req.body;

@@ -50,6 +50,21 @@ export class MemoryCache {
   }
 
   /**
+   * Invalidate all cached user authentication tokens for a specific user ID.
+   * Eliminates the 300s window where revoked/demoted users retained stale privileges (SEC-013).
+   */
+  invalidateUserTokens(userId: string): void {
+    for (const [key, item] of this.cache.entries()) {
+      if (key.startsWith('user_token_')) {
+        const user = item.value as { id?: string } | undefined;
+        if (user?.id === userId) {
+          this.cache.delete(key);
+        }
+      }
+    }
+  }
+
+  /**
    * Clears the entire cache.
    */
   clear(): void {

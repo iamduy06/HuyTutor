@@ -70,9 +70,34 @@ router.post(
     }
 
     await upsertDevice(admin, user.id, device_id, device_name, req);
+
+    // SEC-008: Race Condition (TOCTOU) mitigation
+    // Check total device count after insertion. If concurrent requests resulted in exceeding maxDevices,
+    // immediately revoke/delete the newly registered device and reject.
+    const { count: finalCount } = await admin
+      .from('user_devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if ((finalCount ?? 0) > maxDevices) {
+      await admin
+        .from('user_devices')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('device_id', device_id);
+
+      return res.status(200).json({
+        allowed: false,
+        message: `Tài khoản đã đạt giới hạn ${maxDevices} thiết bị.`,
+        contactUrl: 'https://web.facebook.com/huytutor',
+        currentCount: finalCount ? finalCount - 1 : maxDevices,
+        maxDevices,
+      });
+    }
+
     return res.status(200).json({
       allowed: true,
-      currentCount: (count ?? 0) + 1,
+      currentCount: finalCount ?? ((count ?? 0) + 1),
       maxDevices,
     });
   }
@@ -135,8 +160,8 @@ async function upsertDevice(
   deviceName: string | undefined,
   req: Request
 ) {
-  // Use Express trusted req.ip
-  const ip = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || null;
+  // SEC-014: Rely strictly on Express req.ip with trust proxy enabled
+  const ip = req.ip || null;
 
   await admin.from('user_devices').upsert(
     {

@@ -4,6 +4,7 @@ import { requireAuth } from '../middlewares/auth.js';
 import { requireRole } from '../middlewares/roleGuard.js';
 import { getAdminClient } from '../config/supabase.js';
 import { validate } from '../middlewares/validate.js';
+import { memoryCache } from '../services/cacheService.js';
 import { 
   generatePassword, 
   subadminCreateUserSchema, 
@@ -287,6 +288,7 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
     const pw = generatePassword(8);
     const { error } = await admin.auth.admin.updateUserById(id, { password: pw });
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ tempPassword: pw });
   }
 
@@ -380,6 +382,7 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
       .eq('user_id', id)
       .in('group_id', myGIds);
 
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
@@ -391,12 +394,14 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
       .eq('device_id', body.device_id);
 
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
   if (body.action === 'reset_devices') {
     const { error } = await admin.from('user_devices').delete().eq('user_id', id);
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
@@ -429,6 +434,7 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
       .eq('id', id);
 
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
@@ -448,6 +454,7 @@ router.delete('/subadmin/users/:id', async (req: Request, res: Response) => {
   const admin = getAdminClient();
   const { error } = await admin.auth.admin.deleteUser(id);
   if (error) return res.status(400).json({ error: error.message });
+  memoryCache.invalidateUserTokens(id);
 
   return res.status(200).json({ success: true });
 });

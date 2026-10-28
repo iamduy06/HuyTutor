@@ -35,9 +35,9 @@ export const deckIdParamSchema = z.object({
 export const updateDeckSchema = createDeckSchema.partial();
 
 export const vocabItemSchema = z.object({
-  word: z.string().min(1),
+  word: z.string().min(1, "Từ vựng không được để trống"),
   phonetic: z.string().optional(),
-  meaning: z.string().min(1),
+  meaning: z.string().min(1, "Nghĩa của từ không được để trống"),
   type: z.string().optional(),
   example: z.string().optional(),
   translation: z.string().optional(),
@@ -50,7 +50,7 @@ export const tabSchema = z.object({
   id: z.string().optional(),
   label: z.string().optional(),
   desc: z.string().optional(),
-  vocabulary: z.array(vocabItemSchema),
+  vocabulary: z.array(vocabItemSchema).default([]),
 });
 
 export const saveFlashcardContentSchema = z.object({
@@ -61,6 +61,35 @@ export const saveFlashcardContentSchema = z.object({
   ]),
 });
 
+export const singleTabInputSchema = z.object({
+  id: z.string().min(1, "tabId is required"),
+  label: z.string().min(1, "label is required"),
+  desc: z.string().optional().default(""),
+  vocabulary: z.array(vocabItemSchema).optional().default([]),
+});
+
+export const bulkTabsInputSchema = z.union([
+  z.array(tabSchema),
+  z.object({
+    tabs: z.array(tabSchema),
+  }),
+  singleTabInputSchema,
+]);
+
+export const patchTabSchema = z.object({
+  action: z.enum(["rename", "reorder"]).optional(),
+  label: z.string().optional(),
+  desc: z.string().optional(),
+  newOrder: z.array(z.string()).optional(),
+});
+
+export const bulkWordsInputSchema = z.object({
+  words: z.array(vocabItemSchema).min(1, "Danh sách words không được để trống"),
+});
+
 export type CreateDeckInput = z.infer<typeof createDeckSchema>;
 export type UpdateDeckInput = z.infer<typeof updateDeckSchema>;
 export type SaveFlashcardContentInput = z.infer<typeof saveFlashcardContentSchema>;
+export type SingleTabInput = z.infer<typeof singleTabInputSchema>;
+export type PatchTabInput = z.infer<typeof patchTabSchema>;
+export type BulkWordsInput = z.infer<typeof bulkWordsInputSchema>;

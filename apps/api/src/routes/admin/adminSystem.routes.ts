@@ -18,17 +18,20 @@ const RESTRICTED_GROUPS = [
   '159b18f1-f6de-4567-b83a-6cffcc287438',
 ];
 
+function sanitizeCsvField(val: unknown): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') return JSON.stringify(val);
+  const str = String(val);
+  // SEC-009: Neutralize formula injection characters (=, +, -, @, tab, CR)
+  const sanitized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+  return sanitized.replace(/"/g, '""');
+}
+
 function jsonToCsv(items: any[], columns: string[]): string {
   const header = columns.join(',');
   const rows = items.map(item =>
     columns
-      .map(col => {
-        let val = item[col];
-        if (val === null || val === undefined) val = '';
-        if (typeof val === 'object') val = JSON.stringify(val);
-        const str = String(val).replace(/"/g, '""');
-        return `"${str}"`;
-      })
+      .map(col => `"${sanitizeCsvField(item[col])}"`)
       .join(',')
   );
   return [header, ...rows].join('\n');

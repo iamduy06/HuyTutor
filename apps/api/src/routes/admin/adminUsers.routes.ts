@@ -4,6 +4,7 @@ import { requireAuth } from '../../middlewares/auth.js';
 import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
 import { validate } from '../../middlewares/validate.js';
+import { memoryCache } from '../../services/cacheService.js';
 import { generatePassword, adminCreateUserSchema, adminUpdateUserSchema } from '@huytutor/shared';
 
 const router = Router();
@@ -98,6 +99,7 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
     const newPassword = generatePassword(8);
     const { error } = await supabase.auth.admin.updateUserById(id, { password: newPassword });
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ tempPassword: newPassword });
   }
 
@@ -118,6 +120,7 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
 
     const { error: dbErr } = await supabase.from('users').update(updateData).eq('id', id);
     if (dbErr) return res.status(500).json({ error: dbErr.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true, updateData });
   }
 
@@ -221,6 +224,7 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
       .eq('user_id', id)
       .eq('device_id', body.device_id);
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
@@ -228,6 +232,7 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
   if (body.action === 'reset_devices') {
     const { error } = await supabase.from('user_devices').delete().eq('user_id', id);
     if (error) return res.status(400).json({ error: error.message });
+    memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
@@ -246,6 +251,7 @@ router.delete('/admin/users/:id', async (req: Request, res: Response) => {
   const supabase = getAdminClient();
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) return res.status(400).json({ error: error.message });
+  memoryCache.invalidateUserTokens(id);
   return res.status(200).json({ success: true });
 });
 
