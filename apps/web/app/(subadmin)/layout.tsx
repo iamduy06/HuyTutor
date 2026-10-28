@@ -16,18 +16,29 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
   if (!session?.access_token) redirect("/login");
 
   const apiUrl = getApiUrl();
-  const res = await fetch(`${apiUrl}/subadmin/overview`, {
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    redirect("/dashboard");
+  let hasBrandingAccess = false;
+  let isOk = false;
+  try {
+    const res = await fetch(`${apiUrl}/subadmin/overview`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      hasBrandingAccess = !!data.hasBrandingAccess;
+      isOk = true;
+    }
+  } catch (err: any) {
+    if (err?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+    console.error("[SubAdminLayout] Error fetching overview:", err);
   }
 
-  const { hasBrandingAccess } = await res.json();
+  if (!isOk) {
+    redirect("/dashboard");
+  }
 
   const navItems = [
     ...baseNavItems,

@@ -23,23 +23,48 @@ export default async function DashboardPage() {
   if (!session?.access_token) redirect("/login");
 
   const apiUrl = getApiUrl();
-  const res = await fetch(`${apiUrl}/me/dashboard`, {
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    cache: "no-store",
-  });
+  let dashboardData: any = null;
 
-  if (!res.ok) {
-    if (res.status === 401) {
+  try {
+    const res = await fetch(`${apiUrl}/me/dashboard`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (res.ok) {
+      dashboardData = await res.json();
+    } else if (res.status === 401) {
       redirect("/login");
     }
-    const errText = await res.text().catch(() => "");
-    console.error(`[Dashboard] Failed to fetch /me/dashboard: status=${res.status}`, errText);
-    throw new Error(`Không thể tải dữ liệu Dashboard (HTTP ${res.status}). Vui lòng thử lại.`);
+  } catch (err: any) {
+    if (err?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+    console.error("[Dashboard] Failed to fetch /me/dashboard:", err);
   }
 
-  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCountMap } = await res.json();
+  if (!dashboardData) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] p-8 shadow-sm">
+          <div className="text-4xl mb-4">⏳</div>
+          <h2 className="text-xl font-bold text-[#1a1a2e] mb-2">Đang kết nối lại hệ thống</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            Máy chủ API đang tải dữ liệu. Vui lòng bấm thử lại để tiếp tục.
+          </p>
+          <a
+            href="/dashboard"
+            className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-bold text-white bg-brand hover:opacity-90 transition-opacity"
+          >
+            Tải lại trang
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const { profile, userDecks: filteredUserDecks, extraPublicDecks, wordCountMap } = dashboardData;
 
   // Stats: count active = assigned có hạn + tất cả public
   const maxStreak = filteredUserDecks.reduce((s: number, ud: any) => Math.max(s, (ud.streak as number) ?? 0), 0);

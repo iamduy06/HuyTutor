@@ -14,19 +14,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session?.access_token) redirect("/login");
 
   const apiUrl = getApiUrl();
-  const res = await fetch(`${apiUrl}/me/profile`, {
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    cache: "no-store",
-  });
+  let user: any = null;
+  let status: number | null = null;
+  try {
+    const res = await fetch(`${apiUrl}/me/profile`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    status = res.status;
+    if (res.ok) {
+      const data = await res.json();
+      user = data.user;
+    }
+  } catch (err: any) {
+    if (err?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+    console.error("[AdminLayout] Error fetching profile:", err);
+  }
 
-  if (!res.ok) {
-    if (res.status === 401) redirect("/login");
+  if (!user) {
+    if (status === 401) redirect("/login");
     redirect("/dashboard");
   }
 
-  const { user } = await res.json();
   if (user?.role !== "ADMIN") redirect("/dashboard");
 
   return (
