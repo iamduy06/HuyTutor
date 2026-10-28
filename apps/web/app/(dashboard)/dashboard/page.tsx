@@ -6,6 +6,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { Flame, BookOpen, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FACEBOOK_URL } from "@/lib/constants";
+import { DashboardDeckList } from "./DashboardDeckList";
 
 const GAMES = [
   { href: "/game/listening",       icon: "🎧", title: "Nghe & Viết",       desc: "Nghe phát âm, gõ lại từ tiếng Anh" },
@@ -128,56 +129,11 @@ export default async function DashboardPage() {
 
           {/* ── Mục II: Học từ vựng ── */}
           <h2 className="text-xl font-extrabold text-[#1a1a2e] mb-5">📖 Bộ Flashcard của tôi</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-
-            {/* ── Assigned decks ── */}
-            {filteredUserDecks.map((ud: any) => {
-              const deck = ud.deck as any;
-              const expired_at = ud.expired_at as string | null;
-              const levels = deck?.access_level ?? {};
-              const isFree = levels.public || levels.auth;
-              // Free decks luôn active; restricted check expired_at
-              const active = isFree || hasFullAccess(expired_at);
-              const words = wordCountMap[ud.deck_id as string] ?? 0;
-              if (!deck) return null;
-
-              return (
-                <DeckCard
-                  key={ud.id as string}
-                  title={deck.title}
-                  description={deck.description}
-                  accessLevel={deck.access_level}
-                  active={active}
-                  words={words}
-                  streak={(ud.streak as number) ?? 0}
-                  progressPercent={(ud.progress_percent as number) ?? 0}
-                  expiredAt={isFree ? null : expired_at}  // public không show hạn
-                  deckId={deck.id}
-                  showExpiry={!isFree}
-                  isAssigned={true}
-                />
-              );
-            })}
-
-            {/* ── Extra public decks (chưa được assign) ── */}
-            {(extraPublicDecks ?? []).map((deck: any) => (
-              <DeckCard
-                key={deck.id}
-                title={deck.title}
-                description={deck.description}
-                accessLevel={deck.access_level}
-                active={true}
-                words={wordCountMap[deck.id] ?? 0}
-                streak={0}
-                progressPercent={0}
-                expiredAt={null}
-                deckId={deck.id}
-                showExpiry={false}
-                isAssigned={false}
-              />
-            ))}
-
-          </div>
+          <DashboardDeckList
+            filteredUserDecks={filteredUserDecks}
+            extraPublicDecks={extraPublicDecks}
+            wordCountMap={wordCountMap}
+          />
         </>
       )}
     </div>

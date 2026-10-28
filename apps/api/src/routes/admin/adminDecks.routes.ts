@@ -63,8 +63,54 @@ async function persistTabs(
 }
 
 // GET /admin/decks
-router.get('/admin/decks', async (_req: Request, res: Response) => {
+router.get('/admin/decks', async (req: Request, res: Response) => {
   const supabase = getAdminClient();
+  const { page, limit, search } = req.query;
+
+  if (page !== undefined || limit !== undefined) {
+    const pageNum = Math.max(1, parseInt((page as string) || '1', 10));
+    const rawLimit = Number(limit);
+    const limitNum = [10, 20, 30, 50, 100].includes(rawLimit) ? rawLimit : 20;
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    let query = supabase
+      .from('decks')
+      .select('id, title, description, level, level_min, level_max, access_level, group_id, created_at', { count: 'exact' });
+
+    if (search && typeof search === 'string' && search.trim()) {
+      query = query.ilike('title', `%${search.trim()}%`);
+    }
+
+    const { data, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const wordCountMap = await getWordCountMap();
+    const decks = (data ?? []).map((d: any) => ({
+      ...d,
+      word_count: wordCountMap[d.id] ?? 0,
+      level: computeLevelStr(d.level_min, d.level_max) ?? d.level,
+    }));
+
+    const totalItems = count ?? 0;
+    const totalPages = Math.ceil(totalItems / limitNum) || 1;
+
+    return res.status(200).json({
+      decks,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1,
+      },
+    });
+  }
+
   const { data, error } = await supabase
     .from('decks')
     .select('id, title, description, level, level_min, level_max, access_level, group_id, created_at')

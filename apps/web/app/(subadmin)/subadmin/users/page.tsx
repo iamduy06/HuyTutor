@@ -17,6 +17,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PaginationControls } from "@/components/common/PaginationControls";
+import type { PaginationMeta } from "@huytutor/shared";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UserDevice { id: string; device_id: string; device_name: string | null; ip_address: string | null; last_seen: string; }
@@ -42,9 +44,16 @@ interface MeInfo {
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
-async function fetchData() {
+async function fetchData(page: number, limit: number, search: string) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
   const [usersRes, decksRes] = await Promise.all([
-    fetch("/api/subadmin/users"),
+    fetch(`/api/subadmin/users?${params.toString()}`),
     fetch("/api/subadmin/decks"),
   ]);
   const usersJson = await usersRes.json();
@@ -54,6 +63,7 @@ async function fetchData() {
     managedGroups: (usersJson.managed_groups ?? []) as ManagedGroup[],
     me: usersJson.me as MeInfo,
     decks: (decksJson.decks ?? []) as DeckItem[],
+    pagination: usersJson.pagination as PaginationMeta | undefined,
   };
 }
 
@@ -63,6 +73,8 @@ export default function SubAdminUsersPage() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [showCreate, setShowCreate] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState("USER");
@@ -105,9 +117,11 @@ export default function SubAdminUsersPage() {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["subadmin-data"],
-    queryFn: fetchData,
+    queryKey: ["subadmin-data", page, pageSize, search],
+    queryFn: () => fetchData(page, pageSize, search),
+    placeholderData: (prev) => prev,
   });
+  const pagination = data?.pagination;
   const users = data?.users ?? [];
   const decks = data?.decks ?? [];
   const managedGroups = data?.managedGroups ?? [];
@@ -247,7 +261,7 @@ export default function SubAdminUsersPage() {
   });
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const filtered = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+  const filtered: UserData[] = users;
   const assignedUser = users.find(u => u.id === showAssign);
   const maxUsers = me?.max_managed_users ?? 10;
   const isAdmin = me?.role === "ADMIN";
@@ -298,7 +312,7 @@ export default function SubAdminUsersPage() {
       )}
 
       <Input placeholder="🔍 Tìm theo email..." value={search}
-        onChange={e => setSearch(e.target.value)} className="mb-4 max-w-sm" />
+        onChange={e => { setSearch(e.target.value); setPage(1); }} className="mb-4 max-w-sm" />
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
@@ -470,6 +484,20 @@ export default function SubAdminUsersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="border-t border-[#f0e0e7] px-4 py-2 bg-gray-50/50">
+            <PaginationControls
+              currentPage={page}
+              totalPages={pagination?.totalPages ?? 1}
+              pageSize={pageSize}
+              totalItems={pagination?.totalItems ?? users.length}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              itemName="học viên"
+            />
           </div>
         </div>
       )}

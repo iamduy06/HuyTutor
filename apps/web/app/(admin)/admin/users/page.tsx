@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { generatePassword } from "@/lib/utils";
+import { PaginationControls } from "@/components/common/PaginationControls";
+import type { PaginationMeta } from "@huytutor/shared";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeckItem { id: string; title: string; level?: string; word_count?: number; }
@@ -44,11 +46,21 @@ interface UserData {
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
-async function fetchUsers(): Promise<UserData[]> {
-  const res = await fetch("/api/admin/users");
+async function fetchUsers(page: number, limit: number, search: string): Promise<{ users: UserData[]; pagination?: PaginationMeta }> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  const res = await fetch(`/api/admin/users?${params.toString()}`);
   if (!res.ok) throw new Error("Failed");
   const data = await res.json();
-  return data.users ?? [];
+  return {
+    users: data.users ?? [],
+    pagination: data.pagination,
+  };
 }
 async function fetchDecks(): Promise<DeckItem[]> {
   const res = await fetch("/api/admin/decks");
@@ -77,6 +89,8 @@ export default function AdminUsersPage() {
 
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Global Settings Modal
   const [showSettings, setShowSettings] = useState(false);
@@ -119,7 +133,13 @@ export default function AdminUsersPage() {
   const [assignExpiry, setAssignExpiry] = useState("");
 
   // ── Queries ───────────────────────────────────────────────────────────────
-  const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: fetchUsers });
+  const { data: userData, isLoading } = useQuery({
+    queryKey: ["admin-users", page, pageSize, search],
+    queryFn: () => fetchUsers(page, pageSize, search),
+    placeholderData: (prev) => prev,
+  });
+  const users = userData?.users ?? [];
+  const pagination = userData?.pagination;
   const { data: decks = [] } = useQuery({ queryKey: ["admin-decks-list"], queryFn: fetchDecks });
   const { data: groups = [] } = useQuery({ queryKey: ["admin-groups-list"], queryFn: fetchGroups });
   const { data: globalSettingsValue = "3" } = useQuery({ queryKey: ["admin-global-settings"], queryFn: fetchGlobalSettings });
@@ -424,7 +444,7 @@ export default function AdminUsersPage() {
 
   const getFreshEditingUser = () => {
     if (!editingUser) return null;
-    return users.find(u => u.id === editingUser.id) || editingUser;
+    return users.find((u: UserData) => u.id === editingUser.id) || editingUser;
   };
 
   const currentUserData = getFreshEditingUser();
@@ -441,7 +461,7 @@ export default function AdminUsersPage() {
         <h1 className="text-3xl font-extrabold text-[#1a1a2e]">👥 Hệ Thống Người Dùng</h1>
         <div className="flex gap-3 flex-wrap items-center">
           <Input placeholder="🔍 Tìm theo email..." value={search}
-            onChange={e => setSearch(e.target.value)} className="w-64" />
+            onChange={e => { setSearch(e.target.value); setPage(1); }} className="w-64" />
           <label className="cursor-pointer">
             <input type="file" accept=".csv" className="hidden"
               onChange={e => setCsvFile(e.target.files?.[0] ?? null)} />

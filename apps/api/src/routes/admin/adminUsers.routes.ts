@@ -11,8 +11,58 @@ const router = Router();
 router.use('/admin', requireAuth, requireRole('ADMIN'));
 
 // GET /admin/users
-router.get('/admin/users', async (_req: Request, res: Response) => {
+router.get('/admin/users', async (req: Request, res: Response) => {
   const supabase = getAdminClient();
+  const { page, limit, search, role } = req.query;
+
+  // If pagination requested
+  if (page !== undefined || limit !== undefined) {
+    const pageNum = Math.max(1, parseInt((page as string) || '1', 10));
+    const rawLimit = Number(limit);
+    const limitNum = [10, 20, 30, 50, 100].includes(rawLimit) ? rawLimit : 20;
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    let query = supabase
+      .from('users')
+      .select(`
+        *, 
+        user_decks(id, deck_id, expired_at, progress_percent, learned_count, deck:decks(title)), 
+        group_users(group_id, is_subadmin, group:groups(name)),
+        user_devices(id, device_id, device_name, ip_address, last_seen)
+      `, { count: 'exact' });
+
+    if (search && typeof search === 'string' && search.trim()) {
+      query = query.ilike('email', `%${search.trim()}%`);
+    }
+
+    if (role && typeof role === 'string' && role !== 'ALL') {
+      query = query.eq('role', role);
+    }
+
+    const { data: users, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const totalItems = count ?? 0;
+    const totalPages = Math.ceil(totalItems / limitNum) || 1;
+
+    return res.status(200).json({
+      users: users ?? [],
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1,
+      },
+    });
+  }
+
+  // Non-paginated fallback (for CSV export or internal caller)
   const { data: users, error } = await supabase
     .from('users')
     .select(`

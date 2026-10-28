@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import type { Deck, DeckGroup } from "@/types";
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ export default function GroupDecksPage() {
   });
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ "none": true });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // ── Dialogs ──
   const [showGroupDlg, setShowGroupDlg] = useState(false);
@@ -253,6 +256,8 @@ export default function GroupDecksPage() {
   }, {} as Record<string, Deck[]>);
 
   const uncategorizedDecks = decks.filter(d => !d.group_id);
+  const totalPages = Math.ceil(groups.length / pageSize) || 1;
+  const paginatedGroups = groups.slice((page - 1) * pageSize, page * pageSize);
 
   if (decksLoading || groupsLoading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>;
@@ -267,7 +272,7 @@ export default function GroupDecksPage() {
 
       <div className="flex flex-col gap-6">
         {/* Render Groups */}
-        {groups.map(group => (
+        {paginatedGroups.map(group => (
           <div key={group.id} className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
             <div className="flex items-center justify-between p-4 bg-[#f8f9fa]">
               <div className="flex items-center gap-3">
@@ -360,6 +365,23 @@ export default function GroupDecksPage() {
             </div>
           )}
         </div>
+
+        {groups.length > 0 && (
+          <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] px-4 py-2 mt-2">
+            <PaginationControls
+              currentPage={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={groups.length}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              itemName="nhóm bộ đề"
+            />
+          </div>
+        )}
       </div>
 
       {/* ════ Dialog: Tạo/Sửa Nhóm ════ */}

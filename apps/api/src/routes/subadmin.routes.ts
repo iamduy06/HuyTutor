@@ -100,6 +100,7 @@ router.get('/subadmin/overview', async (req: Request, res: Response) => {
 router.get('/subadmin/users', async (req: Request, res: Response) => {
   const me = req.user!;
   const admin = getAdminClient();
+  const { page, limit, search } = req.query;
 
   const { data: managedGroups } = await admin
     .from('group_users')
@@ -112,14 +113,22 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
   if (me.role !== 'ADMIN' && groupIds.length === 0) {
     return res.status(200).json({
       users: [],
+      managed_groups: [],
       me: { ...me, current_managed: 0, max_managed_users: 0 },
+      ...(page !== undefined || limit !== undefined ? {
+        pagination: { page: 1, limit: 20, totalItems: 0, totalPages: 1, hasNextPage: false, hasPrevPage: false }
+      } : {})
     });
   }
+
+  const isPaginated = page !== undefined || limit !== undefined;
+  const selectOpts = isPaginated ? { count: 'exact' as const } : undefined;
 
   let userQuery = admin
     .from('users')
     .select(
-      'id, email, role, created_at, max_devices, user_decks(id, deck_id, expired_at, learned_count, progress_percent, streak, deck:decks(title))'
+      'id, email, role, created_at, max_devices, user_decks(id, deck_id, expired_at, learned_count, progress_percent, streak, deck:decks(title))',
+      selectOpts
     )
     .order('created_at', { ascending: false });
 
@@ -133,15 +142,39 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
     userQuery = userQuery.in('id', memberIds);
   }
 
-  const { data: users, error } = await userQuery;
-  if (error) {
-    return res.status(500).json({ error: error.message });
+  if (search && typeof search === 'string' && search.trim()) {
+    userQuery = userQuery.ilike('email', `%${search.trim()}%`);
+  }
+
+  let users: any[] | null = null;
+  let totalCount = 0;
+  let pageNum = 1;
+  let limitNum = 20;
+
+  if (isPaginated) {
+    pageNum = Math.max(1, parseInt((page as string) || '1', 10));
+    const rawLimit = Number(limit);
+    limitNum = [10, 20, 30, 50, 100].includes(rawLimit) ? rawLimit : 20;
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    const { data, count, error } = await userQuery.range(from, to);
+    if (error) return res.status(500).json({ error: error.message });
+    users = data;
+    totalCount = count ?? 0;
+  } else {
+    const { data, error } = await userQuery;
+    if (error) return res.status(500).json({ error: error.message });
+    users = data;
+    totalCount = users?.length || 0;
   }
 
   const totalMax = (managedGroups ?? []).reduce(
     (acc: number, g: any) => acc + (g.groups?.max_users ?? 0),
     0
   );
+
+  const totalPages = Math.ceil(totalCount / limitNum) || 1;
 
   return res.status(200).json({
     users: users ?? [],
@@ -151,8 +184,18 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
       email: me.email,
       role: me.role,
       max_managed_users: totalMax,
-      current_managed: users?.length || 0,
+      current_managed: totalCount,
     },
+    ...(isPaginated ? {
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalItems: totalCount,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1,
+      }
+    } : {})
   });
 });
 

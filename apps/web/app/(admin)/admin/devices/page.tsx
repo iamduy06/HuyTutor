@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { PaginationControls } from "@/components/common/PaginationControls";
+import type { PaginationMeta } from "@huytutor/shared";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
@@ -44,6 +46,8 @@ export default function AdminDevicesPage() {
   const [limitValue,      setLimitValue]      = useState("");
   const [globalLimitVal,  setGlobalLimitVal]  = useState("");
   const [searchEmail,     setSearchEmail]     = useState("");
+  const [page,            setPage]            = useState(1);
+  const [pageSize,        setPageSize]        = useState(20);
 
   // ── Fetch global setting ──
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -55,16 +59,28 @@ export default function AdminDevicesPage() {
   });
 
   // ── Fetch users + device counts ──
-  const { data: users = [], isLoading: usersLoading } = useQuery({
-    queryKey: ["admin-device-users"],
+  const { data: userData, isLoading: usersLoading } = useQuery({
+    queryKey: ["admin-device-users", page, pageSize, searchEmail],
     queryFn: async () => {
-      const res = await fetch("/api/admin/users");
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+      });
+      if (searchEmail.trim()) {
+        params.set("search", searchEmail.trim());
+      }
+      const res = await fetch(`/api/admin/users?${params.toString()}`);
       const data = await res.json();
-      // Fetch device counts in parallel
-      const userList: UserRow[] = data.users ?? [];
-      return userList;
+      return {
+        users: (data.users ?? []) as UserRow[],
+        pagination: data.pagination as PaginationMeta | undefined,
+      };
     },
+    placeholderData: (prev) => prev,
   });
+
+  const users = userData?.users ?? [];
+  const pagination = userData?.pagination;
 
   // ── Fetch devices of selected user ──
   const { data: devices = [], isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
@@ -224,7 +240,7 @@ export default function AdminDevicesPage() {
           <Input
             placeholder="🔍 Tìm theo email..."
             value={searchEmail}
-            onChange={e => setSearchEmail(e.target.value)}
+            onChange={e => { setSearchEmail(e.target.value); setPage(1); }}
             className="max-w-xs"
           />
         </div>
@@ -232,7 +248,8 @@ export default function AdminDevicesPage() {
         {usersLoading ? (
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand" /></div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#f0e0e7] bg-[#f8f9fa]">
@@ -292,6 +309,21 @@ export default function AdminDevicesPage() {
               </tbody>
             </table>
           </div>
+          <div className="border-t border-[#f0e0e7] px-4 py-2 bg-gray-50/50">
+            <PaginationControls
+              currentPage={page}
+              totalPages={pagination?.totalPages ?? 1}
+              pageSize={pageSize}
+              totalItems={pagination?.totalItems ?? users.length}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              itemName="người dùng"
+            />
+          </div>
+          </>
         )}
       </div>
 

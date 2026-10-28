@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeckItem { id: string; title: string; }
@@ -70,6 +71,8 @@ export default function AdminSubAdminsPage() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   // Default: collapsed -> empty set
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -288,6 +291,12 @@ export default function AdminSubAdminsPage() {
     });
   }, [groups, search]);
 
+  const totalPages = Math.ceil(filteredGroups.length / pageSize) || 1;
+  const paginatedGroups = useMemo(() => {
+    const from = (page - 1) * pageSize;
+    return filteredGroups.slice(from, from + pageSize);
+  }, [filteredGroups, page, pageSize]);
+
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-brand" /></div>;
 
   return (
@@ -298,14 +307,14 @@ export default function AdminSubAdminsPage() {
           <p className="text-sm text-gray-500 mt-1">Quản lý thành viên, phân quyền Flashcard và tài khoản theo từng đơn vị nhóm.</p>
         </div>
         <div className="flex gap-3">
-          <Input placeholder="🔍 Tìm nhóm hoặc email..." value={search} onChange={e=>setSearch(e.target.value)} className="w-72 bg-white" />
+          <Input placeholder="🔍 Tìm nhóm hoặc email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="w-72 bg-white" />
         </div>
       </div>
 
       <div className="space-y-4">
         {filteredGroups.length === 0 ? (
           <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-500">Không tìm thấy nhóm dữ liệu nào.</div>
-        ) : filteredGroups.map(group => (
+        ) : paginatedGroups.map(group => (
           <div key={group.id} className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden transition-all shadow-sm">
             
             {/* ════ GROUP HEADER ════ */}

@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DECK_LEVELS } from "@/lib/constants";
+import { PaginationControls } from "@/components/common/PaginationControls";
+import type { PaginationMeta } from "@huytutor/shared";
 import { CEFR_LEVELS, WORD_TYPES } from "@/types";
 import type { Deck, DeckGroup, Tab, VocabItem } from "@/types";
 
@@ -35,9 +37,17 @@ interface DeckDetail {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-async function fetchAdminDecks(): Promise<Deck[]> {
-  const res = await fetch("/api/admin/decks");
-  return (await res.json()).decks ?? [];
+async function fetchAdminDecks(page: number, limit: number): Promise<{ decks: Deck[]; pagination?: PaginationMeta }> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  const res = await fetch(`/api/admin/decks?${params.toString()}`);
+  const data = await res.json();
+  return {
+    decks: data.decks ?? [],
+    pagination: data.pagination,
+  };
 }
 
 async function fetchDeckGroups(): Promise<DeckGroup[]> {
@@ -63,9 +73,16 @@ export default function AdminDecksPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data: decks = [], isLoading } = useQuery({
-    queryKey: ["admin-decks"], queryFn: fetchAdminDecks,
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const { data: deckData, isLoading } = useQuery({
+    queryKey: ["admin-decks", page, pageSize],
+    queryFn: () => fetchAdminDecks(page, pageSize),
+    placeholderData: (prev) => prev,
   });
+  const decks = deckData?.decks ?? [];
+  const pagination = deckData?.pagination;
 
   const { data: groups = [] } = useQuery({
     queryKey: ["admin-deck-groups"], queryFn: fetchDeckGroups,
@@ -541,6 +558,23 @@ export default function AdminDecksPage() {
             <div className="text-center py-16 text-muted-foreground">
               <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>Chưa có Flashcard nào. Nhấn "Tạo Flashcard" để bắt đầu.</p>
+            </div>
+          )}
+
+          {decks.length > 0 && (
+            <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] px-4 py-2 mt-2">
+              <PaginationControls
+                currentPage={page}
+                totalPages={pagination?.totalPages ?? 1}
+                pageSize={pageSize}
+                totalItems={pagination?.totalItems ?? decks.length}
+                onPageChange={(p) => setPage(p)}
+                onPageSizeChange={(s) => {
+                  setPageSize(s);
+                  setPage(1);
+                }}
+                itemName="bộ Flashcard"
+              />
             </div>
           )}
         </div>
