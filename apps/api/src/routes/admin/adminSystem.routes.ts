@@ -10,7 +10,7 @@ import { exportLimiter } from '../../middlewares/rateLimiter.js';
 import { adminExportQuerySchema, adminAppSettingsSchema, generatePassword } from '@huytutor/shared';
 
 const router = Router();
-router.use(requireAuth, requireRole('ADMIN'));
+router.use('/admin', requireAuth, requireRole('ADMIN'));
 
 const DEFAULT_GROUP_ID = '159b18f1-f6de-4567-b83a-6cffcc287438';
 const RESTRICTED_GROUPS = [

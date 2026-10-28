@@ -11,7 +11,7 @@ import {
 } from '@huytutor/shared';
 
 const router = Router();
-router.use(requireAuth, requireRole('ADMIN'));
+router.use('/admin', requireAuth, requireRole('ADMIN'));
 
 // GET /admin/subadmins - List all groups with subadmin & user details
 router.get('/admin/subadmins', async (_req: Request, res: Response) => {

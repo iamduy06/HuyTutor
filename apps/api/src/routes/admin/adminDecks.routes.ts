@@ -19,7 +19,7 @@ import { syncDeckWordCount } from '../../services/deckService.js';
 import type { FlashcardRow, Tab, VocabItem } from '@huytutor/shared';
 
 const router = Router();
-router.use(requireAuth, requireRole('ADMIN'));
+router.use('/admin', requireAuth, requireRole('ADMIN'));
 
 // Helper to load tabs from single or multiple flashcard rows
 async function loadCurrentTabs(supabase: ReturnType<typeof getAdminClient>, deckId: string) {

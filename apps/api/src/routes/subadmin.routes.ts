@@ -15,7 +15,7 @@ import {
 const router = Router();
 
 // Middleware: must be SUBADMIN or ADMIN
-router.use(requireAuth, requireRole('SUBADMIN', 'ADMIN'));
+router.use('/subadmin', requireAuth, requireRole('SUBADMIN', 'ADMIN'));
 
 async function canManage(me: any, targetId: string) {
   if (me.role === 'ADMIN') return true;

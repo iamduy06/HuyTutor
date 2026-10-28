@@ -8,7 +8,7 @@ import { memoryCache } from '../../services/cacheService.js';
 import { generatePassword, adminCreateUserSchema, adminUpdateUserSchema } from '@huytutor/shared';
 
 const router = Router();
-router.use(requireAuth, requireRole('ADMIN'));
+router.use('/admin', requireAuth, requireRole('ADMIN'));
 
 // GET /admin/users
 router.get('/admin/users', async (_req: Request, res: Response) => {
