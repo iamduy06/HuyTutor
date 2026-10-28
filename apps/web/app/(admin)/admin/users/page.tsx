@@ -564,6 +564,20 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
           </div>
+          <div className="border-t border-[#f0e0e7] px-4 py-2 bg-gray-50/50">
+            <PaginationControls
+              currentPage={page}
+              totalPages={pagination?.totalPages ?? 1}
+              pageSize={pageSize}
+              totalItems={pagination?.totalItems ?? users.length}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              itemName="người dùng"
+            />
+          </div>
         </div>
       )}
 

@@ -460,6 +460,23 @@ export default function AdminSubAdminsPage() {
             )}
           </div>
         ))}
+
+        {filteredGroups.length > 0 && (
+          <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] px-4 py-2 mt-4 shadow-sm">
+            <PaginationControls
+              currentPage={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={filteredGroups.length}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              itemName="nhóm"
+            />
+          </div>
+        )}
       </div>
 
       {/* ════ MODALS: GROUP ACTIONS ════ */}
