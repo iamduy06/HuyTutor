@@ -41,7 +41,8 @@ export async function apiRequest<T>(
   }
 
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${normalizedEndpoint}`;
+  const base = BASE_URL || (typeof window !== 'undefined' ? '/api' : '');
+  const url = endpoint.startsWith('http') ? endpoint : `${base}${normalizedEndpoint}`;
 
   const response = await fetch(url, {
     ...options,
