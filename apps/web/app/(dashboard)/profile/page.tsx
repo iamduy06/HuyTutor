@@ -15,9 +15,10 @@ export default function ProfilePage() {
   const { user, loading } = useUser();
   const { isSystemAdmin, isSystemSubadmin, isGroupActive, effectiveRoleLabel } = useSubadmin();
   const { toast } = useToast();
-  const [newPw,    setNewPw]    = useState("");
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
-  const [saving,   setSaving]   = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (loading) {
     return (
@@ -30,14 +31,26 @@ export default function ProfilePage() {
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
-    if (newPw !== confirmPw) { toast({ title: "Mật khẩu không khớp", variant: "destructive" }); return; }
-    if (newPw.length < 6)   { toast({ title: "Mật khẩu tối thiểu 6 ký tự", variant: "destructive" }); return; }
+    if (!currentPw) {
+      toast({ title: "Vui lòng nhập mật khẩu hiện tại", variant: "destructive" });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      toast({ title: "Mật khẩu mới không khớp", variant: "destructive" });
+      return;
+    }
+    if (newPw.length < 6) {
+      toast({ title: "Mật khẩu tối thiểu 6 ký tự", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
-    
+
     // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;
@@ -46,19 +59,26 @@ export default function ProfilePage() {
     const response = await fetch("/api/auth/update-password", {
       method: "POST",
       headers,
-      body: JSON.stringify({ password: newPw }),
+      body: JSON.stringify({
+        password: newPw,
+        current_password: currentPw,
+      }),
     });
 
     const result = await response.json();
     setSaving(false);
 
-    if (!response.ok) { 
-      toast({ title: "Thất bại", description: result.error || "Có lỗi xảy ra", variant: "destructive" }); 
-    }
-    else { 
-      toast({ title: "Đổi mật khẩu thành công 🎉" }); 
-      setNewPw(""); 
-      setConfirmPw(""); 
+    if (!response.ok) {
+      const errMsg =
+        typeof result?.error === "string"
+          ? result.error
+          : result?.error?.message || "Có lỗi xảy ra";
+      toast({ title: "Thất bại", description: errMsg, variant: "destructive" });
+    } else {
+      toast({ title: "Đổi mật khẩu thành công 🎉" });
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
     }
   }
 
@@ -66,8 +86,8 @@ export default function ProfilePage() {
   const getBadgeStyles = () => {
     if (isSystemAdmin) return "bg-purple-100 text-purple-700 ring-1 ring-purple-200";
     if (isSystemSubadmin) {
-      return isGroupActive 
-        ? "bg-green-100 text-green-700 ring-1 ring-green-200" 
+      return isGroupActive
+        ? "bg-green-100 text-green-700 ring-1 ring-green-200"
         : "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200";
     }
     return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
@@ -82,11 +102,19 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-4">
           {[
             { icon: <Mail className="w-5 h-5 text-brand" />, label: "Email", value: user.email },
-            { icon: <Calendar className="w-5 h-5 text-brand" />, label: "Ngày tham gia", value: formatDate(user.created_at) },
-            { icon: <Shield className="w-5 h-5 text-brand" />, label: "Vai trò hoạt động",
+            {
+              icon: <Calendar className="w-5 h-5 text-brand" />,
+              label: "Ngày tham gia",
+              value: formatDate(user.created_at),
+            },
+            {
+              icon: <Shield className="w-5 h-5 text-brand" />,
+              label: "Vai trò hoạt động",
               value: (
                 <div className="flex flex-col gap-1">
-                  <span className={`inline-flex items-center w-fit text-[11px] font-bold px-3 py-1 rounded-full ${getBadgeStyles()}`}>
+                  <span
+                    className={`inline-flex items-center w-fit text-[11px] font-bold px-3 py-1 rounded-full ${getBadgeStyles()}`}
+                  >
                     {isSystemAdmin && "🛡️ "}
                     {effectiveRoleLabel}
                   </span>
@@ -94,11 +122,13 @@ export default function ProfilePage() {
                     (Phân quyền dựa trên vai trò hệ thống và nhóm quản lý)
                   </span>
                 </div>
-              )
+              ),
             },
-          ].map(row => (
+          ].map((row) => (
             <div key={row.label} className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">{row.icon}</div>
+              <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                {row.icon}
+              </div>
               <div>
                 <div className="text-xs text-muted-foreground font-medium">{row.label}</div>
                 <div className="font-semibold text-[#1a1a2e] leading-tight">{row.value}</div>
@@ -114,14 +144,37 @@ export default function ProfilePage() {
         </h2>
         <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
           <div>
-            <Label>Mật khẩu mới</Label>
-            <Input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự" required className="mt-1" />
+            <Label>Mật khẩu hiện tại</Label>
+            <Input
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              placeholder="Nhập mật khẩu đang dùng"
+              required
+              className="mt-1"
+            />
           </div>
           <div>
-            <Label>Xác nhận mật khẩu</Label>
-            <Input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
-              placeholder="Nhập lại" required className="mt-1" />
+            <Label>Mật khẩu mới</Label>
+            <Input
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              placeholder="Tối thiểu 6 ký tự"
+              required
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label>Xác nhận mật khẩu mới</Label>
+            <Input
+              type="password"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              placeholder="Nhập lại mật khẩu mới"
+              required
+              className="mt-1"
+            />
           </div>
           <Button type="submit" variant="brand" className="w-full rounded-full" disabled={saving}>
             {saving ? (
@@ -130,7 +183,7 @@ export default function ProfilePage() {
                 Đang xử lý...
               </>
             ) : (
-              "Cập nhật"
+              "Cập nhật mật khẩu"
             )}
           </Button>
         </form>

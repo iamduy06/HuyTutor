@@ -7,7 +7,14 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "flashcard.huytutor.edu.vn" },
+      { protocol: "https", hostname: "flashcard2.huytutor.edu.vn" },
+      { protocol: "https", hostname: "supabase-proxy.huynhthanhduy06.workers.dev" },
+      { protocol: "https", hostname: "*.supabase.co" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
   },
   transpilePackages: ["@huytutor/shared"],
   async rewrites() {

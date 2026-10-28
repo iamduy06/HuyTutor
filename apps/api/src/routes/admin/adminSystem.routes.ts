@@ -6,6 +6,7 @@ import { getAdminClient } from '../../config/supabase.js';
 import { parseDateToISO, parseStringArray } from '../../utils/importUtils.js';
 import * as XLSX from 'xlsx';
 import { validate } from '../../middlewares/validate.js';
+import { exportLimiter } from '../../middlewares/rateLimiter.js';
 import { adminExportQuerySchema, adminAppSettingsSchema, generatePassword } from '@huytutor/shared';
 
 const router = Router();
@@ -394,7 +395,7 @@ router.post('/admin/import/groups', async (req: Request, res: Response) => {
 // ─── EXPORT ──────────────────────────────────────────────────────────────────
 
 // GET /admin/export
-router.get('/admin/export', validate({ query: adminExportQuerySchema }), async (req: Request, res: Response) => {
+router.get('/admin/export', exportLimiter, validate({ query: adminExportQuerySchema }), async (req: Request, res: Response) => {
   const type = req.query.type as string;
   const format = (req.query.format as string) ?? 'json_full';
   const supabase = getAdminClient();

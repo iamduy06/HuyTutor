@@ -92,7 +92,7 @@ export function ResetPasswordForm() {
     const response = await fetch("/api/auth/update-password", {
       method: "POST",
       headers,
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password, is_recovery: true }),
     });
 
     const result = await response.json();

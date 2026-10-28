@@ -96,12 +96,17 @@ router.get('/decks/demo', validate({ query: getDeckDemoQuerySchema }), async (re
 
   const { data: deck } = await admin
     .from('decks')
-    .select('id, title, description, level')
+    .select('id, title, description, level, access_level')
     .eq('id', deckId)
     .single();
 
   if (!deck) {
     return res.status(404).json({ error: 'Not found' });
+  }
+
+  const levels = (deck.access_level as any) || {};
+  if (!levels.preview && !levels.public) {
+    return res.status(403).json({ error: 'Bộ đề này không hỗ trợ chế độ xem thử công khai' });
   }
 
   const { data: rows } = await admin
@@ -220,6 +225,10 @@ router.get('/decks/:id/preview', validate({ params: deckIdParamSchema }), async 
   }
 
   const levels = (deck.access_level as any) || {};
+  if (!levels.preview && !levels.public) {
+    return res.status(403).json({ error: 'Bộ đề này không hỗ trợ chế độ xem thử công khai' });
+  }
+
   const limit = levels.preview_word_limit || 10;
 
   const { data: rows } = await admin

@@ -5,11 +5,15 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { corsOptions } from './middlewares/cors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { globalLimiter } from './middlewares/rateLimiter.js';
 import apiRouter from './routes/index.js';
 import { APP_NAME } from '@huytutor/shared';
 
 const app = express();
 const port = env.PORT;
+
+// Trust reverse proxy (Render / Cloudflare) to ensure accurate client IP for rate limiting
+app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors(corsOptions));
@@ -27,6 +31,9 @@ const healthHandler = (_req: Request, res: Response) => {
 };
 app.get('/api/v1/health', healthHandler);
 app.get('/health', healthHandler);
+
+// Apply global rate limiter to all API endpoints
+app.use('/api/v1', globalLimiter);
 
 // Main API Router under /api/v1 and root fallback
 app.use('/api/v1', apiRouter);

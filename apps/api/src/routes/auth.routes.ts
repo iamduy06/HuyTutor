@@ -3,13 +3,15 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
 import { registerDeviceSchema, updatePasswordSchema } from '@huytutor/shared';
-import { getAdminClient } from '../config/supabase.js';
+import { getAdminClient, getSupabaseClient } from '../config/supabase.js';
+import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
 
 // POST /auth/register-device
 router.post(
   '/auth/register-device',
+  authLimiter,
   requireAuth,
   validate({ body: registerDeviceSchema }),
   async (req: Request, res: Response) => {
@@ -79,12 +81,36 @@ router.post(
 // POST /auth/update-password
 router.post(
   '/auth/update-password',
+  authLimiter,
   requireAuth,
   validate({ body: updatePasswordSchema }),
   async (req: Request, res: Response) => {
     const user = req.user!;
-    const { password } = req.body;
+    const { password, current_password, is_recovery } = req.body;
     const admin = getAdminClient();
+
+    // SEC-003: If not a password recovery flow, verify current password before updating
+    if (!is_recovery) {
+      if (!current_password) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'CURRENT_PASSWORD_REQUIRED', message: 'Vui lòng nhập mật khẩu hiện tại' },
+        });
+      }
+
+      const anonClient = getSupabaseClient();
+      const { error: signInErr } = await anonClient.auth.signInWithPassword({
+        email: user.email,
+        password: current_password,
+      });
+
+      if (signInErr) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_CURRENT_PASSWORD', message: 'Mật khẩu hiện tại không chính xác' },
+        });
+      }
+    }
 
     const { error } = await admin.auth.admin.updateUserById(user.id, { password });
 
@@ -109,10 +135,8 @@ async function upsertDevice(
   deviceName: string | undefined,
   req: Request
 ) {
-  const ip =
-    (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-    req.socket.remoteAddress ||
-    null;
+  // Use Express trusted req.ip
+  const ip = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || null;
 
   await admin.from('user_devices').upsert(
     {

@@ -30,3 +30,4 @@ CREATE POLICY "Flashcards: authorized full access view" ON public.flashcards FOR
     )
   )
 );
+
