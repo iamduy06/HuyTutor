@@ -212,12 +212,15 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
 
   const password = customPw?.trim() || 'goidangkyflashcard';
 
+  // CRITICAL SECURITY FIX (SEC-002): Subadmins can NEVER create accounts with ADMIN or SUBADMIN role
+  const targetRole = me.role === 'ADMIN' ? role : 'USER';
+
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: {
-      role,
+      role: targetRole,
       skip_system_group: true,
     },
   });
@@ -229,7 +232,7 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
   const userId = authUser.user.id;
 
   await Promise.all([
-    admin.from('users').upsert({ id: userId, email, role }, { onConflict: 'id' }),
+    admin.from('users').upsert({ id: userId, email, role: targetRole }, { onConflict: 'id' }),
     admin.from('group_users').insert({ group_id: targetGroupId, user_id: userId, is_subadmin: false }),
   ]);
 
@@ -356,6 +359,10 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
 
   if (body.action === 'change_role') {
     const { role } = body;
+    // CRITICAL SECURITY FIX (SEC-002): Subadmins can NEVER assign ADMIN role!
+    if (!role || !['USER', 'SUBADMIN'].includes(role) || (me.role !== 'ADMIN' && role === 'ADMIN')) {
+      return res.status(403).json({ error: 'Forbidden: Bạn chỉ có thể phân quyền USER hoặc SUBADMIN' });
+    }
     const { error: roleErr } = await admin.from('users').update({ role }).eq('id', id);
     if (roleErr) return res.status(400).json({ error: roleErr.message });
 
@@ -539,7 +546,12 @@ router.get('/subadmin/branding', async (req: Request, res: Response) => {
 router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const admin = getAdminClient();
-  const { group_id, branding } = req.body;
+  const { group_id } = req.body;
+  const brandingData = req.body.branding || {
+    header_logo_text: req.body.header_logo_text ?? null,
+    show_header: req.body.show_header ?? true,
+    show_footer: req.body.show_footer ?? true,
+  };
 
   if (!group_id) {
     return res.status(400).json({ error: 'group_id required' });
@@ -559,9 +571,20 @@ router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), a
     }
   }
 
+  const { data: existingGroup } = await admin
+    .from('groups')
+    .select('branding')
+    .eq('id', group_id)
+    .single();
+
+  const safeBranding = {
+    ...brandingData,
+    allow_custom_branding: existingGroup?.branding?.allow_custom_branding ?? (me.role === 'ADMIN'),
+  };
+
   const { error } = await admin
     .from('groups')
-    .update({ branding })
+    .update({ branding: safeBranding })
     .eq('id', group_id);
 
   if (error) return res.status(500).json({ error: error.message });
