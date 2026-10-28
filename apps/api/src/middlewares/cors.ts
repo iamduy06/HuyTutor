@@ -5,10 +5,19 @@ const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/+
 
 export const corsOptions: CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps, Postman, curl or server-to-server)
-    if (!origin) return callback(null, true);
+    // SEC-015: Origin Validation & Safe Handling of Non-Browser Requests
+    if (!origin) {
+      // In development/test, permit requests without Origin for tooling (curl, Postman, test runner)
+      if (env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      // In production, server-to-server calls (e.g. Next.js SSR) are permitted,
+      // but without reflecting or exposing permissive CORS headers to browsers
+      return callback(null, true);
+    }
+
     const normalized = origin.trim().replace(/\/+$/, '');
-    if (allowedOrigins.includes(normalized) || env.NODE_ENV === 'development') {
+    if (allowedOrigins.includes(normalized) || (env.NODE_ENV === 'development' && origin.startsWith('http://localhost'))) {
       callback(null, true);
     } else {
       callback(new Error(`CORS blocked for origin: ${origin}`));

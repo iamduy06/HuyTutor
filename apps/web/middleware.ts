@@ -32,8 +32,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
+  // SEC-016: Use getUser() instead of getSession() for server-side cryptographic verification
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = user ? await supabase.auth.getSession() : { data: { session: null } };
 
   // ── Inject Bearer Token cho các API routes chuyển tiếp sang Express Backend ─
   if (path.startsWith("/api/")) {

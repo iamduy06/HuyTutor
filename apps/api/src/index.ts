@@ -15,12 +15,7 @@ const port = env.PORT;
 // Trust reverse proxy (Render / Cloudflare) to ensure accurate client IP for rate limiting
 app.set('trust proxy', 1);
 
-app.use(helmet());
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Health check endpoint for Render monitoring
+// Health check endpoint for Render monitoring (exempt from CORS and rate limiting)
 const healthHandler = (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
@@ -31,6 +26,11 @@ const healthHandler = (_req: Request, res: Response) => {
 };
 app.get('/api/v1/health', healthHandler);
 app.get('/health', healthHandler);
+
+app.use(helmet());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply global rate limiter to all API endpoints
 app.use('/api/v1', globalLimiter);
