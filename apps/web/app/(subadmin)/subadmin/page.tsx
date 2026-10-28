@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import { Users, BookOpen, UserPlus } from "lucide-react";
 import Link from "next/link";
@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
 export default async function SubAdminPage() {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) redirect("/login");
+  const token = await getServerToken();
+  if (!token) redirect("/login");
 
   const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/subadmin/overview`, {
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
   });

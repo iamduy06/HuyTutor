@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useUser, getSupabaseClient } from "@/components/common/UserContext";
+import { useUser } from "@/components/common/UserContext";
+import { logoutApi } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
@@ -24,23 +25,7 @@ export function SiteHeader() {
   }
 
   async function handleLogout() {
-    try {
-      await getSupabaseClient().auth.signOut();
-    } catch {
-    }
-
-    try {
-      document.cookie.split(";").forEach(cookie => {
-        const name = cookie.split("=")[0].trim();
-        if (name.startsWith("sb-") || name.includes("supabase")) {
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-        }
-      });
-    } catch {
-    }
-
-    window.location.href = "/";
+    await logoutApi();
   }
 
   const customLogoText = branding?.allow_custom_branding ? branding.header_logo_text : null;

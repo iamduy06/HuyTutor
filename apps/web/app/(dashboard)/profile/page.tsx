@@ -5,7 +5,7 @@ import { Loader2, Mail, Calendar, Shield, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
+import { getClientToken } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
 import { useSubadmin } from "@/hooks/use-subadmin";
@@ -46,14 +46,10 @@ export default function ProfilePage() {
     setSaving(true);
     toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
 
-    // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const token = getClientToken();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (session?.access_token) {
-      headers["Authorization"] = `Bearer ${session.access_token}`;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch("/api/auth/update-password", {

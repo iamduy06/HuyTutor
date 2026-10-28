@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import { LayoutDashboard, Users, Shield, Paintbrush2 } from "lucide-react";
 import { SiteHeader } from "@/components/common/SiteHeader";
@@ -11,9 +11,8 @@ const baseNavItems = [
 ];
 
 export default async function SubAdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) redirect("/login");
+  const token = await getServerToken();
+  if (!token) redirect("/login");
 
   const apiUrl = getApiUrl();
   let hasBrandingAccess = false;
@@ -21,7 +20,7 @@ export default async function SubAdminLayout({ children }: { children: React.Rea
   try {
     const res = await fetch(`${apiUrl}/subadmin/overview`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
       cache: "no-store",
       signal: AbortSignal.timeout(10000),

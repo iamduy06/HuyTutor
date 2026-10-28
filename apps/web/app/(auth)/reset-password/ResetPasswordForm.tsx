@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, KeyRound, Mail } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Eye, EyeOff, Loader2, CheckCircle, KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { verifyOtpApi, resetPasswordApi } from "@/lib/auth";
 
 export function ResetPasswordForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -24,49 +23,52 @@ export function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // Pre-fill email from URL if available
   useEffect(() => {
     const emailParam = searchParams.get("email");
     if (emailParam) setEmail(emailParam);
   }, [searchParams]);
 
-  // Handle OTP Verification
+  // Step 1: Verify OTP
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !otp) {
-      toast({ title: "Vui lòng nhập đầy đủ thông tin", variant: "destructive" });
+      toast({ title: "Vui lòng nhập đầy đủ email và mã OTP", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    const supabase = createClient();
-    
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: "recovery",
-    });
 
-    setLoading(false);
-
-    if (error) {
-      toast({
-        title: "Xác thực thất bại",
-        description: error.message === "Token has expired or is invalid" 
-          ? "Mã OTP không hợp lệ hoặc đã hết hạn." 
-          : error.message,
-        variant: "destructive",
+    try {
+      const res = await verifyOtpApi({
+        email,
+        token: otp,
+        type: "recovery",
       });
-      return;
-    }
 
-    if (data.session) {
+      setLoading(false);
+
+      if (!res.success) {
+        toast({
+          title: "Xác thực thất bại",
+          description: res.error?.message || "Mã OTP không hợp lệ hoặc đã hết hạn.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({ title: "Xác thực mã OTP thành công! 🎉" });
       setStep("reset");
+    } catch (err: any) {
+      setLoading(false);
+      toast({
+        title: "Lỗi kết nối",
+        description: "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   }
 
-  // Handle Password Update
+  // Step 2: Handle Password Update
   async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
@@ -79,41 +81,35 @@ export function ResetPasswordForm() {
     }
 
     setLoading(true);
-    toast({ title: "Đang cập nhật mật khẩu...", description: "Vui lòng đợi giây lát." });
-    
-    // Gọi API Bridge thay vì SDK Client để bypass SMTP delay
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (session?.access_token) {
-      headers["Authorization"] = `Bearer ${session.access_token}`;
-    }
 
-    const response = await fetch("/api/auth/update-password", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ password, is_recovery: true }),
-    });
+    try {
+      const res = await resetPasswordApi({
+        email,
+        token: otp,
+        new_password: password,
+      });
 
-    const result = await response.json();
+      setLoading(false);
 
-    if (!response.ok) {
+      if (!res.success) {
+        toast({
+          title: "Đặt lại mật khẩu thất bại",
+          description: res.error?.message || "Có lỗi xảy ra khi đổi mật khẩu.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setDone(true);
+      toast({ title: "Mật khẩu đã được cập nhật thành công 🎉" });
+    } catch (err: any) {
       setLoading(false);
       toast({
-        title: "Đặt lại mật khẩu thất bại",
-        description: result.error || "Có lỗi xảy ra",
+        title: "Lỗi kết nối",
+        description: "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.",
         variant: "destructive",
       });
-      return;
     }
-
-    // Hiển thị thành công ngay lập tức để cải thiện UX
-    setDone(true);
-    setLoading(false);
-    toast({ title: "Mật khẩu đã được cập nhật thành công 🎉" });
-
-    // Đăng xuất ngầm để dọn dẹp session quay lại màn hình login
-    supabase.auth.signOut().catch(console.error);
   }
 
   // Success Screen
@@ -138,103 +134,108 @@ export function ResetPasswordForm() {
   if (step === "verify") {
     return (
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-brand-light rounded-lg">
-            <KeyRound className="w-5 h-5 text-brand" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-[#1a1a2e]">Xác thực OTP</h1>
-            <p className="text-muted-foreground text-[10px] font-medium italic">
-              Nhập mã 6 số được gửi tới email (Mã có hiệu lực trong <strong>5 phút</strong>)
-            </p>
-          </div>
+        <div className="w-12 h-12 bg-brand-light rounded-full flex items-center justify-center mx-auto mb-4">
+          <Mail className="w-6 h-6 text-brand" />
         </div>
+        <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1 text-center">Xác thực mã OTP</h1>
+        <p className="text-muted-foreground text-sm mb-6 text-center">
+          Nhập mã OTP 6 số đã được gửi tới email của bạn.
+        </p>
 
         <form onSubmit={handleVerifyOtp} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email tài khoản</Label>
-            <div className="relative">
-              <Input id="email" type="email" placeholder="you@example.com" required
-                value={email} onChange={(e) => setEmail(e.target.value)}
-                className="pl-9" />
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="mt-1"
+            />
           </div>
 
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="otp">Mã xác thực 6 số</Label>
-            <Input id="otp" type="text" placeholder="------" required maxLength={6}
-              value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              className="text-center text-lg tracking-[0.5em] font-bold" />
+            <Input
+              id="otp"
+              type="text"
+              placeholder="------"
+              required
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="mt-1 text-center text-lg tracking-[0.5em] font-bold h-12"
+            />
           </div>
 
           <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
             {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            Xác thực mã OTP
+            Tiếp tục đặt lại mật khẩu →
           </Button>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Chưa nhận được mã?{" "}
-          <Link href="/forgot-password" className="text-brand font-semibold hover:underline">
-            Gửi lại yêu cầu
+          <Link href="/login" className="text-brand font-semibold hover:underline">
+            Quay lại đăng nhập
           </Link>
         </p>
       </div>
     );
   }
 
-  // Step 2: New Password
+  // Step 2: Reset Password Form
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
-      <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1">Thiết lập mật khẩu mới</h1>
-      <p className="text-muted-foreground text-sm mb-6">Nhập mật khẩu mới an toàn cho tài khoản của bạn.</p>
+      <div className="w-12 h-12 bg-brand-light rounded-full flex items-center justify-center mx-auto mb-4">
+        <KeyRound className="w-6 h-6 text-brand" />
+      </div>
+      <h1 className="text-2xl font-extrabold text-[#1a1a2e] mb-1 text-center">Mật khẩu mới</h1>
+      <p className="text-muted-foreground text-sm mb-6 text-center">
+        Nhập mật khẩu mới cho tài khoản <strong className="text-brand">{email}</strong>.
+      </p>
 
-      <form onSubmit={handleUpdatePassword} className="flex flex-col gap-4">
+      <form onSubmit={handleUpdatePassword} className="space-y-4">
         <div>
-          <Label htmlFor="password">Mật khẩu mới</Label>
+          <Label htmlFor="new-pw">Mật khẩu mới</Label>
           <div className="relative mt-1">
-            <Input id="password" type={showPw ? "text" : "password"} required
-              value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự" />
-            <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <Input
+              id="new-pw"
+              type={showPw ? "text" : "password"}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPw((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
+
         <div>
-          <Label htmlFor="confirm">Xác nhận mật khẩu</Label>
-          <Input id="confirm" type="password" required className="mt-1"
-            value={confirm} onChange={(e) => setConfirm(e.target.value)}
-            placeholder="Nhập lại mật khẩu mới" />
+          <Label htmlFor="confirm-pw">Xác nhận mật khẩu</Label>
+          <Input
+            id="confirm-pw"
+            type="password"
+            required
+            className="mt-1"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="••••••••"
+          />
         </div>
 
-        {/* Strength indicator */}
-        {password.length > 0 && (
-          <div className="flex gap-1">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
-                i < Math.min(4, Math.floor(password.length / 3))
-                  ? password.length < 6 ? "bg-red-400" : password.length < 10 ? "bg-yellow-400" : "bg-green-500"
-                  : "bg-gray-200"
-              }`} />
-            ))}
-            <span className="text-xs text-muted-foreground ml-1">
-              {password.length < 6 ? "Quá ngắn" : password.length < 10 ? "Trung bình" : "Mạnh"}
-            </span>
-          </div>
-        )}
-
         <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Đang xử lý...
-            </>
-          ) : (
-            "Cập nhật mật khẩu"
-          )}
+          {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+          Cập nhật mật khẩu
         </Button>
       </form>
     </div>

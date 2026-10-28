@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import { FACEBOOK_URL } from "@/lib/constants";
 import { FlashcardPlayer } from "@/components/flashcard/FlashcardPlayer";
@@ -11,9 +11,7 @@ interface Props { params: Promise<{ id: string }> }
 
 export default async function DeckDetailPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getServerToken();
 
   const apiUrl = getApiUrl();
 

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { hasFullAccess, formatDate } from "@/lib/utils";
 import { getApiUrl } from "@/lib/apiUrl";
 import { Flame, BookOpen, Trophy, Clock } from "lucide-react";
@@ -18,9 +18,8 @@ export const dynamic = "force-dynamic";
 
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) redirect("/login");
+  const token = await getServerToken();
+  if (!token) redirect("/login");
 
   const apiUrl = getApiUrl();
   let dashboardData: any = null;
@@ -28,7 +27,7 @@ export default async function DashboardPage() {
   try {
     const res = await fetch(`${apiUrl}/me/dashboard`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
       cache: "no-store",
       signal: AbortSignal.timeout(15000),
@@ -44,7 +43,7 @@ export default async function DashboardPage() {
     console.error("[Dashboard] Failed to fetch /me/dashboard:", err);
   }
 
-  const profile = dashboardData?.profile ?? { email: session.user.email };
+  const profile = dashboardData?.profile ?? { email: "" };
   const filteredUserDecks = dashboardData?.userDecks ?? [];
   const extraPublicDecks = dashboardData?.extraPublicDecks ?? [];
   const wordCountMap = dashboardData?.wordCountMap ?? {};

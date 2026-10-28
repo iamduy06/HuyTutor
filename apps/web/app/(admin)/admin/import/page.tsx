@@ -7,7 +7,6 @@ import {
   Copy, Info, ChevronDown, ChevronUp, Search, List, 
   Menu, X
 } from "lucide-react";
-import { getSupabaseClient } from "@/components/common/UserContext";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";

@@ -3,7 +3,7 @@ import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/common/Providers";
 import { Toaster } from "@/components/ui/toaster";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 
 const bricolage = Bricolage_Grotesque({
@@ -28,16 +28,15 @@ export default async function RootLayout({
 }) {
   // Đọc session từ cookie server-side → truyền xuống client
   // Không có round-trip → không flash
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const token = await getServerToken();
 
   let initialUser = null;
-  if (session?.access_token) {
+  if (token) {
     const apiUrl = getApiUrl();
     try {
       const res = await fetch(`${apiUrl}/me/profile`, {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         cache: "no-store",
       });

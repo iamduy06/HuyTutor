@@ -1,6 +1,6 @@
-import { createClient } from './supabase/client.js';
 import { getApiUrl } from './apiUrl';
 import { getDeviceId } from './device';
+import { getClientToken, logoutApi } from './auth';
 
 const BASE_URL = getApiUrl();
 
@@ -17,18 +17,15 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const token = getClientToken();
 
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
-  if (session?.access_token) {
-    headers.set('Authorization', `Bearer ${session.access_token}`);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   // SEC-007: Attach device ID header to bind request to registered device
@@ -63,11 +60,7 @@ export async function apiRequest<T>(
     // SEC-007: If device was revoked by admin, terminate session and force redirect to login
     if (response.status === 401 && code === 'DEVICE_REVOKED') {
       if (typeof window !== 'undefined') {
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          /* Ignore signOut errors */
-        }
+        logoutApi();
         window.location.href = '/login?error=device_revoked';
       }
     }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import {
   Shield
@@ -9,9 +9,8 @@ import { SiteHeader } from "@/components/common/SiteHeader";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) redirect("/login");
+  const token = await getServerToken();
+  if (!token) redirect("/login");
 
   const apiUrl = getApiUrl();
   let user: any = null;
@@ -19,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   try {
     const res = await fetch(`${apiUrl}/me/profile`, {
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
       cache: "no-store",
       signal: AbortSignal.timeout(10000),

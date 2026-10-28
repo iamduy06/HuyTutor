@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { registerApi, verifyOtpApi } from "@/lib/auth";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [otp, setOtp] = useState("");
@@ -30,33 +31,35 @@ export default function RegisterPage() {
       return;
     }
     setLoading(true);
-    const supabase = createClient();
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        // Mặc định Supabase sẽ gửi mã OTP nếu template được cấu hình đúng
-        emailRedirectTo: `${window.location.origin}/login`,
-      },
-    });
+    try {
+      const res = await registerApi({
+        email,
+        password,
+        full_name: fullName.trim() || email.split("@")[0],
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (error) {
-      toast({ title: "Đăng ký thất bại", description: error.message, variant: "destructive" });
-      return;
+      if (!res.success) {
+        toast({
+          title: "Đăng ký thất bại",
+          description: res.error?.message || "Không thể tạo tài khoản. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setStep("verify");
+      toast({ title: "Vui lòng kiểm tra mã OTP trong email! 📬" });
+    } catch (err: any) {
+      setLoading(false);
+      toast({
+        title: "Lỗi kết nối",
+        description: "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
-
-    // Nếu có session ngay (email confirm off) -> vào dashboard
-    if (data.session) {
-      window.location.href = "/dashboard";
-      return;
-    }
-
-    // Chuyển sang bước xác thực OTP
-    setStep("verify");
-    toast({ title: "Vui lòng kiểm tra mã OTP trong email! 📬" });
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
@@ -67,28 +70,35 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: "signup",
-    });
 
-    setLoading(false);
+    try {
+      const res = await verifyOtpApi({
+        email,
+        token: otp,
+        type: "signup",
+      });
 
-    if (error) {
+      setLoading(false);
+
+      if (!res.success) {
+        toast({
+          title: "Xác thực thất bại",
+          description: res.error?.message || "Mã OTP không chính xác hoặc đã hết hạn.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Đăng ký và xác thực thành công! 🎉" });
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      setLoading(false);
       toast({
-        title: "Xác thực thất bại",
-        description: error.message === "Token has expired or is invalid" 
-          ? "Mã OTP không chính xác hoặc đã hết hạn." 
-          : error.message,
+        title: "Lỗi xác thực",
+        description: "Đã có lỗi xảy ra khi xác thực mã OTP.",
         variant: "destructive",
       });
-      return;
     }
-
-    toast({ title: "Đăng ký và xác thực thành công! 🎉" });
-    window.location.href = "/dashboard";
   }
 
   // ── Bước 2: Xác thực OTP ──────────────────────────────────────────
@@ -110,9 +120,16 @@ export default function RegisterPage() {
         <form onSubmit={handleVerifyOtp} className="space-y-4">
           <div className="space-y-2 text-left">
             <Label htmlFor="otp">Mã xác thực 6 số</Label>
-            <Input id="otp" type="text" placeholder="------" required maxLength={6}
-              value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              className="text-center text-lg tracking-[0.5em] font-bold h-12" />
+            <Input
+              id="otp"
+              type="text"
+              placeholder="------"
+              required
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="text-center text-lg tracking-[0.5em] font-bold h-12"
+            />
           </div>
 
           <Button type="submit" variant="brand" className="w-full rounded-full" disabled={loading}>
@@ -123,8 +140,11 @@ export default function RegisterPage() {
 
         <p className="text-xs text-muted-foreground mt-6">
           Nhập sai email?{" "}
-          <button onClick={() => setStep("form")}
-            className="text-brand font-semibold hover:underline">
+          <button
+            type="button"
+            onClick={() => setStep("form")}
+            className="text-brand font-semibold hover:underline"
+          >
             Quay lại đăng ký
           </button>
         </p>
@@ -139,26 +159,62 @@ export default function RegisterPage() {
       <p className="text-muted-foreground text-sm mb-6">Tạo tài khoản để theo dõi tiến độ.</p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
+          <Label htmlFor="fullName">Họ và tên</Label>
+          <Input
+            id="fullName"
+            type="text"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Nguyễn Văn A"
+            className="mt-1"
+          />
+        </div>
+        <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" required
-            value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com" className="mt-1" />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="mt-1"
+          />
         </div>
         <div>
           <Label htmlFor="pw">Mật khẩu</Label>
           <div className="relative mt-1">
-            <Input id="pw" type={showPw ? "text" : "password"} required
-              value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-            <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <Input
+              id="pw"
+              type={showPw ? "text" : "password"}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPw((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
         <div>
           <Label htmlFor="confirm">Xác nhận mật khẩu</Label>
-          <Input id="confirm" type="password" required className="mt-1"
-            value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="••••••••" />
+          <Input
+            id="confirm"
+            type="password"
+            required
+            className="mt-1"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="••••••••"
+          />
         </div>
         <Button type="submit" variant="brand" className="w-full rounded-full mt-2" disabled={loading}>
           {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -167,7 +223,9 @@ export default function RegisterPage() {
       </form>
       <p className="text-center text-sm text-muted-foreground mt-6">
         Đã có tài khoản?{" "}
-        <Link href="/login" className="text-brand font-semibold hover:underline">Đăng nhập</Link>
+        <Link href="/login" className="text-brand font-semibold hover:underline">
+          Đăng nhập
+        </Link>
       </p>
     </div>
   );

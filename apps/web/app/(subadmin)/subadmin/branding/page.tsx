@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import SubAdminBrandingClient from "./client";
 
 export default async function SubAdminBrandingPage() {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) redirect("/login");
+  const token = await getServerToken();
+  if (!token) redirect("/login");
 
   const apiUrl = getApiUrl();
   const res = await fetch(`${apiUrl}/subadmin/overview`, {
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
   });
