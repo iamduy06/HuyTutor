@@ -50,9 +50,9 @@ router.post(
     // 2. Fetch profile from public.users
     const { data: profile } = await admin
       .from('users')
-      .select('role, max_devices, full_name')
+      .select('role, max_devices')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const role = (profile?.role as UserRole) ?? 'USER';
 
@@ -129,7 +129,7 @@ router.post(
         id: user.id,
         email: user.email,
         role,
-        full_name: profile?.full_name ?? user.user_metadata?.full_name ?? '',
+        full_name: (user.user_metadata?.full_name as string) ?? '',
       },
       session: {
         access_token: session.access_token,
@@ -170,7 +170,6 @@ router.post(
       await admin.from('users').upsert({
         id: data.user.id,
         email,
-        full_name,
         role: 'USER',
       }, { onConflict: 'id' });
     }
@@ -209,9 +208,9 @@ router.post(
 
     const { data: profile } = await admin
       .from('users')
-      .select('role, full_name')
+      .select('role')
       .eq('id', data.user.id)
-      .single();
+      .maybeSingle();
 
     return res.status(200).json({
       success: true,
@@ -219,7 +218,7 @@ router.post(
         id: data.user.id,
         email: data.user.email,
         role: profile?.role ?? 'USER',
-        full_name: profile?.full_name ?? data.user.user_metadata?.full_name ?? '',
+        full_name: (data.user.user_metadata?.full_name as string) ?? '',
       },
       session: data.session ? {
         access_token: data.session.access_token,
@@ -345,9 +344,9 @@ router.get('/auth/me', requireAuth, async (req: Request, res: Response) => {
 
   const { data: profile } = await admin
     .from('users')
-    .select('id, email, role, full_name, created_at')
+    .select('id, email, role, created_at')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   return res.status(200).json({
     success: true,
@@ -355,7 +354,7 @@ router.get('/auth/me', requireAuth, async (req: Request, res: Response) => {
       id: user.id,
       email: user.email,
       role: user.role,
-      full_name: profile?.full_name ?? '',
+      full_name: (user as any).user_metadata?.full_name ?? '',
     },
   });
 });
