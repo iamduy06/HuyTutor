@@ -76,7 +76,7 @@ export default function AdminDecksPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  const { data: deckData, isLoading } = useQuery({
+  const { data: deckData, isLoading, isFetching } = useQuery({
     queryKey: ["admin-decks", page, pageSize],
     queryFn: () => fetchAdminDecks(page, pageSize),
     placeholderData: (prev) => prev,
@@ -395,7 +395,7 @@ export default function AdminDecksPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className={`flex flex-col gap-4 transition-opacity duration-150 ${isFetching && !isLoading ? 'opacity-60' : ''}`}>
           {(decks as Deck[]).map((deck) => {
             const detail   = deckDetail[deck.id];
             const expanded = expandedDeck === deck.id;
@@ -573,6 +573,7 @@ export default function AdminDecksPage() {
                   setPageSize(s);
                   setPage(1);
                 }}
+                isLoading={isFetching}
                 itemName="bộ Flashcard"
               />
             </div>

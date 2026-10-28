@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { startGlobalLoading, finishGlobalLoading } from "@/lib/loading";
 
 export interface PaginationControlsProps {
   currentPage: number;
@@ -28,6 +30,7 @@ export interface PaginationControlsProps {
   itemName?: string;
   className?: string;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
 export function PaginationControls({
@@ -41,6 +44,7 @@ export function PaginationControls({
   itemName = "mục",
   className = "",
   disabled = false,
+  isLoading = false,
 }: PaginationControlsProps) {
   const [jumpPage, setJumpPage] = useState<string>(String(currentPage));
 
@@ -49,8 +53,28 @@ export function PaginationControls({
     setJumpPage(String(currentPage));
   }, [currentPage]);
 
+  // Finish global loading bar when data query finishes
+  useEffect(() => {
+    if (!isLoading) {
+      finishGlobalLoading();
+    }
+  }, [isLoading]);
+
+  const handlePageSelect = (page: number) => {
+    if (page === currentPage || disabled || isLoading) return;
+    startGlobalLoading();
+    onPageChange(page);
+  };
+
+  const handlePageSizeSelect = (newLimit: number) => {
+    if (newLimit === pageSize || disabled || isLoading) return;
+    startGlobalLoading();
+    onPageSizeChange(newLimit);
+  };
+
   const handleJump = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (disabled || isLoading) return;
     const parsed = parseInt(jumpPage.trim(), 10);
     if (isNaN(parsed)) {
       setJumpPage(String(currentPage));
@@ -60,6 +84,7 @@ export function PaginationControls({
     const validPage = Math.min(Math.max(1, parsed), safeTotal);
     setJumpPage(String(validPage));
     if (validPage !== currentPage) {
+      startGlobalLoading();
       onPageChange(validPage);
     }
   };
@@ -100,6 +125,7 @@ export function PaginationControls({
   const fromItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const toItem = Math.min(currentPage * pageSize, totalItems);
   const safeTotalPages = Math.max(1, totalPages);
+  const isBusy = disabled || isLoading;
 
   return (
     <div
@@ -107,14 +133,20 @@ export function PaginationControls({
     >
       {/* Summary and Page Size Select */}
       <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-        <span className="text-xs sm:text-sm text-gray-500 font-medium">
+        <span className="text-xs sm:text-sm text-gray-500 font-medium flex items-center gap-1.5">
+          {isLoading && (
+            <Loader2 className="w-3.5 h-3.5 text-brand animate-spin" />
+          )}
           {totalItems === 0 ? (
             `Không có ${itemName} nào`
           ) : (
             <>
-              Hiển thị <span className="font-semibold text-gray-900">{fromItem}</span> -{" "}
-              <span className="font-semibold text-gray-900">{toItem}</span> trên tổng số{" "}
-              <span className="font-semibold text-gray-900">{totalItems}</span> {itemName}
+              Hiển thị{" "}
+              <span className="font-semibold text-gray-900">{fromItem}</span> -{" "}
+              <span className="font-semibold text-gray-900">{toItem}</span> trên
+              tổng số{" "}
+              <span className="font-semibold text-gray-900">{totalItems}</span>{" "}
+              {itemName}
             </>
           )}
         </span>
@@ -125,10 +157,10 @@ export function PaginationControls({
             onValueChange={(val) => {
               const newLimit = parseInt(val, 10);
               if (!isNaN(newLimit)) {
-                onPageSizeChange(newLimit);
+                handlePageSizeSelect(newLimit);
               }
             }}
-            disabled={disabled}
+            disabled={isBusy}
           >
             <SelectTrigger className="h-8 w-[100px] text-xs font-semibold bg-white border-gray-200">
               <SelectValue placeholder={`${pageSize} / trang`} />
@@ -153,8 +185,8 @@ export function PaginationControls({
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 border-gray-200 hover:bg-gray-100 hover:text-brand"
-            disabled={disabled || currentPage <= 1}
-            onClick={() => onPageChange(1)}
+            disabled={isBusy || currentPage <= 1}
+            onClick={() => handlePageSelect(1)}
             title="Trang đầu"
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -165,8 +197,8 @@ export function PaginationControls({
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 border-gray-200 hover:bg-gray-100 hover:text-brand"
-            disabled={disabled || currentPage <= 1}
-            onClick={() => onPageChange(currentPage - 1)}
+            disabled={isBusy || currentPage <= 1}
+            onClick={() => handlePageSelect(currentPage - 1)}
             title="Trang trước"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -198,10 +230,14 @@ export function PaginationControls({
                       ? "bg-brand text-white shadow-sm hover:bg-brand/90"
                       : "border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-brand"
                   }`}
-                  disabled={disabled}
-                  onClick={() => onPageChange(p)}
+                  disabled={isBusy}
+                  onClick={() => handlePageSelect(p)}
                 >
-                  {p}
+                  {isCurrent && isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    p
+                  )}
                 </Button>
               );
             })}
@@ -212,8 +248,8 @@ export function PaginationControls({
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 border-gray-200 hover:bg-gray-100 hover:text-brand"
-            disabled={disabled || currentPage >= safeTotalPages}
-            onClick={() => onPageChange(currentPage + 1)}
+            disabled={isBusy || currentPage >= safeTotalPages}
+            onClick={() => handlePageSelect(currentPage + 1)}
             title="Trang sau"
           >
             <ChevronRight className="h-4 w-4" />
@@ -224,8 +260,8 @@ export function PaginationControls({
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 border-gray-200 hover:bg-gray-100 hover:text-brand"
-            disabled={disabled || currentPage >= safeTotalPages}
-            onClick={() => onPageChange(safeTotalPages)}
+            disabled={isBusy || currentPage >= safeTotalPages}
+            onClick={() => handlePageSelect(safeTotalPages)}
             title="Trang cuối"
           >
             <ChevronsRight className="h-4 w-4" />
@@ -246,7 +282,7 @@ export function PaginationControls({
             max={safeTotalPages}
             value={jumpPage}
             onChange={(e) => setJumpPage(e.target.value)}
-            disabled={disabled}
+            disabled={isBusy}
             className="h-8 w-14 text-center text-xs font-bold border-gray-200 px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             placeholder="Số"
           />
@@ -254,14 +290,13 @@ export function PaginationControls({
             type="submit"
             variant="outline"
             size="sm"
-            disabled={disabled}
+            disabled={isBusy}
             className="h-8 px-2.5 text-xs font-bold border-gray-200 hover:bg-brand hover:text-white hover:border-brand transition-colors"
           >
-            Đi
+            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Đi"}
           </Button>
         </form>
       </div>
     </div>
   );
 }
-

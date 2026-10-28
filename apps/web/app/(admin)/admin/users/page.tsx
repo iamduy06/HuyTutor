@@ -133,7 +133,7 @@ export default function AdminUsersPage() {
   const [assignExpiry, setAssignExpiry] = useState("");
 
   // ── Queries ───────────────────────────────────────────────────────────────
-  const { data: userData, isLoading } = useQuery({
+  const { data: userData, isLoading, isFetching } = useQuery({
     queryKey: ["admin-users", page, pageSize, search],
     queryFn: () => fetchUsers(page, pageSize, search),
     placeholderData: (prev) => prev,
@@ -487,8 +487,13 @@ export default function AdminUsersPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden relative">
+          {isFetching && !isLoading && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-brand-light overflow-hidden z-20">
+              <div className="h-full bg-brand animate-pulse w-full" />
+            </div>
+          )}
+          <div className={`overflow-x-auto transition-opacity duration-150 ${isFetching && !isLoading ? 'opacity-60' : ''}`}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa] text-left">
@@ -575,6 +580,7 @@ export default function AdminUsersPage() {
                 setPageSize(s);
                 setPage(1);
               }}
+              isLoading={isFetching}
               itemName="người dùng"
             />
           </div>

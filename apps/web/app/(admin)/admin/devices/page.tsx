@@ -59,7 +59,7 @@ export default function AdminDevicesPage() {
   });
 
   // ── Fetch users + device counts ──
-  const { data: userData, isLoading: usersLoading } = useQuery({
+  const { data: userData, isLoading: usersLoading, isFetching: usersFetching } = useQuery({
     queryKey: ["admin-device-users", page, pageSize, searchEmail],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -249,7 +249,7 @@ export default function AdminDevicesPage() {
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand" /></div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className={`overflow-x-auto transition-opacity duration-150 ${usersFetching && !usersLoading ? 'opacity-60' : ''}`}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#f0e0e7] bg-[#f8f9fa]">
@@ -320,6 +320,7 @@ export default function AdminDevicesPage() {
                 setPageSize(s);
                 setPage(1);
               }}
+              isLoading={usersFetching}
               itemName="người dùng"
             />
           </div>

@@ -116,7 +116,7 @@ export default function SubAdminUsersPage() {
   const [editMaxDevicesLocal, setEditMaxDevicesLocal] = useState("");
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["subadmin-data", page, pageSize, search],
     queryFn: () => fetchData(page, pageSize, search),
     placeholderData: (prev) => prev,
@@ -317,8 +317,13 @@ export default function SubAdminUsersPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand" /></div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-2xl border-2 border-[#f0e0e7] overflow-hidden relative">
+          {isFetching && !isLoading && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-brand-light overflow-hidden z-20">
+              <div className="h-full bg-brand animate-pulse w-full" />
+            </div>
+          )}
+          <div className={`overflow-x-auto transition-opacity duration-150 ${isFetching && !isLoading ? 'opacity-60' : ''}`}>
             <table className="w-full text-sm table-fixed min-w-[1050px]">
               <thead>
                 <tr className="border-b-2 border-[#f0e0e7] bg-[#f8f9fa]">
@@ -496,6 +501,7 @@ export default function SubAdminUsersPage() {
                 setPageSize(s);
                 setPage(1);
               }}
+              isLoading={isFetching}
               itemName="học viên"
             />
           </div>

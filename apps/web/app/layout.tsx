@@ -3,6 +3,7 @@ import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/common/Providers";
 import { Toaster } from "@/components/ui/toaster";
+import { TopProgressBar } from "@/components/common/TopProgressBar";
 import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -26,8 +27,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Đọc session từ cookie server-side → truyền xuống client
-  // Không có round-trip → không flash
   const token = await getServerToken();
 
   let initialUser = null;
@@ -53,6 +52,7 @@ export default async function RootLayout({
     <html lang="vi">
       <body className={`${bricolage.variable} font-sans antialiased`}>
         <Providers initialUser={initialUser}>
+          <TopProgressBar />
           {children}
           <Toaster />
         </Providers>
