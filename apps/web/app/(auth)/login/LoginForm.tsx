@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,6 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [blocked, setBlocked] = useState<{ message: string; contactUrl: string } | null>(null);
 
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -66,9 +65,8 @@ export function LoginForm() {
       }
 
       toast({ title: "Đăng nhập thành công 🎉" });
-      router.refresh();
       const next = searchParams.get("next") ?? "/dashboard";
-      setTimeout(() => router.push(next), 50);
+      window.location.href = next;
     } catch (err: any) {
       console.error("[LOGIN_ERROR]", err);
       toast({

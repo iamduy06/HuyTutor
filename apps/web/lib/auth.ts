@@ -55,6 +55,9 @@ export async function loginApi(body: {
   const data = await res.json();
   if (data.success && data.session?.access_token) {
     setClientToken(data.session.access_token);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("hut_auth_changed"));
+    }
   }
   return data;
 }
@@ -85,6 +88,9 @@ export async function verifyOtpApi(body: {
   const data = await res.json();
   if (data.success && data.session?.access_token) {
     setClientToken(data.session.access_token);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("hut_auth_changed"));
+    }
   }
   return data;
 }

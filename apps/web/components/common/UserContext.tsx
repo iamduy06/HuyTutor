@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { UserProfile } from "@/types";
 import { getClientToken, clearClientToken } from "@/lib/auth";
 
@@ -32,6 +33,7 @@ interface UserProviderProps {
 export function UserProvider({ children, initialUser }: UserProviderProps) {
   const [user, setUser] = useState<UserProfile | null>(initialUser);
   const [loading, setLoading] = useState(false);
+  const pathname = usePathname();
 
   const fetchRequestId = useRef(0);
   const timeoutId = useRef<NodeJS.Timeout | null>(null);
@@ -93,11 +95,37 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
     }
   }, [fetchProfile]);
 
+  // Đồng bộ khi initialUser từ server thay đổi
   useEffect(() => {
-    if (!initialUser) {
+    if (initialUser) {
+      setUser(initialUser);
+    }
+  }, [initialUser]);
+
+  // Tự động nạp profile khi chưa có user trên client
+  useEffect(() => {
+    if (!initialUser && !user) {
       refresh();
     }
-  }, [initialUser, refresh]);
+  }, [initialUser, user, refresh]);
+
+  // Lắng nghe khi chuyển route (vd từ /login sang /dashboard)
+  useEffect(() => {
+    if (!user && getClientToken()) {
+      refresh();
+    }
+  }, [pathname, user, refresh]);
+
+  // Lắng nghe event xác thực trên toàn ứng dụng
+  useEffect(() => {
+    const handleAuthEvent = () => {
+      refresh();
+    };
+    window.addEventListener("hut_auth_changed", handleAuthEvent);
+    return () => {
+      window.removeEventListener("hut_auth_changed", handleAuthEvent);
+    };
+  }, [refresh]);
 
   return (
     <UserContext.Provider value={{ user, loading, refresh }}>
