@@ -1,0 +1,15 @@
+{
+  "name": "huytutor-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo cho nền tảng huytutor.edu.vn gồm app/api (Backend API) và app/web (Frontend Web App)",
+  "scripts": {
+    "install:all": "npm --prefix api install && npm --prefix web install",
+    "build:api": "npm --prefix api run build",
+    "build:web": "npm --prefix web run build",
+    "build": "npm run build:api && npm run build:web",
+    "dev:api": "npm --prefix api run dev",
+    "dev:web": "npm --prefix web run dev"
+  }
+}
+
