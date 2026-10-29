@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
-import { createR2PresignedUploadUrl, stampPdfBufferWithWatermark } from '../services/r2Service';
+import {
+  createR2PresignedUploadUrl,
+  stampPdfBufferWithWatermark,
+  uploadBufferToR2,
+} from '../services/r2Service';
 import { submitOrderToGoogleForm } from '../services/googleFormService';
 
 export const adminController = {
@@ -152,6 +156,42 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi khởi tạo Presigned URL cho Cloudflare R2.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/upload-file
+   * Tải trực tiếp file ảnh Thumbnail/PDF lên Cloudflare R2 từ Backend (Bypass 100% CORS trình duyệt)
+   */
+  async uploadFileDirect(req: Request, res: Response): Promise<void> {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const folder = (req.body.folder as any) || 'thumbnails';
+      if (!file) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng chọn file hợp lệ để tải lên.',
+        });
+        return;
+      }
+
+      const result = await uploadBufferToR2({
+        folder,
+        fileName: file.originalname,
+        buffer: file.buffer,
+        contentType: file.mimetype || 'image/png',
+      });
+
+      res.json({
+        ok: true,
+        publicUrl: result.publicUrl,
+        objectKey: result.objectKey,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải file lên Cloudflare R2.',
       });
     }
   },

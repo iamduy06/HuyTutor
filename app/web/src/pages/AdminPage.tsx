@@ -139,32 +139,24 @@ export const AdminPage: React.FC = () => {
     });
   };
 
-  // Upload file ảnh bìa Thumbnail trực tiếp lên Cloudflare R2 qua Backend Presigned URL
+  // Upload file ảnh bìa Thumbnail trực tiếp lên Cloudflare R2 qua Backend API
   const handleThumbnailFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingThumb(true);
     try {
-      const presign = await apiClient.createR2UploadPresign({
-        folder: 'thumbnails',
-        fileName: file.name,
-        contentType: file.type || 'image/png',
-      });
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'thumbnails');
 
-      if (!presign.isSimulated && presign.uploadUrl) {
-        await fetch(presign.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type || 'image/png' },
-          body: file,
-        });
-      }
+      const res = await apiClient.uploadFileDirect(formData);
 
       setEditingProduct((prev) => ({
         ...prev,
-        thumbnail_url: presign.publicUrl,
+        thumbnail_url: res.publicUrl,
       }));
-      showToast(`Đã tạo link Cloudflare R2: ${presign.publicUrl}`);
+      showToast(`Tải ảnh lên Cloudflare R2 thành công! Link: ${res.publicUrl}`);
     } catch (err: any) {
       showToast(err?.message || 'Lỗi upload ảnh bìa lên R2.');
     } finally {

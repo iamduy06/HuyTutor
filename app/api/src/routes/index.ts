@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { catalogController } from '../controllers/catalogController';
 import { orderController } from '../controllers/orderController';
 import { webhookController } from '../controllers/webhookController';
@@ -7,6 +8,9 @@ import { ipDetectMiddleware } from '../middlewares/ipDetect';
 import { adminAuthMiddleware } from '../middlewares/adminAuth';
 
 const router = Router();
+const upload = multer({
+  limits: { fileSize: 50 * 1024 * 1024 }, // Hỗ trợ upload ảnh/PDF tới 50MB
+});
 
 // Áp dụng nhận diện IP Việt Nam (SePay VietQR) vs Quốc tế (PayPal USD)
 router.use(ipDetectMiddleware);
@@ -33,6 +37,12 @@ router.put('/admin/products/:slug', adminAuthMiddleware, adminController.upsertP
 router.delete('/admin/products/:slug', adminAuthMiddleware, adminController.deleteProduct);
 router.put('/admin/menus', adminAuthMiddleware, adminController.updateMenus);
 router.post('/admin/upload-presign', adminAuthMiddleware, adminController.createUploadPresign);
+router.post(
+  '/admin/upload-file',
+  adminAuthMiddleware,
+  upload.single('file'),
+  adminController.uploadFileDirect
+);
 router.post('/admin/stamp-pdf', adminAuthMiddleware, adminController.stampPdfWatermark);
 router.post(
   '/admin/orders/:orderCode/resync-form',

@@ -180,7 +180,28 @@ export const apiClient = {
     });
   },
 
-  // 9. Admin: Tạo Presigned URL để upload ảnh bìa / PDF lên Cloudflare R2
+  // 9. Admin: Tải file trực tiếp lên Cloudflare R2 qua Backend API (An toàn, không bị lỗi CORS)
+  async uploadFileDirect(formData: FormData): Promise<{
+    ok: boolean;
+    publicUrl: string;
+    objectKey: string;
+  }> {
+    const response = await fetch(buildApiUrl('/api/admin/upload-file'), {
+      method: 'POST',
+      headers: {
+        'x-admin-key': ADMIN_API_KEY,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || 'Lỗi tải file lên Cloudflare R2.');
+    }
+    return data;
+  },
+
+  // 9b. Admin: Tạo Presigned URL để upload ảnh bìa / PDF lên Cloudflare R2
   async createR2UploadPresign(params: {
     folder: 'thumbnails' | 'previews' | 'samples' | 'banners';
     fileName: string;

@@ -12,6 +12,12 @@ const R2_PUBLIC_DOMAIN = (
   'https://media.huytutor.edu.vn'
 ).replace(/\/$/, '');
 
+const R2_ENDPOINT =
+  process.env.R2_ENDPOINT ||
+  (R2_ACCOUNT_ID
+    ? `https://${R2_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`
+    : '');
+
 export const isR2Configured = Boolean(
   R2_ACCOUNT_ID &&
     R2_ACCESS_KEY_ID &&
@@ -22,7 +28,7 @@ export const isR2Configured = Boolean(
 const s3Client = isR2Configured
   ? new S3Client({
       region: 'auto',
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: R2_ENDPOINT,
       credentials: {
         accessKeyId: R2_ACCESS_KEY_ID,
         secretAccessKey: R2_SECRET_ACCESS_KEY,
@@ -74,6 +80,36 @@ export async function createR2PresignedUploadUrl(params: {
     objectKey,
     isSimulated: true,
   };
+}
+
+/**
+ * Tải trực tiếp file Buffer lên Cloudflare R2 từ Backend (Bypass 100% lỗi CORS trình duyệt)
+ */
+export async function uploadBufferToR2(params: {
+  folder: 'thumbnails' | 'previews' | 'samples' | 'banners';
+  fileName: string;
+  buffer: Buffer;
+  contentType: string;
+}): Promise<{ publicUrl: string; objectKey: string }> {
+  const safeName = params.fileName
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '-')
+    .replace(/-+/g, '-');
+  const objectKey = `${params.folder}/${Date.now()}-${safeName}`;
+  const publicUrl = `${R2_PUBLIC_DOMAIN}/${objectKey}`;
+
+  if (isR2Configured && s3Client) {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: objectKey,
+        Body: params.buffer,
+        ContentType: params.contentType,
+      })
+    );
+  }
+
+  return { publicUrl, objectKey };
 }
 
 /**
