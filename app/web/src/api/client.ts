@@ -10,6 +10,11 @@ import {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || 'huytutor-admin-2026';
+export const R2_DOMAIN = (
+  import.meta.env.VITE_R2_DOMAIN ||
+  import.meta.env.VITE_R2_PUBLIC_DOMAIN ||
+  'https://media.huytutor.edu.vn'
+).replace(/\/$/, '');
 
 function buildApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;

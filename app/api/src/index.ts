@@ -10,22 +10,22 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
 
-const allowedOrigins = (
+const configuredOrigins = (
   process.env.CORS_ORIGINS ||
   'https://huytutor.edu.vn,https://www.huytutor.edu.vn,http://localhost:5173,http://localhost:3000'
 )
   .split(',')
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const allowedOrigins: (string | RegExp)[] = [
+  ...configuredOrigins.filter((o) => !o.includes('*')),
+  /\.vercel\.app$/,
+];
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-        callback(null, true);
-      } else {
-        callback(null, true);
-      }
-    },
+    origin: allowedOrigins,
     credentials: true,
   })
 );

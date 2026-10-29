@@ -13,8 +13,8 @@ services:
       - key: PORT
         value: 4000
       - key: CORS_ORIGINS
-        value: https://huytutor.edu.vn,https://www.huytutor.edu.vn
-      - key: R2_PUBLIC_DOMAIN
+        value: https://huytutor.edu.vn,https://www.huytutor.edu.vn,*.vercel.app
+      - key: R2_DOMAIN
         value: https://media.huytutor.edu.vn
       - key: GOOGLE_FORM_ACTION_URL
         value: https://docs.google.com/forms/d/e/1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q/formResponse
