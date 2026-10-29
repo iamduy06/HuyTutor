@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: huytutor-api
+    env: node
+    plan: free
+    rootDir: app/api
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: CORS_ORIGINS
+        value: https://huytutor.edu.vn,https://www.huytutor.edu.vn
+      - key: R2_PUBLIC_DOMAIN
+        value: https://media.huytutor.edu.vn
+      - key: GOOGLE_FORM_ACTION_URL
+        value: https://docs.google.com/forms/d/e/1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q/formResponse
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: huytutor-media
+      - key: SEPAY_WEBHOOK_SECRET
+        sync: false
+      - key: ADMIN_API_SECRET
+        sync: false
