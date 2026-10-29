@@ -145,7 +145,7 @@ export const FaqPage: React.FC = () => {
     },
     {
       q: '4. Tại sao mỗi đơn hàng chỉ thanh toán cho 1 định dạng duy nhất?',
-      a: 'Để hệ thống Google Form tự động phân quyền chính xác thư mục Google Drive tương ứng (Word dài, PDF dài hoặc cấp tài khoản Flashcard), giỏ hàng cho phép lưu nhiều định dạng nhưng khi thanh toán mỗi đơn sẽ xử lý đồng nhất 1 định dạng.',
+      a: 'Để đảm bảo phân quyền và gửi tài liệu chính xác theo từng định dạng (file Word, file PDF hoặc tài khoản Flashcard), giỏ hàng cho phép lưu nhiều định dạng nhưng khi thanh toán mỗi đơn hàng sẽ xử lý đồng nhất theo một định dạng đã chọn.',
     },
     {
       q: '5. Tài liệu có kèm đáp án và giải thích chi tiết không?',
@@ -153,7 +153,7 @@ export const FaqPage: React.FC = () => {
     },
     {
       q: '6. Quy trình thanh toán tự động hoạt động như thế nào?',
-      a: 'Khách hàng tại Việt Nam quét mã VietQR (SePay), khách hàng Quốc tế thanh toán qua PayPal (USD). Ngay khi giao dịch thành công, hệ thống tự động đồng bộ 14 trường vào Google Form và cấp quyền qua Gmail.',
+      a: 'Khách hàng tại Việt Nam quét mã VietQR ngân hàng, khách hàng Quốc tế thanh toán qua PayPal. Ngay khi giao dịch hoàn tất, hệ thống sẽ tự động xác nhận và cấp quyền truy cập tài liệu qua Gmail của bạn.',
     },
     {
       q: '7. Tôi nhận file tài liệu qua phương thức nào?',

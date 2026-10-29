@@ -173,7 +173,7 @@ export const HomePage: React.FC = () => {
           <h2 className="text-[#e60049] font-bold text-sm mb-4">Tài liệu THPT</h2>
           {isLoading ? (
             <div className="text-xs text-gray-500 py-8 text-center">
-              Đang tải danh sách tài liệu từ Backend API...
+              Đang tải danh sách tài liệu...
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">

@@ -96,7 +96,7 @@ export const ProductDetailPage: React.FC = () => {
     return (
       <main className="max-w-[680px] mx-auto px-4 py-14 text-center">
         <p className="text-xs text-gray-500">
-          Đang tải thông tin chi tiết tài liệu từ Backend API...
+          Đang tải thông tin tài liệu...
         </p>
       </main>
     );
@@ -168,8 +168,7 @@ export const ProductDetailPage: React.FC = () => {
             </span>
             {!isFreeGift && (
               <span className="text-[10px] text-gray-500 font-medium">
-                Định dạng: <strong>{selectedFormat}</strong> (Ghi chú Form:{' '}
-                <strong>{FORMAT_TO_GOOGLE_FORM_MAP[selectedFormat]}</strong>)
+                Định dạng: <strong>{selectedFormat}</strong>
               </span>
             )}
           </div>

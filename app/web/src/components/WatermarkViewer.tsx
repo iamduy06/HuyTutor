@@ -17,7 +17,7 @@ export const WatermarkViewer: React.FC<{ product: Product }> = ({ product }) => 
     >
       <div className="border-b-2 border-gray-800 pb-1.5 mb-5 flex items-center justify-between">
         <span className="text-[12px] font-bold text-[#e60049] uppercase">
-          Bản đọc thử ({product.preview_type === 'pdf' ? 'PDF Viewer' : 'Trang ảnh A4'})
+          Bản đọc thử
         </span>
         <span className="text-[10px] text-gray-500 font-medium">
           Bảo vệ bản quyền bởi Watermark Huy Tutor

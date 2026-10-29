@@ -12,9 +12,8 @@ export const HeaderFooterDemoPage: React.FC = () => {
           Điều khoản sử dụng, Chính sách bảo mật &amp; Chính sách thanh toán
         </h1>
         <p className="text-xs text-gray-600 max-w-xl mx-auto leading-relaxed">
-          Toàn bộ thanh điều hướng Header phía trên và khối Footer phía dưới được đồng bộ động từ
-          Backend API (`app/api`), tuân thủ nghiêm ngặt bộ quy chuẩn màu thương hiệu `#e60049`, góc
-          bo nhẹ `rounded-md` / `rounded-sm` và nút bấm thuần chữ.
+          Quy định chi tiết về điều khoản cung cấp dịch vụ, bảo mật thông tin và thanh toán
+          dành cho quý khách hàng tại hệ thống website Huy Tutor.
         </p>
       </div>
 

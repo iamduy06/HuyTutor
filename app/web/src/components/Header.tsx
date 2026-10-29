@@ -97,16 +97,6 @@ export const Header: React.FC = () => {
             <Link to="/faq" className="hover:text-[#e60049] transition">
               CÂU HỎI THƯỜNG GẶP
             </Link>
-            <Link
-              to="/admin"
-              className={
-                location.pathname.startsWith('/admin')
-                  ? 'text-[#e60049] font-extrabold'
-                  : 'text-[#e60049] hover:underline font-bold'
-              }
-            >
-              QUẢN TRỊ
-            </Link>
           </nav>
 
           {/* Right Tools: Search & Smart Cart */}
@@ -157,9 +147,6 @@ export const Header: React.FC = () => {
               {item.title}
             </Link>
           ))}
-          <Link to="/admin" className="text-[#e60049] font-bold">
-            QUẢN TRỊ
-          </Link>
         </div>
       </header>
 

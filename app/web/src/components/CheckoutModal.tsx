@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
 import {
-  FORMAT_TO_GOOGLE_FORM_MAP,
   formatVnd,
   OrderRecord,
   PaymentInstruction,
@@ -37,21 +36,40 @@ export const CheckoutModal: React.FC = () => {
   const [invoiceTaxOrCccd, setInvoiceTaxOrCccd] = useState('');
   const [invoiceAddress, setInvoiceAddress] = useState('');
   const [flashcardQuantity, setFlashcardQuantity] = useState<number>(1);
+  const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>(
+    clientRegion.recommendedGateway || 'sepay'
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [createdOrder, setCreatedOrder] = useState<OrderRecord | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInstruction | null>(null);
-  const [googleFormSyncPayload, setGoogleFormSyncPayload] = useState<
-    Record<string, string> | null
-  >(null);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+
+  // Tự động kiểm tra trạng thái đơn hàng định kỳ khi đang ở màn hình thanh toán
+  useEffect(() => {
+    if (!createdOrder || createdOrder.payment_status === 'paid') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiClient.getOrderStatus(createdOrder.order_code);
+        if (res.order.payment_status === 'paid') {
+          setCreatedOrder(res.order);
+          clearSelectedCartItems();
+          showToast(`Thanh toán đơn hàng ${createdOrder.order_code} thành công!`);
+        }
+      } catch {
+        // silent polling
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [createdOrder, clearSelectedCartItems, showToast]);
 
   if (!isCheckoutOpen) return null;
 
   const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
-  const mappedGoogleFormNote = FORMAT_TO_GOOGLE_FORM_MAP[activeFormat];
 
   const handleClose = () => {
     setIsCheckoutOpen(false);
@@ -59,7 +77,6 @@ export const CheckoutModal: React.FC = () => {
     if (createdOrder?.payment_status === 'paid') {
       setCreatedOrder(null);
       setPaymentInfo(null);
-      setGoogleFormSyncPayload(null);
     }
   };
 
@@ -74,7 +91,7 @@ export const CheckoutModal: React.FC = () => {
 
     if (hasFormatConflict) {
       setFormError(
-        'Mỗi đơn hàng chỉ được phép thanh toán cho 1 định dạng duy nhất. Vui lòng quay lại giỏ hàng để lọc định dạng.'
+        'Mỗi đơn hàng chỉ được phép thanh toán cho 1 định dạng duy nhất. Vui lòng quay lại giỏ hàng để chọn đồng nhất định dạng.'
       );
       return;
     }
@@ -83,7 +100,7 @@ export const CheckoutModal: React.FC = () => {
     const email2 = customerEmailConfirm.trim().toLowerCase();
     if (!email1 || email1 !== email2) {
       setFormError(
-        'Gmail xác nhận lần 2 không khớp với Gmail lần 1. Vui lòng nhập khớp chính xác 2 ô Gmail.'
+        'Gmail xác nhận lần 2 không khớp với Gmail lần 1. Vui lòng kiểm tra và nhập lại chính xác.'
       );
       return;
     }
@@ -105,7 +122,7 @@ export const CheckoutModal: React.FC = () => {
         invoiceTaxOrCccd: needInvoice ? invoiceTaxOrCccd.trim() : '',
         invoiceAddress: needInvoice ? invoiceAddress.trim() : '',
         flashcardQuantity: activeFormat === 'Flashcard' ? flashcardQuantity : null,
-        paymentMethod: clientRegion.recommendedGateway,
+        paymentMethod: selectedGateway,
         items: selectedCartItems.map((it) => ({
           productId: it.slug,
           productTitle: it.title,
@@ -117,31 +134,29 @@ export const CheckoutModal: React.FC = () => {
 
       setCreatedOrder(response.order);
       setPaymentInfo(response.paymentInstruction);
-      showToast(`Đã khởi tạo đơn hàng ${response.order.order_code}.`);
+      showToast(`Đã tạo đơn hàng ${response.order.order_code}.`);
     } catch (err: any) {
-      setFormError(err?.message || 'Lỗi tạo đơn hàng từ Backend.');
+      setFormError(err?.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleConfirmPaymentSimulation = async () => {
+  const handleManualCheckStatus = async () => {
     if (!createdOrder) return;
     setVerifyingPayment(true);
     setFormError(null);
     try {
-      const res = await apiClient.simulatePaymentSuccess(createdOrder.order_code);
-      setCreatedOrder(res.order);
-      const firstSub = res.googleFormSync.submissions[0];
-      if (firstSub) {
-        setGoogleFormSyncPayload(firstSub.payload);
+      const res = await apiClient.getOrderStatus(createdOrder.order_code);
+      if (res.order.payment_status === 'paid') {
+        setCreatedOrder(res.order);
+        clearSelectedCartItems();
+        showToast(`Đơn hàng ${createdOrder.order_code} đã được thanh toán thành công!`);
+      } else {
+        showToast('Hệ thống đang kiểm tra giao dịch từ ngân hàng, vui lòng đợi trong giây lát...');
       }
-      clearSelectedCartItems();
-      showToast(
-        `Thanh toán đơn ${createdOrder.order_code} thành công! Đã tự động bắn 14 entry vào Google Form.`
-      );
-    } catch (err: any) {
-      setFormError(err?.message || 'Lỗi xác nhận thanh toán.');
+    } catch {
+      setFormError('Chưa nhận được giao dịch hoặc đang xử lý. Vui lòng kiểm tra lại sau ít phút.');
     } finally {
       setVerifyingPayment(false);
     }
@@ -154,17 +169,16 @@ export const CheckoutModal: React.FC = () => {
         <div className="bg-[#e60049] text-white px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-extrabold uppercase">
-              Thanh toán &amp; Cấp quyền tài liệu tự động
+              Thanh toán &amp; Cấp quyền tài liệu
             </h2>
             <p className="text-[11px] text-white/90 mt-0.5">
-              Định dạng đơn hàng: <strong>{activeFormat}</strong> (Ghi chú Google Form:{' '}
-              <strong>{mappedGoogleFormNote}</strong>)
+              Định dạng tài liệu: <strong>{activeFormat}</strong>
             </p>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            className="px-2.5 py-1 bg-white text-[#e60049] font-bold text-xs rounded-sm hover:bg-gray-100"
+            className="px-2.5 py-1 bg-white text-[#e60049] font-bold text-xs rounded-sm hover:bg-gray-100 transition"
           >
             Đóng
           </button>
@@ -174,37 +188,53 @@ export const CheckoutModal: React.FC = () => {
         <div className="p-6 max-h-[82vh] overflow-y-auto">
           {!createdOrder ? (
             <form onSubmit={handleCreateOrder} className="space-y-4">
-              {/* Chuyển đổi IP vùng thanh toán (Việt Nam VietQR vs Quốc tế PayPal) */}
-              <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="text-[11px] text-gray-700">
-                  <span className="font-bold text-[#e60049]">Nhận diện cổng thanh toán theo IP:</span>{' '}
-                  {clientRegion.country === 'VN'
-                    ? 'Việt Nam (SePay VietQR)'
-                    : 'Quốc tế (PayPal USD)'}
+              {/* Lựa chọn phương thức thanh toán */}
+              <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-3.5 space-y-2">
+                <div className="text-xs font-bold text-gray-800">
+                  Phương thức thanh toán:
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setRegionOverride('VN')}
-                    className={`px-2.5 py-1 text-[10px] font-bold rounded-sm border ${
-                      clientRegion.country === 'VN'
-                        ? 'bg-[#e60049] text-white border-[#e60049]'
-                        : 'bg-white text-gray-700 border-gray-300'
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-sm border cursor-pointer transition ${
+                      selectedGateway === 'sepay'
+                        ? 'bg-white border-[#e60049] text-[#e60049] font-bold shadow-sm'
+                        : 'bg-white/60 border-gray-200 text-gray-700'
                     }`}
                   >
-                    IP Việt Nam (VietQR)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegionOverride('INTL')}
-                    className={`px-2.5 py-1 text-[10px] font-bold rounded-sm border ${
-                      clientRegion.country !== 'VN'
-                        ? 'bg-[#e60049] text-white border-[#e60049]'
-                        : 'bg-white text-gray-700 border-gray-300'
+                    <input
+                      type="radio"
+                      name="payment_gateway"
+                      value="sepay"
+                      checked={selectedGateway === 'sepay'}
+                      onChange={() => {
+                        setSelectedGateway('sepay');
+                        setRegionOverride('VN');
+                      }}
+                      className="accent-[#e60049]"
+                    />
+                    <span className="text-xs">Chuyển khoản Ngân hàng (VietQR)</span>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-sm border cursor-pointer transition ${
+                      selectedGateway === 'paypal'
+                        ? 'bg-white border-[#e60049] text-[#e60049] font-bold shadow-sm'
+                        : 'bg-white/60 border-gray-200 text-gray-700'
                     }`}
                   >
-                    IP Quốc tế (PayPal)
-                  </button>
+                    <input
+                      type="radio"
+                      name="payment_gateway"
+                      value="paypal"
+                      checked={selectedGateway === 'paypal'}
+                      onChange={() => {
+                        setSelectedGateway('paypal');
+                        setRegionOverride('INTL');
+                      }}
+                      className="accent-[#e60049]"
+                    />
+                    <span className="text-xs">Thanh toán Quốc tế (PayPal / Thẻ)</span>
+                  </label>
                 </div>
               </div>
 
@@ -225,7 +255,7 @@ export const CheckoutModal: React.FC = () => {
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Ví dụ: Cô Nguyễn Thị Mai"
+                    placeholder="Ví dụ: Thầy/Cô Nguyễn Văn A"
                     className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-[#e60049]"
                   />
                 </div>
@@ -245,11 +275,11 @@ export const CheckoutModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Xác thực Gmail 2 lớp (Chống gõ sai Gmail nhận tài liệu) */}
+              {/* Nhập Gmail nhận tài liệu 2 lớp */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-gray-50 p-3.5 rounded-md border border-gray-200">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-800 mb-1">
-                    Gmail nhận tài liệu &amp; cấp quyền Google Drive *
+                    Gmail nhận tài liệu &amp; quyền truy cập *
                   </label>
                   <input
                     type="email"
@@ -263,14 +293,14 @@ export const CheckoutModal: React.FC = () => {
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#e60049] mb-1">
-                    Nhập lại chính xác Gmail lần 2 (Không copy/paste) *
+                    Xác nhận lại Gmail lần 2 (tự nhập, không sao chép) *
                   </label>
                   <input
                     type="email"
                     required
                     onPaste={(e) => {
                       e.preventDefault();
-                      showToast('Vui lòng tự gõ lại Gmail lần 2 để đảm bảo không sai sót.');
+                      showToast('Vui lòng tự gõ lại Gmail lần 2 để tránh nhầm lẫn địa chỉ nhận.');
                     }}
                     value={customerEmailConfirm}
                     onChange={(e) => setCustomerEmailConfirm(e.target.value)}
@@ -280,11 +310,11 @@ export const CheckoutModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Nhóm khách hàng & Số lượng tài khoản Flashcard (nếu định dạng là Flashcard) */}
+              {/* Nhóm khách hàng & Số lượng Flashcard */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Nhóm khách hàng (entry.1680953650) *
+                    Đối tượng khách hàng *
                   </label>
                   <select
                     value={customerGroup}
@@ -305,7 +335,7 @@ export const CheckoutModal: React.FC = () => {
                 {activeFormat === 'Flashcard' && (
                   <div>
                     <label className="block text-[11px] font-bold text-[#e60049] mb-1">
-                      Số lượng tài khoản Flashcard (entry.242891304) *
+                      Số lượng tài khoản Flashcard *
                     </label>
                     <input
                       type="number"
@@ -319,7 +349,7 @@ export const CheckoutModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Checkbox Xuất hóa đơn VAT có điều kiện (entry.681163783 & entry.575498379) */}
+              {/* Checkbox Xuất hóa đơn VAT */}
               <div className="border border-gray-200 rounded-md p-3.5">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-800">
                   <input
@@ -328,27 +358,27 @@ export const CheckoutModal: React.FC = () => {
                     onChange={(e) => setNeedInvoice(e.target.checked)}
                     className="accent-[#e60049] w-4 h-4"
                   />
-                  Yêu cầu xuất hóa đơn VAT (Nếu không tích, MST/CCCD và Địa chỉ sẽ gửi trống "")
+                  Yêu cầu xuất hóa đơn VAT điện tử
                 </label>
 
                 {needInvoice && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-100">
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                        Mã số thuế hoặc CCCD (entry.575498379) *
+                        Mã số thuế hoặc CCCD *
                       </label>
                       <input
                         type="text"
                         required={needInvoice}
                         value={invoiceTaxOrCccd}
                         onChange={(e) => setInvoiceTaxOrCccd(e.target.value)}
-                        placeholder="Nhập MST đơn vị hoặc số CCCD"
-                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs"
+                        placeholder="Nhập MST cơ quan hoặc số CCCD"
+                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                        Địa chỉ xuất hóa đơn (entry.681163783) *
+                        Địa chỉ xuất hóa đơn *
                       </label>
                       <input
                         type="text"
@@ -356,7 +386,7 @@ export const CheckoutModal: React.FC = () => {
                         value={invoiceAddress}
                         onChange={(e) => setInvoiceAddress(e.target.value)}
                         placeholder="Nhập địa chỉ đơn vị / cá nhân"
-                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs"
+                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
                       />
                     </div>
                   </div>
@@ -366,8 +396,7 @@ export const CheckoutModal: React.FC = () => {
               {/* Tóm tắt sản phẩm & tiền thanh toán */}
               <div className="bg-gray-50 border border-gray-200 rounded-md p-3.5 space-y-2 text-xs">
                 <div className="font-bold text-gray-800 border-b border-gray-200 pb-1.5">
-                  Danh sách tài liệu thanh toán ({selectedCartItems.length} tài liệu - Định dạng{' '}
-                  {activeFormat}):
+                  Danh sách tài liệu ({selectedCartItems.length} tài liệu - Định dạng {activeFormat}):
                 </div>
                 {selectedCartItems.map((it) => (
                   <div key={it.cartItemId} className="flex justify-between text-gray-700">
@@ -383,12 +412,12 @@ export const CheckoutModal: React.FC = () => {
                 </div>
                 {discountPercent > 0 && (
                   <div className="flex justify-between text-[#e60049] font-bold">
-                    <span>Chiết khấu Combo (-{discountPercent}%):</span>
+                    <span>Ưu đãi Combo (-{discountPercent}%):</span>
                     <span>-{formatVnd(discountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1">
-                  <span>Tổng cộng cần thanh toán:</span>
+                  <span>Tổng thanh toán:</span>
                   <span className="text-[#e60049]">{formatVnd(totalAmount)}</span>
                 </div>
               </div>
@@ -398,11 +427,11 @@ export const CheckoutModal: React.FC = () => {
                 disabled={submitting}
                 className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs py-2.5 rounded-sm transition"
               >
-                {submitting ? 'Đang khởi tạo đơn hàng tại Backend...' : 'Tiến hành thanh toán'}
+                {submitting ? 'Đang xử lý đơn hàng...' : 'Tiến hành thanh toán'}
               </button>
             </form>
           ) : (
-            /* Màn hình QR SePay / PayPal & Kết quả tự động bắn 14 entry Google Form */
+            /* Màn hình Hướng dẫn Chuyển khoản VietQR / PayPal */
             <div className="space-y-5">
               <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -411,8 +440,7 @@ export const CheckoutModal: React.FC = () => {
                   </div>
                   <div className="text-[11px] text-gray-600 mt-0.5">
                     Gmail nhận tài liệu: <strong>{createdOrder.customer_email}</strong> • Định dạng:{' '}
-                    <strong>{createdOrder.selected_format}</strong> (Ghi chú Form:{' '}
-                    <strong>{mappedGoogleFormNote}</strong>)
+                    <strong>{createdOrder.selected_format}</strong>
                   </div>
                 </div>
                 <span
@@ -423,7 +451,7 @@ export const CheckoutModal: React.FC = () => {
                   }`}
                 >
                   {createdOrder.payment_status === 'paid'
-                    ? 'ĐÃ THANH TOÁN & ĐỒNG BỘ GOOGLE FORM'
+                    ? 'ĐÃ THANH TOÁN THÀNH CÔNG'
                     : 'ĐANG CHỜ THANH TOÁN'}
                 </span>
               </div>
@@ -435,16 +463,16 @@ export const CheckoutModal: React.FC = () => {
                       <div className="md:col-span-5 flex flex-col items-center">
                         <img
                           src={paymentInfo.sepay.qrImageUrl}
-                          alt="Mã VietQR SePay"
+                          alt="Mã VietQR Chuyển khoản"
                           className="w-48 h-48 object-contain border border-gray-200 rounded-sm p-1 bg-white"
                         />
                         <span className="text-[10px] text-gray-500 mt-1.5 text-center">
-                          Quét mã VietQR bằng mọi ứng dụng Ngân hàng
+                          Quét mã VietQR bằng ứng dụng Ngân hàng bất kỳ
                         </span>
                       </div>
                       <div className="md:col-span-7 space-y-2 text-xs text-gray-700">
                         <div className="font-extrabold text-[#e60049] uppercase">
-                          Chuyển khoản tự động VietQR (SePay)
+                          Thông tin chuyển khoản Ngân hàng
                         </div>
                         <p>
                           Ngân hàng: <strong>{paymentInfo.sepay.bankName}</strong>
@@ -465,70 +493,66 @@ export const CheckoutModal: React.FC = () => {
                           </strong>
                         </p>
                         <p className="text-[11px] text-gray-500 pt-1">
-                          Ngay khi SePay nhận giao dịch khớp mã {paymentInfo.sepay.transferContent},
-                          Backend sẽ tự động bắn 14 trường vào Google Form và cấp quyền tài liệu qua
-                          Gmail.
+                          Hệ thống sẽ tự động xác nhận và cấp quyền tài liệu qua Gmail của bạn ngay khi nhận được thanh toán.
                         </p>
                       </div>
                     </>
                   ) : (
                     <div className="md:col-span-12 space-y-2 text-xs text-gray-700">
                       <div className="font-extrabold text-[#e60049] uppercase">
-                        Cổng thanh toán Quốc tế PayPal (USD)
+                        Cổng thanh toán Quốc tế PayPal
                       </div>
                       <p>
-                        Số tiền quy đổi Quốc tế: <strong>${paymentInfo.amountUsd} USD</strong> (Tương
-                        đương {formatVnd(paymentInfo.amountVnd)})
+                        Số tiền thanh toán: <strong>${paymentInfo.amountUsd} USD</strong> (Tương đương{' '}
+                        {formatVnd(paymentInfo.amountVnd)})
                       </p>
                       <p>
-                        Mã tham chiếu PayPal Custom ID: <strong>{createdOrder.order_code}</strong>
+                        Mã tham chiếu đơn hàng: <strong>{createdOrder.order_code}</strong>
                       </p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Nút kiểm thử xác nhận Webhook & Đồng bộ 14 entry Google Form */}
+              {/* Nút kiểm tra trạng thái dành cho khách hàng */}
               {createdOrder.payment_status !== 'paid' && (
-                <div className="bg-gray-50 border border-gray-200 rounded-md p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
                   <div className="text-[11px] text-gray-600">
-                    Bấm nút bên cạnh để giả lập Webhook thanh toán thành công từ SePay/PayPal và
-                    kiểm tra dữ liệu 14 entry bắn vào Google Form thực tế:
+                    Sau khi hoàn tất chuyển khoản, hệ thống sẽ tự động xác nhận trong vòng 1-2 phút.
                   </div>
                   <button
                     type="button"
                     disabled={verifyingPayment}
-                    onClick={handleConfirmPaymentSimulation}
+                    onClick={handleManualCheckStatus}
                     className="shrink-0 bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-2 rounded-sm transition"
                   >
-                    {verifyingPayment
-                      ? 'Đang đồng bộ Google Form...'
-                      : 'Xác nhận đã thanh toán (Test Webhook)'}
+                    {verifyingPayment ? 'Đang kiểm tra...' : 'Tôi đã chuyển khoản'}
                   </button>
                 </div>
               )}
 
-              {/* Hiển thị bảng đối soát 14 Entry Google Form sau khi thanh toán */}
+              {/* Màn hình thông báo thanh toán thành công */}
               {createdOrder.payment_status === 'paid' && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-md p-4 space-y-3">
-                  <div className="text-xs font-extrabold text-emerald-800 uppercase">
-                    Đã thanh toán &amp; Tự động gửi 14 Entry vào Google Form thành công
+                <div className="bg-emerald-50 border border-emerald-200 rounded-md p-5 text-center space-y-3">
+                  <div className="text-sm font-extrabold text-emerald-800 uppercase">
+                    Thanh toán thành công!
                   </div>
-                  <p className="text-[11px] text-emerald-700">
-                    Hệ thống Backend (`app/api`) đã gửi HTTP POST trực tiếp tới Google Form nội bộ.
-                    Tài liệu đang được cấp quyền tự động tới Gmail{' '}
+                  <p className="text-xs text-emerald-700">
+                    Cảm ơn bạn đã tin tưởng và ủng hộ Huy Tutor. Tài liệu đã được cấp quyền truy cập tới hòm thư:{' '}
                     <strong>{createdOrder.customer_email}</strong>.
                   </p>
-                  {googleFormSyncPayload && (
-                    <div className="bg-white border border-emerald-200 rounded-sm p-3 text-[11px] font-mono text-gray-700 overflow-x-auto">
-                      <div className="font-sans font-bold text-gray-900 mb-1.5">
-                        Payload 14 Entry đã gửi vào Google Form:
-                      </div>
-                      <pre className="whitespace-pre-wrap">
-                        {JSON.stringify(googleFormSyncPayload, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                  <p className="text-[11px] text-gray-500">
+                    Quý khách vui lòng kiểm tra hộp thư đến (hoặc thư mục Spam/Quảng cáo) để truy cập tài liệu.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2 rounded-sm transition"
+                    >
+                      Hoàn tất &amp; Tiếp tục xem tài liệu
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -538,4 +562,3 @@ export const CheckoutModal: React.FC = () => {
     </div>
   );
 };
-

@@ -107,7 +107,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err: any) {
       setApiError(
         err?.message ||
-          'Không thể kết nối tới Backend API (app/api). Vui lòng kiểm tra server port 4000.'
+          'Không thể kết nối tới máy chủ. Vui lòng tải lại trang hoặc kiểm tra kết nối mạng.'
       );
     } finally {
       setIsLoading(false);

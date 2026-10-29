@@ -109,7 +109,7 @@ export const CategoryPage: React.FC<{ categorySlug: string }> = ({ categorySlug 
 
       {isLoading ? (
         <div className="text-xs text-gray-500 py-10 text-center">
-          Đang tải danh mục sản phẩm từ Backend API...
+          Đang tải danh mục tài liệu...
         </div>
       ) : groupedSections.length === 0 ? (
         <div className="text-xs text-gray-500 py-10 text-center">

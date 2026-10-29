@@ -38,7 +38,7 @@ export const Footer: React.FC = () => {
               </Link>
             </div>
             <div>
-              <Link to="/header-footer" className="hover:text-[#e60049] transition">
+              <Link to="/terms-of-service" className="hover:text-[#e60049] transition">
                 Chính sách bảo mật
               </Link>
             </div>

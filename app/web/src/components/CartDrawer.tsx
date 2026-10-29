@@ -163,7 +163,7 @@ export const CartDrawer: React.FC = () => {
             <p>
               Bạn đang tích chọn nhiều định dạng khác nhau ({selectedFormats.join(', ')}). Mỗi đơn
               hàng chỉ được phép thanh toán cho <strong>1 định dạng duy nhất</strong>. Vui lòng bấm
-              nút lọc định dạngด้าน trên hoặc bỏ tích các định dạng khác.
+              nút lọc định dạng ở phía trên hoặc bỏ tích các định dạng khác.
             </p>
           </div>
         )}

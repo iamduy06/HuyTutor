@@ -311,7 +311,7 @@ export const AdminPage: React.FC = () => {
               HỆ THỐNG QUẢN TRỊ TRUNG TÂM • HUYTUTOR.EDU.VN
             </div>
             <h1 className="text-lg sm:text-xl font-extrabold mt-0.5">
-              Admin Dashboard (100% Kết nối Database qua Backend API)
+              Trang Quản trị Hệ thống Huy Tutor
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -395,7 +395,7 @@ export const AdminPage: React.FC = () => {
                 : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
             }`}
           >
-            3. Bảng Đối soát 14 Entry Google Form &amp; Kiến trúc Backend
+            3. Bảng Đối soát Đơn hàng &amp; Tự động hóa
           </button>
         </div>
 
@@ -419,7 +419,7 @@ export const AdminPage: React.FC = () => {
 
               {loading ? (
                 <div className="text-xs text-gray-500 py-8 text-center">
-                  Đang tải từ Backend API...
+                  Đang tải dữ liệu...
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-[820px] overflow-y-auto pr-1">
@@ -502,8 +502,7 @@ export const AdminPage: React.FC = () => {
                       : 'Tạo tài liệu mới vào Database'}
                   </h2>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    Mọi thay đổi được lưu qua Backend API (`/api/admin/products`) và cập nhật tức
-                    thì lên giao diện khách hàng
+                    Mọi thay đổi sẽ được cập nhật trực tiếp vào hệ thống
                   </p>
                 </div>
                 <button
@@ -625,7 +624,7 @@ export const AdminPage: React.FC = () => {
                 </label>
                 <p className="text-[11px] text-gray-600">
                   Hỗ trợ dán trực tiếp link ảnh có sẵn hoặc chọn ảnh từ máy tính để tải thẳng lên
-                  Cloudflare R2 qua Backend Presigned URL:
+                  lưu trữ Cloudflare R2:
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
@@ -1131,8 +1130,7 @@ export const AdminPage: React.FC = () => {
               Bảng đối soát 14 Entry IDs Google Form (`1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q`)
             </h2>
             <p className="text-xs text-gray-600">
-              Toàn bộ luồng gửi Google Form được thực thi 100% tại Backend (`app/api/src/services/googleFormService.ts`)
-              ngay sau khi Webhook SePay hoặc PayPal xác nhận thanh toán thành công:
+              Hệ thống tự động đồng bộ đơn hàng vào Google Form ngay sau khi xác nhận thanh toán thành công:
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse border border-gray-200">
@@ -1141,7 +1139,7 @@ export const AdminPage: React.FC = () => {
                     <th className="border border-gray-200 p-2 text-left">STT</th>
                     <th className="border border-gray-200 p-2 text-left">Entry ID</th>
                     <th className="border border-gray-200 p-2 text-left">Tên trường trên Form</th>
-                    <th className="border border-gray-200 p-2 text-left">Quy tắc điền tự động từ Backend</th>
+                    <th className="border border-gray-200 p-2 text-left">Quy tắc điền tự động</th>
                   </tr>
                 </thead>
                 <tbody className="text-gray-700">
