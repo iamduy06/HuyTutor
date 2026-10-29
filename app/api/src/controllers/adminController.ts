@@ -54,7 +54,7 @@ export const adminController = {
    */
   async upsertProduct(req: Request, res: Response): Promise<void> {
     try {
-      const slugParam = req.params.slug;
+      const slugParam = typeof req.params.slug === 'string' ? req.params.slug : undefined;
       const payload = {
         ...req.body,
         slug: req.body.slug || slugParam,
@@ -87,7 +87,7 @@ export const adminController = {
    */
   async deleteProduct(req: Request, res: Response): Promise<void> {
     try {
-      const { slug } = req.params;
+      const slug = String(req.params.slug || '');
       const deleted = await dbService.deleteProduct(slug);
       res.json({
         ok: true,
@@ -197,7 +197,7 @@ export const adminController = {
    */
   async resyncOrderToGoogleForm(req: Request, res: Response): Promise<void> {
     try {
-      const { orderCode } = req.params;
+      const orderCode = String(req.params.orderCode || '');
       const order = await dbService.getOrderByCode(orderCode);
       if (!order) {
         res.status(404).json({

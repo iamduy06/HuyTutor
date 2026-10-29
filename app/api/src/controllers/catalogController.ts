@@ -71,7 +71,7 @@ export const catalogController = {
    */
   async getProductDetail(req: Request, res: Response): Promise<void> {
     try {
-      const { slug } = req.params;
+      const slug = String(req.params.slug || '');
       const product = await dbService.getProductBySlugOrId(slug);
       if (!product) {
         res.status(404).json({
@@ -105,7 +105,7 @@ export const catalogController = {
    */
   async getCategoryDetail(req: Request, res: Response): Promise<void> {
     try {
-      const { slug } = req.params;
+      const slug = String(req.params.slug || '');
       const categories = await dbService.getCategories();
       const category = categories.find((c) => c.slug === slug);
       if (!category) {

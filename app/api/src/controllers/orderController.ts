@@ -212,7 +212,7 @@ export const orderController = {
    */
   async getOrderStatus(req: Request, res: Response): Promise<void> {
     try {
-      const { orderCode } = req.params;
+      const orderCode = String(req.params.orderCode || '');
       const order = await dbService.getOrderByCode(orderCode);
       if (!order) {
         res.status(404).json({
