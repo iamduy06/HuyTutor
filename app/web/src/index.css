@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+    color: #222222;
+    background-color: #ffffff;
+  }
+}
+
+.hero-soft-bg {
+  background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%);
+}
+
+.book-3d {
+  box-shadow: -6px 6px 14px rgba(0, 0, 0, 0.22), -2px 2px 4px rgba(0, 0, 0, 0.12);
+  transform: perspective(600px) rotateY(-8deg);
+  transition: transform 0.25s ease;
+}
+
+.product-card:hover .book-3d {
+  transform: perspective(600px) rotateY(-2deg) translateY(-2px);
+}
+
+.watermark-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='340' height='220'%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='12' font-weight='800' fill='rgba(230,0,73,0.13)' text-anchor='middle' transform='rotate(-26 170 110)'%3ET%C3%80I LI%E1%BB%86U %C4%90%E1%BB%8CC TH%E1%BB%AC HUY TUTOR - HUYTUTOR.EDU.VN%3C/text%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
