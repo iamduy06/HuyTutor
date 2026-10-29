@@ -1,0 +1,222 @@
+import { Request, Response } from 'express';
+import { dbService } from '../services/dbService';
+import { createR2PresignedUploadUrl, stampPdfBufferWithWatermark } from '../services/r2Service';
+import { submitOrderToGoogleForm } from '../services/googleFormService';
+
+export const adminController = {
+  /**
+   * GET /api/admin/overview
+   * Tải toàn bộ dữ liệu quản trị (Sản phẩm, Định dạng, Menu, Danh mục, Đơn hàng, Thống kê)
+   * Tất cả luồng dữ liệu Database đi qua Backend.
+   */
+  async getDashboardOverview(_req: Request, res: Response): Promise<void> {
+    try {
+      const [products, categories, menus, comboRules, orders] = await Promise.all([
+        dbService.getProducts({ includeInactive: true }),
+        dbService.getCategories(),
+        dbService.getMenus(true),
+        dbService.getComboRules(),
+        dbService.getAllOrders(),
+      ]);
+
+      const paidOrders = orders.filter((o) => o.payment_status === 'paid');
+      const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      const syncedFormCount = orders.filter((o) => o.google_form_submitted).length;
+
+      res.json({
+        ok: true,
+        stats: {
+          totalProducts: products.length,
+          activeProducts: products.filter((p) => p.is_active).length,
+          totalOrders: orders.length,
+          paidOrders: paidOrders.length,
+          totalRevenue,
+          syncedFormCount,
+        },
+        products,
+        categories,
+        menus,
+        comboRules,
+        orders,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải dữ liệu trang quản trị.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/products
+   * PUT /api/admin/products/:slug
+   * Tạo mới hoặc cập nhật sản phẩm kèm 5 định dạng giá, chế độ đọc thử, watermark và repeater
+   */
+  async upsertProduct(req: Request, res: Response): Promise<void> {
+    try {
+      const slugParam = req.params.slug;
+      const payload = {
+        ...req.body,
+        slug: req.body.slug || slugParam,
+      };
+
+      if (!payload.title) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng nhập Tên tài liệu (title).',
+        });
+        return;
+      }
+
+      const savedProduct = await dbService.upsertProduct(payload);
+      res.json({
+        ok: true,
+        message: 'Đã lưu cấu hình sản phẩm và 5 định dạng giá vào Database thành công.',
+        product: savedProduct,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi lưu sản phẩm từ Admin.',
+      });
+    }
+  },
+
+  /**
+   * DELETE /api/admin/products/:slug
+   */
+  async deleteProduct(req: Request, res: Response): Promise<void> {
+    try {
+      const { slug } = req.params;
+      const deleted = await dbService.deleteProduct(slug);
+      res.json({
+        ok: true,
+        deleted,
+        message: deleted
+          ? `Đã xóa tài liệu "${slug}" khỏi Database.`
+          : `Không tìm thấy tài liệu "${slug}".`,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi xóa sản phẩm.',
+      });
+    }
+  },
+
+  /**
+   * PUT /api/admin/menus
+   * Cập nhật danh sách Menu điều hướng động
+   */
+  async updateMenus(req: Request, res: Response): Promise<void> {
+    try {
+      const { menus } = req.body;
+      if (!Array.isArray(menus)) {
+        res.status(400).json({ ok: false, error: 'Dữ liệu menus phải là mảng.' });
+        return;
+      }
+      const updated = await dbService.updateMenus(menus);
+      res.json({
+        ok: true,
+        menus: updated,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi cập nhật Menu.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/upload-presign
+   * Tạo Presigned URL để Admin tải ảnh bìa Thumbnail / ảnh đọc thử / PDF đọc thử lên Cloudflare R2
+   */
+  async createUploadPresign(req: Request, res: Response): Promise<void> {
+    try {
+      const { folder = 'thumbnails', fileName = 'image.png', contentType = 'image/png' } = req.body;
+      const validFolders = ['thumbnails', 'previews', 'samples', 'banners'] as const;
+      const safeFolder = validFolders.includes(folder) ? folder : 'thumbnails';
+
+      const result = await createR2PresignedUploadUrl({
+        folder: safeFolder,
+        fileName: String(fileName),
+        contentType: String(contentType),
+      });
+
+      res.json({
+        ok: true,
+        ...result,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi khởi tạo Presigned URL cho Cloudflare R2.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/stamp-pdf
+   * Đóng dấu Watermark chéo (Lớp 2 - pdf-lib) lên file PDF đọc thử trước khi lưu lên R2
+   */
+  async stampPdfWatermark(req: Request, res: Response): Promise<void> {
+    try {
+      const { pdfBase64, watermarkText } = req.body;
+      if (!pdfBase64) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng gửi kèm nội dung file PDF (pdfBase64) để đóng dấu Watermark.',
+        });
+        return;
+      }
+
+      const rawBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '');
+      const inputBytes = Uint8Array.from(Buffer.from(rawBase64, 'base64'));
+      const stampedBytes = await stampPdfBufferWithWatermark(
+        inputBytes,
+        watermarkText || 'TAI LIEU DOC THU HUY TUTOR - HUYTUTOR.EDU.VN'
+      );
+
+      res.json({
+        ok: true,
+        stampedPdfBase64: Buffer.from(stampedBytes).toString('base64'),
+        message: 'Đã đóng dấu Watermark bảo vệ bản quyền vào từng trang PDF thành công.',
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi đóng dấu Watermark PDF.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/orders/:orderCode/resync-form
+   * Cho phép Admin bắn lại 14 entry của đơn hàng vào Google Form nội bộ
+   */
+  async resyncOrderToGoogleForm(req: Request, res: Response): Promise<void> {
+    try {
+      const { orderCode } = req.params;
+      const order = await dbService.getOrderByCode(orderCode);
+      if (!order) {
+        res.status(404).json({
+          ok: false,
+          error: `Không tìm thấy đơn hàng mã "${orderCode}".`,
+        });
+        return;
+      }
+
+      const syncResult = await submitOrderToGoogleForm(order);
+      res.json({
+        ok: true,
+        syncResult,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi đồng bộ lại Google Form.',
+      });
+    }
+  },
+};
