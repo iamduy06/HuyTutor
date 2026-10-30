@@ -1,0 +1,13 @@
+/docs
+/huytutor.io.vn
+/demo
+node_modules/
+dist/
+package-lock.json
+.env
+.env.*
+!.env.example
+!.env.*.example
+app/api/data/
+*.log
+.DS_Store
