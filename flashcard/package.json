@@ -1,0 +1,22 @@
+{
+  "name": "huytutor-flashcard-monorepo",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:api": "npm run build -w @huytutor/shared && npm run build -w huytutor-api",
+    "start:api": "npm run start -w huytutor-api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "lint": "npm run lint --workspaces"
+  }
+}
