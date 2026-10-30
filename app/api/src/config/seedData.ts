@@ -230,6 +230,7 @@ export interface HomepageBottomBannerConfig {
   mode: 'custom_html' | 'custom_image' | 'structured';
   custom_html?: string;
   custom_image_url?: string;
+  image_url?: string;
   link_url?: string;
   tag?: string;
   title?: string;

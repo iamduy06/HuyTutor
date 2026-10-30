@@ -25,34 +25,34 @@ import {
 
 const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string; desc: string }> = {
   hero: {
-    name: 'Khung Đen: Hero Top Header',
-    color: 'bg-gray-900 text-white',
-    desc: 'Phần đầu trang (Chữ + Hình ảnh R2 bên phải / HTML / Full ảnh)',
+    name: 'Hero Header (Phần đầu trang)',
+    color: 'bg-rose-700 text-white',
+    desc: 'Phần đầu trang (Chữ + Ảnh Thầy giáo bên phải / HTML / Full ảnh)',
   },
   top_banner: {
-    name: 'Khung Xanh Dương: Top Banner',
+    name: 'Top Banner (Ưu đãi / Nổi bật)',
     color: 'bg-sky-700 text-white',
-    desc: 'Banner trên (Chữ + Up ảnh R2 / Sách 3D / HTML / Full ảnh)',
+    desc: 'Banner quảng cáo (Tải ảnh banner rộng, đứng một mình full-width / HTML)',
   },
   categories_grid: {
-    name: 'Khung Vàng: Danh mục ô vuông',
+    name: 'Danh mục sản phẩm',
     color: 'bg-amber-600 text-white',
-    desc: 'Các ô danh mục sản phẩm linh hoạt số lượng (Upload ảnh R2 / Link)',
+    desc: 'Các ô danh mục sản phẩm squircle icon linh hoạt số lượng',
   },
   section_groups: {
-    name: 'Khung Tím: Nhóm tài liệu cấp 1 & Cấp 2',
+    name: 'Nhóm tài liệu & Sản phẩm',
     color: 'bg-purple-800 text-white',
-    desc: 'Từng nhóm tài liệu & các sản phẩm cấp 2 có tên hiển thị riêng, bật/tắt',
+    desc: 'Các nhóm tài liệu (THPT, THCS...) với card sách 3D + badge + Đọc thử + tên sách',
   },
   notice_text: {
-    name: 'Khung Xám: Dòng chữ thông báo & Nút',
+    name: 'Thông báo & Nút liên kết (Notice / CTA)',
     color: 'bg-zinc-700 text-white',
-    desc: 'Dòng chữ màu xám/hồng + nút chuyển hướng xem toàn bộ',
+    desc: 'Dòng thông báo & nút điều hướng (Tham gia nhóm Facebook / Xem toàn bộ)',
   },
   bottom_banner: {
-    name: 'Khung Nâu: Banner cuối trang',
-    color: 'bg-stone-800 text-white',
-    desc: 'Banner cuối trang (Ảnh mới / HTML / 3D books)',
+    name: 'Bottom Banner (Chân trang)',
+    color: 'bg-emerald-700 text-white',
+    desc: 'Banner chân trang (Tải ảnh banner rộng hoặc HTML)',
   },
 };
 
@@ -68,7 +68,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_hero_default',
         type: 'hero',
-        title_label: 'Khung Đen: Hero Top Header',
+        title_label: 'Hero Header (Phần đầu trang)',
         is_active: siteConfigs?.homepage_hero?.is_active ?? true,
         sort_order: 1,
         config: siteConfigs?.homepage_hero || {
@@ -83,7 +83,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_banner_default',
         type: 'top_banner',
-        title_label: 'Khung Xanh Dương: Top Banner',
+        title_label: 'Top Banner (Ưu đãi / Nổi bật)',
         is_active: siteConfigs?.homepage_top_banner?.is_active ?? true,
         sort_order: 2,
         config: siteConfigs?.homepage_top_banner || {
@@ -101,7 +101,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_cat_grid_default',
         type: 'categories_grid',
-        title_label: 'Khung Vàng: Danh mục ô vuông',
+        title_label: 'Danh mục sản phẩm',
         is_active: siteConfigs?.homepage_categories_grid?.is_active ?? true,
         sort_order: 3,
         config: siteConfigs?.homepage_categories_grid || {
@@ -113,7 +113,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_sec_groups_default',
         type: 'section_groups',
-        title_label: 'Khung Tím: Nhóm tài liệu cấp 1 & Cấp 2',
+        title_label: 'Nhóm tài liệu & Sản phẩm',
         is_active: siteConfigs?.homepage_section_groups?.is_active ?? true,
         sort_order: 4,
         config: siteConfigs?.homepage_section_groups || {
@@ -123,7 +123,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_notice_default',
         type: 'notice_text',
-        title_label: 'Khung Xám: Dòng chữ thông báo & Nút',
+        title_label: 'Thông báo & Nút liên kết (Notice / CTA)',
         is_active: siteConfigs?.homepage_notice_text?.is_active ?? true,
         sort_order: 5,
         config: siteConfigs?.homepage_notice_text || {
@@ -136,7 +136,7 @@ export const AdminHomepageCms: React.FC = () => {
       {
         id: 'block_bottom_banner_default',
         type: 'bottom_banner',
-        title_label: 'Khung Nâu: Banner cuối trang',
+        title_label: 'Bottom Banner (Chân trang)',
         is_active: siteConfigs?.homepage_bottom_banner?.is_active ?? true,
         sort_order: 6,
         config: siteConfigs?.homepage_bottom_banner || {
@@ -408,14 +408,14 @@ export const AdminHomepageCms: React.FC = () => {
               className="text-xs p-1.5 border border-gray-300 rounded font-bold bg-white text-[#e60049] cursor-pointer"
             >
               <option value="" disabled>
-                Chọn loại khung muốn thêm...
+                + Thêm khối nội dung mới...
               </option>
-              <option value="hero">Khung Đen: Hero Top Header</option>
-              <option value="top_banner">Khung Xanh Dương: Top Banner</option>
-              <option value="categories_grid">Khung Vàng: Danh mục ô vuông</option>
-              <option value="section_groups">Khung Tím: Nhóm tài liệu cấp 1 &amp; Cấp 2</option>
-              <option value="notice_text">Khung Xám: Dòng chữ thông báo &amp; Nút</option>
-              <option value="bottom_banner">Khung Nâu: Banner cuối trang</option>
+              <option value="hero">Hero Header (Phần đầu trang)</option>
+              <option value="top_banner">Top Banner (Ưu đãi / Nổi bật)</option>
+              <option value="categories_grid">Danh mục sản phẩm</option>
+              <option value="section_groups">Nhóm tài liệu &amp; Sản phẩm</option>
+              <option value="notice_text">Thông báo &amp; Nút liên kết (Notice / CTA)</option>
+              <option value="bottom_banner">Bottom Banner (Chân trang)</option>
             </select>
           </div>
         </div>
@@ -555,7 +555,7 @@ export const AdminHomepageCms: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <div>
                   <span className="text-[10px] font-black uppercase text-[#e60049] tracking-wider">
-                    ĐANG CẤU HÌNH KHUNG #{currentBlockIndex + 1}
+                    ĐANG CẤU HÌNH KHỐI NỘI DUNG #{currentBlockIndex + 1}
                   </span>
                   <h3 className="font-extrabold text-sm text-gray-900 mt-0.5">
                     {currentBlock.title_label || BLOCK_TYPE_LABELS[currentBlock.type]?.name}
@@ -873,7 +873,7 @@ export const AdminHomepageCms: React.FC = () => {
                 </div>
               )}
 
-              {/* 2. KHUNG XANH DƯƠNG: TOP BANNER */}
+              {/* 2. TOP BANNER (BANNER NỔI BẬT) */}
               {currentBlock.type === 'top_banner' && (
                 <div className="space-y-4">
                   {/* Mode switch */}
@@ -1227,7 +1227,7 @@ export const AdminHomepageCms: React.FC = () => {
                 </div>
               )}
 
-              {/* 3. KHUNG VÀNG: DANH MỤC Ô VUÔNG (DYNAMIC SỐ LƯỢNG) */}
+              {/* 3. DANH MỤC SẢN PHẨM */}
               {currentBlock.type === 'categories_grid' && (
                 <div className="space-y-4">
                   <div>
@@ -1521,7 +1521,7 @@ export const AdminHomepageCms: React.FC = () => {
                 </div>
               )}
 
-              {/* 4. KHUNG TÍM: NHÓM TÀI LIỆU CẤP 1 & CẤP 2 */}
+              {/* 4. NHÓM TÀI LIỆU & SẢN PHẨM */}
               {currentBlock.type === 'section_groups' && (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -1875,7 +1875,7 @@ export const AdminHomepageCms: React.FC = () => {
                 </div>
               )}
 
-              {/* 5. KHUNG XÁM: DÒNG CHỮ THÔNG BÁO & NÚT */}
+              {/* 5. THÔNG BÁO & NÚT LIÊN KẾT */}
               {currentBlock.type === 'notice_text' && (
                 <div className="space-y-4">
                   <div>
@@ -1935,7 +1935,7 @@ export const AdminHomepageCms: React.FC = () => {
                 </div>
               )}
 
-              {/* 6. KHUNG NÂU: BOTTOM BANNER */}
+              {/* 6. BOTTOM BANNER */}
               {currentBlock.type === 'bottom_banner' && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">

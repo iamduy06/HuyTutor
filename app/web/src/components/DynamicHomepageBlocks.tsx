@@ -10,7 +10,7 @@ import {
 } from '../types';
 
 /**
- * 1. Khung Đen: Hero Top Header (Phía trên cùng là hình ảnh, không phải khung chữ)
+ * 1. Hero Header (Phần đầu trang - Tiêu đề, phụ đề, gạch đầu dòng và ảnh Thầy giáo đứng riêng, không khung viền)
  */
 export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ config }) => {
   if (!config || config.is_active === false) return null;
@@ -26,13 +26,14 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
   }
 
   if (config.mode === 'custom_image') {
-    if (!config.custom_image_url?.trim()) return null;
+    const img = config.custom_image_url || config.image_url;
+    if (!img?.trim()) return null;
     return (
       <section className="w-full overflow-hidden">
         <img
-          src={config.custom_image_url}
+          src={img}
           alt={config.title || ''}
-          className="w-full h-auto object-cover"
+          className="w-full h-auto object-cover block"
         />
       </section>
     );
@@ -46,38 +47,40 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
   }
 
   return (
-    <section className="hero-soft-bg pt-10 pb-8 border-b border-pink-50">
-      <div className="max-w-[920px] mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+    <section className="pt-8 sm:pt-12 pb-6 sm:pb-8 bg-gradient-to-b from-[#fff6f8] via-[#fffbfc] to-white border-b border-pink-50/60">
+      <div className="max-w-[1100px] mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Cột Trái: Chữ (Tiêu đề, phụ đề, gạch đầu dòng) */}
-          <div className={config.image_url ? 'md:col-span-7' : 'col-span-12'}>
+          <div className={config.image_url ? 'md:col-span-7 space-y-3' : 'col-span-12 space-y-3'}>
             {config.subtitle && (
-              <p className="text-[#e60049] font-bold text-sm mb-1">{config.subtitle}</p>
+              <p className="text-[#e60049] font-bold text-sm sm:text-base leading-snug">
+                {config.subtitle}
+              </p>
             )}
             {config.title && (
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#e60049] tracking-tight mb-4">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-[#e60049] tracking-tight leading-tight">
                 {config.title}
               </h1>
             )}
             {bullets.length > 0 && (
-              <ul className="space-y-1.5 text-xs sm:text-[13px] text-gray-700 font-medium">
+              <ul className="space-y-2 pt-1 text-xs sm:text-sm text-gray-800 font-medium">
                 {bullets.map((b, idx) => (
-                  <li key={idx} className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-800 shrink-0" />
-                    <span>{b}</span>
+                  <li key={idx} className="flex items-start gap-2.5">
+                    <span className="w-1.5 h-1.5 bg-gray-900 rounded-2xs mt-1.5 shrink-0 inline-block" />
+                    <span className="leading-relaxed">{b}</span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {/* Cột Phải: Hình ảnh trực tiếp (Không dùng khung chữ/vòm CSS) */}
+          {/* Cột Phải: Hình ảnh Thầy giáo tự nhiên (Tuyệt đối không đóng khung, viền hay vòm CSS) */}
           {config.image_url && (
             <div className="md:col-span-5 flex justify-center items-center">
               <img
                 src={config.image_url}
                 alt={config.title || 'Huy Tutor'}
-                className="max-h-[260px] sm:max-h-[300px] w-auto max-w-full object-contain drop-shadow-sm"
+                className="max-h-[280px] sm:max-h-[340px] w-auto max-w-full object-contain mx-auto block"
               />
             </div>
           )}
@@ -88,7 +91,7 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
 };
 
 /**
- * 2. Khung Xanh Dương: Banner Top (Hỗ trợ Chữ + Up hình ảnh / Sách 3D / HTML / Custom Image)
+ * 2. Top Banner (Banner Ưu đãi / Nổi bật - Ảnh đứng một mình full-width, KHÔNG bọc trong khung vàng)
  */
 export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null }> = ({
   config,
@@ -105,80 +108,69 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
     );
   }
 
-  if (config.mode === 'custom_image') {
-    if (!config.custom_image_url?.trim()) return null;
+  const imageUrl = config.image_url || config.custom_image_url;
+
+  // Khi có ảnh: Ảnh đứng một mình (full-width container), KHÔNG bao giờ bị nhốt trong khung nền vàng!
+  if (imageUrl) {
     return (
-      <section>
-        <Link to={config.link_url || '#'}>
+      <section className="space-y-3">
+        {config.header_label && (
+          <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
+        )}
+        <Link
+          to={config.link_url || '#'}
+          className="block w-full overflow-hidden rounded-2xl shadow-sm hover:opacity-95 transition"
+        >
           <img
-            src={config.custom_image_url}
-            alt={config.title || ''}
-            className="w-full h-auto object-cover rounded-md shadow-sm"
+            src={imageUrl}
+            alt={config.header_label || config.title || 'Banner'}
+            className="w-full h-auto object-cover rounded-2xl block"
           />
         </Link>
       </section>
     );
   }
 
-  const isImageText = config.mode === 'image_text' || (!!config.image_url && (!config.books || config.books.length === 0));
+  // Trường hợp không có ảnh up lên, render thẻ 3D Books nếu có cấu hình
   const books = config.books || [];
-
-  if (!config.title && !config.header_label && books.length === 0 && !config.image_url) {
+  if (books.length === 0 && !config.title) {
     return null;
   }
 
   return (
-    <section>
+    <section className="space-y-3">
       {config.header_label && (
-        <h2 className="text-[#e60049] font-bold text-sm mb-3">{config.header_label}</h2>
+        <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
       )}
       <Link
         to={config.link_url || '#'}
-        className="block rounded-md overflow-hidden border border-amber-200 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 relative hover:opacity-95 transition"
+        className="block rounded-2xl overflow-hidden border border-amber-200/80 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 hover:opacity-95 transition"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-          {/* Cột Trái: Hình ảnh up lên HOẶC Bộ sách 3D */}
-          {isImageText && config.image_url ? (
-            <div className="md:col-span-5 flex items-center justify-center p-2">
-              <img
-                src={config.image_url}
-                alt={config.title || 'Banner'}
-                className="max-h-[180px] sm:max-h-[220px] w-auto max-w-full object-contain rounded drop-shadow-sm"
-              />
-            </div>
-          ) : books.length > 0 ? (
-            <div className="md:col-span-6 flex items-center justify-center gap-3">
-              {books.map((b, idx) => (
-                <div
-                  key={idx}
-                  className={`book-3d w-24 rounded-sm bg-gradient-to-br ${b.gradient || ''} p-2 text-white flex flex-col justify-between ${
-                    idx === 1 ? 'h-34 z-10 scale-105' : 'h-32'
-                  }`}
-                >
-                  <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                  <div className="font-black text-[10px] leading-tight uppercase">{b.title}</div>
-                  {b.badge && (
-                    <span
-                      className={`text-[7px] px-1 py-0.5 rounded-sm w-fit font-bold ${
-                        idx === 1 ? 'bg-amber-400 text-black' : 'bg-white/20 text-white'
-                      }`}
-                    >
-                      {b.badge}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <div className="md:col-span-6 flex items-center justify-center gap-3">
+            {books.map((b, idx) => (
+              <div
+                key={idx}
+                className={`book-3d w-24 rounded-sm bg-gradient-to-br ${b.gradient || ''} p-2 text-white flex flex-col justify-between ${
+                  idx === 1 ? 'h-34 z-10 scale-105' : 'h-32'
+                }`}
+              >
+                <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                <div className="font-black text-[10px] leading-tight uppercase">{b.title}</div>
+                {b.badge && (
+                  <span
+                    className={`text-[7px] px-1 py-0.5 rounded-sm w-fit font-bold ${
+                      idx === 1 ? 'bg-amber-400 text-black' : 'bg-white/20 text-white'
+                    }`}
+                  >
+                    {b.badge}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
 
-          {/* Cột Phải: Nội dung Chữ */}
-          <div className={
-            (isImageText && config.image_url)
-              ? 'md:col-span-7 text-center md:text-left'
-              : books.length > 0
-              ? 'md:col-span-6 text-center md:text-left'
-              : 'col-span-12 text-center'
-          }>
+          <div className="md:col-span-6 text-center md:text-left">
             {config.tag && (
               <div className="inline-block text-[10px] font-bold text-[#e60049] uppercase tracking-wider mb-1">
                 {config.tag}
@@ -195,7 +187,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
               </div>
             )}
             {config.cta_badge && (
-              <div className="inline-block mt-2 bg-sky-600 text-white text-[11px] font-extrabold px-3 py-0.5 rounded-sm uppercase">
+              <div className="inline-block mt-2.5 bg-sky-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-sm uppercase tracking-wide">
                 {config.cta_badge}
               </div>
             )}
@@ -207,7 +199,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
 };
 
 /**
- * 3. Khung Vàng: Danh mục sản phẩm cấp 1 (Ô vuông động số lượng - Dynamic counts, không cố định 6 khung)
+ * 3. Danh mục sản phẩm (Các ô icon tự đứng một mình, linh hoạt số lượng)
  */
 export const CategoriesGridBlock: React.FC<{
   config?: HomepageCategoriesGridConfig | null;
@@ -219,31 +211,29 @@ export const CategoriesGridBlock: React.FC<{
   return (
     <section>
       {config.title && (
-        <h2 className="text-[#e60049] font-bold text-sm mb-3">{config.title}</h2>
+        <h2 className="text-[#e60049] font-bold text-sm sm:text-base mb-4">{config.title}</h2>
       )}
-      {/* Grid động tự động dàn trải dựa trên số lượng items */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
         {activeItems.map((cat) => (
           <Link
             key={cat.id}
             to={cat.to || (cat.category_slug ? `/${cat.category_slug}` : '#')}
             className="group text-center flex flex-col items-center"
           >
-            <div className="w-full aspect-square rounded-md bg-gradient-to-br from-[#e60049] to-[#b30038] p-3 flex items-center justify-center shadow-sm group-hover:opacity-90 transition overflow-hidden">
-              {cat.image_url && cat.image_url.trim() ? (
-                <img
-                  src={cat.image_url}
-                  alt={cat.label || ''}
-                  className="w-full h-full object-contain filter brightness-0 invert"
-                />
-              ) : cat.icon_code ? (
-                <div className="w-12 h-14 border-2 border-white/80 rounded-sm bg-white/15 flex items-center justify-center text-white font-black text-xs">
-                  {cat.icon_code}
-                </div>
-              ) : null}
-            </div>
+            {/* Nếu có ảnh: Ảnh hiển thị trực tiếp một mình, không bị nhồi nhét vào hộp màu khác */}
+            {cat.image_url && cat.image_url.trim() ? (
+              <img
+                src={cat.image_url}
+                alt={cat.label || ''}
+                className="w-full aspect-square object-contain rounded-2xl shadow-xs group-hover:scale-105 transition-transform duration-200 block"
+              />
+            ) : cat.icon_code ? (
+              <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-[#c8003f] to-[#9e0031] p-3 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform duration-200 text-white font-black text-xl sm:text-2xl">
+                {cat.icon_code}
+              </div>
+            ) : null}
             {cat.label && (
-              <span className="block text-[11px] font-bold text-gray-800 mt-1.5 group-hover:text-[#e60049] truncate max-w-full">
+              <span className="block text-xs font-bold text-gray-900 mt-2 text-center group-hover:text-[#e60049] transition truncate max-w-full">
                 {cat.label}
               </span>
             )}
@@ -255,7 +245,7 @@ export const CategoriesGridBlock: React.FC<{
 };
 
 /**
- * 4. Khung Tím: Nhóm tài liệu cấp 1 & Các sản phẩm cấp 2 tự cấu hình tên/ảnh (Không fallback)
+ * 4. Nhóm tài liệu & Sản phẩm (Chuẩn giao diện: Hộp bìa sách 3D + Badge & Tag -> Nút Đọc thử -> Tên sách căn giữa)
  */
 export const SectionGroupsBlock: React.FC<{
   config?: HomepageSectionGroupsConfig | null;
@@ -266,7 +256,7 @@ export const SectionGroupsBlock: React.FC<{
   if (activeSections.length === 0) return null;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       {activeSections.map((sec) => {
         const activeItems = (sec.items || []).filter((it) => it.is_active !== false);
         if (activeItems.length === 0) return null;
@@ -274,66 +264,66 @@ export const SectionGroupsBlock: React.FC<{
         return (
           <section key={sec.id}>
             {sec.title && (
-              <h2 className="text-[#e60049] font-bold text-sm mb-4">{sec.title}</h2>
+              <h2 className="text-[#e60049] font-bold text-base sm:text-lg mb-4">{sec.title}</h2>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
               {activeItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="border border-gray-200 rounded-md overflow-hidden bg-white hover:border-[#e60049] transition shadow-sm flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Image Thumbnail with Auto Scale */}
+                <div key={item.id} className="flex flex-col">
+                  {/* Hộp trên: Bìa sách 3D bên trái + Badge & Mô tả bên phải */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[160px] flex items-center justify-center gap-4 shadow-2xs hover:border-gray-300 transition">
+                    {/* Cột trái: Mockup bìa sách 3D */}
                     <Link
                       to={item.target_url || '#'}
-                      className="block w-full aspect-[4/3] sm:aspect-[1/1] bg-gray-50 relative overflow-hidden flex items-center justify-center p-3"
+                      className="h-full flex items-center justify-center shrink-0"
                     >
                       {item.image_url && item.image_url.trim() ? (
                         <img
                           src={item.image_url}
                           alt={item.display_title || ''}
-                          className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
+                          className="max-h-[135px] w-auto max-w-full object-contain drop-shadow-md hover:scale-105 transition-transform duration-200 block"
                         />
                       ) : (
-                        <div className="w-16 h-20 bg-gray-100 rounded flex items-center justify-center text-gray-300 font-bold text-xs">
+                        <div className="w-20 h-28 bg-gray-100 rounded border border-dashed flex items-center justify-center text-gray-400 font-bold text-[11px]">
                           Tài liệu
                         </div>
                       )}
-
-                      {item.badge_text && (
-                        <span className="absolute top-2 right-2 bg-[#e60049] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">
-                          {item.badge_text}
-                        </span>
-                      )}
                     </Link>
 
-                    {/* Display Info */}
-                    <div className="p-3.5 space-y-1.5">
-                      {item.tag_text && (
-                        <div className="text-[10px] text-gray-500 font-semibold truncate">
-                          {item.tag_text}
-                        </div>
-                      )}
-                      {item.display_title && (
-                        <Link
-                          to={item.target_url || '#'}
-                          className="font-bold text-xs text-gray-800 line-clamp-2 hover:text-[#e60049] transition leading-snug"
-                        >
-                          {item.display_title}
-                        </Link>
-                      )}
-                    </div>
+                    {/* Cột phải: Badge "Mới" / "Chính chủ" + Dòng mô tả (nếu có) */}
+                    {(item.badge_text || item.tag_text) && (
+                      <div className="flex flex-col justify-start items-start space-y-1.5 flex-1 min-w-0">
+                        {item.badge_text && (
+                          <span className="bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-xs tracking-wide">
+                            {item.badge_text}
+                          </span>
+                        )}
+                        {item.tag_text && (
+                          <span className="text-[12px] font-medium text-gray-800 leading-snug line-clamp-3">
+                            {item.tag_text}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="p-3.5 pt-0">
+                  {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
+                  <Link
+                    to={item.target_url || '#'}
+                    className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
+                  >
+                    Đọc thử
+                  </Link>
+
+                  {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
+                  {item.display_title && (
                     <Link
                       to={item.target_url || '#'}
-                      className="block w-full text-center py-1.5 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-sm transition shadow-sm"
+                      className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
                     >
-                      Đọc thử
+                      {item.display_title}
                     </Link>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -345,7 +335,7 @@ export const SectionGroupsBlock: React.FC<{
 };
 
 /**
- * 5. Dòng Chữ Xám: Thông Báo & Nút Xem Toàn Bộ (Không fallback)
+ * 5. Thông báo & Kêu gọi hành động (Notice / CTA - Kêu gọi tham gia nhóm, Xem toàn bộ)
  */
 export const NoticeTextBlock: React.FC<{
   config?: HomepageNoticeTextConfig | null;
@@ -354,26 +344,28 @@ export const NoticeTextBlock: React.FC<{
   if (!config.text && !config.cta_button_text) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-center py-4">
       {config.text && (
-        <p className="text-[12px] font-bold text-[#e60049] leading-relaxed whitespace-pre-line">
+        <p className="text-sm sm:text-base font-bold text-[#e60049] leading-relaxed max-w-[850px] mx-auto whitespace-pre-line">
           {config.text}
         </p>
       )}
       {config.cta_button_text && (
-        <Link
-          to={config.cta_button_link || '#'}
-          className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[12px] py-2 rounded-sm text-center transition shadow-sm"
-        >
-          {config.cta_button_text}
-        </Link>
+        <div className="pt-1">
+          <Link
+            to={config.cta_button_link || '#'}
+            className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm px-6 py-2 rounded-xs transition shadow-sm"
+          >
+            {config.cta_button_text}
+          </Link>
+        </div>
       )}
     </div>
   );
 };
 
 /**
- * 6. Khung Nâu: Bottom Banner (Không fallback)
+ * 6. Bottom Banner (Banner chân trang - Ảnh đứng một mình full-width, KHÔNG bọc trong khung màu)
  */
 export const BottomBannerBlock: React.FC<{
   config?: HomepageBottomBannerConfig | null;
@@ -390,18 +382,20 @@ export const BottomBannerBlock: React.FC<{
     );
   }
 
-  if (config.mode === 'custom_image') {
-    if (!config.custom_image_url?.trim()) return null;
+  const imageUrl = config.image_url || config.custom_image_url;
+
+  // Khi có ảnh: Ảnh đứng một mình (full-width), KHÔNG bị bọc trong khung màu!
+  if (imageUrl) {
     return (
       <section>
         <Link
           to={config.link_url || '#'}
-          className="block rounded-md overflow-hidden shadow-sm hover:opacity-95 transition"
+          className="block w-full overflow-hidden rounded-2xl shadow-sm hover:opacity-95 transition"
         >
           <img
-            src={config.custom_image_url}
-            alt={config.title || ''}
-            className="w-full h-auto object-cover rounded-md"
+            src={imageUrl}
+            alt={config.title || 'Bottom Banner'}
+            className="w-full h-auto object-cover rounded-2xl block"
           />
         </Link>
       </section>
@@ -409,7 +403,6 @@ export const BottomBannerBlock: React.FC<{
   }
 
   const books = config.books || [];
-
   if (!config.title && books.length === 0) {
     return null;
   }
@@ -418,7 +411,7 @@ export const BottomBannerBlock: React.FC<{
     <section>
       <Link
         to={config.link_url || '#'}
-        className="block rounded-md overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"
+        className="block rounded-2xl overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           {books.length > 0 && (
@@ -444,7 +437,13 @@ export const BottomBannerBlock: React.FC<{
             </div>
           )}
 
-          <div className={books.length > 0 ? 'md:col-span-7 text-center md:text-left' : 'col-span-12 text-center'}>
+          <div
+            className={
+              books.length > 0
+                ? 'md:col-span-7 text-center md:text-left'
+                : 'col-span-12 text-center'
+            }
+          >
             {config.tag && (
               <div className="text-[11px] font-extrabold text-[#e60049] uppercase">
                 {config.tag}
@@ -456,7 +455,7 @@ export const BottomBannerBlock: React.FC<{
               </div>
             )}
             {config.badge_text && (
-              <div className="inline-block mt-1.5 bg-white text-[#e60049] font-extrabold text-xs px-4 py-1 rounded-sm shadow-sm">
+              <div className="inline-block mt-2 bg-white text-[#e60049] font-extrabold text-xs px-4 py-1 rounded-sm shadow-sm">
                 {config.badge_text}
               </div>
             )}
