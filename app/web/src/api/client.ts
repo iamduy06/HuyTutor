@@ -1,4 +1,5 @@
 import {
+  AdminUserRecord,
   CategoryItem,
   ComboRule,
   MenuItem,
@@ -6,29 +7,57 @@ import {
   PaymentInstruction,
   Product,
   UiFormatCode,
+  UserLibraryItem,
+  UserProfile,
+  UserSessionItem,
 } from '../types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || 'huytutor-admin-2026';
+const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || '';
 export const R2_DOMAIN = (
   import.meta.env.VITE_R2_DOMAIN ||
   import.meta.env.VITE_R2_PUBLIC_DOMAIN ||
   'https://media.huytutor.edu.vn'
 ).replace(/\/$/, '');
 
+export const SESSION_STORAGE_KEY = 'ht_session_token';
+
 function buildApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${API_BASE_URL}${cleanPath}`;
 }
 
+function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const savedToken =
+    typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null;
+  if (savedToken) {
+    headers['Authorization'] = `Bearer ${savedToken}`;
+  }
+  if (ADMIN_API_KEY) {
+    headers['x-admin-key'] = ADMIN_API_KEY;
+  }
+  if (extra) {
+    const entries =
+      extra instanceof Headers
+        ? Array.from(extra.entries())
+        : Array.isArray(extra)
+        ? extra
+        : Object.entries(extra);
+    for (const [k, v] of entries) {
+      headers[k] = String(v);
+    }
+  }
+  return headers;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(buildApiUrl(path), {
     ...init,
-    headers: {
+    headers: buildAuthHeaders({
       'Content-Type': 'application/json',
-      'x-admin-key': ADMIN_API_KEY,
       ...(init?.headers || {}),
-    },
+    }),
   });
 
   const data = await response.json();
@@ -39,12 +68,144 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * Tất cả luồng dữ liệu liên quan đến Database (Menu, Danh mục, Sản phẩm, Định dạng,
- * Quy tắc Combo, Đơn hàng, Admin CRUD) đều bắt buộc đi qua Backend API (`app/api`).
- * Frontend (`app/web`) tuyệt đối không kết nối trực tiếp vào Supabase.
+ * Tất cả luồng dữ liệu liên quan đến Database (Tài khoản, Session, Tủ sách, Menu,
+ * Danh mục, Sản phẩm, Định dạng, Quy tắc Combo, Đơn hàng, Admin CRUD) đều bắt buộc
+ * đi qua Backend API (`app/api`). Frontend tuyệt đối không kết nối trực tiếp vào Supabase.
  */
 export const apiClient = {
-  // 1. Lấy toàn bộ dữ liệu khởi tạo từ Backend API
+  // ====================================================================
+  // NHÓM AUTHENTICATION & QUẢN LÝ SESSION (SHA3-256)
+  // ====================================================================
+  async register(payload: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone?: string;
+    customerGroup?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    schoolOrOrg?: string;
+  }): Promise<{
+    ok: boolean;
+    token: string;
+    user: UserProfile;
+  }> {
+    return requestJson('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async login(
+    email: string,
+    password: string
+  ): Promise<{
+    ok: boolean;
+    token: string;
+    user: UserProfile;
+  }> {
+    return requestJson('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async getCurrentUser(): Promise<{
+    ok: boolean;
+    user: UserProfile;
+    activeSessionCount: number;
+  }> {
+    return requestJson('/api/auth/me');
+  },
+
+  async logout(): Promise<{ ok: boolean; message: string }> {
+    return requestJson('/api/auth/logout', { method: 'POST' });
+  },
+
+  async logoutAll(): Promise<{ ok: boolean; revokedCount: number; message: string }> {
+    return requestJson('/api/auth/logout-all', { method: 'POST' });
+  },
+
+  async getSessions(): Promise<{
+    ok: boolean;
+    sessions: UserSessionItem[];
+  }> {
+    return requestJson('/api/auth/sessions');
+  },
+
+  async revokeSession(sessionId: string): Promise<{
+    ok: boolean;
+    revoked: boolean;
+    message: string;
+  }> {
+    return requestJson(`/api/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ ok: boolean; message: string }> {
+    return requestJson('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async forgotPassword(email: string): Promise<{ ok: boolean; message: string }> {
+    return requestJson('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(payload: {
+    token: string;
+    newPassword: string;
+  }): Promise<{ ok: boolean; message: string }> {
+    return requestJson('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ====================================================================
+  // NHÓM KHÁCH HÀNG: TỦ SÁCH CÁ NHÂN & HỒ SƠ
+  // ====================================================================
+  async getUserLibrary(): Promise<{
+    ok: boolean;
+    items: UserLibraryItem[];
+  }> {
+    return requestJson('/api/user/library');
+  },
+
+  async getUserOrders(): Promise<{
+    ok: boolean;
+    orders: OrderRecord[];
+  }> {
+    return requestJson('/api/user/orders');
+  },
+
+  async updateUserProfile(payload: {
+    fullName?: string;
+    phone?: string;
+    customerGroup?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    schoolOrOrg?: string;
+    defaultTaxCccd?: string;
+    defaultInvoiceAddress?: string;
+  }): Promise<{
+    ok: boolean;
+    user: UserProfile;
+    message: string;
+  }> {
+    return requestJson('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ====================================================================
+  // NHÓM CATALOG & ĐƠN HÀNG
+  // ====================================================================
   async getCatalogInit(countryOverride?: 'VN' | 'INTL'): Promise<{
     ok: boolean;
     menus: MenuItem[];
@@ -61,7 +222,6 @@ export const apiClient = {
     return requestJson(`/api/catalog/init${query}`);
   },
 
-  // 2. Lấy chi tiết 1 sản phẩm theo slug từ Backend API
   async getProductDetail(slug: string): Promise<{
     ok: boolean;
     product: Product;
@@ -70,7 +230,6 @@ export const apiClient = {
     return requestJson(`/api/catalog/products/${encodeURIComponent(slug)}`);
   },
 
-  // 3. Tạo đơn hàng mới qua Backend API
   async createOrder(payload: {
     customerName: string;
     customerEmail: string;
@@ -101,7 +260,6 @@ export const apiClient = {
     });
   },
 
-  // 4. Kiểm tra trạng thái đơn hàng qua Backend API
   async getOrderStatus(orderCode: string): Promise<{
     ok: boolean;
     order: OrderRecord;
@@ -111,7 +269,6 @@ export const apiClient = {
     return requestJson(`/api/orders/${encodeURIComponent(orderCode)}`);
   },
 
-  // 5. Giả lập xác nhận thanh toán thành công & tự động bắn 14 entry Google Form tại Backend
   async simulatePaymentSuccess(orderCode: string): Promise<{
     ok: boolean;
     order: OrderRecord;
@@ -133,7 +290,9 @@ export const apiClient = {
     });
   },
 
-  // 6. Admin: Lấy tổng quan Dashboard từ Backend API
+  // ====================================================================
+  // NHÓM QUẢN TRỊ VIÊN (ADMIN)
+  // ====================================================================
   async getAdminOverview(): Promise<{
     ok: boolean;
     stats: {
@@ -153,7 +312,6 @@ export const apiClient = {
     return requestJson('/api/admin/overview');
   },
 
-  // 7. Admin: Lưu sản phẩm mới hoặc cập nhật sản phẩm vào Database qua Backend API
   async upsertProduct(productPayload: Partial<Product>): Promise<{
     ok: boolean;
     message: string;
@@ -169,7 +327,6 @@ export const apiClient = {
     });
   },
 
-  // 8. Admin: Xóa sản phẩm qua Backend API
   async deleteProduct(slug: string): Promise<{
     ok: boolean;
     deleted: boolean;
@@ -180,7 +337,6 @@ export const apiClient = {
     });
   },
 
-  // 9. Admin: Tải file trực tiếp lên Cloudflare R2 qua Backend API (An toàn, không bị lỗi CORS)
   async uploadFileDirect(formData: FormData): Promise<{
     ok: boolean;
     publicUrl: string;
@@ -188,9 +344,7 @@ export const apiClient = {
   }> {
     const response = await fetch(buildApiUrl('/api/admin/upload-file'), {
       method: 'POST',
-      headers: {
-        'x-admin-key': ADMIN_API_KEY,
-      },
+      headers: buildAuthHeaders(),
       body: formData,
     });
 
@@ -201,7 +355,6 @@ export const apiClient = {
     return data;
   },
 
-  // 9b. Admin: Tạo Presigned URL để upload ảnh bìa / PDF lên Cloudflare R2
   async createR2UploadPresign(params: {
     folder: 'thumbnails' | 'previews' | 'samples' | 'banners';
     fileName: string;
@@ -219,7 +372,6 @@ export const apiClient = {
     });
   },
 
-  // 10. Admin: Bắn lại 14 entry đơn hàng vào Google Form qua Backend API
   async resyncOrderGoogleForm(orderCode: string): Promise<{
     ok: boolean;
     syncResult: {
@@ -236,6 +388,37 @@ export const apiClient = {
   }> {
     return requestJson(`/api/admin/orders/${encodeURIComponent(orderCode)}/resync-form`, {
       method: 'POST',
+    });
+  },
+
+  async getAdminUsers(): Promise<{
+    ok: boolean;
+    users: AdminUserRecord[];
+  }> {
+    return requestJson('/api/admin/users');
+  },
+
+  async updateAdminUserRole(
+    userId: string,
+    payload: { role?: 'user' | 'admin'; isActive?: boolean }
+  ): Promise<{
+    ok: boolean;
+    user: UserProfile;
+    message: string;
+  }> {
+    return requestJson(`/api/admin/users/${encodeURIComponent(userId)}/role`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async revokeAdminUserSessions(userId: string): Promise<{
+    ok: boolean;
+    revokedCount: number;
+    message: string;
+  }> {
+    return requestJson(`/api/admin/users/${encodeURIComponent(userId)}/sessions`, {
+      method: 'DELETE',
     });
   },
 };

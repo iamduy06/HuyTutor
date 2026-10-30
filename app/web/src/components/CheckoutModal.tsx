@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import {
   formatVnd,
@@ -9,6 +10,7 @@ import {
 } from '../types';
 
 export const CheckoutModal: React.FC = () => {
+  const { user } = useAuth();
   const {
     isCheckoutOpen,
     setIsCheckoutOpen,
@@ -39,6 +41,25 @@ export const CheckoutModal: React.FC = () => {
   const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>(
     clientRegion.recommendedGateway || 'sepay'
   );
+
+  // Tự động điền thông tin từ tài khoản đang đăng nhập
+  useEffect(() => {
+    if (user && isCheckoutOpen) {
+      setCustomerName((prev) => prev || user.fullName || '');
+      setCustomerEmail((prev) => prev || user.email || '');
+      setCustomerEmailConfirm((prev) => prev || user.email || '');
+      setCustomerPhone((prev) => prev || user.phone || '');
+      if (user.customerGroup) {
+        setCustomerGroup(user.customerGroup);
+      }
+      if (user.defaultTaxCccd) {
+        setInvoiceTaxOrCccd((prev) => prev || user.defaultTaxCccd);
+      }
+      if (user.defaultInvoiceAddress) {
+        setInvoiceAddress((prev) => prev || user.defaultInvoiceAddress);
+      }
+    }
+  }, [user, isCheckoutOpen]);
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

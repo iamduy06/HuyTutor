@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
 import {
+  AdminUserRecord,
   CategoryItem,
   FORMAT_TO_GOOGLE_FORM_MAP,
   formatVnd,
@@ -25,7 +26,9 @@ const DEFAULT_FORMATS: ProductFormat[] = [
 export const AdminPage: React.FC = () => {
   const { refreshCatalog, showToast } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'mapping'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'mapping' | 'users'>(
+    'products'
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -41,6 +44,7 @@ export const AdminPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
 
   // State cho Form Thêm mới / Chỉnh sửa Sản phẩm
@@ -78,11 +82,15 @@ export const AdminPage: React.FC = () => {
   const loadOverview = async () => {
     setLoading(true);
     try {
-      const data = await apiClient.getAdminOverview();
+      const [data, usersRes] = await Promise.all([
+        apiClient.getAdminOverview(),
+        apiClient.getAdminUsers().catch(() => ({ ok: true, users: [] })),
+      ]);
       setStats(data.stats);
       setProducts(data.products);
       setCategories(data.categories);
       setOrders(data.orders);
+      setAdminUsers(usersRes.users || []);
     } catch (err: any) {
       showToast(err?.message || 'Lỗi tải dữ liệu Admin từ Backend.');
     } finally {
@@ -293,6 +301,37 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleToggleUserRole = async (u: AdminUserRecord) => {
+    const nextRole = u.role === 'admin' ? 'user' : 'admin';
+    try {
+      const res = await apiClient.updateAdminUserRole(u.id, { role: nextRole });
+      showToast(res.message);
+      await loadOverview();
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi đổi quyền thành viên.');
+    }
+  };
+
+  const handleToggleUserActive = async (u: AdminUserRecord) => {
+    try {
+      const res = await apiClient.updateAdminUserRole(u.id, { isActive: !u.isActive });
+      showToast(res.message);
+      await loadOverview();
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi cập nhật trạng thái thành viên.');
+    }
+  };
+
+  const handleRevokeAllUserSessions = async (u: AdminUserRecord) => {
+    try {
+      const res = await apiClient.revokeAdminUserSessions(u.id);
+      showToast(res.message);
+      await loadOverview();
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi thu hồi phiên đăng nhập.');
+    }
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen pb-14">
       {/* Top Admin Header */}
@@ -388,6 +427,17 @@ export const AdminPage: React.FC = () => {
             }`}
           >
             3. Bảng Đối soát Đơn hàng &amp; Tự động hóa
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('users')}
+            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
+              activeTab === 'users'
+                ? 'bg-[#e60049] text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
+            }`}
+          >
+            4. Quản lý Thành viên, Phân quyền &amp; Session ({adminUsers.length})
           </button>
         </div>
 
@@ -1228,6 +1278,111 @@ export const AdminPage: React.FC = () => {
                     <td className="border p-2 font-bold">Người bán</td>
                     <td className="border p-2 font-bold text-[#e60049]">Luôn mặc định là "Website"</td>
                   </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: QUẢN LÝ THÀNH VIÊN, PHÂN QUYỀN & SESSION */}
+        {activeTab === 'users' && (
+          <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+              <div>
+                <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
+                  Quản lý Thành viên, Phân quyền (User / Admin) &amp; Phiên đăng nhập
+                </h2>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Toàn bộ mật khẩu được băm bằng SHA3-256 và quản lý phiên trực tiếp trong bảng{' '}
+                  <code>public.user_sessions</code>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadOverview}
+                className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-2 rounded-sm transition"
+              >
+                Làm mới danh sách
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-800 font-bold">
+                    <th className="border border-gray-200 p-2.5 text-left">Họ tên &amp; Email</th>
+                    <th className="border border-gray-200 p-2.5 text-left">Nhóm / SĐT</th>
+                    <th className="border border-gray-200 p-2.5 text-center">Vai trò (Role)</th>
+                    <th className="border border-gray-200 p-2.5 text-center">Session đang mở</th>
+                    <th className="border border-gray-200 p-2.5 text-center">Trạng thái</th>
+                    <th className="border border-gray-200 p-2.5 text-right">Thao tác quản trị</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminUsers.map((u) => (
+                    <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="border border-gray-200 p-2.5">
+                        <div className="font-bold text-gray-900">{u.fullName}</div>
+                        <div className="text-[11px] text-gray-500">{u.email}</div>
+                      </td>
+                      <td className="border border-gray-200 p-2.5">
+                        <div className="font-semibold text-gray-700">{u.customerGroup}</div>
+                        <div className="text-[11px] text-gray-500">{u.phone || '—'}</div>
+                      </td>
+                      <td className="border border-gray-200 p-2.5 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-sm text-[10px] font-extrabold uppercase ${
+                            u.role === 'admin'
+                              ? 'bg-[#e60049] text-white'
+                              : 'bg-gray-200 text-gray-800'
+                          }`}
+                        >
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="border border-gray-200 p-2.5 text-center font-bold text-gray-800">
+                        {u.activeSessions} phiên
+                      </td>
+                      <td className="border border-gray-200 p-2.5 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                            u.isActive
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {u.isActive ? 'HOẠT ĐỘNG' : 'ĐÃ KHÓA'}
+                        </span>
+                      </td>
+                      <td className="border border-gray-200 p-2.5 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserRole(u)}
+                            className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
+                          >
+                            {u.role === 'admin' ? 'Chuyển sang User' : 'Cấp quyền Admin'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserActive(u)}
+                            className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
+                          >
+                            {u.isActive ? 'Khóa tài khoản' : 'Mở khóa'}
+                          </button>
+                          {u.activeSessions > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeAllUserSessions(u)}
+                              className="border border-[#e60049] text-[#e60049] hover:bg-[#e60049] hover:text-white font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
+                            >
+                              Thu hồi Session
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

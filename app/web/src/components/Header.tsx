@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 
 export const Header: React.FC = () => {
@@ -9,8 +10,11 @@ export const Header: React.FC = () => {
     setIsCartOpen,
     setIsSearchOpen,
     toastMessage,
+    showToast,
   } = useStore();
+  const { user, isAdmin, openAuthModal, logout } = useAuth();
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -28,6 +32,12 @@ export const Header: React.FC = () => {
   const isPathActive = (slug: string) => {
     if (slug === '/') return location.pathname === '/';
     return location.pathname.startsWith(slug);
+  };
+
+  const handleLogoutClick = async () => {
+    setMenuOpen(false);
+    await logout();
+    showToast('Đã đăng xuất khỏi tài khoản.');
   };
 
   return (
@@ -99,7 +109,7 @@ export const Header: React.FC = () => {
             </Link>
           </nav>
 
-          {/* Right Tools: Search & Smart Cart */}
+          {/* Right Tools: Search, Smart Cart & Account */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -129,6 +139,71 @@ export const Header: React.FC = () => {
             >
               Giỏ hàng ({totalCartCount})
             </button>
+
+            {!user ? (
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="px-2.5 py-1 rounded-sm bg-[#e60049] text-white text-[11px] font-bold hover:bg-[#cc0041] transition"
+              >
+                Đăng nhập
+              </button>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  className="px-2.5 py-1 rounded-sm border border-gray-300 bg-white hover:border-[#e60049] text-gray-800 text-[11px] font-bold transition"
+                >
+                  {user.fullName}
+                </button>
+
+                {menuOpen && (
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-md shadow-xl py-1.5 z-50 text-xs">
+                    <div className="px-3 py-1.5 border-b border-gray-100">
+                      <div className="font-extrabold text-gray-900 truncate">
+                        {user.fullName}
+                      </div>
+                      <div className="text-[10px] text-gray-500 truncate">{user.email}</div>
+                    </div>
+
+                    <Link
+                      to="/my-library?tab=library"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-3 py-2 text-gray-700 hover:bg-[#fff5f7] hover:text-[#e60049] font-semibold"
+                    >
+                      Tủ sách của tôi
+                    </Link>
+
+                    <Link
+                      to="/my-library?tab=sessions"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-3 py-2 text-gray-700 hover:bg-[#fff5f7] hover:text-[#e60049] font-semibold"
+                    >
+                      Quản lý phiên đăng nhập
+                    </Link>
+
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setMenuOpen(false)}
+                        className="block px-3 py-2 text-[#e60049] bg-[#fff5f7] hover:bg-pink-100 font-extrabold uppercase"
+                      >
+                        Trang quản trị Admin
+                      </Link>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleLogoutClick}
+                      className="w-full text-left px-3 py-2 text-gray-600 hover:bg-gray-100 font-semibold border-t border-gray-100 mt-1"
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

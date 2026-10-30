@@ -162,3 +162,53 @@ export interface PaymentInstruction {
 export function formatVnd(amount: number): string {
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  role: 'user' | 'admin';
+  customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  schoolOrOrg: string;
+  defaultTaxCccd: string;
+  defaultInvoiceAddress: string;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface UserSessionItem {
+  id: string;
+  userAgent: string;
+  ipAddress: string;
+  createdAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+export interface UserLibraryItem {
+  id: string;
+  user_id: string;
+  order_id: string;
+  order_code: string;
+  product_slug: string;
+  product_title: string;
+  format_code: UiFormatCode;
+  access_drive_url: string;
+  watermarked_pdf_url: string;
+  download_count: number;
+  last_downloaded_at?: string;
+  is_active: boolean;
+  granted_at: string;
+  thumbnail_url?: string;
+  cover_tag?: string;
+  code?: string;
+  sample_pdf_url?: string;
+  preview_images?: string[];
+}
+
+export interface AdminUserRecord extends UserProfile {
+  activeSessions: number;
+}
