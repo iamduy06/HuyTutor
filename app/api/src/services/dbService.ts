@@ -889,6 +889,13 @@ export const dbService = {
             footer_policy_links: Array.isArray(configMap['footer_policy_links'])
               ? configMap['footer_policy_links']
               : [],
+            homepage_hero: configMap['homepage_hero'] || null,
+            homepage_top_banner: configMap['homepage_top_banner'] || null,
+            homepage_categories_grid: configMap['homepage_categories_grid'] || null,
+            homepage_section_groups: configMap['homepage_section_groups'] || null,
+            homepage_notice_text: configMap['homepage_notice_text'] || null,
+            homepage_bottom_banner: configMap['homepage_bottom_banner'] || null,
+            ...configMap,
           };
         }
       } catch (err) {

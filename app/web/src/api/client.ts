@@ -375,6 +375,14 @@ export const apiClient = {
     return data;
   },
 
+  async uploadFile(file: File, folder = 'homepage'): Promise<{ url: string; objectKey: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    const res = await this.uploadFileDirect(formData);
+    return { url: res.publicUrl, objectKey: res.objectKey };
+  },
+
   async createR2UploadPresign(params: {
     folder: 'thumbnails' | 'previews' | 'samples' | 'banners';
     fileName: string;

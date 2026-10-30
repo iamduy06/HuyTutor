@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
+import { AdminHomepageCms } from '../components/AdminHomepageCms';
 import {
   AdminUserRecord,
   CategoryItem,
@@ -37,8 +38,8 @@ export const AdminPage: React.FC = () => {
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<
-    'products' | 'orders' | 'mapping' | 'users' | 'configs'
-  >('products');
+    'homepage_cms' | 'products' | 'orders' | 'mapping' | 'users' | 'configs'
+  >('homepage_cms');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -404,7 +405,7 @@ export const AdminPage: React.FC = () => {
     <div className="bg-gray-50 min-h-screen pb-14">
       {/* Top Admin Header */}
       <div className="bg-[#e60049] text-white py-5 px-4 shadow-sm">
-        <div className="max-w-[1220px] mx-auto flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-[1520px] mx-auto flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wider opacity-90">
               HỆ THỐNG QUẢN TRỊ TRUNG TÂM • HUYTUTOR.EDU.VN
@@ -424,104 +425,180 @@ export const AdminPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-[1220px] mx-auto px-4 pt-6 space-y-6">
-        {/* 4 KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-            <div className="text-[11px] text-gray-500 font-semibold">Tổng sản phẩm trong DB</div>
-            <div className="text-xl font-black text-gray-900 mt-1">
-              {stats.totalProducts}{' '}
-              <span className="text-xs font-semibold text-emerald-600">
-                ({stats.activeProducts} đang hiển thị)
+      <div className="max-w-[1520px] mx-auto px-4 pt-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Menu Quản trị Dọc (Sidebar Nav) */}
+          <aside className="w-full lg:w-64 flex-shrink-0 bg-white border border-gray-200 rounded-md p-3 shadow-sm lg:sticky lg:top-4">
+            <div className="px-2 py-2 border-b border-gray-100 mb-2">
+              <span className="text-[10px] font-black tracking-wider uppercase text-gray-400">
+                Menu Quản Trị
               </span>
             </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-            <div className="text-[11px] text-gray-500 font-semibold">Tổng đơn hàng</div>
-            <div className="text-xl font-black text-gray-900 mt-1">
-              {stats.totalOrders}{' '}
-              <span className="text-xs font-semibold text-[#e60049]">
-                ({stats.paidOrders} đã thanh toán)
-              </span>
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-            <div className="text-[11px] text-gray-500 font-semibold">Doanh thu đã đối soát</div>
-            <div className="text-xl font-black text-[#e60049] mt-1">
-              {formatVnd(stats.totalRevenue)}
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-            <div className="text-[11px] text-gray-500 font-semibold">
-              Đồng bộ 14 Entry Google Form
-            </div>
-            <div className="text-xl font-black text-emerald-700 mt-1">
-              {stats.syncedFormCount}/{stats.totalOrders} đơn
-            </div>
-          </div>
-        </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab('products')}
-            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-              activeTab === 'products'
-                ? 'bg-[#e60049] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-            }`}
-          >
-            1. Quản lý Sản phẩm, 5 Định dạng &amp; Đọc thử Watermark
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('orders')}
-            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-              activeTab === 'orders'
-                ? 'bg-[#e60049] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-            }`}
-          >
-            2. Quản lý Đơn hàng &amp; Nhật ký 14 Entry Google Form
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('mapping')}
-            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-              activeTab === 'mapping'
-                ? 'bg-[#e60049] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-            }`}
-          >
-            3. Bảng Đối soát Đơn hàng &amp; Tự động hóa
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-              activeTab === 'users'
-                ? 'bg-[#e60049] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-            }`}
-          >
-            4. Quản lý Thành viên, Phân quyền &amp; Session ({adminUsers.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('configs')}
-            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-              activeTab === 'configs'
-                ? 'bg-[#e60049] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-            }`}
-          >
-            5. Cấu hình Menu Header &amp; Footer ({adminMenus.length})
-          </button>
-        </div>
+            <nav className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('homepage_cms')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'homepage_cms'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>1. Cấu hình Trang chủ</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'homepage_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  6 khung
+                </span>
+              </button>
 
-        {/* TAB 1: QUẢN LÝ SẢN PHẨM & 5 ĐỊNH DẠNG */}
-        {activeTab === 'products' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('products')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'products'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>2. Quản lý Sản phẩm</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'products' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {products.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('orders')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'orders'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>3. Quản lý Đơn hàng</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'orders' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {orders.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('mapping')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'mapping'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>4. Đối soát &amp; Tự động</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'mapping' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  14 Entry
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'users'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>5. Thành viên &amp; Phân quyền</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'users' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {adminUsers.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('configs')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'configs'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>6. Menu Header &amp; Footer</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'configs' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {adminMenus.length}
+                </span>
+              </button>
+            </nav>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 text-[11px] text-gray-400 text-center">
+              Hệ thống Huy Tutor v2.0
+            </div>
+          </aside>
+
+          {/* Nội dung bên phải (Main Content) */}
+          <main className="flex-1 min-w-0 space-y-6">
+            {/* 4 KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                <div className="text-[11px] text-gray-500 font-semibold">Tổng sản phẩm trong DB</div>
+                <div className="text-xl font-black text-gray-900 mt-1">
+                  {stats.totalProducts}{' '}
+                  <span className="text-xs font-semibold text-emerald-600">
+                    ({stats.activeProducts} đang hiển thị)
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                <div className="text-[11px] text-gray-500 font-semibold">Tổng đơn hàng</div>
+                <div className="text-xl font-black text-gray-900 mt-1">
+                  {stats.totalOrders}{' '}
+                  <span className="text-xs font-semibold text-[#e60049]">
+                    ({stats.paidOrders} đã thanh toán)
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                <div className="text-[11px] text-gray-500 font-semibold">Doanh thu đã đối soát</div>
+                <div className="text-xl font-black text-[#e60049] mt-1">
+                  {formatVnd(stats.totalRevenue)}
+                </div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                <div className="text-[11px] text-gray-500 font-semibold">
+                  Đồng bộ 14 Entry Google Form
+                </div>
+                <div className="text-xl font-black text-emerald-700 mt-1">
+                  {stats.syncedFormCount}/{stats.totalOrders} đơn
+                </div>
+              </div>
+            </div>
+
+            {/* TAB HOMEPAGE CMS */}
+            {activeTab === 'homepage_cms' && <AdminHomepageCms />}
+
+            {/* TAB 1: QUẢN LÝ SẢN PHẨM & 5 ĐỊNH DẠNG */}
+            {activeTab === 'products' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Cột trái: Danh sách sản phẩm trong DB */}
             <div className="lg:col-span-5 bg-white border border-gray-200 rounded-md p-4 shadow-sm space-y-3">
@@ -1875,6 +1952,8 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
         )}
+          </main>
+        </div>
       </div>
     </div>
   );

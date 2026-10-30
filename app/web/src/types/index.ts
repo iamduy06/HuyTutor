@@ -58,9 +58,115 @@ export interface FooterPolicyLink {
   is_active: boolean;
 }
 
+export interface HomepageHeroConfig {
+  mode: 'custom_html' | 'structured';
+  custom_html?: string;
+  subtitle?: string;
+  title?: string;
+  bullets?: string[];
+  badge_left?: string;
+  badge_right?: string;
+  author_avatar_url?: string;
+  author_name?: string;
+  author_title?: string;
+  is_active?: boolean;
+}
+
+export interface HomepageTopBannerBook {
+  title: string;
+  badge: string;
+  gradient: string;
+}
+
+export interface HomepageTopBannerConfig {
+  mode: 'custom_html' | 'structured';
+  custom_html?: string;
+  tag?: string;
+  title?: string;
+  subtitle?: string;
+  cta_badge?: string;
+  link_url?: string;
+  header_label?: string;
+  books?: HomepageTopBannerBook[];
+  is_active?: boolean;
+}
+
+export interface HomepageCategoryTile {
+  id: string;
+  category_slug: string;
+  label: string;
+  icon_code: string;
+  image_url: string;
+  to: string;
+  is_active: boolean;
+}
+
+export interface HomepageCategoriesGridConfig {
+  title: string;
+  items: HomepageCategoryTile[];
+  is_active?: boolean;
+}
+
+export interface HomepageSectionItem {
+  id: string;
+  display_title: string;
+  image_url: string;
+  target_url: string;
+  badge_text?: string;
+  tag_text?: string;
+  price_text?: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface HomepageSectionGroup {
+  id: string;
+  category_slug?: string;
+  title: string;
+  is_active: boolean;
+  sort_order: number;
+  items: HomepageSectionItem[];
+}
+
+export interface HomepageSectionGroupsConfig {
+  sections: HomepageSectionGroup[];
+}
+
+export interface HomepageNoticeTextConfig {
+  text: string;
+  cta_button_text?: string;
+  cta_button_link?: string;
+  is_active?: boolean;
+}
+
+export interface HomepageBottomBannerBook {
+  title: string;
+  year: string;
+  gradient: string;
+}
+
+export interface HomepageBottomBannerConfig {
+  mode: 'custom_html' | 'custom_image' | 'structured';
+  custom_html?: string;
+  custom_image_url?: string;
+  link_url?: string;
+  tag?: string;
+  title?: string;
+  badge_text?: string;
+  books?: HomepageBottomBannerBook[];
+  is_active?: boolean;
+}
+
 export interface SiteConfigs {
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
+  homepage_hero?: HomepageHeroConfig;
+  homepage_top_banner?: HomepageTopBannerConfig;
+  homepage_categories_grid?: HomepageCategoriesGridConfig;
+  homepage_section_groups?: HomepageSectionGroupsConfig;
+  homepage_notice_text?: HomepageNoticeTextConfig;
+  homepage_bottom_banner?: HomepageBottomBannerConfig;
+  [key: string]: any;
 }
 
 export interface CategoryItem {

@@ -61,16 +61,8 @@ const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 const CART_STORAGE_KEY = 'huytutor_cart_v1';
 
 const DEFAULT_SITE_CONFIGS: SiteConfigs = {
-  footer_social_links: [
-    { id: 'facebook', platform: 'facebook', label: 'Facebook Huy Tutor', url: 'https://facebook.com', icon: 'f', is_active: true },
-    { id: 'youtube', platform: 'youtube', label: 'YouTube Huy Tutor', url: 'https://youtube.com', icon: '▶', is_active: true },
-  ],
-  footer_policy_links: [
-    { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
-    { id: 'privacy', label: 'Chính sách bảo mật', url: '/terms-of-service', order_index: 2, is_active: true },
-    { id: 'faq', label: 'Chính sách thanh toán & FAQ', url: '/faq', order_index: 3, is_active: true },
-    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 4, is_active: true },
-  ],
+  footer_social_links: [],
+  footer_policy_links: [],
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
