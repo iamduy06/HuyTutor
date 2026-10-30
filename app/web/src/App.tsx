@@ -69,6 +69,10 @@ export const App: React.FC = () => {
                   path="/do-dung-day-hoc"
                   element={<CategoryPage categorySlug="do-dung-day-hoc" />}
                 />
+                <Route
+                  path="/category/:categorySlug"
+                  element={<CategoryPage />}
+                />
 
                 {/* 3. Các trang Tiện ích, Combo, Hỗ trợ & Chính sách */}
                 <Route path="/flashcard" element={<FlashcardPage />} />

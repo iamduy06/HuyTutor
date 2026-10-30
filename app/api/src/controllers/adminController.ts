@@ -148,6 +148,74 @@ export const adminController = {
   },
 
   /**
+   * POST /api/admin/categories
+   * Tạo mới hoặc cập nhật cấu hình Trang cấp 1 (bao gồm cả mảng blocks động)
+   */
+  async upsertCategory(req: Request, res: Response): Promise<void> {
+    try {
+      const payload = req.body;
+      if (!payload.name || !payload.name.trim()) {
+        res.status(400).json({ ok: false, error: 'Tên danh mục không được để trống.' });
+        return;
+      }
+      const category = await dbService.upsertCategory(payload);
+      res.json({
+        ok: true,
+        category,
+        message: `Đã lưu cấu hình Trang cấp 1 "${category.name}" thành công!`,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi lưu danh mục cấp 1.',
+      });
+    }
+  },
+
+  /**
+   * DELETE /api/admin/categories/:slug
+   * Xóa Trang cấp 1 và dọn dẹp toàn bộ file ảnh trên Cloudflare R2
+   */
+  async deleteCategory(req: Request, res: Response): Promise<void> {
+    try {
+      const slug = req.params.slug;
+      const categories = await dbService.getCategories({ includeInactive: true });
+      const targetCat = categories.find((c) => c.slug === slug || c.id === slug);
+      if (targetCat) {
+        const r2Urls = new Set<string>();
+        if (Array.isArray(targetCat.blocks)) {
+          for (const block of targetCat.blocks) {
+            const cfg = block?.config || {};
+            if (cfg.image_url) r2Urls.add(cfg.image_url);
+            if (Array.isArray(cfg.items)) {
+              for (const it of cfg.items) {
+                if (it?.image_url) r2Urls.add(it.image_url);
+              }
+            }
+          }
+        }
+        await Promise.all(
+          Array.from(r2Urls).map((url) => deleteR2Object(url).catch(() => {}))
+        );
+      }
+
+      const deleted = await dbService.deleteCategory(slug);
+      res.json({
+        ok: true,
+        deleted,
+        message: deleted
+          ? `Đã xóa danh mục "${slug}" và dọn dẹp file R2 thành công.`
+          : `Không tìm thấy danh mục "${slug}".`,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi xóa danh mục.',
+      });
+    }
+  },
+
+  /**
    * PUT /api/admin/menus
    * Cập nhật danh sách Menu điều hướng động
    */

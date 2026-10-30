@@ -1,95 +1,76 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { Product } from '../types';
-
-const BOOK_GRADIENTS = [
-  'from-orange-500 via-pink-600 to-purple-800',
-  'from-amber-700 via-orange-800 to-stone-900',
-  'from-teal-700 to-emerald-900',
-  'from-indigo-900 via-blue-900 to-teal-700',
-  'from-red-700 via-orange-700 to-amber-900',
-  'from-emerald-800 via-green-900 to-stone-900',
-  'from-fuchsia-800 via-purple-800 to-pink-700',
-  'from-rose-600 to-red-700',
-];
-
-function getBookGradient(slug: string): string {
-  let hash = 0;
-  for (let i = 0; i < slug.length; i++) {
-    hash = slug.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return BOOK_GRADIENTS[Math.abs(hash) % BOOK_GRADIENTS.length];
-}
+import { SmartLink } from './SmartLink';
 
 export const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
   const detailUrl = `/${product.category_slug || 'high-school'}/${product.slug}`;
-  const coverLines = (product.cover_tag || 'Dành cho\nKỳ thi THPTQG\ntừ năm 2027').split('\n');
-  const gradientClass = getBookGradient(product.slug);
+  const coverLines = product.cover_tag
+    ? product.cover_tag.split('\n').map((l) => l.trim()).filter(Boolean)
+    : [];
+
+  const hasTag = coverLines.length > 0 || Boolean(product.badge_text);
 
   return (
     <div className="product-card flex flex-col">
-      <Link
+      {/* Khung phía trên: Ảnh bìa + Tag (nếu có) */}
+      <SmartLink
         to={detailUrl}
-        className="bg-[#f8f9fa] border border-gray-200 rounded-md p-4 mb-2 h-[185px] flex items-center justify-between relative shadow-sm hover:border-[#e60049]/50 transition"
+        className="bg-white border border-gray-200 rounded-md p-4 mb-2 min-h-[160px] flex items-center justify-center gap-4 relative shadow-2xs hover:border-[#e60049]/50 transition overflow-hidden group"
       >
         {product.badge_text && (
-          <span className="absolute top-2.5 right-2.5 bg-[#e60049] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-sm">
+          <span className="absolute top-2.5 right-2.5 bg-[#e60049] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-xs">
             {product.badge_text}
           </span>
         )}
 
-        {/* 3D Book Cover hoặc Ảnh bìa Thumbnail từ Cloudflare R2 */}
-        <div className="w-[44%] flex justify-center">
+        {/* Thumbnail từ Cloudflare R2 */}
+        <div className={hasTag ? 'w-[45%] flex justify-center shrink-0' : 'w-full flex justify-center'}>
           {product.thumbnail_url ? (
             <img
               src={product.thumbnail_url}
               alt={product.title}
-              className="book-3d w-20 h-28 rounded-sm object-cover border border-white/20"
+              className="max-h-[135px] w-auto max-w-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-200 block"
             />
           ) : (
-            <div
-              className={`book-3d w-20 h-28 rounded-sm bg-gradient-to-br ${gradientClass} p-2 flex flex-col justify-between text-white`}
-            >
-              <span className="text-[6px] font-bold uppercase opacity-80">HUY TUTOR</span>
-              <div className="font-extrabold text-[8px] leading-tight uppercase line-clamp-3">
-                {product.code || product.title}
-              </div>
-              <span className="text-[6px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">2026</span>
+            <div className="w-20 h-28 bg-gray-100 rounded border border-dashed flex items-center justify-center text-gray-400 font-bold text-[11px]">
+              Tài liệu
             </div>
           )}
         </div>
 
-        {/* Cover Tag bên phải kèm gạch chân đỏ */}
-        <div className="w-[54%] pl-2 text-left">
-          <p className="text-[11px] text-gray-600 leading-snug">
-            {coverLines.map((line, idx) => (
-              <React.Fragment key={idx}>
-                {idx === coverLines.length - 1 ? (
-                  <strong className="text-gray-800">{line}</strong>
-                ) : (
-                  line
-                )}
-                {idx < coverLines.length - 1 && <br />}
-              </React.Fragment>
-            ))}
-          </p>
-          <div className="h-[2px] w-16 bg-[#e60049] mt-1.5" />
-        </div>
-      </Link>
+        {/* Cover Tag bên phải kèm gạch chân đỏ (Chỉ hiện khi có tag thật, không fallback giả) */}
+        {hasTag && coverLines.length > 0 && (
+          <div className="w-[55%] pl-2 text-left">
+            <p className="text-[11px] text-gray-600 leading-snug line-clamp-3">
+              {coverLines.map((line, idx) => (
+                <React.Fragment key={idx}>
+                  {idx === coverLines.length - 1 ? (
+                    <strong className="text-gray-900 font-bold">{line}</strong>
+                  ) : (
+                    line
+                  )}
+                  {idx < coverLines.length - 1 && <br />}
+                </React.Fragment>
+              ))}
+            </p>
+            <div className="h-[2px] w-14 bg-[#e60049] mt-1.5" />
+          </div>
+        )}
+      </SmartLink>
 
-      {/* Nút Đọc thử nguyên bản: bo nhẹ rounded-sm, chỉ có chữ thuần túy, không icon */}
-      <Link
+      {/* Nút Đọc thử: bo nhẹ rounded-xs, màu đỏ thương hiệu */}
+      <SmartLink
         to={detailUrl}
-        className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[12px] py-1.5 rounded-sm text-center transition mb-2"
+        className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[12px] py-1.5 rounded-xs text-center transition mb-2 shadow-xs"
       >
         Đọc thử
-      </Link>
+      </SmartLink>
 
       {/* Tên tài liệu căn giữa */}
-      <h3 className="text-[12px] font-bold text-gray-900 text-center leading-snug px-1">
-        <Link to={detailUrl} className="hover:text-[#e60049] transition">
+      <h3 className="text-[12px] font-bold text-gray-900 text-center leading-snug px-1 line-clamp-2">
+        <SmartLink to={detailUrl} className="hover:text-[#e60049] transition">
           {product.title}
-        </Link>
+        </SmartLink>
       </h3>
     </div>
   );

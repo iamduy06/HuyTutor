@@ -250,6 +250,14 @@ export const apiClient = {
     return requestJson(`/api/catalog/products/${encodeURIComponent(slug)}`);
   },
 
+  async getCategoryDetail(slug: string): Promise<{
+    ok: boolean;
+    category: CategoryItem;
+    products: Product[];
+  }> {
+    return requestJson(`/api/catalog/categories/${encodeURIComponent(slug)}`);
+  },
+
   async createOrder(payload: {
     customerName: string;
     customerEmail: string;
@@ -353,6 +361,31 @@ export const apiClient = {
     message: string;
   }> {
     return requestJson(`/api/admin/products/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async upsertCategory(categoryPayload: Partial<CategoryItem>): Promise<{
+    ok: boolean;
+    message: string;
+    category: CategoryItem;
+  }> {
+    const method = categoryPayload.slug ? 'PUT' : 'POST';
+    const url = categoryPayload.slug
+      ? `/api/admin/categories/${encodeURIComponent(categoryPayload.slug)}`
+      : '/api/admin/categories';
+    return requestJson(url, {
+      method,
+      body: JSON.stringify(categoryPayload),
+    });
+  },
+
+  async deleteCategory(slug: string): Promise<{
+    ok: boolean;
+    deleted: boolean;
+    message: string;
+  }> {
+    return requestJson(`/api/admin/categories/${encodeURIComponent(slug)}`, {
       method: 'DELETE',
     });
   },

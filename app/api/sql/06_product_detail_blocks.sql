@@ -7,3 +7,4 @@
 -- các khối giao diện động (Phần 1 -> Phần 6) của từng Trang cấp 2.
 ALTER TABLE public.products
 ADD COLUMN IF NOT EXISTS detail_blocks JSONB DEFAULT '[]'::jsonb;
+

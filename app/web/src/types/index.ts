@@ -195,6 +195,78 @@ export interface CategoryItem {
   description: string;
   sort_order: number;
   is_active: boolean;
+  blocks?: CategoryBlockItem[];
+}
+
+/**
+ * ============================================================================
+ * CẤU HÌNH CÁC KHỐI ĐỘNG CHO TRANG CẤP 1 (CATEGORY HUB PAGE BUILDER)
+ * ============================================================================
+ */
+
+export type CategoryBlockType =
+  | 'category_hero'
+  | 'category_section'
+  | 'category_banner'
+  | 'category_notice';
+
+export interface CategoryBlockItem {
+  id: string;
+  type: CategoryBlockType;
+  title_label?: string;
+  is_active: boolean;
+  sort_order: number;
+  config: any;
+}
+
+export interface CategoryHeroAnchorLink {
+  id: string;
+  label: string;
+  target_url: string;
+}
+
+export interface CategoryHeroBlockConfig {
+  title?: string;
+  subtitle?: string;
+  show_pink_glow?: boolean;
+  anchor_mode?: 'auto_from_sections' | 'manual' | 'none';
+  custom_anchors?: CategoryHeroAnchorLink[];
+  is_active?: boolean;
+}
+
+export interface CategorySectionCardItem {
+  id: string;
+  display_title: string;
+  image_url: string;
+  image_mode?: 'standalone' | 'card_box';
+  badge_text?: string;
+  tag_text?: string;
+  button_text?: string;
+  target_url: string;
+  is_active: boolean;
+}
+
+export interface CategorySectionBlockConfig {
+  title: string;
+  anchor_id?: string;
+  mode?: 'manual' | 'auto_sub_section';
+  sub_section_filter?: string;
+  items?: CategorySectionCardItem[];
+  is_active?: boolean;
+}
+
+export interface CategoryBannerBlockConfig {
+  header_label?: string;
+  image_url: string;
+  link_url?: string;
+  is_active?: boolean;
+}
+
+export interface CategoryNoticeBlockConfig {
+  title?: string;
+  content: string;
+  bg_style?: 'pink' | 'gray' | 'white';
+  is_active?: boolean;
 }
 
 export interface ComboRule {

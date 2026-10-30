@@ -52,6 +52,9 @@ router.post('/webhook/simulate-payment', webhookController.simulatePaymentSucces
 
 // 6. Luồng Quản trị Admin CRUD (100% qua Backend API)
 router.get('/admin/overview', adminAuthMiddleware, adminController.getDashboardOverview);
+router.post('/admin/categories', adminAuthMiddleware, adminController.upsertCategory);
+router.put('/admin/categories/:slug', adminAuthMiddleware, adminController.upsertCategory);
+router.delete('/admin/categories/:slug', adminAuthMiddleware, adminController.deleteCategory);
 router.post('/admin/products', adminAuthMiddleware, adminController.upsertProduct);
 router.put('/admin/products/:slug', adminAuthMiddleware, adminController.upsertProduct);
 router.delete('/admin/products/:slug', adminAuthMiddleware, adminController.deleteProduct);

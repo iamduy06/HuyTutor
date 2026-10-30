@@ -808,3 +808,4 @@ export const RelatedProductsBlock: React.FC<{
     </section>
   );
 };
+

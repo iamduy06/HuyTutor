@@ -39,6 +39,7 @@ export interface SeedCategory {
   description: string;
   sort_order: number;
   is_active: boolean;
+  blocks?: any[];
 }
 
 export interface SeedComboRule {
@@ -987,16 +988,45 @@ export const dbService = {
     return (db.site_configs as any)[key];
   },
 
-  async getCategories(): Promise<SeedCategory[]> {
+  async getCategories(options?: { includeInactive?: boolean }): Promise<SeedCategory[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const { data, error } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('categories')
           .select('*')
-          .eq('is_active', true)
           .order('sort_order', { ascending: true });
+
+        if (!options?.includeInactive) {
+          query = query.eq('is_active', true);
+        }
+
+        const { data, error } = await query;
         if (!error && data) {
-          return data as SeedCategory[];
+          // Lấy cấu hình blocks dự phòng từ site_configs nếu cột blocks trong DB chưa có hoặc null
+          const { data: configRows } = await supabaseAdmin
+            .from('site_configs')
+            .select('key, value')
+            .like('key', 'category_blocks:%');
+          const configMap = new Map<string, any[]>();
+          if (Array.isArray(configRows)) {
+            for (const r of configRows) {
+              const slug = r.key.replace('category_blocks:', '');
+              configMap.set(slug, r.value);
+            }
+          }
+
+          return data.map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            slug: row.slug,
+            description: row.description || '',
+            sort_order: row.sort_order ?? 0,
+            is_active: row.is_active ?? true,
+            blocks:
+              Array.isArray(row.blocks) && row.blocks.length > 0
+                ? row.blocks
+                : configMap.get(row.slug) || [],
+          }));
         }
       } catch (err) {
         console.error('[dbService] Supabase getCategories error:', err);
@@ -1004,7 +1034,10 @@ export const dbService = {
       return [];
     }
     const db = loadLocalDb();
-    return db.categories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+    const list = options?.includeInactive
+      ? db.categories
+      : db.categories.filter((c) => c.is_active);
+    return list.sort((a, b) => a.sort_order - b.sort_order);
   },
 
   async getComboRules(): Promise<SeedComboRule[]> {
@@ -1345,6 +1378,103 @@ export const dbService = {
     db.products = db.products.filter((p) => p.slug !== slugOrId && p.id !== slugOrId);
     saveLocalDb(db);
     return db.products.length < beforeLen;
+  },
+
+  async upsertCategory(payload: Partial<SeedCategory>): Promise<SeedCategory> {
+    const db = loadLocalDb();
+    const cleanSlug = (payload.slug || payload.name || 'danh-muc-moi')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const existingIdx = db.categories.findIndex(
+      (c) => (payload.id && c.id === payload.id) || (payload.slug && c.slug === payload.slug) || c.slug === cleanSlug
+    );
+    const existing = existingIdx >= 0 ? db.categories[existingIdx] : null;
+
+    const categoryRecord: SeedCategory = {
+      id: payload.id || existing?.id || cleanSlug,
+      name: payload.name || existing?.name || 'Danh mục mới',
+      slug: cleanSlug,
+      description: payload.description !== undefined ? payload.description : (existing?.description || ''),
+      sort_order: payload.sort_order !== undefined ? payload.sort_order : (existing?.sort_order ?? (db.categories.length + 1)),
+      is_active: payload.is_active !== undefined ? payload.is_active : (existing?.is_active ?? true),
+      blocks: Array.isArray(payload.blocks) ? payload.blocks : (existing?.blocks || []),
+    };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const baseDbRow: Record<string, any> = {
+        name: categoryRecord.name,
+        slug: categoryRecord.slug,
+        description: categoryRecord.description,
+        sort_order: categoryRecord.sort_order,
+        is_active: categoryRecord.is_active,
+      };
+
+      // Thử lưu trực tiếp cột blocks vào bảng categories
+      let { data: upsertedCat, error: catErr } = await supabaseAdmin
+        .from('categories')
+        .upsert(
+          {
+            ...baseDbRow,
+            blocks: categoryRecord.blocks || [],
+          },
+          { onConflict: 'slug' }
+        )
+        .select('*')
+        .single();
+
+      // Nếu bảng categories chưa chạy migration thêm cột blocks, tự động lưu baseDbRow
+      if (catErr) {
+        const retryRes = await supabaseAdmin
+          .from('categories')
+          .upsert(baseDbRow, { onConflict: 'slug' })
+          .select('*')
+          .single();
+        upsertedCat = retryRes.data;
+        catErr = retryRes.error;
+      }
+
+      // Đồng bộ lưu blocks vào site_configs (category_blocks:<slug>) để luôn bền vững
+      if (Array.isArray(categoryRecord.blocks)) {
+        await supabaseAdmin.from('site_configs').upsert(
+          {
+            key: `category_blocks:${categoryRecord.slug}`,
+            value: categoryRecord.blocks,
+            description: `Cấu hình các khối động Trang cấp 1 cho danh mục ${categoryRecord.slug}`,
+          },
+          { onConflict: 'key' }
+        );
+      }
+
+      if (!catErr && upsertedCat) {
+        categoryRecord.id = upsertedCat.id;
+      }
+    }
+
+    if (existingIdx >= 0) {
+      db.categories[existingIdx] = categoryRecord;
+    } else {
+      db.categories.push(categoryRecord);
+    }
+    saveLocalDb(db);
+    return categoryRecord;
+  },
+
+  async deleteCategory(slug: string): Promise<boolean> {
+    const db = loadLocalDb();
+    const idx = db.categories.findIndex((c) => c.slug === slug || c.id === slug);
+    if (idx >= 0) {
+      db.categories.splice(idx, 1);
+      saveLocalDb(db);
+    }
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      await supabaseAdmin.from('categories').delete().eq('slug', slug);
+      await supabaseAdmin.from('site_configs').delete().eq('key', `category_blocks:${slug}`);
+    }
+    return true;
   },
 
   async createOrder(order: SeedOrder): Promise<SeedOrder> {

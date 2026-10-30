@@ -1,72 +1,105 @@
 import React, { useMemo } from 'react';
-import { ProductCard } from '../components/ProductCard';
+import { useParams } from 'react-router-dom';
+import {
+  buildInitialCategoryBlocks,
+  CategoryBannerBlock,
+  CategoryHeroBlock,
+  CategoryNoticeBlock,
+  CategorySectionBlock,
+} from '../components/DynamicCategoryBlocks';
 import { useStore } from '../context/StoreContext';
-import { Product } from '../types';
+import {
+  CategoryBannerBlockConfig,
+  CategoryHeroBlockConfig,
+  CategoryItem,
+  CategoryNoticeBlockConfig,
+  CategorySectionBlockConfig,
+} from '../types';
 
-export const CategoryPage: React.FC<{ categorySlug: string }> = ({ categorySlug }) => {
+export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug: propSlug }) => {
+  const params = useParams<{ categorySlug?: string }>();
+  const activeSlug = propSlug || params.categorySlug || 'high-school';
+
   const { products, categories, isLoading } = useStore();
 
   const categoryInfo = useMemo(() => {
-    return categories.find((c) => c.slug === categorySlug) || null;
-  }, [categories, categorySlug]);
+    return (
+      categories.find((c) => c.slug === activeSlug) ||
+      ({
+        id: activeSlug,
+        slug: activeSlug,
+        name: 'Danh mục tài liệu',
+        description: '',
+        sort_order: 1,
+        is_active: true,
+        blocks: [],
+      } as CategoryItem)
+    );
+  }, [categories, activeSlug]);
 
   const categoryProducts = useMemo(() => {
-    return products.filter((p) => p.category_slug === categorySlug);
-  }, [products, categorySlug]);
+    return products.filter((p) => p.category_slug === activeSlug && p.is_active !== false);
+  }, [products, activeSlug]);
 
-  const groupedSections = useMemo(() => {
-    const map = new Map<string, Product[]>();
-    for (const prod of categoryProducts) {
-      const sec = prod.sub_section || 'Tài liệu trọng tâm';
-      const arr = map.get(sec) || [];
-      arr.push(prod);
-      map.set(sec, arr);
-    }
-    return Array.from(map.entries());
-  }, [categoryProducts]);
+  const blocks = useMemo(() => {
+    return buildInitialCategoryBlocks(categoryInfo, categoryProducts);
+  }, [categoryInfo, categoryProducts]);
+
+  const activeSections = useMemo(() => {
+    return blocks
+      .filter((b) => b.is_active && b.type === 'category_section')
+      .map((b) => b.config as CategorySectionBlockConfig);
+  }, [blocks]);
 
   return (
-    <main className="max-w-[920px] mx-auto px-4 py-10 space-y-10">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-[#e60049] leading-snug mb-3">
-          {categoryInfo ? categoryInfo.name : ''}
-        </h1>
-        {categoryInfo?.description && (
-          <p className="text-xs text-gray-500 mb-4">{categoryInfo.description}</p>
-        )}
-
-        {groupedSections.length > 0 && (
-          <div className="space-y-1 text-xs font-medium text-gray-700">
-            {groupedSections.map(([sectionName], idx) => (
-              <div key={sectionName}>
-                <a href={`#sec-${idx}`} className="underline hover:text-[#e60049] transition">
-                  {sectionName}
-                </a>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+    <main className="max-w-[960px] mx-auto px-4 py-8 sm:py-10 space-y-10">
       {isLoading ? (
-        <div className="text-xs text-gray-500 py-10 text-center">
+        <div className="text-xs text-gray-500 py-12 text-center">
           Đang tải danh mục tài liệu...
         </div>
-      ) : groupedSections.length === 0 ? (
-        <div className="text-xs text-gray-500 py-10 text-center">
+      ) : blocks.length === 0 ? (
+        <div className="text-xs text-gray-500 py-12 text-center">
           Chưa có tài liệu nào trong danh mục này.
         </div>
       ) : (
-        groupedSections.map(([sectionName, items], idx) => (
-          <section key={sectionName} id={`sec-${idx}`}>
-            <h2 className="text-[#e60049] font-bold text-sm mb-4">{sectionName}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {items.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </section>
-        ))
+        blocks
+          .filter((b) => b.is_active)
+          .map((block) => {
+            switch (block.type) {
+              case 'category_hero':
+                return (
+                  <CategoryHeroBlock
+                    key={block.id}
+                    config={block.config as CategoryHeroBlockConfig}
+                    sections={activeSections}
+                  />
+                );
+              case 'category_section':
+                return (
+                  <CategorySectionBlock
+                    key={block.id}
+                    config={block.config as CategorySectionBlockConfig}
+                    allCategoryProducts={categoryProducts}
+                  />
+                );
+              case 'category_banner':
+                return (
+                  <CategoryBannerBlock
+                    key={block.id}
+                    config={block.config as CategoryBannerBlockConfig}
+                  />
+                );
+              case 'category_notice':
+                return (
+                  <CategoryNoticeBlock
+                    key={block.id}
+                    config={block.config as CategoryNoticeBlockConfig}
+                  />
+                );
+              default:
+                return null;
+            }
+          })
       )}
     </main>
   );
