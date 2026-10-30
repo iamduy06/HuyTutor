@@ -182,9 +182,15 @@ export const ComboPage: React.FC = () => {
             3 bộ đề mới nhất, bám sát form đề thi thật 2026
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {(threeLatestExams.length > 0 ? threeLatestExams : products.slice(0, 3)).map(
-              (prod) => (
-                <ProductCard key={prod.id} product={prod} />
+            {products.length === 0 ? (
+              <div className="col-span-3 text-xs text-gray-500 py-6 text-center">
+                Chưa có tài liệu nào trong danh mục này.
+              </div>
+            ) : (
+              (threeLatestExams.length > 0 ? threeLatestExams : products.slice(0, 3)).map(
+                (prod) => (
+                  <ProductCard key={prod.id} product={prod} />
+                )
               )
             )}
           </div>

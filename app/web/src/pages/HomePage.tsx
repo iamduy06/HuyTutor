@@ -177,6 +177,10 @@ export const HomePage: React.FC = () => {
             <div className="text-xs text-gray-500 py-8 text-center">
               Đang tải danh sách tài liệu...
             </div>
+          ) : thptExamProducts.length === 0 ? (
+            <div className="text-xs text-gray-500 py-8 text-center">
+              Chưa có tài liệu nào trong danh mục này.
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               {thptExamProducts.slice(0, 9).map((product) => (

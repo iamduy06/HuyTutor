@@ -696,7 +696,7 @@ function buildNormalizedSeedState(): DbState {
     menus,
     categories,
     combo_rules,
-    products,
+    products: [],
     orders,
     users: [defaultAdminUser],
     user_sessions: [],
@@ -781,10 +781,8 @@ function loadLocalDb(): DbState {
     }
     const raw = fs.readFileSync(LOCAL_DB_PATH, 'utf-8');
     const parsed = JSON.parse(raw) as DbState;
-    if (!parsed.products || parsed.products.length < 20) {
-      const refreshed = buildNormalizedSeedState();
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(refreshed, null, 2), 'utf-8');
-      return refreshed;
+    if (!Array.isArray(parsed.products)) {
+      parsed.products = [];
     }
     if (ensureAuthArraysInState(parsed)) {
       fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(parsed, null, 2), 'utf-8');
@@ -819,27 +817,7 @@ export const dbService = {
           query = query.eq('is_active', true);
         }
         const { data, error } = await query;
-        if (!error && data && data.length < 12) {
-          // Tự động nâng cấp đủ 12 menu chuẩn đa cấp cho database
-          const normalized12: SeedMenu[] = INITIAL_MENUS.map((m) => ({
-            id: String(m.id),
-            title: m.title,
-            slug: m.url,
-            parent_id: null,
-            sort_order: m.order_index,
-            is_active: m.is_active,
-            children: m.children?.map((c) => ({
-              id: String(c.id),
-              label: c.label,
-              url: c.url,
-              order_index: c.order_index,
-              is_highlight: c.is_highlight,
-            })) || [],
-          }));
-          await this.updateMenus(normalized12);
-          return normalized12.filter((m) => includeInactive || m.is_active);
-        }
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data.map((m: any) => ({
             id: String(m.id),
             title: m.title,
@@ -859,9 +837,10 @@ export const dbService = {
               })),
           })) as SeedMenu[];
         }
-      } catch {
-        // Fallback to local
+      } catch (err) {
+        console.error('[dbService] Supabase getMenus error:', err);
       }
+      return [];
     }
     const db = loadLocalDb();
     const list = includeInactive ? db.menus : db.menus.filter((m) => m.is_active);
@@ -912,22 +891,27 @@ export const dbService = {
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin.from('site_configs').select('*');
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           const configMap: Record<string, any> = {};
           for (const row of data) {
             configMap[row.key] = row.value;
           }
           return {
-            footer_social_links: configMap['footer_social_links'] || INITIAL_SITE_CONFIGS.footer_social_links,
-            footer_policy_links: configMap['footer_policy_links'] || INITIAL_SITE_CONFIGS.footer_policy_links,
+            footer_social_links: Array.isArray(configMap['footer_social_links'])
+              ? configMap['footer_social_links']
+              : [],
+            footer_policy_links: Array.isArray(configMap['footer_policy_links'])
+              ? configMap['footer_policy_links']
+              : [],
           };
         }
-      } catch {
-        // Fallback
+      } catch (err) {
+        console.error('[dbService] Supabase getSiteConfigs error:', err);
       }
+      return { footer_social_links: [], footer_policy_links: [] };
     }
     const db = loadLocalDb();
-    return db.site_configs || INITIAL_SITE_CONFIGS;
+    return db.site_configs || { footer_social_links: [], footer_policy_links: [] };
   },
 
   async updateSiteConfig(key: string, value: any): Promise<any> {
@@ -953,14 +937,19 @@ export const dbService = {
 
   async getCategories(): Promise<SeedCategory[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
-      const { data, error } = await supabaseAdmin
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-      if (!error && data && data.length > 0) {
-        return data as SeedCategory[];
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        if (!error && data) {
+          return data as SeedCategory[];
+        }
+      } catch (err) {
+        console.error('[dbService] Supabase getCategories error:', err);
       }
+      return [];
     }
     const db = loadLocalDb();
     return db.categories.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
@@ -968,14 +957,19 @@ export const dbService = {
 
   async getComboRules(): Promise<SeedComboRule[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
-      const { data, error } = await supabaseAdmin
-        .from('combo_rules')
-        .select('*')
-        .eq('is_active', true)
-        .order('min_quantity', { ascending: true });
-      if (!error && data && data.length > 0) {
-        return data as SeedComboRule[];
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('combo_rules')
+          .select('*')
+          .eq('is_active', true)
+          .order('min_quantity', { ascending: true });
+        if (!error && data) {
+          return data as SeedComboRule[];
+        }
+      } catch (err) {
+        console.error('[dbService] Supabase getComboRules error:', err);
       }
+      return [];
     }
     const db = loadLocalDb();
     return db.combo_rules
@@ -991,79 +985,82 @@ export const dbService = {
     let products: SeedProduct[] = [];
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      let query = supabaseAdmin
-        .from('products')
-        .select('*, categories(slug, name), product_formats(*)');
-      if (!options?.includeInactive) {
-        query = query.eq('is_active', true);
+      try {
+        let query = supabaseAdmin
+          .from('products')
+          .select('*, categories(slug, name), product_formats(*)');
+        if (!options?.includeInactive) {
+          query = query.eq('is_active', true);
+        }
+        const { data, error } = await query;
+        if (!error && data) {
+          products = data.map((row: any) => ({
+            id: row.id,
+            category_id: row.category_id,
+            category_slug: row.categories?.slug || row.category_slug || 'high-school',
+            category_name: row.categories?.name || 'Tài liệu',
+            sub_section: row.sub_section || '',
+            code: row.code,
+            title: row.title,
+            slug: row.slug,
+            google_form_product_name: row.google_form_product_name,
+            badge_text: row.badge_text || '',
+            short_desc: row.short_desc || '',
+            cover_tag: row.cover_tag || '',
+            thumbnail_url: row.thumbnail_url || '',
+            preview_type: row.preview_type || 'images',
+            sample_pdf_source: row.sample_pdf_source || 'r2',
+            sample_pdf_url: row.sample_pdf_url || '',
+            watermark_enabled: row.watermark_enabled ?? true,
+            watermark_text:
+              row.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+            preview_images: Array.isArray(row.preview_images) ? row.preview_images : [],
+            specs: Array.isArray(row.specs) ? row.specs : [],
+            topics: Array.isArray(row.topics) ? row.topics : [],
+            features: Array.isArray(row.features) ? row.features : [],
+            is_featured: Boolean(row.is_featured),
+            is_combo_eligible: Boolean(row.is_combo_eligible),
+            is_active: Boolean(row.is_active),
+            formats: Array.isArray(row.product_formats)
+              ? row.product_formats.map((f: any) => ({
+                  format_code: f.format_code as UiFormatCode,
+                  price: Number(f.price),
+                  is_active: Boolean(f.is_active),
+                }))
+              : [],
+          }));
+
+          if (options?.categorySlug) {
+            products = products.filter((p) => p.category_slug === options.categorySlug);
+          }
+          if (options?.search && options.search.trim() !== '') {
+            const q = options.search.trim().toLowerCase();
+            products = products.filter(
+              (p) =>
+                p.title.toLowerCase().includes(q) ||
+                p.code.toLowerCase().includes(q) ||
+                p.short_desc.toLowerCase().includes(q) ||
+                p.sub_section.toLowerCase().includes(q)
+            );
+          }
+          // STRICT ZERO-FALLBACK: Luôn trả về đúng dữ liệu thực tế từ Supabase (dù rỗng [])
+          return products;
+        }
+      } catch (err) {
+        console.error('[dbService] Supabase getProducts error:', err);
       }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        products = data.map((row: any) => ({
-          id: row.id,
-          category_id: row.category_id,
-          category_slug: row.categories?.slug || 'high-school',
-          category_name: row.categories?.name || 'Tài liệu THPT',
-          sub_section: row.sub_section || 'Đề thi thử THPT/ĐGNL',
-          code: row.code,
-          title: row.title,
-          slug: row.slug,
-          google_form_product_name: row.google_form_product_name,
-          badge_text: row.badge_text || 'Mới',
-          short_desc: row.short_desc || '',
-          cover_tag: row.cover_tag || '',
-          thumbnail_url: row.thumbnail_url || '',
-          preview_type: row.preview_type || 'images',
-          sample_pdf_source: row.sample_pdf_source || 'r2',
-          sample_pdf_url: row.sample_pdf_url || '',
-          watermark_enabled: row.watermark_enabled ?? true,
-          watermark_text:
-            row.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
-          preview_images: Array.isArray(row.preview_images) ? row.preview_images : [],
-          specs: Array.isArray(row.specs) ? row.specs : [],
-          topics: Array.isArray(row.topics) ? row.topics : [],
-          features: Array.isArray(row.features) ? row.features : [],
-          is_featured: Boolean(row.is_featured),
-          is_combo_eligible: Boolean(row.is_combo_eligible),
-          is_active: Boolean(row.is_active),
-          formats: Array.isArray(row.product_formats)
-            ? row.product_formats.map((f: any) => ({
-                format_code: f.format_code as UiFormatCode,
-                price: Number(f.price),
-                is_active: Boolean(f.is_active),
-              }))
-            : [],
-        }));
-      }
+      return [];
     }
 
-    if (products.length === 0) {
-      const db = loadLocalDb();
-      products = options?.includeInactive
-        ? db.products
-        : db.products.filter((p) => p.is_active);
-    }
+    // Chỉ chạy khi hoàn toàn không kết nối Supabase
+    const db = loadLocalDb();
+    products = options?.includeInactive
+      ? db.products
+      : db.products.filter((p) => p.is_active);
 
     if (options?.categorySlug) {
-      if (options.categorySlug === 'other') {
-        products = products.filter(
-          (p) =>
-            p.category_slug === 'other' ||
-            p.slug === '2500-collocations' ||
-            p.slug === '1400caucumdongtuintermediate'
-        );
-      } else if (options.categorySlug === 'template' || options.categorySlug === 'do-dung-day-hoc') {
-        products = products.filter(
-          (p) =>
-            p.category_slug === options.categorySlug ||
-            p.slug === 'mau-thu-hoc-phi' ||
-            p.slug === 'flashcard-tu-vung'
-        );
-      } else {
-        products = products.filter((p) => p.category_slug === options.categorySlug);
-      }
+      products = products.filter((p) => p.category_slug === options.categorySlug);
     }
-
     if (options?.search && options.search.trim() !== '') {
       const q = options.search.trim().toLowerCase();
       products = products.filter(
@@ -1074,7 +1071,6 @@ export const dbService = {
           p.sub_section.toLowerCase().includes(q)
       );
     }
-
     return products;
   },
 
