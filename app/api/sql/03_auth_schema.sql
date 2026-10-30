@@ -49,22 +49,28 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
 CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON public.user_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON public.user_sessions(user_id);
 
--- 3. Cập nhật Bảng Orders liên kết với User ID của public.users
+-- 3. Cập nhật Bảng Orders & Order Items tương thích với Users
 ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'pending';
+
+ALTER TABLE public.order_items 
+ADD COLUMN IF NOT EXISTS product_title VARCHAR(500),
+ADD COLUMN IF NOT EXISTS format_code VARCHAR(50);
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_email ON public.orders(customer_email);
 
 -- 4. Tạo Bảng Tủ sách cá nhân (User Library - Lưu trữ tài liệu khách đã mua trọn đời)
+-- Khóa ngoại order_id có kiểu UUID tương thích chính xác với public.orders(id)
 CREATE TABLE IF NOT EXISTS public.user_library (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
-  order_code VARCHAR(32) NOT NULL,
+  order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+  order_code VARCHAR(50) NOT NULL,
   product_slug TEXT NOT NULL,
   product_title TEXT NOT NULL,
-  format_code TEXT NOT NULL, -- Word, PDF, Flashcard, Trang tính, Thiết kế
+  format_code TEXT NOT NULL,                    -- Word, PDF, Flashcard, Trang tính, Thiết kế
   access_drive_url TEXT DEFAULT '',
   watermarked_pdf_url TEXT DEFAULT '',
   download_count INT NOT NULL DEFAULT 0,
@@ -82,10 +88,15 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_user_id UUID;
   v_item RECORD;
+  v_is_paid BOOLEAN;
 BEGIN
-  -- Chỉ kích hoạt khi đơn hàng chuyển sang 'paid'
-  IF NEW.payment_status = 'paid' AND (OLD.payment_status IS NULL OR OLD.payment_status != 'paid') THEN
-    
+  -- Hỗ trợ cả payment_status và status nếu bảng orders dùng một trong hai cột
+  v_is_paid := (
+    (NEW.payment_status = 'paid' AND (OLD.payment_status IS NULL OR OLD.payment_status != 'paid'))
+    OR (NEW.status = 'paid' AND (OLD.status IS NULL OR OLD.status != 'paid'))
+  );
+
+  IF v_is_paid THEN
     -- 1. Nếu đơn hàng chưa gắn user_id, tự động tìm kiếm trong bảng public.users theo Email khách mua
     IF NEW.user_id IS NOT NULL THEN
       v_user_id := NEW.user_id;
@@ -99,7 +110,10 @@ BEGIN
     -- 2. Nếu tìm thấy tài khoản người dùng, nạp toàn bộ sản phẩm trong đơn vào Tủ sách cá nhân
     IF v_user_id IS NOT NULL THEN
       FOR v_item IN 
-        SELECT product_id, product_title, format_code 
+        SELECT 
+          COALESCE(product_id, '') AS product_id,
+          COALESCE(product_title, product_name, 'Tài liệu') AS product_title,
+          COALESCE(format_code, ui_format, 'Word') AS format_code 
         FROM public.order_items 
         WHERE order_id = NEW.id 
       LOOP
@@ -138,7 +152,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_order_paid_grant_library ON public.orders;
 CREATE TRIGGER on_order_paid_grant_library
-  AFTER UPDATE OF payment_status ON public.orders
+  AFTER UPDATE ON public.orders
   FOR EACH ROW EXECUTE FUNCTION public.handle_order_payment_completed();
 
 -- 6. Kích hoạt RLS (Row Level Security) - Bảo vệ Backend độc quyền

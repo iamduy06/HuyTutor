@@ -1684,9 +1684,8 @@ export const dbService = {
         if (error) handleSupabaseAuthError(error);
 
         if (!error && !existingLib) {
-          await supabaseAdmin.from('user_library').insert({
+          const insertPayload: Record<string, any> = {
             user_id: targetUser.id,
-            order_id: order.id,
             order_code: order.order_code,
             product_slug: productSlug,
             product_title: item.product_title,
@@ -1694,7 +1693,13 @@ export const dbService = {
             access_drive_url: '',
             watermarked_pdf_url: watermarkedUrl,
             is_active: true,
-          });
+          };
+          const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (order.id && uuidRegex.test(order.id)) {
+            insertPayload.order_id = order.id;
+          }
+          await supabaseAdmin.from('user_library').insert(insertPayload);
         }
       }
 

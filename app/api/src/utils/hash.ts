@@ -28,3 +28,4 @@ export function verifySha3_256(plainText: string, expectedHash: string): boolean
 export function generateSecureToken(byteLength = 32): string {
   return crypto.randomBytes(byteLength).toString('hex');
 }
+
