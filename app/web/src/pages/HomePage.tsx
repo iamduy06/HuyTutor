@@ -71,9 +71,11 @@ export const HomePage: React.FC = () => {
                   CHI TIẾT
                 </div>
                 <div className="w-40 h-44 rounded-t-full bg-gradient-to-b from-pink-100 to-white border border-pink-200 flex flex-col items-center justify-end p-3 text-center">
-                  <div className="w-16 h-16 rounded-full bg-[#e60049]/10 border border-[#e60049]/30 flex items-center justify-center text-[#e60049] font-black text-lg mb-2">
-                    HT
-                  </div>
+                  <img
+                    src="/favicon.png"
+                    alt="Huy Tutor"
+                    className="w-14 h-14 rounded-full object-contain mb-2 p-1 bg-white border border-[#e60049]/20 shadow-sm"
+                  />
                   <span className="text-xs font-extrabold text-gray-800">Thầy Huy Tutor</span>
                   <span className="text-[10px] text-gray-500">Tác giả biên soạn</span>
                 </div>

@@ -7,17 +7,16 @@ export const Footer: React.FC = () => {
       <div className="bg-[#fff0f3] py-10 px-4 border-t border-pink-100">
         <div className="max-w-[920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Cột 1: Logo & Slogan */}
-          <div className="md:col-span-3 flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#e60049] text-white flex items-center justify-center font-black text-xs shrink-0">
-              HT
-            </div>
-            <div>
-              <div className="font-black text-[#e60049] text-base leading-none uppercase">
-                HUY TUTOR
-              </div>
-              <div className="text-[10px] text-gray-500 font-medium mt-0.5">
-                Chuẩn mực &amp; Chi tiết
-              </div>
+          <div className="md:col-span-3 flex flex-col items-start gap-1">
+            <Link to="/" aria-label="Huy Tutor Trang chủ">
+              <img
+                src="/logo.png"
+                alt="Huy Tutor"
+                className="h-8 w-auto object-contain"
+              />
+            </Link>
+            <div className="text-[10px] text-gray-500 font-medium">
+              Chuẩn mực &amp; Chi tiết
             </div>
           </div>
 

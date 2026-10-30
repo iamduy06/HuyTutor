@@ -64,9 +64,11 @@ export const FlashcardPage: React.FC = () => {
 
         <div className="aspect-video w-full max-w-[520px] mx-auto rounded-sm overflow-hidden bg-gradient-to-br from-[#3b0014] via-[#7a0028] to-[#b3003b] relative flex flex-col items-center justify-center text-white shadow-md border border-gray-200">
           <div className="absolute top-3 left-3 flex items-center gap-2 text-left">
-            <div className="w-6 h-6 rounded-full bg-[#e60049] text-white font-black text-[10px] flex items-center justify-center">
-              HT
-            </div>
+            <img
+              src="/favicon.png"
+              alt="Huy Tutor"
+              className="w-6 h-6 rounded-full object-contain bg-white p-0.5 border border-white/50"
+            />
             <div>
               <div className="text-[11px] font-bold leading-none">
                 Học từ vựng hiệu quả cùng flashcard của Huy Tutor

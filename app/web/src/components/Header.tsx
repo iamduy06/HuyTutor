@@ -45,18 +45,12 @@ export const Header: React.FC = () => {
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-[1360px] mx-auto px-4 h-14 flex items-center justify-between gap-2">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <div className="w-7 h-7 rounded-full bg-[#e60049] text-white flex items-center justify-center font-extrabold text-xs">
-                HT
-              </div>
-              <span className="font-black text-[#e60049] text-sm tracking-tight uppercase">
-                HUY TUTOR
-              </span>
-            </div>
-            <span className="text-xs text-gray-600 font-medium hidden sm:inline ml-1">
-              Huy Tutor
-            </span>
+          <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Huy Tutor Trang chủ">
+            <img
+              src="/logo.png"
+              alt="Huy Tutor"
+              className="h-8 sm:h-9 w-auto object-contain"
+            />
           </Link>
 
           {/* Navigation Menu (100% Dynamic from Backend API) */}
