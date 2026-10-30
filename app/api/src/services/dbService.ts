@@ -169,6 +169,28 @@ export interface DbState {
 const DATA_DIR = path.join(__dirname, '../../data');
 const LOCAL_DB_PATH = path.join(DATA_DIR, 'local_db.json');
 
+let supabaseAuthMissingUntil = 0;
+
+function shouldTrySupabaseAuth(): boolean {
+  return Boolean(
+    isSupabaseConfigured && supabaseAdmin && Date.now() >= supabaseAuthMissingUntil
+  );
+}
+
+function handleSupabaseAuthError(error: any): void {
+  if (!error) return;
+  const code = String(error.code || '');
+  const msg = String(error.message || '');
+  if (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    msg.includes('schema cache') ||
+    msg.includes('does not exist')
+  ) {
+    supabaseAuthMissingUntil = Date.now() + 60 * 1000;
+  }
+}
+
 // Bảng ánh xạ slug tương đương giữa 39 trang gốc huytutor.io.vn và slug chuẩn mới
 const SLUG_ALIAS_MAP: Record<string, string> = {
   chotha: '30-de-chot-ha',
@@ -1283,12 +1305,13 @@ export const dbService = {
 
   async getUserByEmail(email: string): Promise<SeedUser | null> {
     const cleanEmail = email.trim().toLowerCase();
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .ilike('email', cleanEmail)
         .maybeSingle();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         return data as SeedUser;
       }
@@ -1298,12 +1321,13 @@ export const dbService = {
   },
 
   async getUserById(id: string): Promise<SeedUser | null> {
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('id', id)
         .maybeSingle();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         return data as SeedUser;
       }
@@ -1315,12 +1339,13 @@ export const dbService = {
   async getUserByResetToken(token: string): Promise<SeedUser | null> {
     const cleanToken = token.trim();
     if (!cleanToken) return null;
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('reset_password_token', cleanToken)
         .maybeSingle();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         return data as SeedUser;
       }
@@ -1365,7 +1390,7 @@ export const dbService = {
       updated_at: nowIso,
     };
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .insert({
@@ -1384,6 +1409,7 @@ export const dbService = {
         })
         .select('*')
         .single();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         newUser = data as SeedUser;
       }
@@ -1408,13 +1434,14 @@ export const dbService = {
     const nowIso = new Date().toISOString();
     const cleanUpdates = { ...updates, updated_at: nowIso };
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .update(cleanUpdates)
         .eq('id', id)
         .select('*')
         .maybeSingle();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         const db = loadLocalDb();
         const idx = db.users.findIndex((u) => u.id === id || u.email === data.email);
@@ -1438,11 +1465,12 @@ export const dbService = {
   },
 
   async getAllUsers(): Promise<SeedUser[]> {
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
+      if (error) handleSupabaseAuthError(error);
       if (!error && data && data.length > 0) {
         return data as SeedUser[];
       }
@@ -1471,7 +1499,7 @@ export const dbService = {
       created_at: nowIso,
     };
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('user_sessions')
         .insert({
@@ -1485,6 +1513,7 @@ export const dbService = {
         })
         .select('*')
         .single();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         sessionRecord = data as SeedUserSession;
       }
@@ -1500,12 +1529,13 @@ export const dbService = {
     const cleanToken = token.trim();
     if (!cleanToken) return null;
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('user_sessions')
         .select('*')
         .eq('session_token', cleanToken)
         .maybeSingle();
+      if (error) handleSupabaseAuthError(error);
       if (!error && data) {
         return data as SeedUserSession;
       }
@@ -1517,11 +1547,12 @@ export const dbService = {
 
   async touchSession(sessionId: string, token: string): Promise<void> {
     const nowIso = new Date().toISOString();
-    if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { error } = await supabaseAdmin
         .from('user_sessions')
         .update({ last_active_at: nowIso })
         .eq('id', sessionId);
+      if (error) handleSupabaseAuthError(error);
     }
     const db = loadLocalDb();
     const idx = db.user_sessions.findIndex(
@@ -1535,11 +1566,12 @@ export const dbService = {
 
   async revokeSessionByToken(token: string): Promise<boolean> {
     const cleanToken = token.trim();
-    if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { error } = await supabaseAdmin
         .from('user_sessions')
         .update({ is_revoked: true })
         .eq('session_token', cleanToken);
+      if (error) handleSupabaseAuthError(error);
     }
     const db = loadLocalDb();
     let changed = false;
@@ -1554,12 +1586,13 @@ export const dbService = {
   },
 
   async revokeSessionById(userId: string, sessionId: string): Promise<boolean> {
-    if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { error } = await supabaseAdmin
         .from('user_sessions')
         .update({ is_revoked: true })
         .eq('id', sessionId)
         .eq('user_id', userId);
+      if (error) handleSupabaseAuthError(error);
     }
     const db = loadLocalDb();
     let changed = false;
@@ -1574,11 +1607,12 @@ export const dbService = {
   },
 
   async revokeAllUserSessions(userId: string): Promise<number> {
-    if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { error } = await supabaseAdmin
         .from('user_sessions')
         .update({ is_revoked: true })
         .eq('user_id', userId);
+      if (error) handleSupabaseAuthError(error);
     }
     const db = loadLocalDb();
     let count = 0;
@@ -1594,13 +1628,14 @@ export const dbService = {
 
   async getUserSessions(userId: string): Promise<SeedUserSession[]> {
     const now = new Date();
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('user_sessions')
         .select('*')
         .eq('user_id', userId)
         .eq('is_revoked', false)
         .order('last_active_at', { ascending: false });
+      if (error) handleSupabaseAuthError(error);
       if (!error && data && data.length > 0) {
         return (data as SeedUserSession[]).filter((s) => new Date(s.expires_at) > now);
       }
@@ -1638,16 +1673,17 @@ export const dbService = {
       const productSlug = matchedProduct?.slug || item.product_id || 'tai-lieu';
       const watermarkedUrl = matchedProduct?.sample_pdf_url || '';
 
-      if (isSupabaseConfigured && supabaseAdmin) {
-        const { data: existingLib } = await supabaseAdmin
+      if (shouldTrySupabaseAuth() && supabaseAdmin) {
+        const { data: existingLib, error } = await supabaseAdmin
           .from('user_library')
           .select('id')
           .eq('user_id', targetUser.id)
           .eq('product_slug', productSlug)
           .eq('format_code', item.format_code)
           .maybeSingle();
+        if (error) handleSupabaseAuthError(error);
 
-        if (!existingLib) {
+        if (!error && !existingLib) {
           await supabaseAdmin.from('user_library').insert({
             user_id: targetUser.id,
             order_id: order.id,
@@ -1711,13 +1747,14 @@ export const dbService = {
       await this.syncPaidOrdersToUserLibrary(user);
     }
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
       const { data, error } = await supabaseAdmin
         .from('user_library')
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
         .order('granted_at', { ascending: false });
+      if (error) handleSupabaseAuthError(error);
       if (!error && data && data.length > 0) {
         return data as SeedUserLibraryItem[];
       }
