@@ -169,15 +169,32 @@ export const AdminHomepageCms: React.FC = () => {
   const currentBlockIndex = blocks.findIndex((b) => b.id === selectedBlockId);
   const currentBlock = blocks[currentBlockIndex] || blocks[0];
 
-  // Upload ảnh qua R2 API
+  // Upload ảnh qua R2 API (với naming chuẩn + tự động xóa ảnh cũ trên R2)
   const handleUploadFile = async (
     file: File,
     onSuccess: (url: string) => void,
-    fieldId: string
+    fieldId: string,
+    options?: {
+      oldUrl?: string;
+      pageLevel1?: string;
+      pageLevel2?: string;
+    }
   ) => {
     setUploading(fieldId);
     try {
-      const res = await apiClient.uploadFile(file);
+      const res = await apiClient.uploadFile(file, {
+        folder: 'homepage',
+        pageLevel1: options?.pageLevel1,
+        pageLevel2: options?.pageLevel2,
+      });
+
+      // Nếu có ảnh cũ trên R2 khác với ảnh mới, xóa file cũ trên R2
+      if (options?.oldUrl && options.oldUrl !== res.url) {
+        apiClient.deleteR2File(options.oldUrl).catch((err) => {
+          console.warn('Lỗi xóa ảnh cũ trên R2:', err);
+        });
+      }
+
       onSuccess(res.url);
       showToast('Tải ảnh lên Cloudflare R2 thành công!');
     } catch (err: any) {
@@ -247,8 +264,34 @@ export const AdminHomepageCms: React.FC = () => {
     showToast(`Đã thêm mới: ${info.name}`);
   };
 
-  // Xóa một khối khỏi trang chủ
+  // Xóa một khối khỏi trang chủ (đồng thời xóa toàn bộ ảnh R2 thuộc khối đó)
   const handleDeleteBlock = (id: string) => {
+    const blockToDelete = blocks.find((b) => b.id === id);
+    if (blockToDelete?.config) {
+      const cfg = blockToDelete.config;
+      // Khung Hero / Top Banner / Bottom Banner
+      if (cfg.image_url) apiClient.deleteR2File(cfg.image_url).catch(() => {});
+      if (cfg.custom_image_url) apiClient.deleteR2File(cfg.custom_image_url).catch(() => {});
+
+      // Khung Danh mục ô vuông (categories_grid)
+      if (Array.isArray(cfg.items)) {
+        cfg.items.forEach((it: any) => {
+          if (it.image_url) apiClient.deleteR2File(it.image_url).catch(() => {});
+        });
+      }
+
+      // Khung Nhóm tài liệu cấp 1 & cấp 2 (section_groups)
+      if (Array.isArray(cfg.sections)) {
+        cfg.sections.forEach((sec: any) => {
+          if (Array.isArray(sec.items)) {
+            sec.items.forEach((it: any) => {
+              if (it.image_url) apiClient.deleteR2File(it.image_url).catch(() => {});
+            });
+          }
+        });
+      }
+    }
+
     const next = blocks.filter((b) => b.id !== id);
     next.forEach((b, idx) => {
       b.sort_order = idx + 1;
@@ -257,7 +300,7 @@ export const AdminHomepageCms: React.FC = () => {
     if (selectedBlockId === id) {
       setSelectedBlockId(next[0]?.id || '');
     }
-    showToast('Đã xóa khung khỏi trang chủ');
+    showToast('Đã xóa khung và dọn dẹp ảnh R2 liên quan');
   };
 
   // Cập nhật config của khối đang chọn
@@ -626,7 +669,12 @@ export const AdminHomepageCms: React.FC = () => {
                                       ...cfg,
                                       custom_image_url: url,
                                     })),
-                                  'hero_custom_img'
+                                  'hero_custom_img',
+                                  {
+                                    oldUrl: currentBlock.config?.custom_image_url,
+                                    pageLevel1: 'Trang chu',
+                                    pageLevel2: 'Hero Banner',
+                                  }
                                 );
                               }
                             }}
@@ -634,11 +682,28 @@ export const AdminHomepageCms: React.FC = () => {
                         </label>
                       </div>
                       {currentBlock.config?.custom_image_url && (
-                        <img
-                          src={currentBlock.config.custom_image_url}
-                          alt="Preview"
-                          className="max-h-48 rounded border p-1"
-                        />
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={currentBlock.config.custom_image_url}
+                            alt="Preview"
+                            className="max-h-48 rounded border p-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (currentBlock.config?.custom_image_url) {
+                                apiClient.deleteR2File(currentBlock.config.custom_image_url).catch(() => {});
+                              }
+                              updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                ...cfg,
+                                custom_image_url: '',
+                              }));
+                            }}
+                            className="text-red-500 hover:text-red-700 text-xs font-bold"
+                          >
+                            Xóa ảnh
+                          </button>
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -766,7 +831,12 @@ export const AdminHomepageCms: React.FC = () => {
                                         ...cfg,
                                         image_url: url,
                                       })),
-                                    'hero_img'
+                                    'hero_img',
+                                    {
+                                      oldUrl: currentBlock.config?.image_url,
+                                      pageLevel1: 'Trang chu',
+                                      pageLevel2: currentBlock.config?.title || 'Hero Minh hoa',
+                                    }
                                   );
                                 }
                               }}
@@ -782,12 +852,15 @@ export const AdminHomepageCms: React.FC = () => {
                             />
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                if (currentBlock.config?.image_url) {
+                                  apiClient.deleteR2File(currentBlock.config.image_url).catch(() => {});
+                                }
                                 updateCurrentConfig((cfg: HomepageHeroConfig) => ({
                                   ...cfg,
                                   image_url: '',
-                                }))
-                              }
+                                }));
+                              }}
                               className="text-red-500 hover:text-red-700 text-xs font-bold"
                             >
                               Xóa ảnh
@@ -918,7 +991,12 @@ export const AdminHomepageCms: React.FC = () => {
                                       ...cfg,
                                       custom_image_url: url,
                                     })),
-                                  'top_banner_full'
+                                  'top_banner_full',
+                                  {
+                                    oldUrl: currentBlock.config?.custom_image_url,
+                                    pageLevel1: 'Trang chu',
+                                    pageLevel2: 'Top Banner',
+                                  }
                                 );
                               }
                             }}
@@ -926,11 +1004,28 @@ export const AdminHomepageCms: React.FC = () => {
                         </label>
                       </div>
                       {currentBlock.config?.custom_image_url && (
-                        <img
-                          src={currentBlock.config.custom_image_url}
-                          alt="Banner Preview"
-                          className="max-h-48 rounded border p-1"
-                        />
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={currentBlock.config.custom_image_url}
+                            alt="Banner Preview"
+                            className="max-h-48 rounded border p-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (currentBlock.config?.custom_image_url) {
+                                apiClient.deleteR2File(currentBlock.config.custom_image_url).catch(() => {});
+                              }
+                              updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                ...cfg,
+                                custom_image_url: '',
+                              }));
+                            }}
+                            className="text-red-500 hover:text-red-700 text-xs font-bold"
+                          >
+                            Xóa ảnh
+                          </button>
+                        </div>
                       )}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -985,7 +1080,12 @@ export const AdminHomepageCms: React.FC = () => {
                                           ...cfg,
                                           image_url: url,
                                         })),
-                                      'top_banner_img'
+                                      'top_banner_img',
+                                      {
+                                        oldUrl: currentBlock.config?.image_url,
+                                        pageLevel1: 'Trang chu',
+                                        pageLevel2: currentBlock.config?.title || 'Top Banner',
+                                      }
                                     );
                                   }
                                 }}
@@ -1001,12 +1101,15 @@ export const AdminHomepageCms: React.FC = () => {
                               />
                               <button
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
+                                  if (currentBlock.config?.image_url) {
+                                    apiClient.deleteR2File(currentBlock.config.image_url).catch(() => {});
+                                  }
                                   updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
                                     ...cfg,
                                     image_url: '',
-                                  }))
-                                }
+                                  }));
+                                }}
                                 className="text-red-500 hover:text-red-700 text-xs font-bold"
                               >
                                 Xóa ảnh
@@ -1253,6 +1356,9 @@ export const AdminHomepageCms: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (item.image_url) {
+                                    apiClient.deleteR2File(item.image_url).catch(() => {});
+                                  }
                                   const next = (currentBlock.config?.items || []).filter(
                                     (_: any, i: number) => i !== idx
                                   );
@@ -1346,7 +1452,12 @@ export const AdminHomepageCms: React.FC = () => {
                                             items: next,
                                           }));
                                         },
-                                        `cat_img_${idx}`
+                                        `cat_img_${idx}`,
+                                        {
+                                          oldUrl: item.image_url,
+                                          pageLevel1: 'Danh muc',
+                                          pageLevel2: item.label || `O ${idx + 1}`,
+                                        }
                                       );
                                     }
                                   }}
@@ -1354,13 +1465,32 @@ export const AdminHomepageCms: React.FC = () => {
                               </label>
                             </div>
                             {item.image_url && (
-                              <div className="mt-1 flex items-center gap-2">
-                                <img
-                                  src={item.image_url}
-                                  alt="thumb"
-                                  className="w-8 h-8 object-contain rounded bg-pink-50 p-1 border"
-                                />
-                                <span className="text-[10px] text-gray-500 truncate">{item.image_url}</span>
+                              <div className="mt-1 flex items-center justify-between gap-2 p-1 bg-white rounded border">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                  <img
+                                    src={item.image_url}
+                                    alt="thumb"
+                                    className="w-8 h-8 object-contain rounded bg-pink-50 p-1 border shrink-0"
+                                  />
+                                  <span className="text-[10px] text-gray-500 truncate">{item.image_url}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (item.image_url) {
+                                      apiClient.deleteR2File(item.image_url).catch(() => {});
+                                    }
+                                    const next = [...(currentBlock.config?.items || [])];
+                                    next[idx].image_url = '';
+                                    updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                      ...cfg,
+                                      items: next,
+                                    }));
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-[10px] font-bold shrink-0 ml-1"
+                                >
+                                  Xóa ảnh
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1473,6 +1603,12 @@ export const AdminHomepageCms: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
+                                const secToDelete = currentBlock.config?.sections?.[sIdx];
+                                if (secToDelete?.items) {
+                                  secToDelete.items.forEach((it: any) => {
+                                    if (it.image_url) apiClient.deleteR2File(it.image_url).catch(() => {});
+                                  });
+                                }
                                 const next = (currentBlock.config?.sections || []).filter(
                                   (_: any, i: number) => i !== sIdx
                                 );
@@ -1550,6 +1686,10 @@ export const AdminHomepageCms: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const itemToDelete = currentBlock.config?.sections?.[sIdx]?.items?.[itIdx];
+                                      if (itemToDelete?.image_url) {
+                                        apiClient.deleteR2File(itemToDelete.image_url).catch(() => {});
+                                      }
                                       const next = [...(currentBlock.config?.sections || [])];
                                       next[sIdx].items = next[sIdx].items.filter(
                                         (_: any, i: number) => i !== itIdx
@@ -1625,13 +1765,47 @@ export const AdminHomepageCms: React.FC = () => {
                                                 sections: next,
                                               }));
                                             },
-                                            `sec_${sIdx}_item_${itIdx}`
+                                            `sec_${sIdx}_item_${itIdx}`,
+                                            {
+                                              oldUrl: item.image_url,
+                                              pageLevel1: sec.title || 'Nhom tai lieu',
+                                              pageLevel2: item.display_title || `San pham ${itIdx + 1}`,
+                                            }
                                           );
                                         }
                                       }}
                                     />
                                   </label>
                                 </div>
+                                {item.image_url && (
+                                  <div className="mt-1 flex items-center justify-between gap-2 p-1 bg-gray-50 rounded border">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <img
+                                        src={item.image_url}
+                                        alt="thumb"
+                                        className="w-8 h-8 object-contain rounded bg-white p-1 border shrink-0"
+                                      />
+                                      <span className="text-[10px] text-gray-500 truncate">{item.image_url}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (item.image_url) {
+                                          apiClient.deleteR2File(item.image_url).catch(() => {});
+                                        }
+                                        const next = [...(currentBlock.config?.sections || [])];
+                                        next[sIdx].items[itIdx].image_url = '';
+                                        updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                          ...cfg,
+                                          sections: next,
+                                        }));
+                                      }}
+                                      className="text-red-500 hover:text-red-700 text-[10px] font-bold shrink-0 ml-1"
+                                    >
+                                      Xóa ảnh
+                                    </button>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
@@ -1861,13 +2035,42 @@ export const AdminHomepageCms: React.FC = () => {
                                       ...cfg,
                                       custom_image_url: url,
                                     })),
-                                  'bottom_banner_img'
+                                  'bottom_banner_img',
+                                  {
+                                    oldUrl: currentBlock.config?.custom_image_url,
+                                    pageLevel1: 'Trang chu',
+                                    pageLevel2: 'Bottom Banner',
+                                  }
                                 );
                               }
                             }}
                           />
                         </label>
                       </div>
+                      {currentBlock.config?.custom_image_url && (
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={currentBlock.config.custom_image_url}
+                            alt="Bottom Banner Preview"
+                            className="max-h-48 rounded border p-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (currentBlock.config?.custom_image_url) {
+                                apiClient.deleteR2File(currentBlock.config.custom_image_url).catch(() => {});
+                              }
+                              updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                                ...cfg,
+                                custom_image_url: '',
+                              }));
+                            }}
+                            className="text-red-500 hover:text-red-700 text-xs font-bold"
+                          >
+                            Xóa ảnh
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-3">

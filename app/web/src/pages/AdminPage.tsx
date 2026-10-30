@@ -223,17 +223,22 @@ export const AdminPage: React.FC = () => {
 
     setUploadingThumb(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'thumbnails');
+      const oldThumb = editingProduct.thumbnail_url;
+      const res = await apiClient.uploadFile(file, {
+        folder: 'thumbnails',
+        pageLevel1: editingProduct.category_name || 'San pham',
+        pageLevel2: editingProduct.title || editingProduct.slug || 'Thumbnail',
+      });
 
-      const res = await apiClient.uploadFileDirect(formData);
+      if (oldThumb && oldThumb !== res.url) {
+        apiClient.deleteR2File(oldThumb).catch(() => {});
+      }
 
       setEditingProduct((prev) => ({
         ...prev,
-        thumbnail_url: res.publicUrl,
+        thumbnail_url: res.url,
       }));
-      showToast(`Tải ảnh lên Cloudflare R2 thành công! Link: ${res.publicUrl}`);
+      showToast(`Tải ảnh lên Cloudflare R2 thành công!`);
     } catch (err: any) {
       showToast(err?.message || 'Lỗi upload ảnh bìa lên R2.');
     } finally {

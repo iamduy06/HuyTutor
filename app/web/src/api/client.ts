@@ -375,12 +375,35 @@ export const apiClient = {
     return data;
   },
 
-  async uploadFile(file: File, folder = 'homepage'): Promise<{ url: string; objectKey: string }> {
+  async uploadFile(
+    file: File,
+    options?: string | { folder?: string; pageLevel1?: string; pageLevel2?: string }
+  ): Promise<{ url: string; objectKey: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('folder', folder);
+    if (typeof options === 'string') {
+      formData.append('folder', options);
+    } else if (options) {
+      formData.append('folder', options.folder || 'homepage');
+      if (options.pageLevel1) formData.append('pageLevel1', options.pageLevel1);
+      if (options.pageLevel2) formData.append('pageLevel2', options.pageLevel2);
+    } else {
+      formData.append('folder', 'homepage');
+    }
     const res = await this.uploadFileDirect(formData);
     return { url: res.publicUrl, objectKey: res.objectKey };
+  },
+
+  async deleteR2File(urlOrKey: string): Promise<{ ok: boolean; result?: any }> {
+    if (!urlOrKey) return { ok: true };
+    try {
+      return await requestJson('/api/admin/delete-file', {
+        method: 'POST',
+        body: JSON.stringify({ url: urlOrKey }),
+      });
+    } catch {
+      return { ok: false };
+    }
   },
 
   async createR2UploadPresign(params: {

@@ -3,6 +3,7 @@ import { dbService } from '../services/dbService';
 import { toPublicUserProfile } from '../services/authService';
 import {
   createR2PresignedUploadUrl,
+  deleteR2Object,
   stampPdfBufferWithWatermark,
   uploadBufferToR2,
 } from '../services/r2Service';
@@ -93,6 +94,10 @@ export const adminController = {
   async deleteProduct(req: Request, res: Response): Promise<void> {
     try {
       const slug = String(req.params.slug || '');
+      const existing = await dbService.getProductBySlugOrId(slug);
+      if (existing?.thumbnail_url) {
+        await deleteR2Object(existing.thumbnail_url).catch(() => {});
+      }
       const deleted = await dbService.deleteProduct(slug);
       res.json({
         ok: true,
@@ -139,14 +144,20 @@ export const adminController = {
    */
   async createUploadPresign(req: Request, res: Response): Promise<void> {
     try {
-      const { folder = 'thumbnails', fileName = 'image.png', contentType = 'image/png' } = req.body;
-      const validFolders = ['thumbnails', 'previews', 'samples', 'banners'] as const;
-      const safeFolder = validFolders.includes(folder) ? folder : 'thumbnails';
+      const {
+        folder = 'thumbnails',
+        fileName = 'image.png',
+        contentType = 'image/png',
+        pageLevel1,
+        pageLevel2,
+      } = req.body;
 
       const result = await createR2PresignedUploadUrl({
-        folder: safeFolder,
+        folder: String(folder || 'thumbnails'),
         fileName: String(fileName),
         contentType: String(contentType),
+        pageLevel1: pageLevel1 ? String(pageLevel1) : undefined,
+        pageLevel2: pageLevel2 ? String(pageLevel2) : undefined,
       });
 
       res.json({
@@ -164,11 +175,15 @@ export const adminController = {
   /**
    * POST /api/admin/upload-file
    * Tải trực tiếp file ảnh Thumbnail/PDF lên Cloudflare R2 từ Backend (Bypass 100% CORS trình duyệt)
+   * Tên file được sinh ngẫu nhiên: [slug1_][slug2_][10_random_digits].[ext]
    */
   async uploadFileDirect(req: Request, res: Response): Promise<void> {
     try {
       const file = (req as any).file as Express.Multer.File | undefined;
-      const folder = (req.body.folder as any) || 'thumbnails';
+      const folder = (req.body.folder as any) || 'homepage';
+      const pageLevel1 = req.body.pageLevel1 ? String(req.body.pageLevel1) : undefined;
+      const pageLevel2 = req.body.pageLevel2 ? String(req.body.pageLevel2) : undefined;
+
       if (!file) {
         res.status(400).json({
           ok: false,
@@ -182,6 +197,8 @@ export const adminController = {
         fileName: file.originalname,
         buffer: file.buffer,
         contentType: file.mimetype || 'image/png',
+        pageLevel1,
+        pageLevel2,
       });
 
       res.json({
@@ -193,6 +210,35 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi tải file lên Cloudflare R2.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/delete-file
+   * Xóa file khỏi Cloudflare R2 khi thay đổi ảnh hoặc xóa block, section, item
+   */
+  async deleteR2File(req: Request, res: Response): Promise<void> {
+    try {
+      const { url, key } = req.body;
+      const target = url || key;
+      if (!target) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng cung cấp url hoặc key của file cần xóa trên R2.',
+        });
+        return;
+      }
+
+      const result = await deleteR2Object(String(target));
+      res.json({
+        ok: true,
+        result,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi xóa file trên Cloudflare R2.',
       });
     }
   },

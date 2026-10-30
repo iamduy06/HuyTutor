@@ -65,6 +65,7 @@ router.post(
   upload.single('file'),
   adminController.uploadFileDirect
 );
+router.post('/admin/delete-file', adminAuthMiddleware, adminController.deleteR2File);
 router.post('/admin/stamp-pdf', adminAuthMiddleware, adminController.stampPdfWatermark);
 router.post(
   '/admin/orders/:orderCode/resync-form',
