@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
 import {
+  HomepageBlockItem,
+  HomepageBlockType,
   HomepageBottomBannerConfig,
   HomepageCategoriesGridConfig,
   HomepageCategoryTile,
@@ -21,102 +23,153 @@ import {
   TopBannerBlock,
 } from './DynamicHomepageBlocks';
 
+const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string; desc: string }> = {
+  hero: {
+    name: 'Khung Đen: Hero Top Header',
+    color: 'bg-gray-900 text-white',
+    desc: 'Phần đầu trang (Chữ + Hình ảnh R2 bên phải / HTML / Full ảnh)',
+  },
+  top_banner: {
+    name: 'Khung Xanh Dương: Top Banner',
+    color: 'bg-sky-700 text-white',
+    desc: 'Banner trên (Chữ + Up ảnh R2 / Sách 3D / HTML / Full ảnh)',
+  },
+  categories_grid: {
+    name: 'Khung Vàng: Danh mục ô vuông',
+    color: 'bg-amber-600 text-white',
+    desc: 'Các ô danh mục sản phẩm linh hoạt số lượng (Upload ảnh R2 / Link)',
+  },
+  section_groups: {
+    name: 'Khung Tím: Nhóm tài liệu cấp 1 & Cấp 2',
+    color: 'bg-purple-800 text-white',
+    desc: 'Từng nhóm tài liệu & các sản phẩm cấp 2 có tên hiển thị riêng, bật/tắt',
+  },
+  notice_text: {
+    name: 'Khung Xám: Dòng chữ thông báo & Nút',
+    color: 'bg-zinc-700 text-white',
+    desc: 'Dòng chữ màu xám/hồng + nút chuyển hướng xem toàn bộ',
+  },
+  bottom_banner: {
+    name: 'Khung Nâu: Banner cuối trang',
+    color: 'bg-stone-800 text-white',
+    desc: 'Banner cuối trang (Ảnh mới / HTML / 3D books)',
+  },
+};
+
 export const AdminHomepageCms: React.FC = () => {
   const { siteConfigs, updateSiteConfig, showToast } = useStore();
 
-  const [activeBlock, setActiveBlock] = useState<
-    'hero' | 'top_banner' | 'categories_grid' | 'section_groups' | 'notice_text' | 'bottom_banner'
-  >('hero');
+  // Danh sách các khung (Block-based layout) - hoàn toàn động số lượng và thứ tự
+  const [blocks, setBlocks] = useState<HomepageBlockItem[]>(() => {
+    if (Array.isArray(siteConfigs?.homepage_blocks) && siteConfigs.homepage_blocks.length > 0) {
+      return siteConfigs.homepage_blocks;
+    }
+    return [
+      {
+        id: 'block_hero_default',
+        type: 'hero',
+        title_label: 'Khung Đen: Hero Top Header',
+        is_active: siteConfigs?.homepage_hero?.is_active ?? true,
+        sort_order: 1,
+        config: siteConfigs?.homepage_hero || {
+          mode: 'structured',
+          title: '',
+          subtitle: '',
+          bullets: [],
+          image_url: '',
+          is_active: true,
+        },
+      },
+      {
+        id: 'block_banner_default',
+        type: 'top_banner',
+        title_label: 'Khung Xanh Dương: Top Banner',
+        is_active: siteConfigs?.homepage_top_banner?.is_active ?? true,
+        sort_order: 2,
+        config: siteConfigs?.homepage_top_banner || {
+          mode: 'image_text',
+          header_label: '',
+          tag: '',
+          title: '',
+          subtitle: '',
+          cta_badge: '',
+          link_url: '',
+          image_url: '',
+          is_active: true,
+        },
+      },
+      {
+        id: 'block_cat_grid_default',
+        type: 'categories_grid',
+        title_label: 'Khung Vàng: Danh mục ô vuông',
+        is_active: siteConfigs?.homepage_categories_grid?.is_active ?? true,
+        sort_order: 3,
+        config: siteConfigs?.homepage_categories_grid || {
+          title: '',
+          items: [],
+          is_active: true,
+        },
+      },
+      {
+        id: 'block_sec_groups_default',
+        type: 'section_groups',
+        title_label: 'Khung Tím: Nhóm tài liệu cấp 1 & Cấp 2',
+        is_active: siteConfigs?.homepage_section_groups?.is_active ?? true,
+        sort_order: 4,
+        config: siteConfigs?.homepage_section_groups || {
+          sections: [],
+        },
+      },
+      {
+        id: 'block_notice_default',
+        type: 'notice_text',
+        title_label: 'Khung Xám: Dòng chữ thông báo & Nút',
+        is_active: siteConfigs?.homepage_notice_text?.is_active ?? true,
+        sort_order: 5,
+        config: siteConfigs?.homepage_notice_text || {
+          text: '',
+          cta_button_text: '',
+          cta_button_link: '',
+          is_active: true,
+        },
+      },
+      {
+        id: 'block_bottom_banner_default',
+        type: 'bottom_banner',
+        title_label: 'Khung Nâu: Banner cuối trang',
+        is_active: siteConfigs?.homepage_bottom_banner?.is_active ?? true,
+        sort_order: 6,
+        config: siteConfigs?.homepage_bottom_banner || {
+          mode: 'structured',
+          title: '',
+          link_url: '',
+          books: [],
+          is_active: true,
+        },
+      },
+    ];
+  });
 
-  // Toggle Live Preview Side-by-Side (Mặc định: tắt)
+  const [selectedBlockId, setSelectedBlockId] = useState<string>('block_hero_default');
   const [isSideBySide, setIsSideBySide] = useState<boolean>(false);
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [saving, setSaving] = useState<boolean>(false);
   const [uploading, setUploading] = useState<string | null>(null);
 
-  // Local draft states - strictly without fallback data
-  const [heroDraft, setHeroDraft] = useState<HomepageHeroConfig>(() => ({
-    mode: siteConfigs?.homepage_hero?.mode || 'structured',
-    custom_html: siteConfigs?.homepage_hero?.custom_html || '',
-    subtitle: siteConfigs?.homepage_hero?.subtitle || '',
-    title: siteConfigs?.homepage_hero?.title || '',
-    bullets: siteConfigs?.homepage_hero?.bullets || [],
-    badge_left: siteConfigs?.homepage_hero?.badge_left || '',
-    badge_right: siteConfigs?.homepage_hero?.badge_right || '',
-    author_avatar_url: siteConfigs?.homepage_hero?.author_avatar_url || '',
-    author_name: siteConfigs?.homepage_hero?.author_name || '',
-    author_title: siteConfigs?.homepage_hero?.author_title || '',
-    is_active: siteConfigs?.homepage_hero?.is_active ?? true,
-  }));
-
-  const [topBannerDraft, setTopBannerDraft] = useState<HomepageTopBannerConfig>(() => ({
-    mode: siteConfigs?.homepage_top_banner?.mode || 'structured',
-    custom_html: siteConfigs?.homepage_top_banner?.custom_html || '',
-    tag: siteConfigs?.homepage_top_banner?.tag || '',
-    title: siteConfigs?.homepage_top_banner?.title || '',
-    subtitle: siteConfigs?.homepage_top_banner?.subtitle || '',
-    cta_badge: siteConfigs?.homepage_top_banner?.cta_badge || '',
-    link_url: siteConfigs?.homepage_top_banner?.link_url || '',
-    header_label: siteConfigs?.homepage_top_banner?.header_label || '',
-    books: siteConfigs?.homepage_top_banner?.books || [],
-    is_active: siteConfigs?.homepage_top_banner?.is_active ?? true,
-  }));
-
-  const [categoriesGridDraft, setCategoriesGridDraft] =
-    useState<HomepageCategoriesGridConfig>(() => ({
-      title: siteConfigs?.homepage_categories_grid?.title || '',
-      items: siteConfigs?.homepage_categories_grid?.items || [],
-      is_active: siteConfigs?.homepage_categories_grid?.is_active ?? true,
-    }));
-
-  const [sectionGroupsDraft, setSectionGroupsDraft] =
-    useState<HomepageSectionGroupsConfig>(() => ({
-      sections: siteConfigs?.homepage_section_groups?.sections || [],
-    }));
-
-  const [noticeDraft, setNoticeDraft] = useState<HomepageNoticeTextConfig>(() => ({
-    text: siteConfigs?.homepage_notice_text?.text || '',
-    cta_button_text: siteConfigs?.homepage_notice_text?.cta_button_text || '',
-    cta_button_link: siteConfigs?.homepage_notice_text?.cta_button_link || '',
-    is_active: siteConfigs?.homepage_notice_text?.is_active ?? true,
-  }));
-
-  const [bottomBannerDraft, setBottomBannerDraft] =
-    useState<HomepageBottomBannerConfig>(() => ({
-      mode: siteConfigs?.homepage_bottom_banner?.mode || 'structured',
-      custom_html: siteConfigs?.homepage_bottom_banner?.custom_html || '',
-      custom_image_url: siteConfigs?.homepage_bottom_banner?.custom_image_url || '',
-      link_url: siteConfigs?.homepage_bottom_banner?.link_url || '',
-      tag: siteConfigs?.homepage_bottom_banner?.tag || '',
-      title: siteConfigs?.homepage_bottom_banner?.title || '',
-      badge_text: siteConfigs?.homepage_bottom_banner?.badge_text || '',
-      books: siteConfigs?.homepage_bottom_banner?.books || [],
-      is_active: siteConfigs?.homepage_bottom_banner?.is_active ?? true,
-    }));
-
-  // Sync draft states whenever siteConfigs updates from DB
+  // Đồng bộ blocks khi siteConfigs load từ backend
   useEffect(() => {
-    if (siteConfigs?.homepage_hero) {
-      setHeroDraft(siteConfigs.homepage_hero);
-    }
-    if (siteConfigs?.homepage_top_banner) {
-      setTopBannerDraft(siteConfigs.homepage_top_banner);
-    }
-    if (siteConfigs?.homepage_categories_grid) {
-      setCategoriesGridDraft(siteConfigs.homepage_categories_grid);
-    }
-    if (siteConfigs?.homepage_section_groups) {
-      setSectionGroupsDraft(siteConfigs.homepage_section_groups);
-    }
-    if (siteConfigs?.homepage_notice_text) {
-      setNoticeDraft(siteConfigs.homepage_notice_text);
-    }
-    if (siteConfigs?.homepage_bottom_banner) {
-      setBottomBannerDraft(siteConfigs.homepage_bottom_banner);
+    if (Array.isArray(siteConfigs?.homepage_blocks) && siteConfigs.homepage_blocks.length > 0) {
+      setBlocks(siteConfigs.homepage_blocks);
+      if (!selectedBlockId && siteConfigs.homepage_blocks[0]) {
+        setSelectedBlockId(siteConfigs.homepage_blocks[0].id);
+      }
     }
   }, [siteConfigs]);
 
-  // Handle direct file upload via API
+  const currentBlockIndex = blocks.findIndex((b) => b.id === selectedBlockId);
+  const currentBlock = blocks[currentBlockIndex] || blocks[0];
+
+  // Upload ảnh qua R2 API
   const handleUploadFile = async (
     file: File,
     onSuccess: (url: string) => void,
@@ -126,7 +179,7 @@ export const AdminHomepageCms: React.FC = () => {
     try {
       const res = await apiClient.uploadFile(file);
       onSuccess(res.url);
-      showToast('Tải ảnh lên thành công!');
+      showToast('Tải ảnh lên Cloudflare R2 thành công!');
     } catch (err: any) {
       showToast(err?.message || 'Lỗi tải ảnh lên.');
     } finally {
@@ -134,661 +187,432 @@ export const AdminHomepageCms: React.FC = () => {
     }
   };
 
-  const handleSaveCurrentBlock = async () => {
+  // Di chuyển khối lên trên
+  const handleMoveBlockUp = (index: number) => {
+    if (index <= 0) return;
+    const next = [...blocks];
+    const temp = next[index - 1];
+    next[index - 1] = next[index];
+    next[index] = temp;
+    next.forEach((b, idx) => {
+      b.sort_order = idx + 1;
+    });
+    setBlocks(next);
+  };
+
+  // Di chuyển khối xuống dưới
+  const handleMoveBlockDown = (index: number) => {
+    if (index >= blocks.length - 1) return;
+    const next = [...blocks];
+    const temp = next[index + 1];
+    next[index + 1] = next[index];
+    next[index] = temp;
+    next.forEach((b, idx) => {
+      b.sort_order = idx + 1;
+    });
+    setBlocks(next);
+  };
+
+  // Thêm một khối mới vào danh sách
+  const handleAddBlock = (type: HomepageBlockType) => {
+    const id = `block_${type}_${Date.now()}`;
+    const info = BLOCK_TYPE_LABELS[type];
+
+    let initialConfig: any = {};
+    if (type === 'hero') {
+      initialConfig = { mode: 'structured', title: '', subtitle: '', bullets: [], image_url: '', is_active: true };
+    } else if (type === 'top_banner') {
+      initialConfig = { mode: 'image_text', header_label: '', tag: '', title: '', subtitle: '', cta_badge: '', link_url: '', image_url: '', is_active: true };
+    } else if (type === 'categories_grid') {
+      initialConfig = { title: 'Danh mục sản phẩm', items: [], is_active: true };
+    } else if (type === 'section_groups') {
+      initialConfig = { sections: [] };
+    } else if (type === 'notice_text') {
+      initialConfig = { text: '', cta_button_text: '', cta_button_link: '', is_active: true };
+    } else if (type === 'bottom_banner') {
+      initialConfig = { mode: 'structured', title: '', link_url: '', books: [], is_active: true };
+    }
+
+    const newBlock: HomepageBlockItem = {
+      id,
+      type,
+      title_label: info.name,
+      is_active: true,
+      sort_order: blocks.length + 1,
+      config: initialConfig,
+    };
+
+    setBlocks((prev) => [...prev, newBlock]);
+    setSelectedBlockId(id);
+    showToast(`Đã thêm mới: ${info.name}`);
+  };
+
+  // Xóa một khối khỏi trang chủ
+  const handleDeleteBlock = (id: string) => {
+    const next = blocks.filter((b) => b.id !== id);
+    next.forEach((b, idx) => {
+      b.sort_order = idx + 1;
+    });
+    setBlocks(next);
+    if (selectedBlockId === id) {
+      setSelectedBlockId(next[0]?.id || '');
+    }
+    showToast('Đã xóa khung khỏi trang chủ');
+  };
+
+  // Cập nhật config của khối đang chọn
+  const updateCurrentConfig = (updater: (prev: any) => any) => {
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === currentBlock.id ? { ...b, config: updater(b.config) } : b))
+    );
+  };
+
+  // Lưu toàn bộ layout trang chủ vào Supabase
+  const handleSaveAllLayout = async () => {
     setSaving(true);
     try {
-      if (activeBlock === 'hero') {
-        await updateSiteConfig('homepage_hero', heroDraft);
-      } else if (activeBlock === 'top_banner') {
-        await updateSiteConfig('homepage_top_banner', topBannerDraft);
-      } else if (activeBlock === 'categories_grid') {
-        await updateSiteConfig('homepage_categories_grid', categoriesGridDraft);
-      } else if (activeBlock === 'section_groups') {
-        await updateSiteConfig('homepage_section_groups', sectionGroupsDraft);
-      } else if (activeBlock === 'notice_text') {
-        await updateSiteConfig('homepage_notice_text', noticeDraft);
-      } else if (activeBlock === 'bottom_banner') {
-        await updateSiteConfig('homepage_bottom_banner', bottomBannerDraft);
-      }
-      showToast('Đã lưu cấu hình khối vào cơ sở dữ liệu thành công!');
+      await updateSiteConfig('homepage_blocks', blocks);
+
+      // Cập nhật đồng bộ các key lẻ nếu có block tương ứng (đảm bảo tương thích ngược)
+      const hero = blocks.find((b) => b.type === 'hero');
+      if (hero) await updateSiteConfig('homepage_hero', hero.config);
+      const banner = blocks.find((b) => b.type === 'top_banner');
+      if (banner) await updateSiteConfig('homepage_top_banner', banner.config);
+      const cat = blocks.find((b) => b.type === 'categories_grid');
+      if (cat) await updateSiteConfig('homepage_categories_grid', cat.config);
+      const sec = blocks.find((b) => b.type === 'section_groups');
+      if (sec) await updateSiteConfig('homepage_section_groups', sec.config);
+      const noti = blocks.find((b) => b.type === 'notice_text');
+      if (noti) await updateSiteConfig('homepage_notice_text', noti.config);
+      const btm = blocks.find((b) => b.type === 'bottom_banner');
+      if (btm) await updateSiteConfig('homepage_bottom_banner', btm.config);
+
+      showToast('Đã lưu toàn bộ cấu hình và thứ tự các khung trang chủ thành công!');
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi lưu cấu hình khối.');
+      showToast(err?.message || 'Lỗi lưu cấu hình.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Helper cho Quản lý Section Groups (Khung Tím)
-  const handleAddSectionGroup = () => {
-    const newGroup: HomepageSectionGroup = {
-      id: `sec-${Date.now()}`,
-      title: 'Nhóm tài liệu mới',
-      is_active: true,
-      sort_order: (sectionGroupsDraft.sections.length || 0) + 1,
-      items: [],
-    };
-    setSectionGroupsDraft((prev) => ({
-      ...prev,
-      sections: [...prev.sections, newGroup],
-    }));
-  };
-
-  const handleRemoveSectionGroup = (groupId: string) => {
-    setSectionGroupsDraft((prev) => ({
-      ...prev,
-      sections: prev.sections.filter((s) => s.id !== groupId),
-    }));
-  };
-
-  const handleAddItemToGroup = (groupId: string) => {
-    const newItem: HomepageSectionItem = {
-      id: `item-${Date.now()}`,
-      display_title: 'Tên tài liệu hiển thị riêng',
-      image_url: '',
-      target_url: '/high-school',
-      badge_text: 'Mới',
-      tag_text: 'Luyện đề chi tiết',
-      is_active: true,
-      sort_order: 1,
-    };
-
-    setSectionGroupsDraft((prev) => ({
-      ...prev,
-      sections: prev.sections.map((s) => {
-        if (s.id === groupId) {
-          return {
-            ...s,
-            items: [...s.items, newItem],
-          };
-        }
-        return s;
-      }),
-    }));
-  };
-
-  const handleRemoveItemFromGroup = (groupId: string, itemId: string) => {
-    setSectionGroupsDraft((prev) => ({
-      ...prev,
-      sections: prev.sections.map((s) => {
-        if (s.id === groupId) {
-          return {
-            ...s,
-            items: s.items.filter((it) => it.id !== itemId),
-          };
-        }
-        return s;
-      }),
-    }));
-  };
-
-  const handleUpdateItem = (
-    groupId: string,
-    itemId: string,
-    updates: Partial<HomepageSectionItem>
-  ) => {
-    setSectionGroupsDraft((prev) => ({
-      ...prev,
-      sections: prev.sections.map((s) => {
-        if (s.id === groupId) {
-          return {
-            ...s,
-            items: s.items.map((it) => (it.id === itemId ? { ...it, ...updates } : it)),
-          };
-        }
-        return s;
-      }),
-    }));
-  };
-
   return (
     <div className="space-y-6">
-      {/* CMS Header & Controls */}
-      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-xs font-bold text-gray-700">Khối giao diện:</label>
-          <select
-            value={activeBlock}
-            onChange={(e) => setActiveBlock(e.target.value as any)}
-            className="text-xs font-bold border border-gray-300 rounded px-3 py-1.5 focus:border-[#e60049] outline-none bg-white text-gray-800"
-          >
-            <option value="hero">1. Khung Đen (Hero Top Header)</option>
-            <option value="top_banner">2. Khung Xanh Dương (Top Banner 90 đề)</option>
-            <option value="categories_grid">3. Khung Vàng (Danh mục 6 ô vuông)</option>
-            <option value="section_groups">4. Khung Tím (Nhóm cấp 1 &amp; Sản phẩm cấp 2)</option>
-            <option value="notice_text">5. Dòng Chữ Xám (Thông báo &amp; CTA)</option>
-            <option value="bottom_banner">6. Khung Nâu (Bottom Banner CT GDPT 2018)</option>
-          </select>
+      {/* Top Action Bar */}
+      <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-base font-black text-gray-900">
+            Quản trị Giao diện Trang chủ (CMS Page Builder)
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Tự do thêm các khung khác nhau, sắp xếp thứ tự hiển thị, tải ảnh R2 trực tiếp và xem trước Liveview.
+          </p>
         </div>
 
-        {/* Live Preview Toggle & Save Button */}
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-gray-700">
-            <input
-              type="checkbox"
-              checked={isSideBySide}
-              onChange={(e) => setIsSideBySide(e.target.checked)}
-              className="rounded text-[#e60049] focus:ring-[#e60049] h-4 w-4"
-            />
-            <span>Bật Live Preview Side-by-Side</span>
-          </label>
+        <div className="flex items-center gap-3">
+          {/* Toggle Liveview Side-by-side */}
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-sm">
+            <span className="text-xs font-bold text-gray-700">Xem Liveview Side-by-Side:</span>
+            <button
+              type="button"
+              onClick={() => setIsSideBySide((v) => !v)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                isSideBySide ? 'bg-[#e60049]' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-[3px] ml-[3px] ${
+                  isSideBySide ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
 
+          {/* Nút Lưu cấu hình tổng */}
           <button
             type="button"
-            onClick={handleSaveCurrentBlock}
+            onClick={handleSaveAllLayout}
             disabled={saving}
-            className="bg-[#e60049] hover:bg-[#cc0041] disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-sm shadow transition"
+            className="bg-[#e60049] hover:bg-[#cc0041] disabled:opacity-50 text-white font-extrabold text-xs px-4 py-2 rounded-sm shadow-sm transition flex items-center gap-1.5"
           >
-            {saving ? 'Đang lưu...' : 'Lưu khối này vào DB'}
+            {saving ? 'Đang lưu vào DB...' : 'Lưu toàn bộ thứ tự & cấu hình'}
           </button>
         </div>
       </div>
 
-      {/* Main CMS Layout: Single Panel vs Side-by-Side */}
-      <div
-        className={
-          isSideBySide
-            ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 items-start'
-            : 'w-full max-w-[960px]'
-        }
-      >
-        {/* Left Column: Form Controls */}
-        <div
-          className={
-            isSideBySide
-              ? 'lg:col-span-6 bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-6'
-              : 'bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-6'
-          }
-        >
-          {/* ============================================================== */}
-          {/* 1. KHUNG ĐEN: HERO TOP */}
-          {/* ============================================================== */}
-          {activeBlock === 'hero' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-extrabold text-sm text-gray-900">
-                  Cấu hình Khung Đen (Hero Top Header)
-                </h3>
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={heroDraft.is_active}
-                    onChange={(e) =>
-                      setHeroDraft((prev) => ({ ...prev, is_active: e.target.checked }))
-                    }
-                    className="rounded text-[#e60049]"
-                  />
-                  <span>Hiển thị trên web</span>
-                </label>
-              </div>
+      {/* DANH SÁCH CÁC KHUNG VÀ SẮP XẾP THỨ TỰ (REORDER & ADD NEW) */}
+      <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <h3 className="text-xs font-black uppercase text-gray-900 tracking-wider">
+              Danh sách thứ tự các khung hiển thị trên Trang chủ ({blocks.length} khung)
+            </h3>
+            <p className="text-[11px] text-gray-500">
+              Bấm ▲ Lên hoặc ▼ Xuống để thay đổi vị trí khung trên trang chủ. Bấm vào khung để chỉnh sửa nội dung chi tiết.
+            </p>
+          </div>
 
-              {/* Mode switch: HTML vs Structured */}
-              <div className="flex items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="hero_mode"
-                    value="structured"
-                    checked={heroDraft.mode === 'structured'}
-                    onChange={() =>
-                      setHeroDraft((prev) => ({ ...prev, mode: 'structured' }))
-                    }
-                  />
-                  <span>Ảnh &amp; Chữ chuẩn (Khuyên dùng)</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="hero_mode"
-                    value="custom_html"
-                    checked={heroDraft.mode === 'custom_html'}
-                    onChange={() =>
-                      setHeroDraft((prev) => ({ ...prev, mode: 'custom_html' }))
-                    }
-                  />
-                  <span>Dán đoạn mã HTML</span>
-                </label>
-              </div>
+          {/* Nút thêm khung mới */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-600">+ Thêm khung:</span>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleAddBlock(e.target.value as HomepageBlockType);
+                  e.target.value = '';
+                }
+              }}
+              className="text-xs p-1.5 border border-gray-300 rounded font-bold bg-white text-[#e60049] cursor-pointer"
+            >
+              <option value="" disabled>
+                Chọn loại khung muốn thêm...
+              </option>
+              <option value="hero">Khung Đen: Hero Top Header</option>
+              <option value="top_banner">Khung Xanh Dương: Top Banner</option>
+              <option value="categories_grid">Khung Vàng: Danh mục ô vuông</option>
+              <option value="section_groups">Khung Tím: Nhóm tài liệu cấp 1 &amp; Cấp 2</option>
+              <option value="notice_text">Khung Xám: Dòng chữ thông báo &amp; Nút</option>
+              <option value="bottom_banner">Khung Nâu: Banner cuối trang</option>
+            </select>
+          </div>
+        </div>
 
-              {heroDraft.mode === 'custom_html' ? (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Đoạn mã HTML tự do:
-                  </label>
-                  <textarea
-                    rows={12}
-                    value={heroDraft.custom_html || ''}
-                    onChange={(e) =>
-                      setHeroDraft((prev) => ({ ...prev, custom_html: e.target.value }))
-                    }
-                    placeholder="<div>... Paste HTML của bạn tại đây ...</div>"
-                    className="w-full font-mono text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Phụ đề nhỏ trên cùng:
-                    </label>
-                    <input
-                      type="text"
-                      value={heroDraft.subtitle || ''}
-                      onChange={(e) =>
-                        setHeroDraft((prev) => ({ ...prev, subtitle: e.target.value }))
-                      }
-                      className="w-full text-xs p-2.5 border border-gray-300 rounded focus:border-[#e60049] outline-none font-medium"
-                    />
-                  </div>
+        {/* Danh sách các card khung với nút Di chuyển Lên/Xuống */}
+        <div className="space-y-2">
+          {blocks.map((block, idx) => {
+            const isSelected = block.id === currentBlock?.id;
+            const info = BLOCK_TYPE_LABELS[block.type] || {
+              name: block.type,
+              color: 'bg-gray-700 text-white',
+              desc: '',
+            };
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Tiêu đề chính:
-                    </label>
-                    <input
-                      type="text"
-                      value={heroDraft.title || ''}
-                      onChange={(e) =>
-                        setHeroDraft((prev) => ({ ...prev, title: e.target.value }))
-                      }
-                      className="w-full text-xs p-2.5 border border-gray-300 rounded focus:border-[#e60049] outline-none font-bold"
-                    />
-                  </div>
-
-                  {/* Bullets */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Các gạch đầu dòng tính năng:
-                    </label>
-                    {(heroDraft.bullets || []).map((b, idx) => (
-                      <div key={idx} className="flex items-center gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={b}
-                          onChange={(e) => {
-                            const newB = [...(heroDraft.bullets || [])];
-                            newB[idx] = e.target.value;
-                            setHeroDraft((prev) => ({ ...prev, bullets: newB }));
-                          }}
-                          className="flex-1 text-xs p-2 border border-gray-300 rounded focus:border-[#e60049] outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newB = (heroDraft.bullets || []).filter(
-                              (_, i) => i !== idx
-                            );
-                            setHeroDraft((prev) => ({ ...prev, bullets: newB }));
-                          }}
-                          className="text-red-500 hover:text-red-700 text-xs px-2 py-1 font-bold"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    ))}
+            return (
+              <div
+                key={block.id}
+                className={`flex items-center justify-between p-3 rounded-md border transition ${
+                  isSelected
+                    ? 'border-[#e60049] bg-pink-50/40 shadow-sm ring-1 ring-[#e60049]'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                {/* Vị trí thứ tự & Nút Reorder */}
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-0.5">
                     <button
                       type="button"
-                      onClick={() =>
-                        setHeroDraft((prev) => ({
-                          ...prev,
-                          bullets: [...(prev.bullets || []), 'Tính năng bổ sung mới'],
-                        }))
-                      }
-                      className="text-xs font-bold text-[#e60049] hover:underline"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveBlockUp(idx)}
+                      className="text-gray-500 hover:text-[#e60049] disabled:opacity-20 text-[11px] p-0.5 font-bold leading-none"
+                      title="Di chuyển lên"
                     >
-                      + Thêm gạch đầu dòng
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === blocks.length - 1}
+                      onClick={() => handleMoveBlockDown(idx)}
+                      className="text-gray-500 hover:text-[#e60049] disabled:opacity-20 text-[11px] p-0.5 font-bold leading-none"
+                      title="Di chuyển xuống"
+                    >
+                      ▼
                     </button>
                   </div>
 
-                  {/* Author avatar & info */}
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Tên tác giả:
-                      </label>
-                      <input
-                        type="text"
-                        value={heroDraft.author_name || ''}
-                        onChange={(e) =>
-                          setHeroDraft((prev) => ({ ...prev, author_name: e.target.value }))
-                        }
-                        className="w-full text-xs p-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Danh xưng tác giả:
-                      </label>
-                      <input
-                        type="text"
-                        value={heroDraft.author_title || ''}
-                        onChange={(e) =>
-                          setHeroDraft((prev) => ({
-                            ...prev,
-                            author_title: e.target.value,
-                          }))
-                        }
-                        className="w-full text-xs p-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
+                  <span className="font-mono text-xs font-extrabold text-gray-500 w-6">
+                    #{idx + 1}
+                  </span>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Link ảnh đại diện tác giả (hoặc upload mới):
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={heroDraft.author_avatar_url || ''}
-                        onChange={(e) =>
-                          setHeroDraft((prev) => ({
-                            ...prev,
-                            author_avatar_url: e.target.value,
-                          }))
-                        }
-                        placeholder="/favicon.png hoặc https://..."
-                        className="flex-1 text-xs p-2 border border-gray-300 rounded"
-                      />
-                      <label className="bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-3 py-2 text-xs font-bold cursor-pointer shrink-0">
-                        {uploading === 'hero_avatar' ? 'Đang up...' : 'Upload ảnh'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files?.[0]) {
-                              handleUploadFile(
-                                e.target.files[0],
-                                (url) =>
-                                  setHeroDraft((prev) => ({
-                                    ...prev,
-                                    author_avatar_url: url,
-                                  })),
-                                'hero_avatar'
-                              );
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ============================================================== */}
-          {/* 2. KHUNG XANH DƯƠNG: TOP BANNER 90 ĐỀ */}
-          {/* ============================================================== */}
-          {activeBlock === 'top_banner' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-extrabold text-sm text-gray-900">
-                  Cấu hình Khung Xanh Dương (Top Banner 90 Đề)
-                </h3>
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={topBannerDraft.is_active}
-                    onChange={(e) =>
-                      setTopBannerDraft((prev) => ({ ...prev, is_active: e.target.checked }))
-                    }
-                    className="rounded text-[#e60049]"
-                  />
-                  <span>Hiển thị trên web</span>
-                </label>
-              </div>
-
-              {/* Mode switch */}
-              <div className="flex items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="top_banner_mode"
-                    value="structured"
-                    checked={topBannerDraft.mode === 'structured'}
-                    onChange={() =>
-                      setTopBannerDraft((prev) => ({ ...prev, mode: 'structured' }))
-                    }
-                  />
-                  <span>Bộ sách 3D &amp; Chữ chuẩn (Khuyên dùng)</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="top_banner_mode"
-                    value="custom_html"
-                    checked={topBannerDraft.mode === 'custom_html'}
-                    onChange={() =>
-                      setTopBannerDraft((prev) => ({ ...prev, mode: 'custom_html' }))
-                    }
-                  />
-                  <span>Dán đoạn mã HTML</span>
-                </label>
-              </div>
-
-              {topBannerDraft.mode === 'custom_html' ? (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Mã HTML tùy biến:
-                  </label>
-                  <textarea
-                    rows={12}
-                    value={topBannerDraft.custom_html || ''}
-                    onChange={(e) =>
-                      setTopBannerDraft((prev) => ({
-                        ...prev,
-                        custom_html: e.target.value,
-                      }))
-                    }
-                    placeholder="<div>... Paste HTML tại đây ...</div>"
-                    className="w-full font-mono text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Nhãn tiêu đề phía trên banner:
-                    </label>
-                    <input
-                      type="text"
-                      value={topBannerDraft.header_label || ''}
-                      onChange={(e) =>
-                        setTopBannerDraft((prev) => ({
-                          ...prev,
-                          header_label: e.target.value,
-                        }))
-                      }
-                      className="w-full text-xs p-2.5 border border-gray-300 rounded"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Tiêu đề lớn:
-                      </label>
-                      <input
-                        type="text"
-                        value={topBannerDraft.title || ''}
-                        onChange={(e) =>
-                          setTopBannerDraft((prev) => ({
-                            ...prev,
-                            title: e.target.value,
-                          }))
-                        }
-                        className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Huy hiệu nút CTA:
-                      </label>
-                      <input
-                        type="text"
-                        value={topBannerDraft.cta_badge || ''}
-                        onChange={(e) =>
-                          setTopBannerDraft((prev) => ({
-                            ...prev,
-                            cta_badge: e.target.value,
-                          }))
-                        }
-                        className="w-full text-xs p-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Đường dẫn khi click vào banner:
-                    </label>
-                    <input
-                      type="text"
-                      value={topBannerDraft.link_url || ''}
-                      onChange={(e) =>
-                        setTopBannerDraft((prev) => ({
-                          ...prev,
-                          link_url: e.target.value,
-                        }))
-                      }
-                      className="w-full text-xs p-2 border border-gray-300 rounded"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ============================================================== */}
-          {/* 3. KHUNG VÀNG: DANH MỤC Ô VUÔNG */}
-          {/* ============================================================== */}
-          {activeBlock === 'categories_grid' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-extrabold text-sm text-gray-900">
-                  Cấu hình Khung Vàng (Danh mục sản phẩm ô vuông)
-                </h3>
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={categoriesGridDraft.is_active}
-                    onChange={(e) =>
-                      setCategoriesGridDraft((prev) => ({
-                        ...prev,
-                        is_active: e.target.checked,
-                      }))
-                    }
-                    className="rounded text-[#e60049]"
-                  />
-                  <span>Hiển thị trên web</span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Tiêu đề nhóm ô vuông:
-                </label>
-                <input
-                  type="text"
-                  value={categoriesGridDraft.title}
-                  onChange={(e) =>
-                    setCategoriesGridDraft((prev) => ({ ...prev, title: e.target.value }))
-                  }
-                  className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
-                />
-              </div>
-
-              {/* Danh sách từng ô */}
-              <div className="space-y-3">
-                <label className="block text-xs font-bold text-gray-700">
-                  Danh sách ô danh mục ({categoriesGridDraft.items.length}):
-                </label>
-                {categoriesGridDraft.items.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    className="p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2 text-xs"
+                  <span
+                    className={`text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 ${info.color}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#e60049]">Ô số {idx + 1}</span>
-                      <label className="flex items-center gap-1.5 font-semibold cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.is_active}
-                          onChange={(e) => {
-                            const newItems = [...categoriesGridDraft.items];
-                            newItems[idx].is_active = e.target.checked;
-                            setCategoriesGridDraft((prev) => ({
-                              ...prev,
-                              items: newItems,
-                            }));
-                          }}
-                          className="rounded text-[#e60049]"
-                        />
-                        <span>Kích hoạt</span>
-                      </label>
-                    </div>
+                    {block.type}
+                  </span>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="col-span-2">
-                        <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                          Tên hiển thị:
-                        </label>
-                        <input
-                          type="text"
-                          value={item.label}
-                          onChange={(e) => {
-                            const newItems = [...categoriesGridDraft.items];
-                            newItems[idx].label = e.target.value;
-                            setCategoriesGridDraft((prev) => ({
-                              ...prev,
-                              items: newItems,
-                            }));
-                          }}
-                          className="w-full p-1.5 border border-gray-300 rounded text-xs font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                          Icon text:
-                        </label>
-                        <input
-                          type="text"
-                          value={item.icon_code}
-                          onChange={(e) => {
-                            const newItems = [...categoriesGridDraft.items];
-                            newItems[idx].icon_code = e.target.value;
-                            setCategoriesGridDraft((prev) => ({
-                              ...prev,
-                              items: newItems,
-                            }));
-                          }}
-                          className="w-full p-1.5 border border-gray-300 rounded text-xs text-center font-bold"
-                        />
-                      </div>
-                    </div>
+                  {/* Input tên gợi nhớ */}
+                  <input
+                    type="text"
+                    value={block.title_label || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBlocks((prev) =>
+                        prev.map((b) => (b.id === block.id ? { ...b, title_label: val } : b))
+                      );
+                    }}
+                    placeholder={info.name}
+                    className="text-xs font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-[#e60049] outline-none px-1 py-0.5 bg-transparent min-w-[200px]"
+                  />
+                </div>
 
+                {/* Các nút hành động bên phải */}
+                <div className="flex items-center gap-3">
+                  {/* Công tắc Bật/Tắt */}
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={block.is_active}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setBlocks((prev) =>
+                          prev.map((b) => (b.id === block.id ? { ...b, is_active: checked } : b))
+                        );
+                      }}
+                      className="rounded text-[#e60049]"
+                    />
+                    <span>{block.is_active ? 'Đang hiện' : 'Ẩn'}</span>
+                  </label>
+
+                  {/* Nút Chọn để chỉnh sửa */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBlockId(block.id)}
+                    className={`text-xs font-bold px-3 py-1 rounded-sm transition ${
+                      isSelected
+                        ? 'bg-[#e60049] text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {isSelected ? 'Đang sửa' : 'Cấu hình chi tiết'}
+                  </button>
+
+                  {/* Nút Xóa */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBlock(block.id)}
+                    className="text-gray-400 hover:text-red-600 text-xs font-bold px-1.5"
+                    title="Xóa khung này"
+                  >
+                    Xóa
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Content Area: Editor + Live Preview (Optional Side-by-Side) */}
+      <div
+        className={
+          isSideBySide
+            ? 'grid grid-cols-1 xl:grid-cols-12 gap-6 items-start'
+            : 'space-y-6 max-w-4xl mx-auto'
+        }
+      >
+        {/* CỘT TRÁI: FORM BIÊN TẬP CHI TIẾT KHỐI ĐANG CHỌN */}
+        <div
+          className={
+            isSideBySide
+              ? 'xl:col-span-6 bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4'
+              : 'bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4'
+          }
+        >
+          {currentBlock ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-[#e60049] tracking-wider">
+                    ĐANG CẤU HÌNH KHUNG #{currentBlockIndex + 1}
+                  </span>
+                  <h3 className="font-extrabold text-sm text-gray-900 mt-0.5">
+                    {currentBlock.title_label || BLOCK_TYPE_LABELS[currentBlock.type]?.name}
+                  </h3>
+                </div>
+                <span className="text-[11px] text-gray-500">
+                  Loại: <strong>{currentBlock.type}</strong>
+                </span>
+              </div>
+
+              {/* 1. KHUNG ĐEN: HERO TOP */}
+              {currentBlock.type === 'hero' && (
+                <div className="space-y-4">
+                  {/* Mode switch */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hero_mode"
+                        value="structured"
+                        checked={currentBlock.config?.mode === 'structured'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                            ...cfg,
+                            mode: 'structured',
+                          }))
+                        }
+                      />
+                      <span>Chữ + Hình ảnh R2 bên phải (Chuẩn)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hero_mode"
+                        value="custom_html"
+                        checked={currentBlock.config?.mode === 'custom_html'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                            ...cfg,
+                            mode: 'custom_html',
+                          }))
+                        }
+                      />
+                      <span>Dán đoạn mã HTML</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hero_mode"
+                        value="custom_image"
+                        checked={currentBlock.config?.mode === 'custom_image'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                            ...cfg,
+                            mode: 'custom_image',
+                          }))
+                        }
+                      />
+                      <span>Full ảnh Banner</span>
+                    </label>
+                  </div>
+
+                  {currentBlock.config?.mode === 'custom_html' ? (
                     <div>
-                      <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                        Link ảnh tùy biến (Tự scale - Upload hoặc dán link view):
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Đoạn mã HTML tự do:
+                      </label>
+                      <textarea
+                        rows={12}
+                        value={currentBlock.config?.custom_html || ''}
+                        onChange={(e) =>
+                          updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                            ...cfg,
+                            custom_html: e.target.value,
+                          }))
+                        }
+                        placeholder="<div>... Paste HTML tại đây ...</div>"
+                        className="w-full font-mono text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none"
+                      />
+                    </div>
+                  ) : currentBlock.config?.mode === 'custom_image' ? (
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Ảnh Banner Hero:
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          value={item.image_url || ''}
+                          value={currentBlock.config?.custom_image_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                              ...cfg,
+                              custom_image_url: e.target.value,
+                            }))
+                          }
                           placeholder="Dán link view ảnh..."
-                          onChange={(e) => {
-                            const newItems = [...categoriesGridDraft.items];
-                            newItems[idx].image_url = e.target.value;
-                            setCategoriesGridDraft((prev) => ({
-                              ...prev,
-                              items: newItems,
-                            }));
-                          }}
-                          className="flex-1 p-1.5 border border-gray-300 rounded text-xs"
+                          className="flex-1 text-xs p-2 border border-gray-300 rounded"
                         />
-                        <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-2.5 py-1 text-[11px] font-bold cursor-pointer shrink-0">
-                          {uploading === `cat_img_${idx}` ? 'Đang up...' : 'Upload'}
+                        <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0">
+                          {uploading === 'hero_custom_img' ? 'Đang tải...' : 'Upload ảnh R2'}
                           <input
                             type="file"
                             accept="image/*"
@@ -797,218 +621,357 @@ export const AdminHomepageCms: React.FC = () => {
                               if (e.target.files?.[0]) {
                                 handleUploadFile(
                                   e.target.files[0],
-                                  (url) => {
-                                    const newItems = [...categoriesGridDraft.items];
-                                    newItems[idx].image_url = url;
-                                    setCategoriesGridDraft((prev) => ({
-                                      ...prev,
-                                      items: newItems,
-                                    }));
-                                  },
-                                  `cat_img_${idx}`
+                                  (url) =>
+                                    updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                      ...cfg,
+                                      custom_image_url: url,
+                                    })),
+                                  'hero_custom_img'
                                 );
                               }
                             }}
                           />
                         </label>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                        Đường link dẫn tới:
-                      </label>
-                      <input
-                        type="text"
-                        value={item.to}
-                        onChange={(e) => {
-                          const newItems = [...categoriesGridDraft.items];
-                          newItems[idx].to = e.target.value;
-                          setCategoriesGridDraft((prev) => ({
-                            ...prev,
-                            items: newItems,
-                          }));
-                        }}
-                        className="w-full p-1.5 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ============================================================== */}
-          {/* 4. KHUNG TÍM: NHÓM CẤP 1 & SẢN PHẨM CẤP 2 (TRỌNG TÂM) */}
-          {/* ============================================================== */}
-          {activeBlock === 'section_groups' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <div>
-                  <h3 className="font-extrabold text-sm text-gray-900">
-                    Cấu hình Khung Tím (Nhóm cấp 1 &amp; Sản phẩm con cấp 2)
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Tên sản phẩm tự đặt độc lập, ảnh tự upload/link, bật/tắt active cho từng
-                    nhóm và từng sản phẩm.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddSectionGroup}
-                  className="bg-[#e60049] text-white font-bold text-xs px-3 py-1.5 rounded shadow-sm hover:bg-[#cc0041]"
-                >
-                  + Thêm nhóm cấp 1
-                </button>
-              </div>
-
-              {/* Danh sách từng nhóm cấp 1 */}
-              {sectionGroupsDraft.sections.map((group, gIdx) => (
-                <div
-                  key={group.id}
-                  className="p-4 bg-white border-2 border-pink-100 rounded-md shadow-sm space-y-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-[#e60049] text-white font-black text-[10px] px-2 py-0.5 rounded">
-                        Nhóm #{gIdx + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={group.title}
-                        onChange={(e) => {
-                          const newSec = [...sectionGroupsDraft.sections];
-                          newSec[gIdx].title = e.target.value;
-                          setSectionGroupsDraft((prev) => ({
-                            ...prev,
-                            sections: newSec,
-                          }));
-                        }}
-                        placeholder="Tiêu đề nhóm (ví dụ: Tài liệu THPT)"
-                        className="font-extrabold text-xs text-gray-900 border-b border-gray-300 focus:border-[#e60049] outline-none px-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={group.is_active}
-                          onChange={(e) => {
-                            const newSec = [...sectionGroupsDraft.sections];
-                            newSec[gIdx].is_active = e.target.checked;
-                            setSectionGroupsDraft((prev) => ({
-                              ...prev,
-                              sections: newSec,
-                            }));
-                          }}
-                          className="rounded text-[#e60049]"
+                      {currentBlock.config?.custom_image_url && (
+                        <img
+                          src={currentBlock.config.custom_image_url}
+                          alt="Preview"
+                          className="max-h-48 rounded border p-1"
                         />
-                        <span>{group.is_active ? 'Đang bật nhóm' : 'Đã ẩn nhóm'}</span>
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSectionGroup(group.id)}
-                        className="text-red-500 hover:text-red-700 text-xs font-bold"
-                      >
-                        Xóa nhóm
-                      </button>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Phụ đề nhỏ trên cùng:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.subtitle || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                              ...cfg,
+                              subtitle: e.target.value,
+                            }))
+                          }
+                          placeholder="Dạy & học tiếng Anh với tài nguyên"
+                          className="w-full text-xs p-2.5 border border-gray-300 rounded focus:border-[#e60049] outline-none font-medium"
+                        />
+                      </div>
 
-                  {/* Danh sách các sản phẩm cấp 2 trong nhóm này */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-gray-600">
-                      <span>Sản phẩm con cấp 2 ({group.items?.length || 0}):</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddItemToGroup(group.id)}
-                        className="text-xs font-bold text-[#e60049] hover:underline"
-                      >
-                        + Thêm sản phẩm con vào nhóm này
-                      </button>
-                    </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Tiêu đề chính:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.title || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                              ...cfg,
+                              title: e.target.value,
+                            }))
+                          }
+                          placeholder="Chuẩn mực & Chi tiết"
+                          className="w-full text-xs p-2.5 border border-gray-300 rounded focus:border-[#e60049] outline-none font-bold"
+                        />
+                      </div>
 
-                    {(group.items || []).map((item, iIdx) => (
-                      <div
-                        key={item.id}
-                        className="p-3 bg-gray-50 border border-gray-200 rounded text-xs space-y-2.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-gray-700">
-                            Sản phẩm #{iIdx + 1}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-1.5 font-bold cursor-pointer text-[#e60049]">
-                              <input
-                                type="checkbox"
-                                checked={item.is_active}
-                                onChange={(e) =>
-                                  handleUpdateItem(group.id, item.id, {
-                                    is_active: e.target.checked,
-                                  })
-                                }
-                                className="rounded text-[#e60049]"
-                              />
-                              <span>
-                                {item.is_active ? 'Đang hiển thị' : 'Đã ẩn'}
-                              </span>
-                            </label>
-
+                      {/* Bullets */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Các gạch đầu dòng tính năng:
+                        </label>
+                        {(currentBlock.config?.bullets || []).map((b: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={b}
+                              onChange={(e) => {
+                                const newB = [...(currentBlock.config?.bullets || [])];
+                                newB[idx] = e.target.value;
+                                updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                  ...cfg,
+                                  bullets: newB,
+                                }));
+                              }}
+                              className="flex-1 text-xs p-2 border border-gray-300 rounded focus:border-[#e60049] outline-none"
+                            />
                             <button
                               type="button"
-                              onClick={() =>
-                                handleRemoveItemFromGroup(group.id, item.id)
-                              }
-                              className="text-red-500 hover:text-red-700 font-bold"
+                              onClick={() => {
+                                const newB = (currentBlock.config?.bullets || []).filter(
+                                  (_: any, i: number) => i !== idx
+                                );
+                                updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                  ...cfg,
+                                  bullets: newB,
+                                }));
+                              }}
+                              className="text-red-500 hover:text-red-700 text-xs px-2 py-1 font-bold"
                             >
                               Xóa
                             </button>
                           </div>
-                        </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                              ...cfg,
+                              bullets: [...(cfg.bullets || []), 'Tính năng mới'],
+                            }))
+                          }
+                          className="text-xs font-bold text-[#e60049] hover:underline"
+                        >
+                          + Thêm gạch đầu dòng
+                        </button>
+                      </div>
 
-                        {/* Tên hiển thị do Admin tự đặt */}
-                        <div>
-                          <label className="text-[10px] text-gray-600 font-bold block mb-0.5">
-                            Tên hiển thị bên dưới (Tự đặt, không phụ thuộc URL hay tên
-                            gốc):
-                          </label>
+                      {/* Right Side Image (Hình ảnh bên phải lấy từ R2 hoặc link view) */}
+                      <div className="pt-3 border-t space-y-2">
+                        <label className="block text-xs font-bold text-gray-800">
+                          Hình ảnh phía bên phải (Thầy giáo / Minh họa):
+                        </label>
+                        <div className="text-[11px] text-gray-500">
+                          Hình ảnh lấy từ Cloudflare R2 (hoặc dán link view), không phải ảnh tĩnh trong code, tự động co giãn đẹp mắt.
+                        </div>
+                        <div className="flex gap-2">
                           <input
                             type="text"
-                            value={item.display_title}
+                            value={currentBlock.config?.image_url || ''}
                             onChange={(e) =>
-                              handleUpdateItem(group.id, item.id, {
-                                display_title: e.target.value,
-                              })
+                              updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                ...cfg,
+                                image_url: e.target.value,
+                              }))
                             }
-                            placeholder="Nhập tên hiển thị..."
-                            className="w-full p-2 border border-gray-300 rounded text-xs font-bold text-gray-800"
+                            placeholder="Dán link R2/ảnh hoặc bấm Upload..."
+                            className="flex-1 text-xs p-2 border border-gray-300 rounded"
                           />
+                          <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0">
+                            {uploading === 'hero_img' ? 'Đang tải...' : 'Upload ảnh R2'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                  handleUploadFile(
+                                    e.target.files[0],
+                                    (url) =>
+                                      updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                        ...cfg,
+                                        image_url: url,
+                                      })),
+                                    'hero_img'
+                                  );
+                                }
+                              }}
+                            />
+                          </label>
                         </div>
+                        {currentBlock.config?.image_url && (
+                          <div className="flex items-center gap-3 p-2 bg-gray-50 border rounded w-fit">
+                            <img
+                              src={currentBlock.config.image_url}
+                              alt="Hero right"
+                              className="h-20 w-auto object-contain"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateCurrentConfig((cfg: HomepageHeroConfig) => ({
+                                  ...cfg,
+                                  image_url: '',
+                                }))
+                              }
+                              className="text-red-500 hover:text-red-700 text-xs font-bold"
+                            >
+                              Xóa ảnh
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                        {/* Hình ảnh kèm theo - Upload mới hoặc dán link view */}
-                        <div>
-                          <label className="text-[10px] text-gray-600 font-bold block mb-0.5">
-                            Hình ảnh kèm theo (Upload file hoặc dán đường link view - Tự
-                            động scale chuẩn):
+              {/* 2. KHUNG XANH DƯƠNG: TOP BANNER */}
+              {currentBlock.type === 'top_banner' && (
+                <div className="space-y-4">
+                  {/* Mode switch */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="top_banner_mode"
+                        value="image_text"
+                        checked={currentBlock.config?.mode === 'image_text'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                            ...cfg,
+                            mode: 'image_text',
+                          }))
+                        }
+                      />
+                      <span>Chữ + Up hình ảnh (Khuyên dùng)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="top_banner_mode"
+                        value="custom_html"
+                        checked={currentBlock.config?.mode === 'custom_html'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                            ...cfg,
+                            mode: 'custom_html',
+                          }))
+                        }
+                      />
+                      <span>Dán đoạn mã HTML</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="top_banner_mode"
+                        value="structured"
+                        checked={currentBlock.config?.mode === 'structured'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                            ...cfg,
+                            mode: 'structured',
+                          }))
+                        }
+                      />
+                      <span>Bộ sách 3D + Chữ</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="top_banner_mode"
+                        value="custom_image"
+                        checked={currentBlock.config?.mode === 'custom_image'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                            ...cfg,
+                            mode: 'custom_image',
+                          }))
+                        }
+                      />
+                      <span>Full ảnh Banner</span>
+                    </label>
+                  </div>
+
+                  {currentBlock.config?.mode === 'custom_html' ? (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Mã HTML tùy biến:
+                      </label>
+                      <textarea
+                        rows={12}
+                        value={currentBlock.config?.custom_html || ''}
+                        onChange={(e) =>
+                          updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                            ...cfg,
+                            custom_html: e.target.value,
+                          }))
+                        }
+                        placeholder="<div>... Paste HTML tại đây ...</div>"
+                        className="w-full font-mono text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none"
+                      />
+                    </div>
+                  ) : currentBlock.config?.mode === 'custom_image' ? (
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Ảnh Banner lớn:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={currentBlock.config?.custom_image_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              custom_image_url: e.target.value,
+                            }))
+                          }
+                          placeholder="Dán link view ảnh..."
+                          className="flex-1 text-xs p-2 border border-gray-300 rounded"
+                        />
+                        <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0">
+                          {uploading === 'top_banner_full' ? 'Đang tải...' : 'Upload ảnh R2'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) {
+                                handleUploadFile(
+                                  e.target.files[0],
+                                  (url) =>
+                                    updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                      ...cfg,
+                                      custom_image_url: url,
+                                    })),
+                                  'top_banner_full'
+                                );
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {currentBlock.config?.custom_image_url && (
+                        <img
+                          src={currentBlock.config.custom_image_url}
+                          alt="Banner Preview"
+                          className="max-h-48 rounded border p-1"
+                        />
+                      )}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Đường dẫn khi click vào banner:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.link_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              link_url: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2 border border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {/* Chữ + Up hình ảnh */}
+                      {currentBlock.config?.mode === 'image_text' && (
+                        <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-md space-y-2">
+                          <label className="block text-xs font-bold text-blue-900">
+                            Hình ảnh minh họa banner (Upload R2 hoặc dán link view):
                           </label>
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              value={item.image_url || ''}
+                              value={currentBlock.config?.image_url || ''}
                               onChange={(e) =>
-                                handleUpdateItem(group.id, item.id, {
+                                updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                  ...cfg,
                                   image_url: e.target.value,
-                                })
+                                }))
                               }
-                              placeholder="Dán link view ảnh (Google Drive, R2, CDN...)"
-                              className="flex-1 p-2 border border-gray-300 rounded text-xs"
+                              placeholder="Dán link view ảnh hoặc bấm Upload..."
+                              className="flex-1 text-xs p-2 border border-gray-300 rounded bg-white"
                             />
-                            <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-2 text-xs font-bold cursor-pointer shrink-0">
-                              {uploading === `item_${group.id}_${item.id}`
-                                ? 'Đang up...'
-                                : 'Upload ảnh'}
+                            <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0">
+                              {uploading === 'top_banner_img' ? 'Đang tải...' : 'Upload ảnh R2'}
                               <input
                                 type="file"
                                 accept="image/*"
@@ -1018,375 +981,956 @@ export const AdminHomepageCms: React.FC = () => {
                                     handleUploadFile(
                                       e.target.files[0],
                                       (url) =>
-                                        handleUpdateItem(group.id, item.id, {
+                                        updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                          ...cfg,
                                           image_url: url,
-                                        }),
-                                      `item_${group.id}_${item.id}`
+                                        })),
+                                      'top_banner_img'
                                     );
                                   }
                                 }}
                               />
                             </label>
                           </div>
+                          {currentBlock.config?.image_url && (
+                            <div className="flex items-center gap-3 p-1.5 bg-white border rounded w-fit">
+                              <img
+                                src={currentBlock.config.image_url}
+                                alt="Banner img"
+                                className="h-16 w-auto object-contain"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                    ...cfg,
+                                    image_url: '',
+                                  }))
+                                }
+                                className="text-red-500 hover:text-red-700 text-xs font-bold"
+                              >
+                                Xóa ảnh
+                              </button>
+                            </div>
+                          )}
                         </div>
+                      )}
 
-                        {/* Target URL & Badges */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div className="sm:col-span-1">
-                            <label className="text-[10px] text-gray-600 font-bold block mb-0.5">
-                              Đường link click vào:
-                            </label>
-                            <input
-                              type="text"
-                              value={item.target_url}
-                              onChange={(e) =>
-                                handleUpdateItem(group.id, item.id, {
-                                  target_url: e.target.value,
-                                })
-                              }
-                              placeholder="/high-school/..."
-                              className="w-full p-1.5 border border-gray-300 rounded text-xs"
-                            />
-                          </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Nhãn tiêu đề phía trên banner:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.header_label || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              header_label: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2.5 border border-gray-300 rounded"
+                        />
+                      </div>
 
-                          <div>
-                            <label className="text-[10px] text-gray-600 font-bold block mb-0.5">
-                              Huy hiệu (Badge đỏ):
-                            </label>
-                            <input
-                              type="text"
-                              value={item.badge_text || ''}
-                              onChange={(e) =>
-                                handleUpdateItem(group.id, item.id, {
-                                  badge_text: e.target.value,
-                                })
-                              }
-                              placeholder="Mới, Hot..."
-                              className="w-full p-1.5 border border-gray-300 rounded text-xs"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] text-gray-600 font-bold block mb-0.5">
-                              Tag mô tả:
-                            </label>
-                            <input
-                              type="text"
-                              value={item.tag_text || ''}
-                              onChange={(e) =>
-                                handleUpdateItem(group.id, item.id, {
-                                  tag_text: e.target.value,
-                                })
-                              }
-                              placeholder="Dành cho kỳ thi..."
-                              className="w-full p-1.5 border border-gray-300 rounded text-xs"
-                            />
-                          </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Thẻ tag nhỏ:
+                          </label>
+                          <input
+                            type="text"
+                            value={currentBlock.config?.tag || ''}
+                            onChange={(e) =>
+                              updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                ...cfg,
+                                tag: e.target.value,
+                              }))
+                            }
+                            className="w-full text-xs p-2 border border-gray-300 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Tiêu đề lớn:
+                          </label>
+                          <input
+                            type="text"
+                            value={currentBlock.config?.title || ''}
+                            onChange={(e) =>
+                              updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                ...cfg,
+                                title: e.target.value,
+                              }))
+                            }
+                            className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
-          {/* ============================================================== */}
-          {/* 5. DÒNG CHỮ XÁM: THÔNG BÁO & NÚT CTA */}
-          {/* ============================================================== */}
-          {activeBlock === 'notice_text' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-extrabold text-sm text-gray-900">
-                  Cấu hình Dòng Chữ Xám (Thông báo &amp; Nút Xem Toàn Bộ)
-                </h3>
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={noticeDraft.is_active}
-                    onChange={(e) =>
-                      setNoticeDraft((prev) => ({ ...prev, is_active: e.target.checked }))
-                    }
-                    className="rounded text-[#e60049]"
-                  />
-                  <span>Hiển thị trên web</span>
-                </label>
-              </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Mô tả / Phụ đề:
+                          </label>
+                          <input
+                            type="text"
+                            value={currentBlock.config?.subtitle || ''}
+                            onChange={(e) =>
+                              updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                ...cfg,
+                                subtitle: e.target.value,
+                              }))
+                            }
+                            className="w-full text-xs p-2 border border-gray-300 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Huy hiệu nút CTA:
+                          </label>
+                          <input
+                            type="text"
+                            value={currentBlock.config?.cta_badge || ''}
+                            onChange={(e) =>
+                              updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                                ...cfg,
+                                cta_badge: e.target.value,
+                              }))
+                            }
+                            className="w-full text-xs p-2 border border-gray-300 rounded"
+                          />
+                        </div>
+                      </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Nội dung dòng chữ thông báo:
-                </label>
-                <textarea
-                  rows={4}
-                  value={noticeDraft.text}
-                  onChange={(e) =>
-                    setNoticeDraft((prev) => ({ ...prev, text: e.target.value }))
-                  }
-                  className="w-full text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none font-medium leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Chữ trên nút bấm:
-                  </label>
-                  <input
-                    type="text"
-                    value={noticeDraft.cta_button_text || ''}
-                    onChange={(e) =>
-                      setNoticeDraft((prev) => ({
-                        ...prev,
-                        cta_button_text: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Đường dẫn nút bấm:
-                  </label>
-                  <input
-                    type="text"
-                    value={noticeDraft.cta_button_link || ''}
-                    onChange={(e) =>
-                      setNoticeDraft((prev) => ({
-                        ...prev,
-                        cta_button_link: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs p-2 border border-gray-300 rounded"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ============================================================== */}
-          {/* 6. KHUNG NÂU: BOTTOM BANNER CT GDPT 2018 */}
-          {/* ============================================================== */}
-          {activeBlock === 'bottom_banner' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-extrabold text-sm text-gray-900">
-                  Cấu hình Khung Nâu (Bottom Banner CT GDPT 2018)
-                </h3>
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={bottomBannerDraft.is_active}
-                    onChange={(e) =>
-                      setBottomBannerDraft((prev) => ({
-                        ...prev,
-                        is_active: e.target.checked,
-                      }))
-                    }
-                    className="rounded text-[#e60049]"
-                  />
-                  <span>Hiển thị trên web</span>
-                </label>
-              </div>
-
-              {/* Mode switch */}
-              <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="bottom_banner_mode"
-                    value="structured"
-                    checked={bottomBannerDraft.mode === 'structured'}
-                    onChange={() =>
-                      setBottomBannerDraft((prev) => ({ ...prev, mode: 'structured' }))
-                    }
-                  />
-                  <span>Sách 3D có cấu trúc</span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="bottom_banner_mode"
-                    value="custom_image"
-                    checked={bottomBannerDraft.mode === 'custom_image'}
-                    onChange={() =>
-                      setBottomBannerDraft((prev) => ({ ...prev, mode: 'custom_image' }))
-                    }
-                  />
-                  <span>Banner ảnh nguyên tấm</span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="bottom_banner_mode"
-                    value="custom_html"
-                    checked={bottomBannerDraft.mode === 'custom_html'}
-                    onChange={() =>
-                      setBottomBannerDraft((prev) => ({ ...prev, mode: 'custom_html' }))
-                    }
-                  />
-                  <span>Dán mã HTML</span>
-                </label>
-              </div>
-
-              {bottomBannerDraft.mode === 'custom_html' && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Mã HTML tùy biến:
-                  </label>
-                  <textarea
-                    rows={12}
-                    value={bottomBannerDraft.custom_html || ''}
-                    onChange={(e) =>
-                      setBottomBannerDraft((prev) => ({
-                        ...prev,
-                        custom_html: e.target.value,
-                      }))
-                    }
-                    placeholder="<div>... Paste HTML tại đây ...</div>"
-                    className="w-full font-mono text-xs p-3 border border-gray-300 rounded focus:border-[#e60049] outline-none"
-                  />
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Đường dẫn khi click vào banner:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.link_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              link_url: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2 border border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {bottomBannerDraft.mode === 'custom_image' && (
-                <div className="space-y-3">
+              {/* 3. KHUNG VÀNG: DANH MỤC Ô VUÔNG (DYNAMIC SỐ LƯỢNG) */}
+              {currentBlock.type === 'categories_grid' && (
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Link hình ảnh banner (Upload hoặc dán URL):
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={bottomBannerDraft.custom_image_url || ''}
-                        onChange={(e) =>
-                          setBottomBannerDraft((prev) => ({
-                            ...prev,
-                            custom_image_url: e.target.value,
-                          }))
-                        }
-                        placeholder="https://..."
-                        className="flex-1 text-xs p-2 border border-gray-300 rounded"
-                      />
-                      <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-3 py-2 text-xs font-bold cursor-pointer shrink-0">
-                        {uploading === 'bottom_banner_img' ? 'Đang up...' : 'Upload ảnh'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files?.[0]) {
-                              handleUploadFile(
-                                e.target.files[0],
-                                (url) =>
-                                  setBottomBannerDraft((prev) => ({
-                                    ...prev,
-                                    custom_image_url: url,
-                                  })),
-                                'bottom_banner_img'
-                              );
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Đường dẫn khi click vào banner:
+                      Tiêu đề nhóm ô vuông:
                     </label>
                     <input
                       type="text"
-                      value={bottomBannerDraft.link_url || ''}
+                      value={currentBlock.config?.title || ''}
                       onChange={(e) =>
-                        setBottomBannerDraft((prev) => ({
-                          ...prev,
-                          link_url: e.target.value,
+                        updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                          ...cfg,
+                          title: e.target.value,
                         }))
                       }
-                      className="w-full text-xs p-2 border border-gray-300 rounded"
+                      className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
                     />
+                  </div>
+
+                  {/* Danh sách từng ô - hoàn toàn động */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-gray-700">
+                        Danh sách ô danh mục ({(currentBlock.config?.items || []).length} ô):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newId = `cat-${Date.now()}`;
+                          updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                            ...cfg,
+                            items: [
+                              ...(cfg.items || []),
+                              {
+                                id: newId,
+                                category_slug: '',
+                                label: '',
+                                icon_code: '',
+                                image_url: '',
+                                to: '',
+                                is_active: true,
+                              },
+                            ],
+                          }));
+                        }}
+                        className="bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold px-3 py-1 rounded-sm shadow-sm"
+                      >
+                        + Thêm ô danh mục mới
+                      </button>
+                    </div>
+
+                    {(currentBlock.config?.items || []).length === 0 ? (
+                      <div className="p-6 text-center text-xs text-gray-500 border border-dashed rounded-md bg-gray-50">
+                        Chưa có ô danh mục nào. Bấm "+ Thêm ô danh mục mới" để cấu hình từng ô.
+                      </div>
+                    ) : (
+                      (currentBlock.config?.items || []).map((item: HomepageCategoryTile, idx: number) => (
+                        <div
+                          key={item.id || idx}
+                          className="p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2 text-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-[#e60049] bg-white px-2 py-0.5 rounded border text-[11px]">
+                                Ô #{idx + 1}
+                              </span>
+                              <span className="font-bold text-gray-800">
+                                {item.label || '(Chưa đặt tên)'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...(currentBlock.config?.items || [])];
+                                    const temp = next[idx - 1];
+                                    next[idx - 1] = next[idx];
+                                    next[idx] = temp;
+                                    updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                      ...cfg,
+                                      items: next,
+                                    }));
+                                  }}
+                                  className="text-gray-500 hover:text-gray-800 text-[10px] px-1.5 py-0.5 bg-white border rounded"
+                                  title="Di chuyển lên"
+                                >
+                                  ▲
+                                </button>
+                              )}
+                              {idx < (currentBlock.config?.items || []).length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...(currentBlock.config?.items || [])];
+                                    const temp = next[idx + 1];
+                                    next[idx + 1] = next[idx];
+                                    next[idx] = temp;
+                                    updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                      ...cfg,
+                                      items: next,
+                                    }));
+                                  }}
+                                  className="text-gray-500 hover:text-gray-800 text-[10px] px-1.5 py-0.5 bg-white border rounded"
+                                  title="Di chuyển xuống"
+                                >
+                                  ▼
+                                </button>
+                              )}
+                              <label className="flex items-center gap-1.5 font-semibold cursor-pointer ml-1">
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_active}
+                                  onChange={(e) => {
+                                    const next = [...(currentBlock.config?.items || [])];
+                                    next[idx].is_active = e.target.checked;
+                                    updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                      ...cfg,
+                                      items: next,
+                                    }));
+                                  }}
+                                  className="rounded text-[#e60049]"
+                                />
+                                <span>Kích hoạt</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = (currentBlock.config?.items || []).filter(
+                                    (_: any, i: number) => i !== idx
+                                  );
+                                  updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                    ...cfg,
+                                    items: next,
+                                  }));
+                                }}
+                                className="text-red-500 hover:text-red-700 font-bold text-xs ml-2"
+                              >
+                                Xóa ô này
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div className="sm:col-span-2">
+                              <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                Tên hiển thị danh mục:
+                              </label>
+                              <input
+                                type="text"
+                                value={item.label}
+                                placeholder="Ví dụ: Flashcard, Cấp THPT..."
+                                onChange={(e) => {
+                                  const next = [...(currentBlock.config?.items || [])];
+                                  next[idx].label = e.target.value;
+                                  updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                    ...cfg,
+                                    items: next,
+                                  }));
+                                }}
+                                className="w-full p-1.5 border border-gray-300 rounded text-xs font-bold bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                Icon text (khi chưa có ảnh):
+                              </label>
+                              <input
+                                type="text"
+                                value={item.icon_code}
+                                placeholder="+, %, 12, A+..."
+                                onChange={(e) => {
+                                  const next = [...(currentBlock.config?.items || [])];
+                                  next[idx].icon_code = e.target.value;
+                                  updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                    ...cfg,
+                                    items: next,
+                                  }));
+                                }}
+                                className="w-full p-1.5 border border-gray-300 rounded text-xs text-center font-bold bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                              Hình ảnh ô vuông (Tự scale - Upload R2 hoặc dán link view):
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={item.image_url || ''}
+                                placeholder="Dán link view ảnh hoặc bấm Upload..."
+                                onChange={(e) => {
+                                  const next = [...(currentBlock.config?.items || [])];
+                                  next[idx].image_url = e.target.value;
+                                  updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                    ...cfg,
+                                    items: next,
+                                  }));
+                                }}
+                                className="flex-1 p-1.5 border border-gray-300 rounded text-xs bg-white"
+                              />
+                              <label className="bg-white hover:bg-gray-100 border border-gray-300 rounded px-2.5 py-1 text-[11px] font-bold cursor-pointer shrink-0">
+                                {uploading === `cat_img_${idx}` ? 'Đang up...' : 'Upload ảnh R2'}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      handleUploadFile(
+                                        e.target.files[0],
+                                        (url) => {
+                                          const next = [...(currentBlock.config?.items || [])];
+                                          next[idx].image_url = url;
+                                          updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                            ...cfg,
+                                            items: next,
+                                          }));
+                                        },
+                                        `cat_img_${idx}`
+                                      );
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            {item.image_url && (
+                              <div className="mt-1 flex items-center gap-2">
+                                <img
+                                  src={item.image_url}
+                                  alt="thumb"
+                                  className="w-8 h-8 object-contain rounded bg-pink-50 p-1 border"
+                                />
+                                <span className="text-[10px] text-gray-500 truncate">{item.image_url}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                              Đường link dẫn tới:
+                            </label>
+                            <input
+                              type="text"
+                              value={item.to}
+                              placeholder="/flashcard, /high-school..."
+                              onChange={(e) => {
+                                const next = [...(currentBlock.config?.items || [])];
+                                next[idx].to = e.target.value;
+                                updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                  ...cfg,
+                                  items: next,
+                                }));
+                              }}
+                              className="w-full p-1.5 border border-gray-300 rounded text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
 
-              {bottomBannerDraft.mode === 'structured' && (
-                <div className="space-y-3">
+              {/* 4. KHUNG TÍM: NHÓM TÀI LIỆU CẤP 1 & CẤP 2 */}
+              {currentBlock.type === 'section_groups' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">
+                      Danh sách các nhóm cấp 1 ({(currentBlock.config?.sections || []).length} nhóm):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newSecId = `sec-${Date.now()}`;
+                        updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                          ...cfg,
+                          sections: [
+                            ...(cfg.sections || []),
+                            {
+                              id: newSecId,
+                              title: 'Tên nhóm cấp 1 mới',
+                              is_active: true,
+                              sort_order: (cfg.sections || []).length + 1,
+                              items: [],
+                            },
+                          ],
+                        }));
+                      }}
+                      className="bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold px-3 py-1 rounded-sm shadow-sm"
+                    >
+                      + Thêm nhóm cấp 1 mới
+                    </button>
+                  </div>
+
+                  {(currentBlock.config?.sections || []).length === 0 ? (
+                    <div className="p-6 text-center text-xs text-gray-500 border border-dashed rounded-md bg-gray-50">
+                      Chưa có nhóm nào. Bấm nút phía trên để thêm nhóm cấp 1.
+                    </div>
+                  ) : (
+                    (currentBlock.config?.sections || []).map((sec: HomepageSectionGroup, sIdx: number) => (
+                      <div
+                        key={sec.id || sIdx}
+                        className="border-2 border-purple-200 bg-purple-50/20 rounded-md p-4 space-y-4"
+                      >
+                        {/* Tiêu đề nhóm cấp 1 */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-100 pb-3">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-xs font-black text-purple-900 bg-purple-100 px-2 py-0.5 rounded">
+                              Nhóm #{sIdx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={sec.title}
+                              onChange={(e) => {
+                                const next = [...(currentBlock.config?.sections || [])];
+                                next[sIdx].title = e.target.value;
+                                updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                  ...cfg,
+                                  sections: next,
+                                }));
+                              }}
+                              className="text-xs font-extrabold text-purple-950 p-1.5 border border-purple-300 rounded bg-white flex-1"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-1 text-xs font-bold text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={sec.is_active}
+                                onChange={(e) => {
+                                  const next = [...(currentBlock.config?.sections || [])];
+                                  next[sIdx].is_active = e.target.checked;
+                                  updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                    ...cfg,
+                                    sections: next,
+                                  }));
+                                }}
+                                className="rounded text-[#e60049]"
+                              />
+                              <span>Kích hoạt nhóm</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = (currentBlock.config?.sections || []).filter(
+                                  (_: any, i: number) => i !== sIdx
+                                );
+                                updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                  ...cfg,
+                                  sections: next,
+                                }));
+                              }}
+                              className="text-red-500 hover:text-red-700 text-xs font-bold"
+                            >
+                              Xóa nhóm này
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Danh sách các sản phẩm cấp 2 */}
+                        <div className="space-y-3 pl-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-gray-600">
+                              Sản phẩm cấp 2 trong nhóm ({sec.items.length}):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newItemId = `item-${Date.now()}`;
+                                const next = [...(currentBlock.config?.sections || [])];
+                                next[sIdx].items = [
+                                  ...(next[sIdx].items || []),
+                                  {
+                                    id: newItemId,
+                                    display_title: '',
+                                    image_url: '',
+                                    target_url: '',
+                                    badge_text: '',
+                                    tag_text: '',
+                                    is_active: true,
+                                    sort_order: (next[sIdx].items || []).length + 1,
+                                  },
+                                ];
+                                updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                  ...cfg,
+                                  sections: next,
+                                }));
+                              }}
+                              className="text-[#e60049] hover:underline text-[11px] font-bold"
+                            >
+                              + Thêm sản phẩm con vào nhóm này
+                            </button>
+                          </div>
+
+                          {sec.items.map((item: HomepageSectionItem, itIdx: number) => (
+                            <div
+                              key={item.id || itIdx}
+                              className="p-3 bg-white border border-gray-200 rounded text-xs space-y-2 shadow-2xs"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-gray-700">Tài liệu #{itIdx + 1}</span>
+                                <div className="flex items-center gap-3">
+                                  <label className="flex items-center gap-1 font-semibold cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.is_active}
+                                      onChange={(e) => {
+                                        const next = [...(currentBlock.config?.sections || [])];
+                                        next[sIdx].items[itIdx].is_active = e.target.checked;
+                                        updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                          ...cfg,
+                                          sections: next,
+                                        }));
+                                      }}
+                                      className="rounded text-[#e60049]"
+                                    />
+                                    <span>Hiển thị</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = [...(currentBlock.config?.sections || [])];
+                                      next[sIdx].items = next[sIdx].items.filter(
+                                        (_: any, i: number) => i !== itIdx
+                                      );
+                                      updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                        ...cfg,
+                                        sections: next,
+                                      }));
+                                    }}
+                                    className="text-red-500 hover:text-red-700 text-xs font-bold"
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                  Tên hiển thị tự đặt (Không tự lấy từ url):
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.display_title}
+                                  placeholder="Ví dụ: 30 đề thi thử ngôn ngữ Anh..."
+                                  onChange={(e) => {
+                                    const next = [...(currentBlock.config?.sections || [])];
+                                    next[sIdx].items[itIdx].display_title = e.target.value;
+                                    updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                      ...cfg,
+                                      sections: next,
+                                    }));
+                                  }}
+                                  className="w-full p-1.5 border border-gray-300 rounded font-bold"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                  Hình ảnh (Tự scale - Upload R2 hoặc dán link view):
+                                </label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={item.image_url || ''}
+                                    placeholder="Dán link view ảnh..."
+                                    onChange={(e) => {
+                                      const next = [...(currentBlock.config?.sections || [])];
+                                      next[sIdx].items[itIdx].image_url = e.target.value;
+                                      updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                        ...cfg,
+                                        sections: next,
+                                      }));
+                                    }}
+                                    className="flex-1 p-1.5 border border-gray-300 rounded text-xs"
+                                  />
+                                  <label className="bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-2.5 py-1 text-[11px] font-bold cursor-pointer shrink-0">
+                                    {uploading === `sec_${sIdx}_item_${itIdx}`
+                                      ? 'Đang up...'
+                                      : 'Upload R2'}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                          handleUploadFile(
+                                            e.target.files[0],
+                                            (url) => {
+                                              const next = [...(currentBlock.config?.sections || [])];
+                                              next[sIdx].items[itIdx].image_url = url;
+                                              updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                                ...cfg,
+                                                sections: next,
+                                              }));
+                                            },
+                                            `sec_${sIdx}_item_${itIdx}`
+                                          );
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                    Dòng chữ phụ / tag:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.tag_text || ''}
+                                    onChange={(e) => {
+                                      const next = [...(currentBlock.config?.sections || [])];
+                                      next[sIdx].items[itIdx].tag_text = e.target.value;
+                                      updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                        ...cfg,
+                                        sections: next,
+                                      }));
+                                    }}
+                                    className="w-full p-1.5 border border-gray-300 rounded"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                    Huy hiệu (Mới, Hot...):
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.badge_text || ''}
+                                    onChange={(e) => {
+                                      const next = [...(currentBlock.config?.sections || [])];
+                                      next[sIdx].items[itIdx].badge_text = e.target.value;
+                                      updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                        ...cfg,
+                                        sections: next,
+                                      }));
+                                    }}
+                                    className="w-full p-1.5 border border-gray-300 rounded"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
+                                  Đường dẫn đích (target_url):
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.target_url || ''}
+                                  placeholder="/high-school/dgnl-bca..."
+                                  onChange={(e) => {
+                                    const next = [...(currentBlock.config?.sections || [])];
+                                    next[sIdx].items[itIdx].target_url = e.target.value;
+                                    updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                      ...cfg,
+                                      sections: next,
+                                    }));
+                                  }}
+                                  className="w-full p-1.5 border border-gray-300 rounded"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* 5. KHUNG XÁM: DÒNG CHỮ THÔNG BÁO & NÚT */}
+              {currentBlock.type === 'notice_text' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Nội dung thông báo (hỗ trợ xuống dòng):
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={currentBlock.config?.text || ''}
+                      onChange={(e) =>
+                        updateCurrentConfig((cfg: HomepageNoticeTextConfig) => ({
+                          ...cfg,
+                          text: e.target.value,
+                        }))
+                      }
+                      placeholder="Nhập thông báo..."
+                      className="w-full text-xs p-2.5 border border-gray-300 rounded outline-none"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Tiêu đề banner:
+                        Chữ trên nút bấm:
                       </label>
                       <input
                         type="text"
-                        value={bottomBannerDraft.title || ''}
+                        value={currentBlock.config?.cta_button_text || ''}
                         onChange={(e) =>
-                          setBottomBannerDraft((prev) => ({
-                            ...prev,
-                            title: e.target.value,
+                          updateCurrentConfig((cfg: HomepageNoticeTextConfig) => ({
+                            ...cfg,
+                            cta_button_text: e.target.value,
                           }))
                         }
-                        className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
+                        placeholder="Xem toàn bộ"
+                        className="w-full text-xs p-2 border border-gray-300 rounded"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Huy hiệu (Badge):
+                        Đường dẫn nút bấm:
                       </label>
                       <input
                         type="text"
-                        value={bottomBannerDraft.badge_text || ''}
+                        value={currentBlock.config?.cta_button_link || ''}
                         onChange={(e) =>
-                          setBottomBannerDraft((prev) => ({
-                            ...prev,
-                            badge_text: e.target.value,
+                          updateCurrentConfig((cfg: HomepageNoticeTextConfig) => ({
+                            ...cfg,
+                            cta_button_link: e.target.value,
                           }))
                         }
+                        placeholder="/high-school"
                         className="w-full text-xs p-2 border border-gray-300 rounded"
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Đường dẫn khi click vào banner:
-                    </label>
-                    <input
-                      type="text"
-                      value={bottomBannerDraft.link_url || ''}
-                      onChange={(e) =>
-                        setBottomBannerDraft((prev) => ({
-                          ...prev,
-                          link_url: e.target.value,
-                        }))
-                      }
-                      className="w-full text-xs p-2 border border-gray-300 rounded"
-                    />
-                  </div>
                 </div>
               )}
+
+              {/* 6. KHUNG NÂU: BOTTOM BANNER */}
+              {currentBlock.type === 'bottom_banner' && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-700 bg-gray-50 p-2.5 rounded">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="bottom_banner_mode"
+                        value="structured"
+                        checked={currentBlock.config?.mode === 'structured'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                            ...cfg,
+                            mode: 'structured',
+                          }))
+                        }
+                      />
+                      <span>Bộ sách 3D + Chữ chuẩn</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="bottom_banner_mode"
+                        value="custom_image"
+                        checked={currentBlock.config?.mode === 'custom_image'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                            ...cfg,
+                            mode: 'custom_image',
+                          }))
+                        }
+                      />
+                      <span>Tải ảnh Banner mới</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="bottom_banner_mode"
+                        value="custom_html"
+                        checked={currentBlock.config?.mode === 'custom_html'}
+                        onChange={() =>
+                          updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                            ...cfg,
+                            mode: 'custom_html',
+                          }))
+                        }
+                      />
+                      <span>Dán đoạn mã HTML</span>
+                    </label>
+                  </div>
+
+                  {currentBlock.config?.mode === 'custom_html' ? (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Mã HTML tùy biến:
+                      </label>
+                      <textarea
+                        rows={10}
+                        value={currentBlock.config?.custom_html || ''}
+                        onChange={(e) =>
+                          updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                            ...cfg,
+                            custom_html: e.target.value,
+                          }))
+                        }
+                        className="w-full font-mono text-xs p-3 border border-gray-300 rounded"
+                      />
+                    </div>
+                  ) : currentBlock.config?.mode === 'custom_image' ? (
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Link ảnh hoặc tải ảnh mới:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={currentBlock.config?.custom_image_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              custom_image_url: e.target.value,
+                            }))
+                          }
+                          className="flex-1 text-xs p-2 border border-gray-300 rounded"
+                        />
+                        <label className="bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0">
+                          {uploading === 'bottom_banner_img' ? 'Đang tải...' : 'Upload ảnh R2'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) {
+                                handleUploadFile(
+                                  e.target.files[0],
+                                  (url) =>
+                                    updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                                      ...cfg,
+                                      custom_image_url: url,
+                                    })),
+                                  'bottom_banner_img'
+                                );
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Tiêu đề lớn:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.title || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              title: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2 border border-gray-300 rounded font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Đường link khi click:
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.link_url || ''}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              link_url: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2 border border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-gray-500 text-xs">
+              Chưa chọn khung nào để cấu hình.
             </div>
           )}
         </div>
 
-        {/* Right Column: Live Preview Side-by-Side */}
+        {/* CỘT PHẢI: LIVE PREVIEW THEO ĐÚNG THỨ TỰ (SIDE-BY-SIDE NẾU BẬT) */}
         {isSideBySide && (
-          <div className="lg:col-span-6 bg-gray-100 p-4 rounded-md border-2 border-dashed border-gray-300 sticky top-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 mb-3 border-b border-gray-300">
-              <span className="text-xs font-black text-gray-700 uppercase tracking-wide">
-                Live Preview (Xem trước thời gian thực)
-              </span>
-              <div className="flex items-center gap-1.5 bg-white border border-gray-300 p-0.5 rounded text-[10px] font-bold">
+          <div className="xl:col-span-6 sticky top-4 space-y-3">
+            <div className="bg-gray-800 text-white p-3 rounded-t-md flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Live Preview Toàn Trang Chủ
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-gray-900 px-2 py-1 rounded text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => setPreviewViewport('desktop')}
-                  className={`px-2 py-0.5 rounded ${
-                    previewViewport === 'desktop'
-                      ? 'bg-[#e60049] text-white'
-                      : 'text-gray-600'
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                    previewViewport === 'desktop' ? 'bg-[#e60049] text-white' : 'text-gray-400'
                   }`}
                 >
                   Desktop
@@ -1394,10 +1938,8 @@ export const AdminHomepageCms: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setPreviewViewport('mobile')}
-                  className={`px-2 py-0.5 rounded ${
-                    previewViewport === 'mobile'
-                      ? 'bg-[#e60049] text-white'
-                      : 'text-gray-600'
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                    previewViewport === 'mobile' ? 'bg-[#e60049] text-white' : 'text-gray-400'
                   }`}
                 >
                   Mobile
@@ -1405,24 +1947,38 @@ export const AdminHomepageCms: React.FC = () => {
               </div>
             </div>
 
-            <div
-              className={`mx-auto bg-white rounded shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${
-                previewViewport === 'mobile' ? 'max-w-[375px]' : 'w-full'
-              }`}
-            >
-              <div className="p-4 space-y-8">
-                {activeBlock === 'hero' && <HeroBlock config={heroDraft} />}
-                {activeBlock === 'top_banner' && <TopBannerBlock config={topBannerDraft} />}
-                {activeBlock === 'categories_grid' && (
-                  <CategoriesGridBlock config={categoriesGridDraft} />
-                )}
-                {activeBlock === 'section_groups' && (
-                  <SectionGroupsBlock config={sectionGroupsDraft} />
-                )}
-                {activeBlock === 'notice_text' && <NoticeTextBlock config={noticeDraft} />}
-                {activeBlock === 'bottom_banner' && (
-                  <BottomBannerBlock config={bottomBannerDraft} />
-                )}
+            <div className="bg-gray-100 border border-gray-300 rounded-b-md p-4 overflow-x-auto max-h-[820px] overflow-y-auto">
+              <div
+                className={`mx-auto bg-white shadow-md rounded overflow-hidden transition-all duration-300 ${
+                  previewViewport === 'mobile' ? 'w-[375px]' : 'w-full'
+                }`}
+              >
+                {/* Render toàn bộ các block theo đúng thứ tự đã sắp xếp */}
+                <div className="space-y-10 py-6">
+                  {blocks
+                    .filter((b) => b.is_active !== false)
+                    .map((block) => {
+                      if (block.type === 'hero') {
+                        return <HeroBlock key={block.id} config={block.config} />;
+                      }
+
+                      return (
+                        <div key={block.id} className="max-w-[920px] mx-auto px-4">
+                          {block.type === 'top_banner' && <TopBannerBlock config={block.config} />}
+                          {block.type === 'categories_grid' && (
+                            <CategoriesGridBlock config={block.config} />
+                          )}
+                          {block.type === 'section_groups' && (
+                            <SectionGroupsBlock config={block.config} />
+                          )}
+                          {block.type === 'notice_text' && <NoticeTextBlock config={block.config} />}
+                          {block.type === 'bottom_banner' && (
+                            <BottomBannerBlock config={block.config} />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             </div>
           </div>

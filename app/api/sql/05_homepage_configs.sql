@@ -151,3 +151,4 @@ VALUES
     'Cấu hình Khung Nâu: Banner cuối trang'
 )
 ON CONFLICT (key) DO NOTHING;
+

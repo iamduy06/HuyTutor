@@ -882,6 +882,63 @@ export const dbService = {
           for (const row of data) {
             configMap[row.key] = row.value;
           }
+          let homepageBlocks = Array.isArray(configMap['homepage_blocks'])
+            ? configMap['homepage_blocks']
+            : null;
+
+          if (!homepageBlocks) {
+            homepageBlocks = [
+              {
+                id: 'block_hero_default',
+                type: 'hero',
+                title_label: 'Khung Đen: Hero Top Header',
+                is_active: configMap['homepage_hero']?.is_active ?? true,
+                sort_order: 1,
+                config: configMap['homepage_hero'] || {},
+              },
+              {
+                id: 'block_banner_default',
+                type: 'top_banner',
+                title_label: 'Khung Xanh Dương: Top Banner',
+                is_active: configMap['homepage_top_banner']?.is_active ?? true,
+                sort_order: 2,
+                config: configMap['homepage_top_banner'] || {},
+              },
+              {
+                id: 'block_cat_grid_default',
+                type: 'categories_grid',
+                title_label: 'Khung Vàng: Danh mục ô vuông',
+                is_active: configMap['homepage_categories_grid']?.is_active ?? true,
+                sort_order: 3,
+                config: configMap['homepage_categories_grid'] || {},
+              },
+              {
+                id: 'block_sec_groups_default',
+                type: 'section_groups',
+                title_label: 'Khung Tím: Nhóm tài liệu cấp 1 & Cấp 2',
+                is_active: configMap['homepage_section_groups']?.is_active ?? true,
+                sort_order: 4,
+                config: configMap['homepage_section_groups'] || {},
+              },
+              {
+                id: 'block_notice_default',
+                type: 'notice_text',
+                title_label: 'Khung Xám: Dòng chữ thông báo & Nút',
+                is_active: configMap['homepage_notice_text']?.is_active ?? true,
+                sort_order: 5,
+                config: configMap['homepage_notice_text'] || {},
+              },
+              {
+                id: 'block_bottom_banner_default',
+                type: 'bottom_banner',
+                title_label: 'Khung Nâu: Banner cuối trang',
+                is_active: configMap['homepage_bottom_banner']?.is_active ?? true,
+                sort_order: 6,
+                config: configMap['homepage_bottom_banner'] || {},
+              },
+            ];
+          }
+
           return {
             footer_social_links: Array.isArray(configMap['footer_social_links'])
               ? configMap['footer_social_links']
@@ -895,6 +952,7 @@ export const dbService = {
             homepage_section_groups: configMap['homepage_section_groups'] || null,
             homepage_notice_text: configMap['homepage_notice_text'] || null,
             homepage_bottom_banner: configMap['homepage_bottom_banner'] || null,
+            homepage_blocks: homepageBlocks,
             ...configMap,
           };
         }

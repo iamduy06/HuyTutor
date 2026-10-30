@@ -10,7 +10,7 @@ import {
 } from '../types';
 
 /**
- * 1. Khung Đen: Hero Top Header (Không fallback)
+ * 1. Khung Đen: Hero Top Header (Phía trên cùng là hình ảnh, không phải khung chữ)
  */
 export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ config }) => {
   if (!config || config.is_active === false) return null;
@@ -25,10 +25,23 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
     );
   }
 
+  if (config.mode === 'custom_image') {
+    if (!config.custom_image_url?.trim()) return null;
+    return (
+      <section className="w-full overflow-hidden">
+        <img
+          src={config.custom_image_url}
+          alt={config.title || ''}
+          className="w-full h-auto object-cover"
+        />
+      </section>
+    );
+  }
+
   const bullets = (config.bullets || []).filter((b) => b && b.trim().length > 0);
 
   // Nếu không có nội dung gì thì không render
-  if (!config.title && !config.subtitle && bullets.length === 0 && !config.author_name) {
+  if (!config.title && !config.subtitle && bullets.length === 0 && !config.image_url) {
     return null;
   }
 
@@ -36,7 +49,8 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
     <section className="hero-soft-bg pt-10 pb-8 border-b border-pink-50">
       <div className="max-w-[920px] mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-          <div className="md:col-span-7">
+          {/* Cột Trái: Chữ (Tiêu đề, phụ đề, gạch đầu dòng) */}
+          <div className={config.image_url ? 'md:col-span-7' : 'col-span-12'}>
             {config.subtitle && (
               <p className="text-[#e60049] font-bold text-sm mb-1">{config.subtitle}</p>
             )}
@@ -57,39 +71,16 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
             )}
           </div>
 
-          <div className="md:col-span-5 flex justify-center">
-            <div className="relative w-64 h-52 flex items-end justify-center">
-              {config.badge_left && (
-                <div className="absolute top-6 left-0 bg-white border border-pink-200 shadow-sm px-2.5 py-1 rounded-sm text-[10px] font-bold text-[#e60049]">
-                  {config.badge_left}
-                </div>
-              )}
-              {config.badge_right && (
-                <div className="absolute top-4 right-0 bg-white border border-blue-200 shadow-sm px-2.5 py-1 rounded-sm text-[10px] font-bold text-blue-700">
-                  {config.badge_right}
-                </div>
-              )}
-              <div className="w-40 h-44 rounded-t-full bg-gradient-to-b from-pink-100 to-white border border-pink-200 flex flex-col items-center justify-end p-3 text-center">
-                {config.author_avatar_url && (
-                  <img
-                    src={config.author_avatar_url}
-                    alt={config.author_name || ''}
-                    className="w-14 h-14 rounded-full object-contain mb-2 p-1 bg-white border border-[#e60049]/20 shadow-sm"
-                  />
-                )}
-                {config.author_name && (
-                  <span className="text-xs font-extrabold text-gray-800">
-                    {config.author_name}
-                  </span>
-                )}
-                {config.author_title && (
-                  <span className="text-[10px] text-gray-500">
-                    {config.author_title}
-                  </span>
-                )}
-              </div>
+          {/* Cột Phải: Hình ảnh trực tiếp (Không dùng khung chữ/vòm CSS) */}
+          {config.image_url && (
+            <div className="md:col-span-5 flex justify-center items-center">
+              <img
+                src={config.image_url}
+                alt={config.title || 'Huy Tutor'}
+                className="max-h-[260px] sm:max-h-[300px] w-auto max-w-full object-contain drop-shadow-sm"
+              />
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>
@@ -97,7 +88,7 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
 };
 
 /**
- * 2. Khung Xanh Dương: Banner Top (Không fallback)
+ * 2. Khung Xanh Dương: Banner Top (Hỗ trợ Chữ + Up hình ảnh / Sách 3D / HTML / Custom Image)
  */
 export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null }> = ({
   config,
@@ -114,9 +105,25 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
     );
   }
 
+  if (config.mode === 'custom_image') {
+    if (!config.custom_image_url?.trim()) return null;
+    return (
+      <section>
+        <Link to={config.link_url || '#'}>
+          <img
+            src={config.custom_image_url}
+            alt={config.title || ''}
+            className="w-full h-auto object-cover rounded-md shadow-sm"
+          />
+        </Link>
+      </section>
+    );
+  }
+
+  const isImageText = config.mode === 'image_text' || (!!config.image_url && (!config.books || config.books.length === 0));
   const books = config.books || [];
 
-  if (!config.title && !config.header_label && books.length === 0) {
+  if (!config.title && !config.header_label && books.length === 0 && !config.image_url) {
     return null;
   }
 
@@ -130,7 +137,16 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
         className="block rounded-md overflow-hidden border border-amber-200 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 relative hover:opacity-95 transition"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-          {books.length > 0 && (
+          {/* Cột Trái: Hình ảnh up lên HOẶC Bộ sách 3D */}
+          {isImageText && config.image_url ? (
+            <div className="md:col-span-5 flex items-center justify-center p-2">
+              <img
+                src={config.image_url}
+                alt={config.title || 'Banner'}
+                className="max-h-[180px] sm:max-h-[220px] w-auto max-w-full object-contain rounded drop-shadow-sm"
+              />
+            </div>
+          ) : books.length > 0 ? (
             <div className="md:col-span-6 flex items-center justify-center gap-3">
               {books.map((b, idx) => (
                 <div
@@ -153,9 +169,16 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
 
-          <div className={books.length > 0 ? 'md:col-span-6 text-center md:text-left' : 'col-span-12 text-center'}>
+          {/* Cột Phải: Nội dung Chữ */}
+          <div className={
+            (isImageText && config.image_url)
+              ? 'md:col-span-7 text-center md:text-left'
+              : books.length > 0
+              ? 'md:col-span-6 text-center md:text-left'
+              : 'col-span-12 text-center'
+          }>
             {config.tag && (
               <div className="inline-block text-[10px] font-bold text-[#e60049] uppercase tracking-wider mb-1">
                 {config.tag}
@@ -184,7 +207,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
 };
 
 /**
- * 3. Khung Vàng: Danh mục sản phẩm cấp 1 (Ô vuông, Không fallback)
+ * 3. Khung Vàng: Danh mục sản phẩm cấp 1 (Ô vuông động số lượng - Dynamic counts, không cố định 6 khung)
  */
 export const CategoriesGridBlock: React.FC<{
   config?: HomepageCategoriesGridConfig | null;
@@ -198,7 +221,8 @@ export const CategoriesGridBlock: React.FC<{
       {config.title && (
         <h2 className="text-[#e60049] font-bold text-sm mb-3">{config.title}</h2>
       )}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+      {/* Grid động tự động dàn trải dựa trên số lượng items */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {activeItems.map((cat) => (
           <Link
             key={cat.id}

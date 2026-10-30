@@ -140,16 +140,13 @@ export interface FooterPolicyLink {
 }
 
 export interface HomepageHeroConfig {
-  mode: 'custom_html' | 'structured';
+  mode: 'custom_html' | 'custom_image' | 'structured';
   custom_html?: string;
+  custom_image_url?: string;
   subtitle?: string;
   title?: string;
   bullets?: string[];
-  badge_left?: string;
-  badge_right?: string;
-  author_avatar_url?: string;
-  author_name?: string;
-  author_title?: string;
+  image_url?: string;
   is_active?: boolean;
 }
 
@@ -160,8 +157,10 @@ export interface HomepageTopBannerBook {
 }
 
 export interface HomepageTopBannerConfig {
-  mode: 'custom_html' | 'structured';
+  mode: 'custom_html' | 'custom_image' | 'image_text' | 'structured';
   custom_html?: string;
+  custom_image_url?: string;
+  image_url?: string;
   tag?: string;
   title?: string;
   subtitle?: string;
@@ -211,6 +210,7 @@ export interface HomepageSectionGroup {
 
 export interface HomepageSectionGroupsConfig {
   sections: HomepageSectionGroup[];
+  is_active?: boolean;
 }
 
 export interface HomepageNoticeTextConfig {
@@ -238,6 +238,23 @@ export interface HomepageBottomBannerConfig {
   is_active?: boolean;
 }
 
+export type HomepageBlockType =
+  | 'hero'
+  | 'top_banner'
+  | 'categories_grid'
+  | 'section_groups'
+  | 'notice_text'
+  | 'bottom_banner';
+
+export interface HomepageBlockItem {
+  id: string;
+  type: HomepageBlockType;
+  title_label?: string;
+  is_active: boolean;
+  sort_order: number;
+  config: any;
+}
+
 export interface SiteConfigs {
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
@@ -247,6 +264,7 @@ export interface SiteConfigs {
   homepage_section_groups?: HomepageSectionGroupsConfig;
   homepage_notice_text?: HomepageNoticeTextConfig;
   homepage_bottom_banner?: HomepageBottomBannerConfig;
+  homepage_blocks?: HomepageBlockItem[];
   [key: string]: any;
 }
 
