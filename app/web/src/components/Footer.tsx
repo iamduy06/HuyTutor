@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { SmartLink } from './SmartLink';
 
 export const Footer: React.FC = () => {
   const { siteConfigs } = useStore();
@@ -23,13 +23,13 @@ export const Footer: React.FC = () => {
         <div className="max-w-[920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Cột 1: Logo & Slogan (Cố định chuẩn nhận diện) */}
           <div className="md:col-span-3 flex flex-col items-start gap-1">
-            <Link to="/" aria-label="Huy Tutor Trang chủ">
+            <SmartLink to="/" aria-label="Huy Tutor Trang chủ">
               <img
                 src="/logo.png"
                 alt="Huy Tutor"
                 className="h-8 w-auto object-contain"
               />
-            </Link>
+            </SmartLink>
             <div className="text-[10px] text-gray-500 font-medium">
               Chuẩn mực &amp; Chi tiết
             </div>
@@ -48,9 +48,9 @@ export const Footer: React.FC = () => {
           <div className="md:col-span-4 text-[11px] text-gray-700 space-y-2">
             {policyLinks.map((policy) => (
               <div key={policy.id || policy.url}>
-                <Link to={policy.url} className="hover:text-[#e60049] transition">
+                <SmartLink to={policy.url} className="hover:text-[#e60049] transition">
                   {policy.label}
-                </Link>
+                </SmartLink>
               </div>
             ))}
             <div className="flex items-center gap-2 pt-1">

@@ -22,6 +22,7 @@ import {
   SectionGroupsBlock,
   TopBannerBlock,
 } from './DynamicHomepageBlocks';
+import { normalizeTargetUrl } from './SmartLink';
 
 const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string; desc: string }> = {
   hero: {
@@ -310,24 +311,72 @@ export const AdminHomepageCms: React.FC = () => {
     );
   };
 
-  // Lưu toàn bộ layout trang chủ vào Supabase
+  // Lưu toàn bộ layout trang chủ vào Supabase (tự động chuẩn hóa link ra ngoài https:// và link nội bộ root/url)
   const handleSaveAllLayout = async () => {
     setSaving(true);
     try {
-      await updateSiteConfig('homepage_blocks', blocks);
+      const normalizedBlocks: HomepageBlockItem[] = blocks.map((b) => {
+        const clone = JSON.parse(JSON.stringify(b));
+        const cfg = clone.config || {};
+
+        if (clone.type === 'top_banner' || clone.type === 'bottom_banner') {
+          if (cfg.link_url) {
+            const norm = normalizeTargetUrl(cfg.link_url);
+            cfg.link_url = norm === '#' ? '' : norm;
+          }
+        } else if (clone.type === 'categories_grid') {
+          if (Array.isArray(cfg.items)) {
+            cfg.items.forEach((it: any) => {
+              if (it.to) {
+                const norm = normalizeTargetUrl(it.to);
+                it.to = norm === '#' ? '' : norm;
+              }
+              if (it.category_slug && !it.to) {
+                const norm = normalizeTargetUrl(it.category_slug);
+                it.to = norm === '#' ? '' : norm;
+              }
+            });
+          }
+        } else if (clone.type === 'section_groups') {
+          if (Array.isArray(cfg.sections)) {
+            cfg.sections.forEach((sec: any) => {
+              if (Array.isArray(sec.items)) {
+                sec.items.forEach((it: any) => {
+                  if (it.target_url) {
+                    const norm = normalizeTargetUrl(it.target_url);
+                    it.target_url = norm === '#' ? '' : norm;
+                  }
+                });
+              }
+            });
+          }
+        } else if (clone.type === 'notice_text') {
+          if (cfg.cta_button_link) {
+            const norm = normalizeTargetUrl(cfg.cta_button_link);
+            cfg.cta_button_link = norm === '#' ? '' : norm;
+          }
+        }
+
+        clone.config = cfg;
+        return clone;
+      });
+
+      setBlocks(normalizedBlocks);
+
+      await updateSiteConfig('homepage_blocks', normalizedBlocks);
 
       // Cập nhật đồng bộ các key lẻ nếu có block tương ứng (đảm bảo tương thích ngược)
-      const hero = blocks.find((b) => b.type === 'hero');
+      const hero = normalizedBlocks.find((b) => b.type === 'hero');
       if (hero) await updateSiteConfig('homepage_hero', hero.config);
-      const banner = blocks.find((b) => b.type === 'top_banner');
+      const banner = normalizedBlocks.find((b) => b.type === 'top_banner');
       if (banner) await updateSiteConfig('homepage_top_banner', banner.config);
-      const cat = blocks.find((b) => b.type === 'categories_grid');
+      const cat = normalizedBlocks.find((b) => b.type === 'categories_grid');
       if (cat) await updateSiteConfig('homepage_categories_grid', cat.config);
-      const sec = blocks.find((b) => b.type === 'section_groups');
+      const sec = normalizedBlocks.find((b) => b.type === 'section_groups');
       if (sec) await updateSiteConfig('homepage_section_groups', sec.config);
-      const noti = blocks.find((b) => b.type === 'notice_text');
+      const noti = normalizedBlocks.find((b) => b.type === 'notice_text');
       if (noti) await updateSiteConfig('homepage_notice_text', noti.config);
-      const btm = blocks.find((b) => b.type === 'bottom_banner');
+      const btm = normalizedBlocks.find((b) => b.type === 'bottom_banner');
       if (btm) await updateSiteConfig('homepage_bottom_banner', btm.config);
 
       showToast('Đã lưu toàn bộ cấu hình và thứ tự các khung trang chủ thành công!');
@@ -1029,11 +1078,19 @@ export const AdminHomepageCms: React.FC = () => {
                       )}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Đường dẫn khi click vào banner:
+                          Đường dẫn đích (Hỗ trợ https:// ra ngoài hoặc link nội bộ root /url):
                         </label>
                         <input
                           type="text"
                           value={currentBlock.config?.link_url || ''}
+                          placeholder="Ví dụ: /combo-thpt hoặc https://..."
+                          onBlur={(e) => {
+                            const norm = normalizeTargetUrl(e.target.value);
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              link_url: norm === '#' ? '' : norm,
+                            }));
+                          }}
                           onChange={(e) =>
                             updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
                               ...cfg,
@@ -1208,11 +1265,19 @@ export const AdminHomepageCms: React.FC = () => {
 
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Đường dẫn khi click vào banner:
+                          Đường dẫn đích (Hỗ trợ https:// ra ngoài hoặc link nội bộ root /url):
                         </label>
                         <input
                           type="text"
                           value={currentBlock.config?.link_url || ''}
+                          placeholder="Ví dụ: /combo-thpt hoặc https://..."
+                          onBlur={(e) => {
+                            const norm = normalizeTargetUrl(e.target.value);
+                            updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
+                              ...cfg,
+                              link_url: norm === '#' ? '' : norm,
+                            }));
+                          }}
                           onChange={(e) =>
                             updateCurrentConfig((cfg: HomepageTopBannerConfig) => ({
                               ...cfg,
@@ -1497,12 +1562,21 @@ export const AdminHomepageCms: React.FC = () => {
 
                           <div>
                             <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                              Đường link dẫn tới:
+                              Đường dẫn đích (Link https:// ngoài hoặc link nội bộ root /url):
                             </label>
                             <input
                               type="text"
                               value={item.to}
-                              placeholder="/flashcard, /high-school..."
+                              placeholder="Ví dụ: /flashcard hoặc https://..."
+                              onBlur={(e) => {
+                                const norm = normalizeTargetUrl(e.target.value);
+                                const next = [...(currentBlock.config?.items || [])];
+                                next[idx].to = norm === '#' ? '' : norm;
+                                updateCurrentConfig((cfg: HomepageCategoriesGridConfig) => ({
+                                  ...cfg,
+                                  items: next,
+                                }));
+                              }}
                               onChange={(e) => {
                                 const next = [...(currentBlock.config?.items || [])];
                                 next[idx].to = e.target.value;
@@ -1849,12 +1923,21 @@ export const AdminHomepageCms: React.FC = () => {
 
                               <div>
                                 <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-                                  Đường dẫn đích (target_url):
+                                  Đường dẫn đích (target_url - Link https:// ngoài hoặc link nội bộ root /url):
                                 </label>
                                 <input
                                   type="text"
                                   value={item.target_url || ''}
-                                  placeholder="/high-school/dgnl-bca..."
+                                  placeholder="Ví dụ: /high-school/dgnl-bca hoặc https://..."
+                                  onBlur={(e) => {
+                                    const norm = normalizeTargetUrl(e.target.value);
+                                    const next = [...(currentBlock.config?.sections || [])];
+                                    next[sIdx].items[itIdx].target_url = norm === '#' ? '' : norm;
+                                    updateCurrentConfig((cfg: HomepageSectionGroupsConfig) => ({
+                                      ...cfg,
+                                      sections: next,
+                                    }));
+                                  }}
                                   onChange={(e) => {
                                     const next = [...(currentBlock.config?.sections || [])];
                                     next[sIdx].items[itIdx].target_url = e.target.value;
@@ -1916,18 +1999,25 @@ export const AdminHomepageCms: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Đường dẫn nút bấm:
+                        Đường dẫn nút bấm (Link https:// ngoài hoặc link nội bộ root /url):
                       </label>
                       <input
                         type="text"
                         value={currentBlock.config?.cta_button_link || ''}
+                        placeholder="Ví dụ: /high-school hoặc https://facebook.com/groups/..."
+                        onBlur={(e) => {
+                          const norm = normalizeTargetUrl(e.target.value);
+                          updateCurrentConfig((cfg: HomepageNoticeTextConfig) => ({
+                            ...cfg,
+                            cta_button_link: norm === '#' ? '' : norm,
+                          }));
+                        }}
                         onChange={(e) =>
                           updateCurrentConfig((cfg: HomepageNoticeTextConfig) => ({
                             ...cfg,
                             cta_button_link: e.target.value,
                           }))
                         }
-                        placeholder="/high-school"
                         className="w-full text-xs p-2 border border-gray-300 rounded"
                       />
                     </div>
@@ -2071,6 +2161,30 @@ export const AdminHomepageCms: React.FC = () => {
                           </button>
                         </div>
                       )}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Đường dẫn đích khi click banner (Link https:// ngoài hoặc link nội bộ root /url):
+                        </label>
+                        <input
+                          type="text"
+                          value={currentBlock.config?.link_url || ''}
+                          placeholder="Ví dụ: /high-school hoặc https://..."
+                          onBlur={(e) => {
+                            const norm = normalizeTargetUrl(e.target.value);
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              link_url: norm === '#' ? '' : norm,
+                            }));
+                          }}
+                          onChange={(e) =>
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              link_url: e.target.value,
+                            }))
+                          }
+                          className="w-full text-xs p-2 border border-gray-300 rounded"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -2092,11 +2206,19 @@ export const AdminHomepageCms: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Đường link khi click:
+                          Đường dẫn đích khi click (Link https:// ngoài hoặc link nội bộ root /url):
                         </label>
                         <input
                           type="text"
                           value={currentBlock.config?.link_url || ''}
+                          placeholder="Ví dụ: /high-school hoặc https://..."
+                          onBlur={(e) => {
+                            const norm = normalizeTargetUrl(e.target.value);
+                            updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
+                              ...cfg,
+                              link_url: norm === '#' ? '' : norm,
+                            }));
+                          }}
                           onChange={(e) =>
                             updateCurrentConfig((cfg: HomepageBottomBannerConfig) => ({
                               ...cfg,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { SmartLink } from './SmartLink';
 import {
   HomepageBottomBannerConfig,
   HomepageCategoriesGridConfig,
@@ -117,8 +117,8 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
         {config.header_label && (
           <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
         )}
-        <Link
-          to={config.link_url || '#'}
+        <SmartLink
+          to={config.link_url}
           className="block w-full overflow-hidden rounded-2xl shadow-sm hover:opacity-95 transition"
         >
           <img
@@ -126,7 +126,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
             alt={config.header_label || config.title || 'Banner'}
             className="w-full h-auto object-cover rounded-2xl block"
           />
-        </Link>
+        </SmartLink>
       </section>
     );
   }
@@ -142,8 +142,8 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
       {config.header_label && (
         <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
       )}
-      <Link
-        to={config.link_url || '#'}
+      <SmartLink
+        to={config.link_url}
         className="block rounded-2xl overflow-hidden border border-amber-200/80 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 hover:opacity-95 transition"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
@@ -193,7 +193,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
             )}
           </div>
         </div>
-      </Link>
+      </SmartLink>
     </section>
   );
 };
@@ -215,9 +215,9 @@ export const CategoriesGridBlock: React.FC<{
       )}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
         {activeItems.map((cat) => (
-          <Link
+          <SmartLink
             key={cat.id}
-            to={cat.to || (cat.category_slug ? `/${cat.category_slug}` : '#')}
+            to={cat.to || cat.category_slug}
             className="group text-center flex flex-col items-center"
           >
             {/* Nếu có ảnh: Ảnh hiển thị trực tiếp một mình, không bị nhồi nhét vào hộp màu khác */}
@@ -237,7 +237,7 @@ export const CategoriesGridBlock: React.FC<{
                 {cat.label}
               </span>
             )}
-          </Link>
+          </SmartLink>
         ))}
       </div>
     </section>
@@ -273,8 +273,8 @@ export const SectionGroupsBlock: React.FC<{
                   {/* Hộp trên: Bìa sách 3D bên trái + Badge & Mô tả bên phải */}
                   <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[160px] flex items-center justify-center gap-4 shadow-2xs hover:border-gray-300 transition">
                     {/* Cột trái: Mockup bìa sách 3D */}
-                    <Link
-                      to={item.target_url || '#'}
+                    <SmartLink
+                      to={item.target_url}
                       className="h-full flex items-center justify-center shrink-0"
                     >
                       {item.image_url && item.image_url.trim() ? (
@@ -288,7 +288,7 @@ export const SectionGroupsBlock: React.FC<{
                           Tài liệu
                         </div>
                       )}
-                    </Link>
+                    </SmartLink>
 
                     {/* Cột phải: Badge "Mới" / "Chính chủ" + Dòng mô tả (nếu có) */}
                     {(item.badge_text || item.tag_text) && (
@@ -308,21 +308,21 @@ export const SectionGroupsBlock: React.FC<{
                   </div>
 
                   {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
-                  <Link
-                    to={item.target_url || '#'}
+                  <SmartLink
+                    to={item.target_url}
                     className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
                   >
                     Đọc thử
-                  </Link>
+                  </SmartLink>
 
                   {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
                   {item.display_title && (
-                    <Link
-                      to={item.target_url || '#'}
+                    <SmartLink
+                      to={item.target_url}
                       className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
                     >
                       {item.display_title}
-                    </Link>
+                    </SmartLink>
                   )}
                 </div>
               ))}
@@ -352,12 +352,12 @@ export const NoticeTextBlock: React.FC<{
       )}
       {config.cta_button_text && (
         <div className="pt-1">
-          <Link
-            to={config.cta_button_link || '#'}
+          <SmartLink
+            to={config.cta_button_link}
             className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm px-6 py-2 rounded-xs transition shadow-sm"
           >
             {config.cta_button_text}
-          </Link>
+          </SmartLink>
         </div>
       )}
     </div>
@@ -388,8 +388,8 @@ export const BottomBannerBlock: React.FC<{
   if (imageUrl) {
     return (
       <section>
-        <Link
-          to={config.link_url || '#'}
+        <SmartLink
+          to={config.link_url}
           className="block w-full overflow-hidden rounded-2xl shadow-sm hover:opacity-95 transition"
         >
           <img
@@ -397,7 +397,7 @@ export const BottomBannerBlock: React.FC<{
             alt={config.title || 'Bottom Banner'}
             className="w-full h-auto object-cover rounded-2xl block"
           />
-        </Link>
+        </SmartLink>
       </section>
     );
   }
@@ -409,8 +409,8 @@ export const BottomBannerBlock: React.FC<{
 
   return (
     <section>
-      <Link
-        to={config.link_url || '#'}
+      <SmartLink
+        to={config.link_url}
         className="block rounded-2xl overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
@@ -461,7 +461,7 @@ export const BottomBannerBlock: React.FC<{
             )}
           </div>
         </div>
-      </Link>
+      </SmartLink>
     </section>
   );
 };
