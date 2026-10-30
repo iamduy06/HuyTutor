@@ -165,6 +165,7 @@ export const orderController = {
 
       const newOrder: SeedOrder = {
         id: `ord-${Date.now()}`,
+        user_id: req.user?.id || null,
         order_code: orderCode,
         customer_name: String(customerName).trim(),
         customer_email: email1,

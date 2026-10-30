@@ -83,6 +83,7 @@ export interface SeedOrderItem {
 
 export interface SeedOrder {
   id: string;
+  user_id?: string | null;
   order_code: string;
   customer_name: string;
   customer_email: string;
@@ -106,12 +107,63 @@ export interface SeedOrder {
   items: SeedOrderItem[];
 }
 
+export interface SeedUser {
+  id: string;
+  email: string;
+  password_hash: string; // SHA3-256 hex (64 chars)
+  full_name: string;
+  phone: string;
+  role: 'user' | 'admin';
+  customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  school_or_org: string;
+  default_tax_cccd: string;
+  default_invoice_address: string;
+  reset_password_token: string | null;
+  reset_password_expires_at: string | null;
+  email_verified: boolean;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SeedUserSession {
+  id: string;
+  user_id: string;
+  session_token: string;
+  user_agent: string;
+  ip_address: string;
+  is_revoked: boolean;
+  expires_at: string;
+  last_active_at: string;
+  created_at: string;
+}
+
+export interface SeedUserLibraryItem {
+  id: string;
+  user_id: string;
+  order_id: string;
+  order_code: string;
+  product_slug: string;
+  product_title: string;
+  format_code: UiFormatCode;
+  access_drive_url: string;
+  watermarked_pdf_url: string;
+  download_count: number;
+  last_downloaded_at?: string;
+  is_active: boolean;
+  granted_at: string;
+}
+
 export interface DbState {
   menus: SeedMenu[];
   categories: SeedCategory[];
   combo_rules: SeedComboRule[];
   products: SeedProduct[];
   orders: SeedOrder[];
+  users: SeedUser[];
+  user_sessions: SeedUserSession[];
+  user_library: SeedUserLibraryItem[];
 }
 
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -577,13 +629,78 @@ function buildNormalizedSeedState(): DbState {
     })),
   }));
 
+  const defaultAdminUser: SeedUser = {
+    id: '00000000-0000-4000-8000-000000000001',
+    email: 'huymdcc@gmail.com',
+    password_hash: '8e6b8cb7aa0ce9ec3c88a50e42cc9bb51c4aa62fd0fc2a3139fbf713ec7d6eda', // SHA3-256('Admin@123')
+    full_name: 'Thầy Huỳnh Thanh Duy (Huy Tutor)',
+    phone: '0358999147',
+    role: 'admin',
+    customer_group: 'Giáo viên',
+    school_or_org: 'Huy Tutor Education',
+    default_tax_cccd: '',
+    default_invoice_address: '',
+    reset_password_token: null,
+    reset_password_expires_at: null,
+    email_verified: true,
+    is_active: true,
+    last_login_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   return {
     menus,
     categories,
     combo_rules,
     products,
     orders,
+    users: [defaultAdminUser],
+    user_sessions: [],
+    user_library: [],
   };
+}
+
+function ensureAuthArraysInState(parsed: DbState): boolean {
+  let mutated = false;
+  if (!Array.isArray(parsed.users)) {
+    parsed.users = [];
+    mutated = true;
+  }
+  const hasAdmin = parsed.users.some(
+    (u) => u.email.toLowerCase() === 'huymdcc@gmail.com'
+  );
+  if (!hasAdmin) {
+    parsed.users.unshift({
+      id: '00000000-0000-4000-8000-000000000001',
+      email: 'huymdcc@gmail.com',
+      password_hash: '8e6b8cb7aa0ce9ec3c88a50e42cc9bb51c4aa62fd0fc2a3139fbf713ec7d6eda',
+      full_name: 'Thầy Huỳnh Thanh Duy (Huy Tutor)',
+      phone: '0358999147',
+      role: 'admin',
+      customer_group: 'Giáo viên',
+      school_or_org: 'Huy Tutor Education',
+      default_tax_cccd: '',
+      default_invoice_address: '',
+      reset_password_token: null,
+      reset_password_expires_at: null,
+      email_verified: true,
+      is_active: true,
+      last_login_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    mutated = true;
+  }
+  if (!Array.isArray(parsed.user_sessions)) {
+    parsed.user_sessions = [];
+    mutated = true;
+  }
+  if (!Array.isArray(parsed.user_library)) {
+    parsed.user_library = [];
+    mutated = true;
+  }
+  return mutated;
 }
 
 function loadLocalDb(): DbState {
@@ -602,6 +719,9 @@ function loadLocalDb(): DbState {
       const refreshed = buildNormalizedSeedState();
       fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(refreshed, null, 2), 'utf-8');
       return refreshed;
+    }
+    if (ensureAuthArraysInState(parsed)) {
+      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(parsed, null, 2), 'utf-8');
     }
     return parsed;
   } catch (err) {
@@ -950,27 +1070,32 @@ export const dbService = {
 
   async createOrder(order: SeedOrder): Promise<SeedOrder> {
     if (isSupabaseConfigured && supabaseAdmin) {
+      const insertPayload: Record<string, any> = {
+        order_code: order.order_code,
+        customer_name: order.customer_name,
+        customer_email: order.customer_email,
+        customer_phone: order.customer_phone,
+        customer_group: order.customer_group,
+        selected_format: order.selected_format,
+        flashcard_quantity: order.flashcard_quantity,
+        need_invoice: order.need_invoice,
+        invoice_tax_or_cccd: order.invoice_tax_or_cccd,
+        invoice_address: order.invoice_address,
+        subtotal_amount: order.subtotal_amount,
+        discount_percent: order.discount_percent,
+        discount_amount: order.discount_amount,
+        total_amount: order.total_amount,
+        payment_method: order.payment_method,
+        payment_status: order.payment_status,
+        google_form_submitted: order.google_form_submitted,
+      };
+      if (order.user_id) {
+        insertPayload.user_id = order.user_id;
+      }
+
       const { data: insertedOrder, error } = await supabaseAdmin
         .from('orders')
-        .insert({
-          order_code: order.order_code,
-          customer_name: order.customer_name,
-          customer_email: order.customer_email,
-          customer_phone: order.customer_phone,
-          customer_group: order.customer_group,
-          selected_format: order.selected_format,
-          flashcard_quantity: order.flashcard_quantity,
-          need_invoice: order.need_invoice,
-          invoice_tax_or_cccd: order.invoice_tax_or_cccd,
-          invoice_address: order.invoice_address,
-          subtotal_amount: order.subtotal_amount,
-          discount_percent: order.discount_percent,
-          discount_amount: order.discount_amount,
-          total_amount: order.total_amount,
-          payment_method: order.payment_method,
-          payment_status: order.payment_status,
-          google_form_submitted: order.google_form_submitted,
-        })
+        .insert(insertPayload)
         .select('*')
         .single();
 
@@ -1007,6 +1132,7 @@ export const dbService = {
       if (!error && data) {
         return {
           id: data.id,
+          user_id: data.user_id || null,
           order_code: data.order_code,
           customer_name: data.customer_name,
           customer_email: data.customer_email,
@@ -1055,6 +1181,7 @@ export const dbService = {
       if (!error && data && data.length > 0) {
         return data.map((row: any) => ({
           id: row.id,
+          user_id: row.user_id || null,
           order_code: row.order_code,
           customer_name: row.customer_name,
           customer_email: row.customer_email,
@@ -1109,15 +1236,23 @@ export const dbService = {
 
     const db = loadLocalDb();
     const idx = db.orders.findIndex((o) => o.order_code.toUpperCase() === normalized);
+    let updatedOrder: SeedOrder | null = null;
     if (idx >= 0) {
       db.orders[idx] = {
         ...db.orders[idx],
         ...updates,
       };
       saveLocalDb(db);
-      return db.orders[idx];
+      updatedOrder = db.orders[idx];
+    } else {
+      updatedOrder = await this.getOrderByCode(normalized);
     }
-    return null;
+
+    if (updates.payment_status === 'paid' && updatedOrder) {
+      await this.grantOrderToUserLibrary(updatedOrder);
+    }
+
+    return updatedOrder;
   },
 
   async logGoogleFormSubmission(log: {
@@ -1139,5 +1274,465 @@ export const dbService = {
         error_message: log.error_message || null,
       });
     }
+  },
+
+  // ====================================================================
+  // QUẢN LÝ TÀI KHOẢN (PUBLIC.USERS), SESSION (PUBLIC.USER_SESSIONS)
+  // VÀ TỦ SÁCH CÁ NHÂN (PUBLIC.USER_LIBRARY)
+  // ====================================================================
+
+  async getUserByEmail(email: string): Promise<SeedUser | null> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+      if (!error && data) {
+        return data as SeedUser;
+      }
+    }
+    const db = loadLocalDb();
+    return db.users.find((u) => u.email.toLowerCase() === cleanEmail) || null;
+  },
+
+  async getUserById(id: string): Promise<SeedUser | null> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (!error && data) {
+        return data as SeedUser;
+      }
+    }
+    const db = loadLocalDb();
+    return db.users.find((u) => u.id === id) || null;
+  },
+
+  async getUserByResetToken(token: string): Promise<SeedUser | null> {
+    const cleanToken = token.trim();
+    if (!cleanToken) return null;
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('reset_password_token', cleanToken)
+        .maybeSingle();
+      if (!error && data) {
+        return data as SeedUser;
+      }
+    }
+    const db = loadLocalDb();
+    return db.users.find((u) => u.reset_password_token === cleanToken) || null;
+  },
+
+  async createUser(payload: {
+    email: string;
+    password_hash: string;
+    full_name: string;
+    phone?: string;
+    role?: 'user' | 'admin';
+    customer_group?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    school_or_org?: string;
+  }): Promise<SeedUser> {
+    const nowIso = new Date().toISOString();
+    const validGroups = ['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'] as const;
+    const group =
+      payload.customer_group && validGroups.includes(payload.customer_group)
+        ? payload.customer_group
+        : 'Giáo viên';
+
+    let newUser: SeedUser = {
+      id: `usr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      email: payload.email.trim().toLowerCase(),
+      password_hash: payload.password_hash,
+      full_name: payload.full_name.trim(),
+      phone: (payload.phone || '').trim(),
+      role: payload.role === 'admin' ? 'admin' : 'user',
+      customer_group: group,
+      school_or_org: (payload.school_or_org || '').trim(),
+      default_tax_cccd: '',
+      default_invoice_address: '',
+      reset_password_token: null,
+      reset_password_expires_at: null,
+      email_verified: false,
+      is_active: true,
+      last_login_at: nowIso,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .insert({
+          email: newUser.email,
+          password_hash: newUser.password_hash,
+          full_name: newUser.full_name,
+          phone: newUser.phone,
+          role: newUser.role,
+          customer_group: newUser.customer_group,
+          school_or_org: newUser.school_or_org,
+          default_tax_cccd: newUser.default_tax_cccd,
+          default_invoice_address: newUser.default_invoice_address,
+          email_verified: newUser.email_verified,
+          is_active: newUser.is_active,
+          last_login_at: newUser.last_login_at,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        newUser = data as SeedUser;
+      }
+    }
+
+    const db = loadLocalDb();
+    const existingIdx = db.users.findIndex(
+      (u) => u.email.toLowerCase() === newUser.email.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      db.users[existingIdx] = newUser;
+    } else {
+      db.users.push(newUser);
+    }
+    saveLocalDb(db);
+
+    await this.syncPaidOrdersToUserLibrary(newUser);
+    return newUser;
+  },
+
+  async updateUser(id: string, updates: Partial<SeedUser>): Promise<SeedUser | null> {
+    const nowIso = new Date().toISOString();
+    const cleanUpdates = { ...updates, updated_at: nowIso };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .update(cleanUpdates)
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (!error && data) {
+        const db = loadLocalDb();
+        const idx = db.users.findIndex((u) => u.id === id || u.email === data.email);
+        if (idx >= 0) {
+          db.users[idx] = { ...db.users[idx], ...(data as SeedUser) };
+          saveLocalDb(db);
+        }
+        return data as SeedUser;
+      }
+    }
+
+    const db = loadLocalDb();
+    const idx = db.users.findIndex((u) => u.id === id);
+    if (idx < 0) return null;
+    db.users[idx] = {
+      ...db.users[idx],
+      ...cleanUpdates,
+    };
+    saveLocalDb(db);
+    return db.users[idx];
+  },
+
+  async getAllUsers(): Promise<SeedUser[]> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        return data as SeedUser[];
+      }
+    }
+    const db = loadLocalDb();
+    return db.users;
+  },
+
+  async createSession(params: {
+    user_id: string;
+    session_token: string;
+    user_agent?: string;
+    ip_address?: string;
+    expires_at: string;
+  }): Promise<SeedUserSession> {
+    const nowIso = new Date().toISOString();
+    let sessionRecord: SeedUserSession = {
+      id: `sess-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      user_id: params.user_id,
+      session_token: params.session_token,
+      user_agent: (params.user_agent || 'Trình duyệt Web').slice(0, 500),
+      ip_address: (params.ip_address || '127.0.0.1').slice(0, 64),
+      is_revoked: false,
+      expires_at: params.expires_at,
+      last_active_at: nowIso,
+      created_at: nowIso,
+    };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_sessions')
+        .insert({
+          user_id: sessionRecord.user_id,
+          session_token: sessionRecord.session_token,
+          user_agent: sessionRecord.user_agent,
+          ip_address: sessionRecord.ip_address,
+          is_revoked: false,
+          expires_at: sessionRecord.expires_at,
+          last_active_at: nowIso,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        sessionRecord = data as SeedUserSession;
+      }
+    }
+
+    const db = loadLocalDb();
+    db.user_sessions.unshift(sessionRecord);
+    saveLocalDb(db);
+    return sessionRecord;
+  },
+
+  async getSessionByToken(token: string): Promise<SeedUserSession | null> {
+    const cleanToken = token.trim();
+    if (!cleanToken) return null;
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_sessions')
+        .select('*')
+        .eq('session_token', cleanToken)
+        .maybeSingle();
+      if (!error && data) {
+        return data as SeedUserSession;
+      }
+    }
+
+    const db = loadLocalDb();
+    return db.user_sessions.find((s) => s.session_token === cleanToken) || null;
+  },
+
+  async touchSession(sessionId: string, token: string): Promise<void> {
+    const nowIso = new Date().toISOString();
+    if (isSupabaseConfigured && supabaseAdmin) {
+      await supabaseAdmin
+        .from('user_sessions')
+        .update({ last_active_at: nowIso })
+        .eq('id', sessionId);
+    }
+    const db = loadLocalDb();
+    const idx = db.user_sessions.findIndex(
+      (s) => s.id === sessionId || s.session_token === token
+    );
+    if (idx >= 0) {
+      db.user_sessions[idx].last_active_at = nowIso;
+      saveLocalDb(db);
+    }
+  },
+
+  async revokeSessionByToken(token: string): Promise<boolean> {
+    const cleanToken = token.trim();
+    if (isSupabaseConfigured && supabaseAdmin) {
+      await supabaseAdmin
+        .from('user_sessions')
+        .update({ is_revoked: true })
+        .eq('session_token', cleanToken);
+    }
+    const db = loadLocalDb();
+    let changed = false;
+    for (const s of db.user_sessions) {
+      if (s.session_token === cleanToken && !s.is_revoked) {
+        s.is_revoked = true;
+        changed = true;
+      }
+    }
+    if (changed) saveLocalDb(db);
+    return changed;
+  },
+
+  async revokeSessionById(userId: string, sessionId: string): Promise<boolean> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      await supabaseAdmin
+        .from('user_sessions')
+        .update({ is_revoked: true })
+        .eq('id', sessionId)
+        .eq('user_id', userId);
+    }
+    const db = loadLocalDb();
+    let changed = false;
+    for (const s of db.user_sessions) {
+      if (s.id === sessionId && s.user_id === userId && !s.is_revoked) {
+        s.is_revoked = true;
+        changed = true;
+      }
+    }
+    if (changed) saveLocalDb(db);
+    return changed;
+  },
+
+  async revokeAllUserSessions(userId: string): Promise<number> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      await supabaseAdmin
+        .from('user_sessions')
+        .update({ is_revoked: true })
+        .eq('user_id', userId);
+    }
+    const db = loadLocalDb();
+    let count = 0;
+    for (const s of db.user_sessions) {
+      if (s.user_id === userId && !s.is_revoked) {
+        s.is_revoked = true;
+        count++;
+      }
+    }
+    if (count > 0) saveLocalDb(db);
+    return count;
+  },
+
+  async getUserSessions(userId: string): Promise<SeedUserSession[]> {
+    const now = new Date();
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_revoked', false)
+        .order('last_active_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        return (data as SeedUserSession[]).filter((s) => new Date(s.expires_at) > now);
+      }
+    }
+    const db = loadLocalDb();
+    return db.user_sessions
+      .filter((s) => s.user_id === userId && !s.is_revoked && new Date(s.expires_at) > now)
+      .sort(
+        (a, b) =>
+          new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime()
+      );
+  },
+
+  async grantOrderToUserLibrary(order: SeedOrder): Promise<void> {
+    let targetUser: SeedUser | null = null;
+    if (order.user_id) {
+      targetUser = await this.getUserById(order.user_id);
+    }
+    if (!targetUser && order.customer_email) {
+      targetUser = await this.getUserByEmail(order.customer_email);
+    }
+    if (!targetUser) return;
+
+    const allProducts = await this.getProducts({ includeInactive: true });
+    const db = loadLocalDb();
+    let localChanged = false;
+
+    for (const item of order.items) {
+      const matchedProduct = allProducts.find(
+        (p) =>
+          p.id === item.product_id ||
+          p.slug === item.product_id ||
+          p.title === item.product_title
+      );
+      const productSlug = matchedProduct?.slug || item.product_id || 'tai-lieu';
+      const watermarkedUrl = matchedProduct?.sample_pdf_url || '';
+
+      if (isSupabaseConfigured && supabaseAdmin) {
+        const { data: existingLib } = await supabaseAdmin
+          .from('user_library')
+          .select('id')
+          .eq('user_id', targetUser.id)
+          .eq('product_slug', productSlug)
+          .eq('format_code', item.format_code)
+          .maybeSingle();
+
+        if (!existingLib) {
+          await supabaseAdmin.from('user_library').insert({
+            user_id: targetUser.id,
+            order_id: order.id,
+            order_code: order.order_code,
+            product_slug: productSlug,
+            product_title: item.product_title,
+            format_code: item.format_code,
+            access_drive_url: '',
+            watermarked_pdf_url: watermarkedUrl,
+            is_active: true,
+          });
+        }
+      }
+
+      const existsInLocal = db.user_library.some(
+        (lib) =>
+          lib.user_id === targetUser!.id &&
+          lib.product_slug === productSlug &&
+          lib.format_code === item.format_code
+      );
+      if (!existsInLocal) {
+        db.user_library.unshift({
+          id: `lib-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+          user_id: targetUser.id,
+          order_id: order.id,
+          order_code: order.order_code,
+          product_slug: productSlug,
+          product_title: item.product_title,
+          format_code: item.format_code,
+          access_drive_url: '',
+          watermarked_pdf_url: watermarkedUrl,
+          download_count: 0,
+          is_active: true,
+          granted_at: new Date().toISOString(),
+        });
+        localChanged = true;
+      }
+    }
+
+    if (localChanged) {
+      saveLocalDb(db);
+    }
+  },
+
+  async syncPaidOrdersToUserLibrary(user: SeedUser): Promise<void> {
+    const orders = await this.getAllOrders();
+    const userPaidOrders = orders.filter(
+      (o) =>
+        o.payment_status === 'paid' &&
+        (o.user_id === user.id ||
+          o.customer_email.toLowerCase() === user.email.toLowerCase())
+    );
+    for (const ord of userPaidOrders) {
+      await this.grantOrderToUserLibrary({ ...ord, user_id: user.id });
+    }
+  },
+
+  async getUserLibrary(userId: string): Promise<SeedUserLibraryItem[]> {
+    const user = await this.getUserById(userId);
+    if (user) {
+      await this.syncPaidOrdersToUserLibrary(user);
+    }
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_library')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('granted_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        return data as SeedUserLibraryItem[];
+      }
+    }
+
+    const db = loadLocalDb();
+    return db.user_library.filter((item) => item.user_id === userId && item.is_active);
+  },
+
+  async getUserOrders(userId: string, email: string): Promise<SeedOrder[]> {
+    const allOrders = await this.getAllOrders();
+    const cleanEmail = email.trim().toLowerCase();
+    return allOrders.filter(
+      (o) =>
+        o.user_id === userId || o.customer_email.trim().toLowerCase() === cleanEmail
+    );
   },
 };

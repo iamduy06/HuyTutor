@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
+import { toPublicUserProfile } from '../services/authService';
 import {
   createR2PresignedUploadUrl,
   stampPdfBufferWithWatermark,
@@ -256,6 +257,99 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi đồng bộ lại Google Form.',
+      });
+    }
+  },
+
+  /**
+   * GET /api/admin/users
+   * Lấy danh sách toàn bộ tài khoản người dùng & số phiên đăng nhập đang hoạt động
+   */
+  async getUsers(_req: Request, res: Response): Promise<void> {
+    try {
+      const users = await dbService.getAllUsers();
+      const enrichedUsers = await Promise.all(
+        users.map(async (u) => {
+          const sessions = await dbService.getUserSessions(u.id);
+          return {
+            ...toPublicUserProfile(u),
+            activeSessions: sessions.length,
+          };
+        })
+      );
+
+      res.json({
+        ok: true,
+        users: enrichedUsers,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải danh sách thành viên.',
+      });
+    }
+  },
+
+  /**
+   * PUT /api/admin/users/:id/role
+   * Cập nhật quyền hạn ('user' | 'admin') hoặc trạng thái hoạt động (is_active)
+   */
+  async updateUserRoleAndStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = String(req.params.id || '');
+      const { role, isActive } = req.body;
+
+      const updates: Record<string, any> = {};
+      if (role === 'user' || role === 'admin') {
+        updates.role = role;
+      }
+      if (typeof isActive === 'boolean') {
+        updates.is_active = isActive;
+      }
+
+      const updated = await dbService.updateUser(userId, updates);
+      if (!updated) {
+        res.status(404).json({
+          ok: false,
+          error: 'Không tìm thấy tài khoản người dùng.',
+        });
+        return;
+      }
+
+      if (updates.is_active === false) {
+        await dbService.revokeAllUserSessions(userId);
+      }
+
+      res.json({
+        ok: true,
+        user: toPublicUserProfile(updated),
+        message: 'Đã cập nhật phân quyền và trạng thái tài khoản.',
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi cập nhật quyền tài khoản.',
+      });
+    }
+  },
+
+  /**
+   * DELETE /api/admin/users/:id/sessions
+   * Thu hồi toàn bộ phiên đăng nhập của một người dùng bất kỳ
+   */
+  async revokeUserSessions(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = String(req.params.id || '');
+      const revokedCount = await dbService.revokeAllUserSessions(userId);
+      res.json({
+        ok: true,
+        revokedCount,
+        message: `Đã thu hồi ${revokedCount} phiên đăng nhập của thành viên.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi thu hồi phiên đăng nhập.',
       });
     }
   },
