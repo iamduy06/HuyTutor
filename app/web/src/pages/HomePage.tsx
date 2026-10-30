@@ -4,7 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import { useStore } from '../context/StoreContext';
 
 export const HomePage: React.FC = () => {
-  const { products, isLoading } = useStore();
+  const { products, categories, isLoading } = useStore();
 
   const thptExamProducts = products.filter(
     (p) =>
@@ -31,7 +31,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <div>
-      {/* 1. HERO SECTION CHUẨN MẪU SCREENSHOT 1 */}
+      {/* 1. HERO SECTION */}
       <section className="hero-soft-bg pt-10 pb-8 border-b border-pink-50">
         <div className="max-w-[920px] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
@@ -85,90 +85,87 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. CONTAINER CHÍNH (MAX-W-920PX) */}
+      {/* 2. CONTAINER CHÍNH */}
       <main className="max-w-[920px] mx-auto px-4 py-8 space-y-12">
-        {/* Banner Mới ra mắt: 90 đề thi thử */}
-        <section>
-          <h2 className="text-[#e60049] font-bold text-sm mb-3">
-            Mới ra mắt: 90 đề thi thử từ cơ bản đến nâng cao
-          </h2>
-          <Link
-            to="/combo-thpt"
-            className="block rounded-md overflow-hidden border border-amber-200 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 relative hover:opacity-95 transition"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              <div className="md:col-span-6 flex items-center justify-center gap-3">
-                <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-orange-500 via-pink-600 to-purple-700 p-2 text-white flex flex-col justify-between">
-                  <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                  <div className="font-black text-[10px] leading-tight uppercase">
-                    THỰC CHIẾN ĐỀ THI THPT
+        {/* Banner Mới ra mắt: 90 đề thi thử (Chỉ hiện khi có sản phẩm trong DB) */}
+        {products.length > 0 && (
+          <section>
+            <h2 className="text-[#e60049] font-bold text-sm mb-3">
+              Mới ra mắt: 90 đề thi thử từ cơ bản đến nâng cao
+            </h2>
+            <Link
+              to="/combo-thpt"
+              className="block rounded-md overflow-hidden border border-amber-200 shadow-sm bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 p-6 sm:p-8 relative hover:opacity-95 transition"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <div className="md:col-span-6 flex items-center justify-center gap-3">
+                  <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-orange-500 via-pink-600 to-purple-700 p-2 text-white flex flex-col justify-between">
+                    <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                    <div className="font-black text-[10px] leading-tight uppercase">
+                      THỰC CHIẾN ĐỀ THI THPT
+                    </div>
+                    <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
+                      B1-B2
+                    </span>
                   </div>
-                  <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
-                    B1-B2
-                  </span>
+                  <div className="book-3d w-24 h-34 rounded-sm bg-gradient-to-br from-amber-700 via-red-800 to-stone-900 p-2 text-white flex flex-col justify-between z-10 scale-105">
+                    <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                    <div className="font-black text-[10px] leading-tight uppercase">
+                      ĐỘT PHÁ ĐỀ THI THPT
+                    </div>
+                    <span className="text-[7px] bg-amber-400 text-black font-bold px-1 py-0.5 rounded-sm w-fit">
+                      B2-C2
+                    </span>
+                  </div>
+                  <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-indigo-900 via-blue-800 to-emerald-600 p-2 text-white flex flex-col justify-between">
+                    <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                    <div className="font-black text-[10px] leading-tight uppercase">
+                      BỘ ĐỀ CHUẨN CẤU TRÚC
+                    </div>
+                    <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
+                      B1-C1
+                    </span>
+                  </div>
                 </div>
-                <div className="book-3d w-24 h-34 rounded-sm bg-gradient-to-br from-amber-700 via-red-800 to-stone-900 p-2 text-white flex flex-col justify-between z-10 scale-105">
-                  <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                  <div className="font-black text-[10px] leading-tight uppercase">
-                    ĐỘT PHÁ ĐỀ THI THPT
+                <div className="md:col-span-6 text-center md:text-left">
+                  <div className="inline-block text-[10px] font-bold text-[#e60049] uppercase tracking-wider mb-1">
+                    HUY TUTOR
                   </div>
-                  <span className="text-[7px] bg-amber-400 text-black font-bold px-1 py-0.5 rounded-sm w-fit">
-                    B2-C2
-                  </span>
-                </div>
-                <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-indigo-900 via-blue-800 to-emerald-600 p-2 text-white flex flex-col justify-between">
-                  <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                  <div className="font-black text-[10px] leading-tight uppercase">
-                    BỘ ĐỀ CHUẨN CẤU TRÚC
+                  <div className="text-xl sm:text-2xl font-black text-[#e60049] leading-tight">
+                    Combo 90 ĐỀ THI THỬ
                   </div>
-                  <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
-                    B1-C1
-                  </span>
+                  <div className="text-xs font-extrabold text-amber-900 uppercase mt-1">
+                    KỲ THI TỐT NGHIỆP THPT MÔN TIẾNG ANH
+                  </div>
+                  <div className="inline-block mt-2 bg-sky-600 text-white text-[11px] font-extrabold px-3 py-0.5 rounded-sm uppercase">
+                    CƠ BẢN + NÂNG CAO
+                  </div>
                 </div>
               </div>
-              <div className="md:col-span-6 text-center md:text-left">
-                <div className="inline-block text-[10px] font-bold text-[#e60049] uppercase tracking-wider mb-1">
-                  HUY TUTOR
-                </div>
-                <div className="text-xl sm:text-2xl font-black text-[#e60049] leading-tight">
-                  Combo 90 ĐỀ THI THỬ
-                </div>
-                <div className="text-xs font-extrabold text-amber-900 uppercase mt-1">
-                  KỲ THI TỐT NGHIỆP THPT MÔN TIẾNG ANH
-                </div>
-                <div className="inline-block mt-2 bg-sky-600 text-white text-[11px] font-extrabold px-3 py-0.5 rounded-sm uppercase">
-                  CƠ BẢN + NÂNG CAO
-                </div>
-              </div>
-            </div>
-          </Link>
-        </section>
+            </Link>
+          </section>
+        )}
 
-        {/* Danh mục sản phẩm: 6 ô vuông đỏ chuẩn mẫu */}
-        <section>
-          <h2 className="text-[#e60049] font-bold text-sm mb-3">Danh mục sản phẩm</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-            {[
-              { label: 'Flashcard', to: '/flashcard', icon: '+' },
-              { label: 'Combo THPT', to: '/combo-thpt', icon: '%' },
-              { label: 'Cấp THPT', to: '/high-school', icon: '12' },
-              { label: 'Cấp THCS', to: '/secondary-school', icon: '9' },
-              { label: 'Bồi dưỡng HSG', to: '/gifted-students', icon: 'A+' },
-              { label: 'Tiện ích giảng dạy', to: '/flashcard', icon: '≡' },
-            ].map((cat) => (
-              <Link key={cat.label} to={cat.to} className="group text-center">
-                <div className="aspect-square rounded-md bg-gradient-to-br from-[#e60049] to-[#b30038] p-3 flex items-center justify-center shadow-sm group-hover:opacity-90 transition">
-                  <div className="w-12 h-14 border-2 border-white/80 rounded-sm bg-white/15 flex items-center justify-center text-white font-black text-xs">
-                    {cat.icon}
+        {/* Danh mục sản phẩm (Động 100% theo categories từ Database) */}
+        {categories.length > 0 && (
+          <section>
+            <h2 className="text-[#e60049] font-bold text-sm mb-3">Danh mục sản phẩm</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {categories.map((cat, idx) => (
+                <Link key={cat.id} to={`/${cat.slug}`} className="group text-center">
+                  <div className="aspect-square rounded-md bg-gradient-to-br from-[#e60049] to-[#b30038] p-3 flex items-center justify-center shadow-sm group-hover:opacity-90 transition">
+                    <div className="w-12 h-14 border-2 border-white/80 rounded-sm bg-white/15 flex items-center justify-center text-white font-black text-xs">
+                      {idx + 1}
+                    </div>
                   </div>
-                </div>
-                <span className="block text-[11px] font-bold text-gray-800 mt-1.5 group-hover:text-[#e60049]">
-                  {cat.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
+                  <span className="block text-[11px] font-bold text-gray-800 mt-1.5 group-hover:text-[#e60049] truncate">
+                    {cat.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Tài liệu THPT (Lấy động 100% từ Backend API) */}
         <section>
@@ -189,58 +186,60 @@ export const HomePage: React.FC = () => {
             </div>
           )}
 
-          {/* Thanh CTA Xem toàn bộ + Banner xanh CT GDPT 2018 */}
-          <div className="mt-8 space-y-3">
-            <p className="text-[12px] font-bold text-[#e60049]">
-              Không chỉ có các bộ đề chất lượng, thầy Huy còn biên soạn rất nhiều tài liệu bổ trợ
-              khác như chuyên đề điền từ, cụm từ cố định, từ vựng SGK,...
-            </p>
-            <Link
-              to="/high-school"
-              className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[12px] py-2 rounded-sm text-center transition"
-            >
-              Xem toàn bộ
-            </Link>
+          {/* Thanh CTA Xem toàn bộ + Banner xanh CT GDPT 2018 (Chỉ hiện khi có sản phẩm) */}
+          {thptExamProducts.length > 0 && (
+            <div className="mt-8 space-y-3">
+              <p className="text-[12px] font-bold text-[#e60049]">
+                Không chỉ có các bộ đề chất lượng, thầy Huy còn biên soạn rất nhiều tài liệu bổ trợ
+                khác như chuyên đề điền từ, cụm từ cố định, từ vựng SGK,...
+              </p>
+              <Link
+                to="/high-school"
+                className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[12px] py-2 rounded-sm text-center transition"
+              >
+                Xem toàn bộ
+              </Link>
 
-            <Link
-              to="/high-school"
-              className="block rounded-md overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                <div className="md:col-span-5 flex items-center justify-center gap-4">
-                  <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-amber-700 via-red-800 to-stone-900 p-2 text-white flex flex-col justify-between">
-                    <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                    <div className="font-black text-[10px] leading-tight uppercase">
-                      ĐỘT PHÁ ĐỀ THI
+              <Link
+                to="/high-school"
+                className="block rounded-md overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                  <div className="md:col-span-5 flex items-center justify-center gap-4">
+                    <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-amber-700 via-red-800 to-stone-900 p-2 text-white flex flex-col justify-between">
+                      <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                      <div className="font-black text-[10px] leading-tight uppercase">
+                        ĐỘT PHÁ ĐỀ THI
+                      </div>
+                      <span className="text-[7px] bg-amber-400 text-black font-bold px-1 py-0.5 rounded-sm w-fit">
+                        2026
+                      </span>
                     </div>
-                    <span className="text-[7px] bg-amber-400 text-black font-bold px-1 py-0.5 rounded-sm w-fit">
-                      2026
-                    </span>
+                    <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-orange-500 via-pink-600 to-purple-700 p-2 text-white flex flex-col justify-between">
+                      <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
+                      <div className="font-black text-[10px] leading-tight uppercase">
+                        THỰC CHIẾN ĐỀ THI
+                      </div>
+                      <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
+                        2026
+                      </span>
+                    </div>
                   </div>
-                  <div className="book-3d w-24 h-32 rounded-sm bg-gradient-to-br from-orange-500 via-pink-600 to-purple-700 p-2 text-white flex flex-col justify-between">
-                    <span className="text-[7px] font-bold uppercase opacity-90">HUY TUTOR</span>
-                    <div className="font-black text-[10px] leading-tight uppercase">
-                      THỰC CHIẾN ĐỀ THI
+                  <div className="md:col-span-7 text-center md:text-left">
+                    <div className="text-[11px] font-extrabold text-[#e60049] uppercase">
+                      HUY TUTOR
                     </div>
-                    <span className="text-[7px] bg-white/20 px-1 py-0.5 rounded-sm w-fit">
-                      2026
-                    </span>
+                    <div className="text-xl sm:text-2xl font-black text-blue-900 uppercase mt-1">
+                      TÀI LIỆU TIẾNG ANH
+                    </div>
+                    <div className="inline-block mt-1.5 bg-white text-[#e60049] font-extrabold text-xs px-4 py-1 rounded-sm shadow-sm">
+                      CT GDPT 2018
+                    </div>
                   </div>
                 </div>
-                <div className="md:col-span-7 text-center md:text-left">
-                  <div className="text-[11px] font-extrabold text-[#e60049] uppercase">
-                    HUY TUTOR
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-blue-900 uppercase mt-1">
-                    TÀI LIỆU TIẾNG ANH
-                  </div>
-                  <div className="inline-block mt-1.5 bg-white text-[#e60049] font-extrabold text-xs px-4 py-1 rounded-sm shadow-sm">
-                    CT GDPT 2018
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </div>
+              </Link>
+            </div>
+          )}
         </section>
 
         {/* Tiện ích */}
