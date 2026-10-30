@@ -79,3 +79,4 @@ export const ProtectedRoute: React.FC<{
 
   return <>{children}</>;
 };
+

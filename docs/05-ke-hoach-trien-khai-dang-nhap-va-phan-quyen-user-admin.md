@@ -188,8 +188,8 @@ sequenceDiagram
 ├────────────────────────────────────┤ ├───────────────────────────────────────┤
 │ id (UUID, PK)                      │ │ id (UUID, PK)                         │
 │ user_id (UUID, FK -> users.id)     │ │ user_id (UUID, FK -> users.id)        │
-│ session_token (VARCHAR(128), UNIQ) │ │ order_id (TEXT, FK -> orders.id)      │
-│ user_agent (TEXT)                  │ │ order_code (VARCHAR(32))              │
+│ session_token (VARCHAR(128), UNIQ) │ │ order_id (UUID, FK -> orders.id)      │
+│ user_agent (TEXT)                  │ │ order_code (VARCHAR(50))              │
 │ ip_address (VARCHAR(64))           │ │ product_slug (TEXT)                   │
 │ is_revoked (BOOLEAN, DEFAULT false)│ │ product_title (TEXT)                  │
 │ expires_at (TIMESTAMPTZ)           │ │ format_code (TEXT)                    │

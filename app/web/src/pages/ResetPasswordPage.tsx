@@ -122,3 +122,4 @@ export const ResetPasswordPage: React.FC = () => {
     </main>
   );
 };
+
