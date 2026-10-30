@@ -90,20 +90,53 @@ export const adminController = {
 
   /**
    * DELETE /api/admin/products/:slug
+   * Xóa sản phẩm và tự động dọn dẹp toàn bộ ảnh/PDF liên quan trên Cloudflare R2
    */
   async deleteProduct(req: Request, res: Response): Promise<void> {
     try {
       const slug = String(req.params.slug || '');
       const existing = await dbService.getProductBySlugOrId(slug);
-      if (existing?.thumbnail_url) {
-        await deleteR2Object(existing.thumbnail_url).catch(() => {});
+      if (existing) {
+        const r2Urls = new Set<string>();
+        if (existing.thumbnail_url) r2Urls.add(existing.thumbnail_url);
+        if (existing.sample_pdf_url) r2Urls.add(existing.sample_pdf_url);
+        if (Array.isArray(existing.preview_images)) {
+          existing.preview_images.forEach((u) => {
+            if (u) r2Urls.add(u);
+          });
+        }
+        if (Array.isArray(existing.detail_blocks)) {
+          for (const block of existing.detail_blocks) {
+            const cfg = block?.config || {};
+            if (cfg.image_url) r2Urls.add(cfg.image_url);
+            if (cfg.pdf_url) r2Urls.add(cfg.pdf_url);
+            if (Array.isArray(cfg.groups)) {
+              for (const g of cfg.groups) {
+                if (g?.pdf_url) r2Urls.add(g.pdf_url);
+                if (Array.isArray(g?.images)) {
+                  g.images.forEach((img: string) => {
+                    if (img) r2Urls.add(img);
+                  });
+                }
+              }
+            }
+            if (Array.isArray(cfg.items)) {
+              for (const it of cfg.items) {
+                if (it?.image_url) r2Urls.add(it.image_url);
+              }
+            }
+          }
+        }
+        await Promise.all(
+          Array.from(r2Urls).map((url) => deleteR2Object(url).catch(() => {}))
+        );
       }
       const deleted = await dbService.deleteProduct(slug);
       res.json({
         ok: true,
         deleted,
         message: deleted
-          ? `Đã xóa tài liệu "${slug}" khỏi Database.`
+          ? `Đã xóa tài liệu "${slug}" và dọn dẹp file R2 thành công.`
           : `Không tìm thấy tài liệu "${slug}".`,
       });
     } catch (err: any) {

@@ -82,6 +82,7 @@ export interface SeedProduct {
   is_combo_eligible: boolean;
   is_active: boolean;
   formats: SeedProductFormat[];
+  detail_blocks?: any[];
 }
 
 export interface SeedOrderItem {
@@ -1043,7 +1044,24 @@ export const dbService = {
         if (!options?.includeInactive) {
           query = query.eq('is_active', true);
         }
-        const { data, error } = await query;
+        const [prodRes, cfgRes] = await Promise.all([
+          query,
+          supabaseAdmin
+            .from('site_configs')
+            .select('key, value')
+            .like('key', 'product_detail_blocks:%'),
+        ]);
+        const { data, error } = prodRes;
+        const blocksBySlug: Record<string, any[]> = {};
+        if (!cfgRes.error && Array.isArray(cfgRes.data)) {
+          for (const row of cfgRes.data) {
+            const slugKey = String(row.key || '').replace('product_detail_blocks:', '');
+            if (slugKey && Array.isArray(row.value)) {
+              blocksBySlug[slugKey] = row.value;
+            }
+          }
+        }
+
         if (!error && data) {
           products = data.map((row: any) => ({
             id: row.id,
@@ -1079,6 +1097,10 @@ export const dbService = {
                   is_active: Boolean(f.is_active),
                 }))
               : [],
+            detail_blocks:
+              Array.isArray(row.detail_blocks) && row.detail_blocks.length > 0
+                ? row.detail_blocks
+                : blocksBySlug[row.slug] || [],
           }));
 
           if (options?.categorySlug) {
@@ -1215,40 +1237,72 @@ export const dbService = {
       is_combo_eligible: payload.is_combo_eligible ?? existing?.is_combo_eligible ?? true,
       is_active: payload.is_active ?? existing?.is_active ?? true,
       formats,
+      detail_blocks: Array.isArray(payload.detail_blocks)
+        ? payload.detail_blocks
+        : existing?.detail_blocks || [],
     };
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      const { data: upsertedProd, error: prodErr } = await supabaseAdmin
+      const baseDbRow: Record<string, any> = {
+        category_id: productRecord.category_id,
+        code: productRecord.code,
+        title: productRecord.title,
+        slug: productRecord.slug,
+        sub_section: productRecord.sub_section,
+        google_form_product_name: productRecord.google_form_product_name,
+        badge_text: productRecord.badge_text,
+        short_desc: productRecord.short_desc,
+        cover_tag: productRecord.cover_tag,
+        thumbnail_url: productRecord.thumbnail_url,
+        preview_type: productRecord.preview_type,
+        sample_pdf_source: productRecord.sample_pdf_source,
+        sample_pdf_url: productRecord.sample_pdf_url,
+        watermark_enabled: productRecord.watermark_enabled,
+        watermark_text: productRecord.watermark_text,
+        preview_images: productRecord.preview_images,
+        specs: productRecord.specs,
+        topics: productRecord.topics,
+        features: productRecord.features,
+        is_featured: productRecord.is_featured,
+        is_combo_eligible: productRecord.is_combo_eligible,
+        is_active: productRecord.is_active,
+      };
+
+      // Thử lưu trực tiếp cột detail_blocks vào bảng products trước
+      let { data: upsertedProd, error: prodErr } = await supabaseAdmin
         .from('products')
         .upsert(
           {
-            category_id: productRecord.category_id,
-            code: productRecord.code,
-            title: productRecord.title,
-            slug: productRecord.slug,
-            sub_section: productRecord.sub_section,
-            google_form_product_name: productRecord.google_form_product_name,
-            badge_text: productRecord.badge_text,
-            short_desc: productRecord.short_desc,
-            cover_tag: productRecord.cover_tag,
-            thumbnail_url: productRecord.thumbnail_url,
-            preview_type: productRecord.preview_type,
-            sample_pdf_source: productRecord.sample_pdf_source,
-            sample_pdf_url: productRecord.sample_pdf_url,
-            watermark_enabled: productRecord.watermark_enabled,
-            watermark_text: productRecord.watermark_text,
-            preview_images: productRecord.preview_images,
-            specs: productRecord.specs,
-            topics: productRecord.topics,
-            features: productRecord.features,
-            is_featured: productRecord.is_featured,
-            is_combo_eligible: productRecord.is_combo_eligible,
-            is_active: productRecord.is_active,
+            ...baseDbRow,
+            detail_blocks: productRecord.detail_blocks || [],
           },
           { onConflict: 'slug' }
         )
         .select('*')
         .single();
+
+      // Nếu bảng products chưa chạy migration thêm cột detail_blocks, tự động lưu baseDbRow
+      if (prodErr) {
+        const retryRes = await supabaseAdmin
+          .from('products')
+          .upsert(baseDbRow, { onConflict: 'slug' })
+          .select('*')
+          .single();
+        upsertedProd = retryRes.data;
+        prodErr = retryRes.error;
+      }
+
+      // Đồng bộ lưu detail_blocks vào site_configs (product_detail_blocks:<slug>) để luôn bền vững
+      if (Array.isArray(productRecord.detail_blocks)) {
+        await supabaseAdmin.from('site_configs').upsert(
+          {
+            key: `product_detail_blocks:${productRecord.slug}`,
+            value: productRecord.detail_blocks,
+            description: `Cấu hình các khối động Trang cấp 2 cho tài liệu ${productRecord.slug}`,
+          },
+          { onConflict: 'key' }
+        );
+      }
 
       if (!prodErr && upsertedProd) {
         productRecord.id = upsertedProd.id;
@@ -1281,6 +1335,10 @@ export const dbService = {
         .from('products')
         .delete()
         .or(`slug.eq.${slugOrId},id.eq.${slugOrId}`);
+      await supabaseAdmin
+        .from('site_configs')
+        .delete()
+        .eq('key', `product_detail_blocks:${slugOrId}`);
     }
     const db = loadLocalDb();
     const beforeLen = db.products.length;

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
 import { AdminHomepageCms } from '../components/AdminHomepageCms';
+import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
+import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import {
   AdminUserRecord,
   CategoryItem,
@@ -14,8 +16,13 @@ import {
   MenuItemChild,
   OrderRecord,
   Product,
+  ProductDetailBlockItem,
   ProductFormat,
+  ProductHeroBlockConfig,
+  ProductIntroBlockConfig,
   ProductSpec,
+  SampleGroupsBlockConfig,
+  TopicAccordionBlockConfig,
   UI_FORMATS,
   UiFormatCode,
 } from '../types';
@@ -116,30 +123,28 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // State cho Form Thêm mới / Chỉnh sửa Sản phẩm
+  // State cho Form Thêm mới / Chỉnh sửa Sản phẩm (Không hardcode giá trị mẫu giả)
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({
     title: '',
     code: '',
     slug: '',
     category_slug: 'high-school',
-    sub_section: 'Đề thi thử THPT/ĐGNL',
-    badge_text: 'Mới',
+    sub_section: '',
+    badge_text: '',
     google_form_product_name: '',
-    cover_tag: 'Dành cho\nKỳ thi THPTQG\ntừ năm 2027',
+    cover_tag: '',
     short_desc: '',
     thumbnail_url: '',
     preview_type: 'images',
     sample_pdf_source: 'r2',
     sample_pdf_url: '',
-    watermark_enabled: true,
-    watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+    watermark_enabled: false,
+    watermark_text: '',
     preview_images: [],
-    specs: [
-      { label: 'Số lượng', val: '30 đề chuẩn cấu trúc mới nhất' },
-      { label: 'Độ khó', val: 'B2 - C2 (tương đương 8.0 - 10 điểm)' },
-    ],
-    topics: ['Chủ đề đọc hiểu bám sát định hướng ra đề mới nhất của Bộ GD&ĐT'],
-    features: ['Giải thích chi tiết từng câu hỏi và bảng từ vựng mở rộng phong phú'],
+    specs: [],
+    topics: [],
+    features: [],
+    detail_blocks: [],
     is_combo_eligible: true,
     is_active: true,
     formats: DEFAULT_FORMATS,
@@ -177,13 +182,19 @@ export const AdminPage: React.FC = () => {
       return found || { format_code: code, price: 150000, is_active: false };
     });
 
+    const initialBlocks: ProductDetailBlockItem[] =
+      Array.isArray(prod.detail_blocks) && prod.detail_blocks.length > 0
+        ? prod.detail_blocks
+        : buildInitialDetailBlocksFromProduct(prod);
+
     setEditingProduct({
       ...prod,
       formats: mergedFormats,
-      specs: prod.specs?.length ? [...prod.specs] : [{ label: 'Số lượng', val: '30 đề' }],
-      topics: prod.topics?.length ? [...prod.topics] : ['Chủ đề trọng tâm'],
-      features: prod.features?.length ? [...prod.features] : ['Giải thích chi tiết'],
+      specs: prod.specs?.length ? [...prod.specs] : [],
+      topics: prod.topics?.length ? [...prod.topics] : [],
+      features: prod.features?.length ? [...prod.features] : [],
       preview_images: prod.preview_images ? [...prod.preview_images] : [],
+      detail_blocks: initialBlocks,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -195,21 +206,22 @@ export const AdminPage: React.FC = () => {
       code: '',
       slug: '',
       category_slug: 'high-school',
-      sub_section: 'Đề thi thử THPT/ĐGNL',
-      badge_text: 'Mới',
+      sub_section: '',
+      badge_text: '',
       google_form_product_name: '',
-      cover_tag: 'Dành cho\nKỳ thi THPTQG\ntừ năm 2027',
+      cover_tag: '',
       short_desc: '',
       thumbnail_url: '',
       preview_type: 'images',
       sample_pdf_source: 'r2',
       sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+      watermark_enabled: false,
+      watermark_text: '',
       preview_images: [],
-      specs: [{ label: 'Số lượng', val: '30 đề chuẩn cấu trúc' }],
-      topics: ['Chủ đề trọng tâm bám sát đề thi chính thức'],
-      features: ['Giải thích chi tiết kèm bảng từ vựng mở rộng'],
+      specs: [],
+      topics: [],
+      features: [],
+      detail_blocks: [],
       is_combo_eligible: true,
       is_active: true,
       formats: DEFAULT_FORMATS.map((f) => ({ ...f })),
@@ -338,11 +350,61 @@ export const AdminPage: React.FC = () => {
 
     setSaving(true);
     try {
-      const res = await apiClient.upsertProduct(editingProduct);
+      const blocks = Array.isArray(editingProduct.detail_blocks)
+        ? editingProduct.detail_blocks
+        : [];
+      const payloadToSave: Partial<Product> = { ...editingProduct };
+
+      // Đồng bộ ngược từ detail_blocks sang các cột cấp cao nhất để tương thích hoàn toàn
+      const heroBlock = blocks.find((b) => b.type === 'product_hero');
+      if (heroBlock?.config) {
+        const hCfg = heroBlock.config as ProductHeroBlockConfig;
+        if (hCfg.image_url) payloadToSave.thumbnail_url = hCfg.image_url;
+        if (Array.isArray(hCfg.specs) && hCfg.specs.length > 0) {
+          payloadToSave.specs = hCfg.specs;
+        }
+      }
+
+      const introBlock = blocks.find((b) => b.type === 'product_intro');
+      if (introBlock?.config) {
+        const iCfg = introBlock.config as ProductIntroBlockConfig;
+        if (Array.isArray(iCfg.paragraphs) && iCfg.paragraphs.length > 0) {
+          payloadToSave.short_desc = iCfg.paragraphs[0];
+        }
+        if (Array.isArray(iCfg.bullets) && iCfg.bullets.length > 0) {
+          payloadToSave.features = iCfg.bullets.map((b) => b.text).filter(Boolean);
+        }
+      }
+
+      const topicBlock = blocks.find((b) => b.type === 'topic_accordion');
+      if (topicBlock?.config) {
+        const tCfg = topicBlock.config as TopicAccordionBlockConfig;
+        const firstAcc = (tCfg.accordions || [])[0];
+        if (firstAcc && Array.isArray(firstAcc.items) && firstAcc.items.length > 0) {
+          payloadToSave.topics = firstAcc.items;
+        }
+      }
+
+      const sampleBlock = blocks.find((b) => b.type === 'sample_groups');
+      if (sampleBlock?.config) {
+        const sCfg = sampleBlock.config as SampleGroupsBlockConfig;
+        const allImages = (sCfg.groups || []).flatMap((g) => g.images || []).filter(Boolean);
+        if (allImages.length > 0) {
+          payloadToSave.preview_images = allImages;
+        }
+      }
+
+      const res = await apiClient.upsertProduct(payloadToSave);
       showToast(res.message);
       await loadOverview();
       await refreshCatalog();
-      setEditingProduct(res.product);
+      setEditingProduct({
+        ...res.product,
+        detail_blocks:
+          Array.isArray(res.product.detail_blocks) && res.product.detail_blocks.length > 0
+            ? res.product.detail_blocks
+            : blocks,
+      });
     } catch (err: any) {
       showToast(err?.message || 'Lỗi lưu sản phẩm.');
     } finally {
@@ -931,7 +993,26 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4. Cấu hình Chế độ Đọc thử (PDF hoặc Ảnh dọc) & Watermark Bắt buộc */}
+              {/* 4. Trình thiết kế Bố cục Động Trang cấp 2 (6 Phần chuẩn huytutor.io.vn) */}
+              <AdminProductDetailBuilder
+                product={editingProduct}
+                allProducts={products}
+                onChangeBlocks={(nextBlocks) =>
+                  setEditingProduct((prev) => ({
+                    ...prev,
+                    detail_blocks: nextBlocks,
+                  }))
+                }
+                showToast={showToast}
+              />
+
+              {/* 5. Các trường dữ liệu cơ sở mở rộng (Thu gọn mặc định, tự động đồng bộ từ 6 Phần trên) */}
+              <details className="border border-gray-200 rounded-md bg-gray-50/40 p-3">
+                <summary className="text-xs font-extrabold text-gray-600 cursor-pointer select-none">
+                  Cấu hình nâng cao / Trường dữ liệu cơ sở (Tự động đồng bộ từ Trình thiết kế 6 Phần)
+                </summary>
+                <div className="pt-3 space-y-4">
+              {/* 4b. Cấu hình Chế độ Đọc thử (PDF hoặc Ảnh dọc) & Watermark */}
               <div className="border border-gray-200 rounded-md p-4 space-y-3 bg-gray-50/60">
                 <div className="text-xs font-extrabold text-[#e60049] uppercase">
                   Chế độ Đọc thử (Chỉ hiển thị 1 chế độ duy nhất) &amp; Watermark Bản quyền
@@ -1059,14 +1140,17 @@ export const AdminPage: React.FC = () => {
                             </span>
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                if (url) {
+                                  apiClient.deleteR2File(url).catch(() => {});
+                                }
                                 setEditingProduct((prev) => ({
                                   ...prev,
                                   preview_images: (prev.preview_images || []).filter(
                                     (_, i) => i !== idx
                                   ),
-                                }))
-                              }
+                                }));
+                              }}
                               className="text-[#e60049] font-bold ml-2"
                             >
                               Xóa
@@ -1217,6 +1301,8 @@ export const AdminPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+                </div>
+              </details>
 
               <button
                 type="submit"

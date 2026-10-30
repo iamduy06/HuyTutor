@@ -216,6 +216,129 @@ export interface ProductSpec {
   val: string;
 }
 
+/**
+ * ============================================================================
+ * CẤU HÌNH 6 LOẠI KHỐI ĐỘNG CHO TRANG CẤP 2 (PRODUCT DETAIL PAGE BUILDER)
+ * ============================================================================
+ */
+
+// Phần 1: Khối Đầu trang & Mua hàng (product_hero)
+export interface ProductHeroBlockConfig {
+  image_mode?: 'standalone' | 'card_box';
+  image_url?: string;
+  badge_text?: string;
+  cover_tag?: string;
+  title?: string;
+  price_override_text?: string;
+  show_format_selector?: boolean;
+  specs?: ProductSpec[];
+  primary_cta_text?: string;
+  primary_cta_action?: 'buy_now' | 'add_to_cart' | 'custom_link';
+  primary_cta_link?: string;
+  show_add_to_cart_button?: boolean;
+  secondary_cta_text?: string;
+  secondary_cta_link?: string;
+  is_active?: boolean;
+}
+
+// Phần 2: Khối Giới thiệu & Điểm nổi bật (product_intro)
+export interface ProductIntroBulletItem {
+  id: string;
+  text: string;
+  is_highlight?: boolean;
+}
+
+export interface ProductIntroBlockConfig {
+  bg_style?: 'gray' | 'white';
+  paragraphs?: string[];
+  bullets_title?: string;
+  bullets?: ProductIntroBulletItem[];
+  is_active?: boolean;
+}
+
+// Phần 3: Khối Tiêu đề Xem thử, Thanh nhảy nhanh & Danh sách chủ đề thu gọn (topic_accordion)
+export interface TopicAccordionBox {
+  id: string;
+  title: string;
+  default_open?: boolean;
+  items: string[];
+}
+
+export interface TopicAccordionBlockConfig {
+  section_heading?: string;
+  show_quick_anchor_nav?: boolean;
+  accordions?: TopicAccordionBox[];
+  is_active?: boolean;
+}
+
+// Phần 4: Khối Các Nhóm Đọc Thử Đa Phân Mục (sample_groups)
+export interface SamplePreviewGroup {
+  id: string;
+  title: string;
+  description?: string;
+  media_type: 'images' | 'pdf';
+  images: string[];
+  pdf_url?: string;
+  watermark_enabled?: boolean;
+  watermark_text?: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface SampleGroupsBlockConfig {
+  groups: SamplePreviewGroup[];
+  is_active?: boolean;
+}
+
+// Phần 5: Khối Lời cảm ơn & Đặt hàng cuối trang (bottom_cta)
+export interface BottomCtaBlockConfig {
+  thank_you_text?: string;
+  sub_text?: string;
+  primary_button_text?: string;
+  primary_button_action?: 'buy_now' | 'add_to_cart' | 'custom_link';
+  primary_button_link?: string;
+  secondary_link_text?: string;
+  secondary_link_url?: string;
+  is_active?: boolean;
+}
+
+// Phần 6: Khối Sản phẩm gợi ý / Nhiều Thầy/Cô cũng chọn (related_products)
+export interface RelatedProductCustomCard {
+  id: string;
+  display_title: string;
+  image_url: string;
+  badge_text?: string;
+  tag_text?: string;
+  button_text?: string;
+  target_url: string;
+  is_active: boolean;
+}
+
+export interface RelatedProductsBlockConfig {
+  title?: string;
+  mode: 'auto' | 'manual';
+  max_items?: number;
+  items?: RelatedProductCustomCard[];
+  is_active?: boolean;
+}
+
+export type ProductDetailBlockType =
+  | 'product_hero'
+  | 'product_intro'
+  | 'topic_accordion'
+  | 'sample_groups'
+  | 'bottom_cta'
+  | 'related_products';
+
+export interface ProductDetailBlockItem {
+  id: string;
+  type: ProductDetailBlockType;
+  title_label?: string;
+  is_active: boolean;
+  sort_order: number;
+  config: any;
+}
+
 export interface Product {
   id: string;
   category_id: string;
@@ -243,6 +366,7 @@ export interface Product {
   is_combo_eligible: boolean;
   is_active: boolean;
   formats: ProductFormat[];
+  detail_blocks?: ProductDetailBlockItem[];
 }
 
 export interface CartItem {
