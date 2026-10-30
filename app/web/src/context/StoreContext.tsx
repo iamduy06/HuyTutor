@@ -6,6 +6,7 @@ import {
   ComboRule,
   MenuItem,
   Product,
+  SiteConfigs,
   UiFormatCode,
 } from '../types';
 
@@ -16,6 +17,8 @@ interface StoreContextValue {
   categories: CategoryItem[];
   comboRules: ComboRule[];
   products: Product[];
+  siteConfigs: SiteConfigs;
+  updateSiteConfig: (key: string, value: any) => Promise<void>;
   clientRegion: {
     country: string;
     recommendedGateway: 'sepay' | 'paypal';
@@ -57,6 +60,19 @@ const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'huytutor_cart_v1';
 
+const DEFAULT_SITE_CONFIGS: SiteConfigs = {
+  footer_social_links: [
+    { id: 'facebook', platform: 'facebook', label: 'Facebook Huy Tutor', url: 'https://facebook.com', icon: 'f', is_active: true },
+    { id: 'youtube', platform: 'youtube', label: 'YouTube Huy Tutor', url: 'https://youtube.com', icon: '▶', is_active: true },
+  ],
+  footer_policy_links: [
+    { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
+    { id: 'privacy', label: 'Chính sách bảo mật', url: '/terms-of-service', order_index: 2, is_active: true },
+    { id: 'faq', label: 'Chính sách thanh toán & FAQ', url: '/faq', order_index: 3, is_active: true },
+    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 4, is_active: true },
+  ],
+};
+
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -64,6 +80,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [comboRules, setComboRules] = useState<ComboRule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [siteConfigs, setSiteConfigs] = useState<SiteConfigs>(DEFAULT_SITE_CONFIGS);
   const [clientRegion, setClientRegion] = useState<{
     country: string;
     recommendedGateway: 'sepay' | 'paypal';
@@ -103,6 +120,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCategories(data.categories);
       setComboRules(data.comboRules);
       setProducts(data.products);
+      if (data.siteConfigs) {
+        setSiteConfigs(data.siteConfigs);
+      }
       setClientRegion(data.clientRegion);
     } catch (err: any) {
       setApiError(
@@ -112,6 +132,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const updateSiteConfig = async (key: string, value: any) => {
+    await apiClient.updateSiteConfig(key, value);
+    setSiteConfigs((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   useEffect(() => {
@@ -322,6 +350,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         categories,
         comboRules,
         products,
+        siteConfigs,
+        updateSiteConfig,
         clientRegion,
         setRegionOverride,
         refreshCatalog,

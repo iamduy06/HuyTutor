@@ -6,6 +6,7 @@ import {
   OrderRecord,
   PaymentInstruction,
   Product,
+  SiteConfigs,
   UiFormatCode,
   UserLibraryItem,
   UserProfile,
@@ -212,6 +213,7 @@ export const apiClient = {
     categories: CategoryItem[];
     comboRules: ComboRule[];
     products: Product[];
+    siteConfigs?: SiteConfigs;
     clientRegion: {
       country: string;
       recommendedGateway: 'sepay' | 'paypal';
@@ -220,6 +222,24 @@ export const apiClient = {
   }> {
     const query = countryOverride ? `?country=${countryOverride}` : '';
     return requestJson(`/api/catalog/init${query}`);
+  },
+
+  async updateMenus(menus: MenuItem[]): Promise<{ ok: boolean; menus: MenuItem[] }> {
+    return requestJson('/api/admin/menus', {
+      method: 'PUT',
+      body: JSON.stringify({ menus }),
+    });
+  },
+
+  async getSiteConfigs(): Promise<{ ok: boolean; configs: SiteConfigs }> {
+    return requestJson('/api/admin/configs');
+  },
+
+  async updateSiteConfig(key: string, value: any): Promise<{ ok: boolean; key: string; value: any }> {
+    return requestJson(`/api/admin/configs/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    });
   },
 
   async getProductDetail(slug: string): Promise<{

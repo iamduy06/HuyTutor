@@ -152,16 +152,88 @@ export const INITIAL_MENUS: NavMenu[] = [
   {
     id: 6,
     title: 'TÀI LIỆU HSG',
-    url: '/gifted-students/1400caucumdongtuintermediate',
+    url: '/gifted-students',
     order_index: 6,
     is_active: true,
     children: [
       { id: 61, label: '1400 Cụm Động Từ HSG', url: '/gifted-students/1400caucumdongtuintermediate', order_index: 1, is_highlight: true }
     ]
   },
-  { id: 7, title: 'SOẠN TÀI LIỆU', url: '/#utilities', order_index: 7, is_active: true, children: [] },
-  { id: 8, title: 'CÂU HỎI THƯỜNG GẶP', url: '/#faq-section', order_index: 8, is_active: true, children: [] }
+  { id: 7, title: 'SOẠN TÀI LIỆU', url: '/soan-tai-lieu', order_index: 7, is_active: true, children: [] },
+  {
+    id: 8,
+    title: 'TÀI LIỆU KHÁC',
+    url: '/other',
+    order_index: 8,
+    is_active: true,
+    children: [
+      { id: 81, label: 'Chuyên đề Điền từ', url: '/other#dien-tu', order_index: 1 },
+      { id: 82, label: 'Chuyên đề Ngữ pháp', url: '/other#ngu-phap', order_index: 2 },
+      { id: 83, label: 'Bảng từ vựng tổng hợp', url: '/other#tu-vung', order_index: 3 }
+    ]
+  },
+  {
+    id: 9,
+    title: 'MẪU',
+    url: '/template',
+    order_index: 9,
+    is_active: true,
+    children: [
+      { id: 91, label: 'Mẫu Kế hoạch bài dạy (Giáo án)', url: '/template#giao-an', order_index: 1 },
+      { id: 92, label: 'Mẫu Đề thi theo ma trận', url: '/template#de-thi', order_index: 2 },
+      { id: 93, label: 'Mẫu Bảng kiểm đánh giá', url: '/template#bang-kiem', order_index: 3 }
+    ]
+  },
+  {
+    id: 10,
+    title: 'TÀI LIỆU MIỄN PHÍ',
+    url: '/gifts',
+    order_index: 10,
+    is_active: true,
+    children: [
+      { id: 101, label: 'Đề thi học kỳ miễn phí', url: '/gifts#de-thi', order_index: 1 },
+      { id: 102, label: 'Cẩm nang từ vựng miễn phí', url: '/gifts#cam-nang', order_index: 2 },
+      { id: 103, label: 'Tài liệu đọc thử trích đoạn', url: '/gifts#doc-thu', order_index: 3 }
+    ]
+  },
+  { id: 11, title: 'HC REWARDS', url: '/hc-rewards', order_index: 11, is_active: true, children: [] },
+  { id: 12, title: 'CÂU HỎI THƯỜNG GẶP', url: '/faq', order_index: 12, is_active: true, children: [] }
 ];
+
+export interface FooterSocialLink {
+  id: string;
+  platform: string;
+  label: string;
+  url: string;
+  icon: string;
+  is_active: boolean;
+}
+
+export interface FooterPolicyLink {
+  id: string;
+  label: string;
+  url: string;
+  order_index: number;
+  is_active: boolean;
+}
+
+export interface SiteConfigs {
+  footer_social_links: FooterSocialLink[];
+  footer_policy_links: FooterPolicyLink[];
+}
+
+export const INITIAL_SITE_CONFIGS: SiteConfigs = {
+  footer_social_links: [
+    { id: 'facebook', platform: 'facebook', label: 'Facebook Huy Tutor', url: 'https://facebook.com', icon: 'f', is_active: true },
+    { id: 'youtube', platform: 'youtube', label: 'YouTube Huy Tutor', url: 'https://youtube.com', icon: '▶', is_active: true }
+  ],
+  footer_policy_links: [
+    { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
+    { id: 'privacy', label: 'Chính sách bảo mật', url: '/terms-of-service', order_index: 2, is_active: true },
+    { id: 'faq', label: 'Chính sách thanh toán & FAQ', url: '/faq', order_index: 3, is_active: true },
+    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 4, is_active: true }
+  ]
+};
 
 export const INITIAL_CATEGORIES: CategoryRecord[] = [
   {

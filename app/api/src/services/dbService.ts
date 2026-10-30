@@ -7,8 +7,20 @@ import {
   INITIAL_COMBO_RULES,
   INITIAL_PRODUCTS,
   INITIAL_ORDERS,
+  INITIAL_SITE_CONFIGS,
+  SiteConfigs,
+  FooterSocialLink,
+  FooterPolicyLink,
 } from '../config/seedData';
 import { UiFormatCode } from '../constants/formatMapping';
+
+export interface SeedMenuItem {
+  id: string;
+  label: string;
+  url: string;
+  order_index: number;
+  is_highlight?: boolean;
+}
 
 export interface SeedMenu {
   id: string;
@@ -17,6 +29,7 @@ export interface SeedMenu {
   parent_id: string | null;
   sort_order: number;
   is_active: boolean;
+  children?: SeedMenuItem[];
 }
 
 export interface SeedCategory {
@@ -164,6 +177,7 @@ export interface DbState {
   users: SeedUser[];
   user_sessions: SeedUserSession[];
   user_library: SeedUserLibraryItem[];
+  site_configs: SiteConfigs;
 }
 
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -498,6 +512,13 @@ function buildNormalizedSeedState(): DbState {
     parent_id: null,
     sort_order: m.order_index,
     is_active: m.is_active,
+    children: m.children?.map((c) => ({
+      id: String(c.id),
+      label: c.label,
+      url: c.url,
+      order_index: c.order_index,
+      is_highlight: c.is_highlight,
+    })) || [],
   }));
 
   const extraCategories: SeedCategory[] = [
@@ -680,11 +701,34 @@ function buildNormalizedSeedState(): DbState {
     users: [defaultAdminUser],
     user_sessions: [],
     user_library: [],
+    site_configs: INITIAL_SITE_CONFIGS,
   };
 }
 
 function ensureAuthArraysInState(parsed: DbState): boolean {
   let mutated = false;
+  if (!parsed.site_configs) {
+    parsed.site_configs = { ...INITIAL_SITE_CONFIGS };
+    mutated = true;
+  }
+  if (!parsed.menus || parsed.menus.length < 12 || !parsed.menus[3]?.children || parsed.menus[3].children.length === 0) {
+    parsed.menus = INITIAL_MENUS.map((m) => ({
+      id: String(m.id),
+      title: m.title,
+      slug: m.url,
+      parent_id: null,
+      sort_order: m.order_index,
+      is_active: m.is_active,
+      children: m.children?.map((c) => ({
+        id: String(c.id),
+        label: c.label,
+        url: c.url,
+        order_index: c.order_index,
+        is_highlight: c.is_highlight,
+      })) || [],
+    }));
+    mutated = true;
+  }
   if (!Array.isArray(parsed.users)) {
     parsed.users = [];
     mutated = true;
@@ -766,13 +810,57 @@ function saveLocalDb(state: DbState): void {
 export const dbService = {
   async getMenus(includeInactive = false): Promise<SeedMenu[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
-      let query = supabaseAdmin.from('menus').select('*').order('sort_order', { ascending: true });
-      if (!includeInactive) {
-        query = query.eq('is_active', true);
-      }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return data as SeedMenu[];
+      try {
+        let query = supabaseAdmin
+          .from('navigation_menus')
+          .select('id, title, url, order_index, is_active, navigation_items(id, label, url, order_index, is_highlight, is_active)')
+          .order('order_index', { ascending: true });
+        if (!includeInactive) {
+          query = query.eq('is_active', true);
+        }
+        const { data, error } = await query;
+        if (!error && data && data.length < 12) {
+          // Tự động nâng cấp đủ 12 menu chuẩn đa cấp cho database
+          const normalized12: SeedMenu[] = INITIAL_MENUS.map((m) => ({
+            id: String(m.id),
+            title: m.title,
+            slug: m.url,
+            parent_id: null,
+            sort_order: m.order_index,
+            is_active: m.is_active,
+            children: m.children?.map((c) => ({
+              id: String(c.id),
+              label: c.label,
+              url: c.url,
+              order_index: c.order_index,
+              is_highlight: c.is_highlight,
+            })) || [],
+          }));
+          await this.updateMenus(normalized12);
+          return normalized12.filter((m) => includeInactive || m.is_active);
+        }
+        if (!error && data && data.length > 0) {
+          return data.map((m: any) => ({
+            id: String(m.id),
+            title: m.title,
+            slug: m.url,
+            parent_id: null,
+            sort_order: m.order_index,
+            is_active: m.is_active,
+            children: (m.navigation_items || [])
+              .filter((sub: any) => includeInactive || sub.is_active)
+              .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+              .map((sub: any) => ({
+                id: String(sub.id),
+                label: sub.label,
+                url: sub.url,
+                order_index: sub.order_index || 0,
+                is_highlight: Boolean(sub.is_highlight),
+              })),
+          })) as SeedMenu[];
+        }
+      } catch {
+        // Fallback to local
       }
     }
     const db = loadLocalDb();
@@ -782,21 +870,85 @@ export const dbService = {
 
   async updateMenus(menus: SeedMenu[]): Promise<SeedMenu[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
-      for (const m of menus) {
-        await supabaseAdmin.from('menus').upsert({
-          id: m.id,
-          title: m.title,
-          slug: m.slug,
-          parent_id: m.parent_id,
-          sort_order: m.sort_order,
-          is_active: m.is_active,
-        });
+      try {
+        for (const m of menus) {
+          const numId = Number(m.id);
+          const menuId = !isNaN(numId) ? numId : undefined;
+          const { data: upsertedMenu } = await supabaseAdmin.from('navigation_menus').upsert({
+            ...(menuId ? { id: menuId } : {}),
+            title: m.title,
+            url: m.slug,
+            order_index: m.sort_order,
+            is_active: m.is_active,
+          }).select().single();
+
+          if (upsertedMenu && Array.isArray(m.children)) {
+            await supabaseAdmin.from('navigation_items').delete().eq('menu_id', upsertedMenu.id);
+            if (m.children.length > 0) {
+              await supabaseAdmin.from('navigation_items').insert(
+                m.children.map((sub, idx) => ({
+                  menu_id: upsertedMenu.id,
+                  label: sub.label,
+                  url: sub.url,
+                  order_index: sub.order_index || idx + 1,
+                  is_highlight: Boolean(sub.is_highlight),
+                  is_active: true,
+                }))
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[dbService] Error updating navigation_menus in Supabase:', err);
       }
     }
     const db = loadLocalDb();
     db.menus = menus;
     saveLocalDb(db);
     return db.menus;
+  },
+
+  async getSiteConfigs(): Promise<SiteConfigs> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin.from('site_configs').select('*');
+        if (!error && data && data.length > 0) {
+          const configMap: Record<string, any> = {};
+          for (const row of data) {
+            configMap[row.key] = row.value;
+          }
+          return {
+            footer_social_links: configMap['footer_social_links'] || INITIAL_SITE_CONFIGS.footer_social_links,
+            footer_policy_links: configMap['footer_policy_links'] || INITIAL_SITE_CONFIGS.footer_policy_links,
+          };
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    const db = loadLocalDb();
+    return db.site_configs || INITIAL_SITE_CONFIGS;
+  },
+
+  async updateSiteConfig(key: string, value: any): Promise<any> {
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        await supabaseAdmin.from('site_configs').upsert({
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error('[dbService] Error updating site_configs in Supabase:', err);
+      }
+    }
+    const db = loadLocalDb();
+    if (!db.site_configs) {
+      db.site_configs = { ...INITIAL_SITE_CONFIGS };
+    }
+    (db.site_configs as any)[key] = value;
+    saveLocalDb(db);
+    return (db.site_configs as any)[key];
   },
 
   async getCategories(): Promise<SeedCategory[]> {

@@ -23,6 +23,14 @@ export const FORMAT_TO_GOOGLE_FORM_MAP: Record<UiFormatCode, GoogleFormNoteValue
   'Thiết kế': 'Thiết kế',
 };
 
+export interface MenuItemChild {
+  id: string;
+  label: string;
+  url: string;
+  order_index?: number;
+  is_highlight?: boolean;
+}
+
 export interface MenuItem {
   id: string;
   title: string;
@@ -30,6 +38,29 @@ export interface MenuItem {
   parent_id: string | null;
   sort_order: number;
   is_active: boolean;
+  children?: MenuItemChild[];
+}
+
+export interface FooterSocialLink {
+  id: string;
+  platform: string;
+  label: string;
+  url: string;
+  icon: string;
+  is_active: boolean;
+}
+
+export interface FooterPolicyLink {
+  id: string;
+  label: string;
+  url: string;
+  order_index: number;
+  is_active: boolean;
+}
+
+export interface SiteConfigs {
+  footer_social_links: FooterSocialLink[];
+  footer_policy_links: FooterPolicyLink[];
 }
 
 export interface CategoryItem {

@@ -5,8 +5,12 @@ import { useStore } from '../context/StoreContext';
 import {
   AdminUserRecord,
   CategoryItem,
+  FooterPolicyLink,
+  FooterSocialLink,
   FORMAT_TO_GOOGLE_FORM_MAP,
   formatVnd,
+  MenuItem,
+  MenuItemChild,
   OrderRecord,
   Product,
   ProductFormat,
@@ -24,11 +28,17 @@ const DEFAULT_FORMATS: ProductFormat[] = [
 ];
 
 export const AdminPage: React.FC = () => {
-  const { refreshCatalog, showToast } = useStore();
+  const {
+    menus: storeMenus,
+    siteConfigs,
+    updateSiteConfig,
+    refreshCatalog,
+    showToast,
+  } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'mapping' | 'users'>(
-    'products'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'products' | 'orders' | 'mapping' | 'users' | 'configs'
+  >('products');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -46,6 +56,64 @@ export const AdminPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
+
+  // State cho Tab 5: Cấu hình Menu Header & Footer
+  const [adminMenus, setAdminMenus] = useState<MenuItem[]>([]);
+  const [adminSocials, setAdminSocials] = useState<FooterSocialLink[]>([]);
+  const [adminPolicies, setAdminPolicies] = useState<FooterPolicyLink[]>([]);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    if (storeMenus && storeMenus.length > 0) {
+      setAdminMenus(storeMenus);
+    }
+  }, [storeMenus]);
+
+  useEffect(() => {
+    if (siteConfigs?.footer_social_links) {
+      setAdminSocials(siteConfigs.footer_social_links);
+    }
+    if (siteConfigs?.footer_policy_links) {
+      setAdminPolicies(siteConfigs.footer_policy_links);
+    }
+  }, [siteConfigs]);
+
+  const handleSaveMenus = async () => {
+    setSavingConfig(true);
+    try {
+      await apiClient.updateMenus(adminMenus);
+      await refreshCatalog();
+      showToast('Đã lưu cấu hình danh sách Menu Header thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi lưu cấu hình Menu Header.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleSaveSocials = async () => {
+    setSavingConfig(true);
+    try {
+      await updateSiteConfig('footer_social_links', adminSocials);
+      showToast('Đã lưu cấu hình Mạng xã hội Footer thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi lưu cấu hình Mạng xã hội.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleSavePolicies = async () => {
+    setSavingConfig(true);
+    try {
+      await updateSiteConfig('footer_policy_links', adminPolicies);
+      showToast('Đã lưu cấu hình Liên kết chính sách Footer thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi lưu cấu hình Chính sách.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   // State cho Form Thêm mới / Chỉnh sửa Sản phẩm
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({
@@ -438,6 +506,17 @@ export const AdminPage: React.FC = () => {
             }`}
           >
             4. Quản lý Thành viên, Phân quyền &amp; Session ({adminUsers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('configs')}
+            className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
+              activeTab === 'configs'
+                ? 'bg-[#e60049] text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
+            }`}
+          >
+            5. Cấu hình Menu Header &amp; Footer ({adminMenus.length})
           </button>
         </div>
 
@@ -1385,6 +1464,414 @@ export const AdminPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: CẤU HÌNH MENU HEADER & FOOTER */}
+        {activeTab === 'configs' && (
+          <div className="space-y-6">
+            {/* 1. Cấu hình Menu Header */}
+            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
+                    1. Cấu hình Danh sách Menu Header (100% Dynamic)
+                  </h2>
+                  <p className="text-xs text-gray-600">
+                    Toàn bộ menu trên thanh điều hướng chính và mobile nav được đồng bộ động từ cơ sở dữ liệu.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = String(Date.now());
+                      setAdminMenus((prev) => [
+                        ...prev,
+                        {
+                          id: newId,
+                          title: 'MENU MỚI',
+                          slug: '/new-menu',
+                          parent_id: null,
+                          sort_order: prev.length + 1,
+                          is_active: true,
+                          children: [],
+                        },
+                      ]);
+                    }}
+                    className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3 py-1.5 rounded-sm transition"
+                  >
+                    + Thêm mục Menu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveMenus}
+                    disabled={savingConfig}
+                    className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50"
+                  >
+                    {savingConfig ? 'Đang lưu...' : 'Lưu Danh Sách Menu'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-gray-200">
+                  <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                    <tr>
+                      <th className="border border-gray-200 p-2.5 w-16 text-center">Thứ tự</th>
+                      <th className="border border-gray-200 p-2.5">Tiêu đề Menu</th>
+                      <th className="border border-gray-200 p-2.5">Đường dẫn (Slug/URL)</th>
+                      <th className="border border-gray-200 p-2.5">Menu con (Submenus)</th>
+                      <th className="border border-gray-200 p-2.5 w-24 text-center">Hiển thị</th>
+                      <th className="border border-gray-200 p-2.5 w-20 text-center">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminMenus.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="number"
+                            value={item.sort_order}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setAdminMenus((prev) =>
+                                prev.map((m, i) => (i === idx ? { ...m, sort_order: val } : m))
+                              );
+                            }}
+                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={item.title}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminMenus((prev) =>
+                                prev.map((m, i) => (i === idx ? { ...m, title: val } : m))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-semibold"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={item.slug}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminMenus((prev) =>
+                                prev.map((m, i) => (i === idx ? { ...m, slug: val } : m))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs text-gray-700 font-mono"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <span className="text-[11px] text-gray-600 font-medium">
+                            {item.children && item.children.length > 0
+                              ? `${item.children.length} mục con (${item.children.map((c) => c.label).slice(0, 2).join(', ')}${item.children.length > 2 ? '...' : ''})`
+                              : 'Không có'}
+                          </span>
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={item.is_active}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setAdminMenus((prev) =>
+                                prev.map((m, i) => (i === idx ? { ...m, is_active: checked } : m))
+                              );
+                            }}
+                            className="w-4 h-4 text-[#e60049] rounded"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminMenus((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. Cấu hình Mạng Xã Hội Footer */}
+            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
+                    2. Cấu hình Đường dẫn Mạng xã hội Footer
+                  </h2>
+                  <p className="text-xs text-gray-600">
+                    Quản lý liên kết các kênh mạng xã hội chính thức (Facebook, YouTube, TikTok, Zalo) hiển thị ở góc Footer.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = String(Date.now());
+                      setAdminSocials((prev) => [
+                        ...prev,
+                        {
+                          id: newId,
+                          platform: 'custom',
+                          label: 'Kênh mới',
+                          url: 'https://',
+                          icon: '★',
+                          is_active: true,
+                        },
+                      ]);
+                    }}
+                    className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3 py-1.5 rounded-sm transition"
+                  >
+                    + Thêm Kênh MXH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveSocials}
+                    disabled={savingConfig}
+                    className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50"
+                  >
+                    {savingConfig ? 'Đang lưu...' : 'Lưu Cấu Hình Mạng Xã Hội'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-gray-200">
+                  <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                    <tr>
+                      <th className="border border-gray-200 p-2.5 w-28">Nền tảng</th>
+                      <th className="border border-gray-200 p-2.5 w-48">Tên hiển thị</th>
+                      <th className="border border-gray-200 p-2.5">Đường dẫn (URL chính thức)</th>
+                      <th className="border border-gray-200 p-2.5 w-20 text-center">Biểu tượng</th>
+                      <th className="border border-gray-200 p-2.5 w-24 text-center">Kích hoạt</th>
+                      <th className="border border-gray-200 p-2.5 w-20 text-center">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminSocials.map((soc, idx) => (
+                      <tr key={soc.id || idx} className="hover:bg-gray-50">
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={soc.platform}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminSocials((prev) =>
+                                prev.map((s, i) => (i === idx ? { ...s, platform: val } : s))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={soc.label}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminSocials((prev) =>
+                                prev.map((s, i) => (i === idx ? { ...s, label: val } : s))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={soc.url}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminSocials((prev) =>
+                                prev.map((s, i) => (i === idx ? { ...s, url: val } : s))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="text"
+                            value={soc.icon}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminSocials((prev) =>
+                                prev.map((s, i) => (i === idx ? { ...s, icon: val } : s))
+                              );
+                            }}
+                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={soc.is_active}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setAdminSocials((prev) =>
+                                prev.map((s, i) => (i === idx ? { ...s, is_active: checked } : s))
+                              );
+                            }}
+                            className="w-4 h-4 text-[#e60049] rounded"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminSocials((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3. Cấu hình Liên kết Chính sách & Hỗ trợ Footer */}
+            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
+                    3. Cấu hình Liên kết Chính sách &amp; Hỗ trợ Footer
+                  </h2>
+                  <p className="text-xs text-gray-600">
+                    Quản lý danh sách các liên kết Điều khoản sử dụng, Chính sách bảo mật, FAQ và Donate hiển thị ở cột 3 Footer.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = String(Date.now());
+                      setAdminPolicies((prev) => [
+                        ...prev,
+                        {
+                          id: newId,
+                          label: 'Chính sách mới',
+                          url: '/terms-of-service',
+                          order_index: prev.length + 1,
+                          is_active: true,
+                        },
+                      ]);
+                    }}
+                    className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3 py-1.5 rounded-sm transition"
+                  >
+                    + Thêm Liên Kết
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePolicies}
+                    disabled={savingConfig}
+                    className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50"
+                  >
+                    {savingConfig ? 'Đang lưu...' : 'Lưu Cấu Hình Chính Sách'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-gray-200">
+                  <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                    <tr>
+                      <th className="border border-gray-200 p-2.5 w-16 text-center">Thứ tự</th>
+                      <th className="border border-gray-200 p-2.5 w-60">Tên liên kết (Label)</th>
+                      <th className="border border-gray-200 p-2.5">Đường dẫn trang (URL)</th>
+                      <th className="border border-gray-200 p-2.5 w-24 text-center">Hiển thị</th>
+                      <th className="border border-gray-200 p-2.5 w-20 text-center">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminPolicies.map((pol, idx) => (
+                      <tr key={pol.id || idx} className="hover:bg-gray-50">
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="number"
+                            value={pol.order_index}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setAdminPolicies((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, order_index: val } : p))
+                              );
+                            }}
+                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={pol.label}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminPolicies((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, label: val } : p))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-semibold"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2">
+                          <input
+                            type="text"
+                            value={pol.url}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdminPolicies((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, url: val } : p))
+                              );
+                            }}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={pol.is_active}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setAdminPolicies((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, is_active: checked } : p))
+                              );
+                            }}
+                            className="w-4 h-4 text-[#e60049] rounded"
+                          />
+                        </td>
+                        <td className="border border-gray-200 p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminPolicies((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

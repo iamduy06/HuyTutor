@@ -10,11 +10,12 @@ export const catalogController = {
    */
   async getInitData(req: Request, res: Response): Promise<void> {
     try {
-      const [menus, categories, comboRules, products] = await Promise.all([
+      const [menus, categories, comboRules, products, siteConfigs] = await Promise.all([
         dbService.getMenus(false),
         dbService.getCategories(),
         dbService.getComboRules(),
         dbService.getProducts({ includeInactive: false }),
+        dbService.getSiteConfigs(),
       ]);
 
       res.json({
@@ -23,6 +24,7 @@ export const catalogController = {
         categories,
         comboRules,
         products,
+        siteConfigs,
         clientRegion: {
           country: req.clientCountry || 'VN',
           recommendedGateway: req.recommendedGateway || 'sepay',

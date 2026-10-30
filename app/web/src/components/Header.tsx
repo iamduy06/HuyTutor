@@ -18,16 +18,10 @@ export const Header: React.FC = () => {
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  const defaultMenus = [
-    { id: '1', title: 'TRANG CHỦ', slug: '/' },
-    { id: '2', title: 'FLASHCARD', slug: '/flashcard' },
-    { id: '3', title: 'COMBO THPT', slug: '/combo-thpt' },
-    { id: '4', title: 'TÀI LIỆU THPT', slug: '/high-school' },
-    { id: '5', title: 'TÀI LIỆU THCS', slug: '/secondary-school' },
-    { id: '6', title: 'TÀI LIỆU HSG', slug: '/gifted-students' },
-  ];
-
-  const navItems = menus.length > 0 ? menus.slice(0, 6) : defaultMenus;
+  // Chỉ lấy các menu đang kích hoạt, sắp xếp theo sort_order
+  const activeMenus = (menus.length > 0 ? menus : [])
+    .filter((m) => m.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
 
   const isPathActive = (slug: string) => {
     if (slug === '/') return location.pathname === '/';
@@ -53,54 +47,61 @@ export const Header: React.FC = () => {
             />
           </Link>
 
-          {/* Navigation Menu (100% Dynamic from Backend API) */}
-          <nav className="hidden xl:flex items-center gap-4 text-[11px] font-semibold text-gray-700 tracking-tight">
-            {navItems.map((item) => {
+          {/* Navigation Menu (100% Dynamic từ Backend Database - Zero-Hardcode) */}
+          <nav className="hidden xl:flex items-center gap-3.5 text-[11px] font-semibold text-gray-700 tracking-tight">
+            {activeMenus.map((item) => {
               const active = isPathActive(item.slug);
-              const hasCaret =
-                item.slug.includes('school') || item.slug.includes('students');
+              const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+
+              if (hasChildren) {
+                return (
+                  <div key={item.id} className="relative group">
+                    <Link
+                      to={item.slug}
+                      className={
+                        active
+                          ? 'text-[#e60049] font-bold flex items-center gap-0.5 py-4 cursor-pointer'
+                          : 'hover:text-[#e60049] transition flex items-center gap-0.5 py-4 cursor-pointer'
+                      }
+                    >
+                      {item.title}
+                      <span className="text-[9px]">▾</span>
+                    </Link>
+
+                    {/* Submenu Dropdown */}
+                    <div className="absolute left-0 top-full -mt-1 hidden group-hover:block bg-white border border-gray-200 rounded-md shadow-xl py-1.5 min-w-[220px] z-50">
+                      {item.children!.map((sub) => (
+                        <Link
+                          key={sub.id}
+                          to={sub.url}
+                          className={`block px-3.5 py-2 text-xs transition ${
+                            sub.is_highlight
+                              ? 'text-[#e60049] font-bold bg-[#fff5f7] hover:bg-pink-100'
+                              : 'text-gray-700 hover:text-[#e60049] hover:bg-gray-50'
+                          }`}
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.id}
                   to={item.slug}
                   className={
                     active
-                      ? 'text-[#e60049] font-bold flex items-center gap-0.5'
-                      : 'hover:text-[#e60049] transition flex items-center gap-0.5'
+                      ? 'text-[#e60049] font-bold flex items-center gap-0.5 py-4'
+                      : 'hover:text-[#e60049] transition flex items-center gap-0.5 py-4'
                   }
                 >
                   {item.title}
-                  {hasCaret && <span className="text-[9px]">▾</span>}
                 </Link>
               );
             })}
-            <Link to="/soan-tai-lieu" className="hover:text-[#e60049] transition">
-              SOẠN TÀI LIỆU
-            </Link>
-            <Link
-              to="/other"
-              className="hover:text-[#e60049] transition flex items-center gap-0.5"
-            >
-              TÀI LIỆU KHÁC <span className="text-[9px]">▾</span>
-            </Link>
-            <Link
-              to="/template"
-              className="hover:text-[#e60049] transition flex items-center gap-0.5"
-            >
-              MẪU <span className="text-[9px]">▾</span>
-            </Link>
-            <Link
-              to="/gifts"
-              className="hover:text-[#e60049] transition flex items-center gap-0.5"
-            >
-              TÀI LIỆU MIỄN PHÍ <span className="text-[9px]">▾</span>
-            </Link>
-            <Link to="/hc-rewards" className="hover:text-[#e60049] transition">
-              HC REWARDS
-            </Link>
-            <Link to="/faq" className="hover:text-[#e60049] transition">
-              CÂU HỎI THƯỜNG GẶP
-            </Link>
           </nav>
 
           {/* Right Tools: Search, Smart Cart & Account */}
@@ -201,9 +202,9 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Quick Nav */}
+        {/* Mobile Quick Nav (100% Dynamic toàn bộ Menu) */}
         <div className="xl:hidden border-t border-gray-100 px-4 py-1.5 flex items-center gap-4 overflow-x-auto text-[11px] font-semibold text-gray-700 whitespace-nowrap">
-          {navItems.map((item) => (
+          {activeMenus.map((item) => (
             <Link
               key={item.id}
               to={item.slug}

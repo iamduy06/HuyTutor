@@ -353,4 +353,50 @@ export const adminController = {
       });
     }
   },
+
+  /**
+   * GET /api/admin/configs
+   * Lấy cấu hình hệ thống (mạng xã hội Footer, liên kết chính sách...)
+   */
+  async getSiteConfigs(_req: Request, res: Response): Promise<void> {
+    try {
+      const configs = await dbService.getSiteConfigs();
+      res.json({
+        ok: true,
+        configs,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải cấu hình hệ thống.',
+      });
+    }
+  },
+
+  /**
+   * PUT /api/admin/configs/:key
+   * Cập nhật một mục cấu hình trong bảng site_configs
+   */
+  async updateSiteConfig(req: Request, res: Response): Promise<void> {
+    try {
+      const key = String(req.params.key || '');
+      const { value } = req.body;
+      if (!key) {
+        res.status(400).json({ ok: false, error: 'Khóa cấu hình (key) không được để trống.' });
+        return;
+      }
+      const updatedValue = await dbService.updateSiteConfig(key, value);
+      res.json({
+        ok: true,
+        key,
+        value: updatedValue,
+        message: `Đã cập nhật cấu hình "${key}" thành công.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi cập nhật cấu hình.',
+      });
+    }
+  },
 };

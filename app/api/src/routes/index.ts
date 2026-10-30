@@ -56,6 +56,8 @@ router.post('/admin/products', adminAuthMiddleware, adminController.upsertProduc
 router.put('/admin/products/:slug', adminAuthMiddleware, adminController.upsertProduct);
 router.delete('/admin/products/:slug', adminAuthMiddleware, adminController.deleteProduct);
 router.put('/admin/menus', adminAuthMiddleware, adminController.updateMenus);
+router.get('/admin/configs', adminAuthMiddleware, adminController.getSiteConfigs);
+router.put('/admin/configs/:key', adminAuthMiddleware, adminController.updateSiteConfig);
 router.post('/admin/upload-presign', adminAuthMiddleware, adminController.createUploadPresign);
 router.post(
   '/admin/upload-file',
