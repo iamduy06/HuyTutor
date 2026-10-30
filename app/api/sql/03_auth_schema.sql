@@ -1,15 +1,16 @@
 -- ====================================================================
 -- FILE: app/api/sql/03_auth_schema.sql
 -- DỰ ÁN: HUY TUTOR (huytutor.edu.vn)
--- MỤC ĐÍCH: BẢNG USERS TỰ CHỦ 100%, PHÂN QUYỀN (ROLE USER & ADMIN) & TỦ SÁCH CÁ NHÂN
--- KIẾN TRÚC: TỰ QUẢN LÝ DỮ LIỆU BẰNG BẢNG PUBLIC.USERS, KHÔNG PHỤ THUỘC VÀO AUTH.USERS
+-- MỤC ĐÍCH: BẢNG USERS TỰ CHỦ 100%, QUẢN LÝ SESSION (USER_SESSIONS),
+--           PHÂN QUYỀN (ROLE USER & ADMIN) & TỦ SÁCH CÁ NHÂN (USER_LIBRARY)
+-- THUẬT TOÁN BĂM MẬT KHẨU: SHA3-256 (crypto.createHash('sha3-256'))
 -- ====================================================================
 
 -- 1. Tạo Bảng Users tự chủ 100% trong schema public
 CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,                  -- Băm một chiều bằng bcryptjs (salt 10)
+  password_hash VARCHAR(64) NOT NULL,           -- Chuỗi băm SHA3-256 (64 ký tự hex)
   full_name VARCHAR(255) NOT NULL,
   phone VARCHAR(50) DEFAULT '',
   role VARCHAR(20) NOT NULL DEFAULT 'user',     -- 'user' hoặc 'admin'
@@ -32,14 +33,30 @@ CREATE TABLE IF NOT EXISTS public.users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
 
--- 2. Cập nhật Bảng Orders liên kết với User ID của public.users
+-- 2. Tạo Bảng Quản lý Phiên đăng nhập (User Sessions)
+CREATE TABLE IF NOT EXISTS public.user_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  session_token VARCHAR(128) NOT NULL UNIQUE,   -- Chuỗi token phiên đăng nhập
+  user_agent TEXT DEFAULT '',                   -- Thiết bị / Trình duyệt đăng nhập
+  ip_address VARCHAR(64) DEFAULT '',            -- Địa chỉ IP đăng nhập
+  is_revoked BOOLEAN NOT NULL DEFAULT false,    -- Trạng thái thu hồi phiên (Logout / Kick thiết bị)
+  expires_at TIMESTAMPTZ NOT NULL,              -- Thời điểm hết hạn phiên
+  last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON public.user_sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON public.user_sessions(user_id);
+
+-- 3. Cập nhật Bảng Orders liên kết với User ID của public.users
 ALTER TABLE public.orders 
 ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_email ON public.orders(customer_email);
 
--- 3. Tạo Bảng Tủ sách cá nhân (User Library - Lưu trữ tài liệu khách đã mua trọn đời)
+-- 4. Tạo Bảng Tủ sách cá nhân (User Library - Lưu trữ tài liệu khách đã mua trọn đời)
 CREATE TABLE IF NOT EXISTS public.user_library (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -59,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.user_library (
 CREATE INDEX IF NOT EXISTS idx_user_library_user_id ON public.user_library(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_library_product_slug ON public.user_library(product_slug);
 
--- 4. Trigger tự động cấp tài liệu vào Tủ sách cá nhân khi đơn hàng hoàn tất thanh toán
+-- 5. Trigger tự động cấp tài liệu vào Tủ sách cá nhân khi đơn hàng hoàn tất thanh toán
 CREATE OR REPLACE FUNCTION public.handle_order_payment_completed()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -124,12 +141,16 @@ CREATE TRIGGER on_order_paid_grant_library
   AFTER UPDATE OF payment_status ON public.orders
   FOR EACH ROW EXECUTE FUNCTION public.handle_order_payment_completed();
 
--- 5. Kích hoạt RLS (Row Level Security) - Bảo vệ Backend độc quyền
+-- 6. Kích hoạt RLS (Row Level Security) - Bảo vệ Backend độc quyền
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_library ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Deny anon access to users" ON public.users;
 CREATE POLICY "Deny anon access to users" ON public.users FOR ALL TO anon USING (false);
+
+DROP POLICY IF EXISTS "Deny anon access to user_sessions" ON public.user_sessions;
+CREATE POLICY "Deny anon access to user_sessions" ON public.user_sessions FOR ALL TO anon USING (false);
 
 DROP POLICY IF EXISTS "Deny anon access to user_library" ON public.user_library;
 CREATE POLICY "Deny anon access to user_library" ON public.user_library FOR ALL TO anon USING (false);
@@ -137,5 +158,21 @@ CREATE POLICY "Deny anon access to user_library" ON public.user_library FOR ALL 
 DROP POLICY IF EXISTS "Service role full access on users" ON public.users;
 CREATE POLICY "Service role full access on users" ON public.users FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service role full access on user_sessions" ON public.user_sessions;
+CREATE POLICY "Service role full access on user_sessions" ON public.user_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Service role full access on user_library" ON public.user_library;
 CREATE POLICY "Service role full access on user_library" ON public.user_library FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- 7. Khởi tạo tài khoản Admin ban đầu (Mật khẩu mặc định: Admin@123 -> SHA3-256)
+INSERT INTO public.users (email, password_hash, full_name, phone, role, customer_group, email_verified, is_active)
+VALUES (
+  'huymdcc@gmail.com',
+  '8e6b8cb7aa0ce9ec3c88a50e42cc9bb51c4aa62fd0fc2a3139fbf713ec7d6eda',
+  'Thầy Huỳnh Thanh Duy (Huy Tutor)',
+  '0358999147',
+  'admin',
+  'Giáo viên',
+  true,
+  true
+) ON CONFLICT (email) DO UPDATE SET role = 'admin';
