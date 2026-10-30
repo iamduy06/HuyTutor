@@ -19,7 +19,7 @@ export const Header: React.FC = () => {
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Chỉ lấy các menu đang kích hoạt, sắp xếp theo sort_order
-  const activeMenus = (menus.length > 0 ? menus : [])
+  const activeMenus = (menus || [])
     .filter((m) => m.is_active)
     .sort((a, b) => a.sort_order - b.sort_order);
 

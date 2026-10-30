@@ -693,9 +693,9 @@ function buildNormalizedSeedState(): DbState {
   };
 
   return {
-    menus,
-    categories,
-    combo_rules,
+    menus: [],
+    categories: [],
+    combo_rules: [],
     products: [],
     orders,
     users: [defaultAdminUser],
@@ -711,22 +711,8 @@ function ensureAuthArraysInState(parsed: DbState): boolean {
     parsed.site_configs = { ...INITIAL_SITE_CONFIGS };
     mutated = true;
   }
-  if (!parsed.menus || parsed.menus.length < 12 || !parsed.menus[3]?.children || parsed.menus[3].children.length === 0) {
-    parsed.menus = INITIAL_MENUS.map((m) => ({
-      id: String(m.id),
-      title: m.title,
-      slug: m.url,
-      parent_id: null,
-      sort_order: m.order_index,
-      is_active: m.is_active,
-      children: m.children?.map((c) => ({
-        id: String(c.id),
-        label: c.label,
-        url: c.url,
-        order_index: c.order_index,
-        is_highlight: c.is_highlight,
-      })) || [],
-    }));
+  if (!Array.isArray(parsed.menus)) {
+    parsed.menus = [];
     mutated = true;
   }
   if (!Array.isArray(parsed.users)) {
