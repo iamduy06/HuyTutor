@@ -11,8 +11,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : 'https://huytutor.edu.vn';
-  const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : 'https://flashcard.huytutor.edu.vn';
+  const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : '/';
+  const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : '';
 
   return (
     <html lang="vi">
@@ -24,8 +24,12 @@ export default function RootLayout({
               <span className="text-xs px-2 py-0.5 rounded-full bg-brand-light text-brand font-semibold">SSO Portal</span>
             </a>
             <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
-              <a href={shopUrl} className="hover:text-brand transition-colors">Tài liệu Shop</a>
-              <a href={flashcardUrl} className="hover:text-brand transition-colors">Flashcard Học tập</a>
+              {shopUrl !== '/' && (
+                <a href={shopUrl} className="hover:text-brand transition-colors">Tài liệu Shop</a>
+              )}
+              {flashcardUrl && (
+                <a href={flashcardUrl} className="hover:text-brand transition-colors">Flashcard Học tập</a>
+              )}
             </div>
           </div>
         </header>

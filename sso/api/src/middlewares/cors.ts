@@ -5,15 +5,12 @@ const configuredOrigins = rawCors
   ? rawCors.split(',').map((o: string) => o.trim()).filter(Boolean)
   : [];
 
-const allowedOrigins: (string | RegExp)[] = [
-  ...configuredOrigins.filter((o: string) => !o.includes('*')),
-  'https://sso.huytutor.edu.vn',
-  'https://flashcard.huytutor.edu.vn',
-  'https://huytutor.edu.vn',
-  'https://www.huytutor.edu.vn',
-  /\.vercel\.app$/,
-  /\.vercel$/,
-];
+const allowedOrigins: (string | RegExp)[] = configuredOrigins.map((o: string) => {
+  if (o.includes('*')) {
+    return new RegExp('^' + o.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+  }
+  return o;
+});
 
 export const corsMiddleware = cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {

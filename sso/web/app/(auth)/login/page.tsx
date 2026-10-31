@@ -58,11 +58,19 @@ function LoginContent() {
       if (redirectUrl) {
         window.location.href = redirectUrl;
       } else if (app === 'flashcard') {
-        const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : 'https://flashcard.huytutor.edu.vn';
-        window.location.href = `${flashcardUrl.replace(/\/+$/, '')}/dashboard`;
+        const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL;
+        if (flashcardUrl) {
+          window.location.href = `${flashcardUrl.replace(/\/+$/, '')}/dashboard`;
+        } else {
+          window.location.href = '/dashboard';
+        }
       } else {
-        const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : 'https://huytutor.edu.vn';
-        window.location.href = shopUrl;
+        const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL;
+        if (shopUrl) {
+          window.location.href = shopUrl;
+        } else {
+          window.location.href = '/';
+        }
       }
     } catch (err: any) {
       console.error('[LOGIN_ERROR]', err);
