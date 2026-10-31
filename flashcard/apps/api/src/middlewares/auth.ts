@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   email: string;
   role: UserRole;
   max_devices?: number | null;
+  device_id?: string;
 }
 
 declare global {
@@ -80,18 +81,29 @@ async function getUserDeviceQuota(admin: any, userId: string, profileMaxDevices?
 }
 
 /**
- * Middleware requiring valid Bearer JWT.
+ * Middleware requiring valid Bearer JWT or Master SSO Cookie.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const cookieHeader = req.headers.cookie;
+  const cookieToken =
+    cookieHeader?.match(/(?:^|;\s*)ht_sso_token=([^;]*)/)?.[1]
+      ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)ht_sso_token=([^;]*)/)![1])
+      : cookieHeader?.match(/(?:^|;\s*)hut_access_token=([^;]*)/)?.[1]
+      ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)hut_access_token=([^;]*)/)![1])
+      : '';
+
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.split(' ')[1]
+    : cookieToken;
+
+  if (!token) {
     return res.status(401).json({
       success: false,
       error: { code: 'UNAUTHORIZED', message: 'Vui lòng đăng nhập để tiếp tục' },
     });
   }
 
-  const token = authHeader.split(' ')[1];
   req.token = token;
 
   // 1. Check in-memory RAM cache
@@ -101,6 +113,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!authUser) {
     let userId: string | null = null;
     let userEmail: string = '';
+    let ssoDeviceId: string | undefined = undefined;
 
     // 2. Validate token via SSO JWT (HS256)
     const ssoSecret = process.env.JWT_SECRET;
@@ -108,6 +121,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (ssoPayload?.sub) {
       userId = ssoPayload.sub;
       userEmail = ssoPayload.email || '';
+      ssoDeviceId = ssoPayload.device_id;
     } else {
       // Fallback: Supabase GoTrue Auth
       try {
@@ -140,6 +154,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       email: userEmail,
       role: (profile?.role as UserRole) ?? 'USER',
       max_devices: profile?.max_devices ?? null,
+      device_id: ssoDeviceId,
     };
 
     // Cache in RAM for 5 minutes
@@ -157,7 +172,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         : '') ||
       (cookieHeader?.match(/(?:^|;\s*)device_id=([^;]*)/)?.[1]
         ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)device_id=([^;]*)/)![1])
-        : '');
+        : '') ||
+      authUser.device_id ||
+      '';
 
     const isRegisterEndpoint =
       (req.originalUrl && req.originalUrl.includes('/register-device')) ||
@@ -237,15 +254,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 /**
- * Middleware optionally verifying Bearer JWT if present.
+ * Middleware optionally verifying Bearer JWT or Master SSO Cookie if present.
  */
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const cookieHeader = req.headers.cookie;
+  const cookieToken =
+    cookieHeader?.match(/(?:^|;\s*)ht_sso_token=([^;]*)/)?.[1]
+      ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)ht_sso_token=([^;]*)/)![1])
+      : cookieHeader?.match(/(?:^|;\s*)hut_access_token=([^;]*)/)?.[1]
+      ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)hut_access_token=([^;]*)/)![1])
+      : '';
+
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.split(' ')[1]
+    : cookieToken;
+
+  if (!token) {
     return next();
   }
 
-  const token = authHeader.split(' ')[1];
   req.token = token;
 
   const cacheKey = `user_token_${token}`;
@@ -257,12 +285,14 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 
   let userId: string | null = null;
   let userEmail: string = '';
+  let ssoDeviceId: string | undefined = undefined;
 
   const ssoSecret = process.env.JWT_SECRET;
   const ssoPayload = ssoSecret ? verifySsoJwt(token, ssoSecret) : null;
   if (ssoPayload?.sub) {
     userId = ssoPayload.sub;
     userEmail = ssoPayload.email || '';
+    ssoDeviceId = ssoPayload.device_id;
   } else {
     try {
       const supabase = getSupabaseClient();
@@ -287,6 +317,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       email: userEmail,
       role: (profile?.role as UserRole) ?? 'USER',
       max_devices: profile?.max_devices ?? null,
+      device_id: ssoDeviceId,
     };
 
     memoryCache.set(cacheKey, authUser, 300);

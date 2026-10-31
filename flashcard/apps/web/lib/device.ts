@@ -7,7 +7,12 @@ export function getDeviceId(): string {
 
   // Lấy từ localStorage nếu đã có
   const stored = localStorage.getItem("hut_device_id");
-  if (stored) return stored;
+  if (stored) {
+    if (typeof document !== "undefined" && !document.cookie.includes("hut_device_id=")) {
+      document.cookie = `hut_device_id=${stored}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+    return stored;
+  }
 
   // Tạo mới từ browser fingerprint
   const parts = [
@@ -27,6 +32,9 @@ export function getDeviceId(): string {
   }
   const id = Math.abs(hash).toString(36) + "-" + Date.now().toString(36);
   localStorage.setItem("hut_device_id", id);
+  if (typeof document !== "undefined") {
+    document.cookie = `hut_device_id=${id}; path=/; max-age=31536000; SameSite=Lax`;
+  }
   return id;
 }
 

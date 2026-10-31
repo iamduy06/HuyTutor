@@ -37,17 +37,26 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(ssoUrl));
       }
 
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", path);
-      return NextResponse.redirect(url);
+      const ssoUrl = `https://sso.huytutor.edu.vn/login?app=flashcard&redirect=${encodeURIComponent(request.url)}`;
+      return NextResponse.redirect(new URL(ssoUrl));
     }
   }
 
-  // 3. Redirect logged-in users away from /login and /register (unless error param is present)
+  // 3. Centralized SSO Redirection for Auth Routes (/login, /register, /forgot-password)
   const hasAuthError = request.nextUrl.searchParams.has("error");
-  if (["/login", "/register"].includes(path) && token && !hasAuthError) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (["/login", "/register", "/forgot-password"].includes(path)) {
+    if (token && !hasAuthError) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (!token && !hasAuthError) {
+      const ssoRoute = path === "/register" ? "register" : path === "/forgot-password" ? "forgot-password" : "login";
+      const nextParam = request.nextUrl.searchParams.get("next");
+      const redirectTarget = nextParam
+        ? (nextParam.startsWith("http") ? nextParam : `https://flashcard.huytutor.edu.vn${nextParam.startsWith("/") ? nextParam : `/${nextParam}`}`)
+        : "https://flashcard.huytutor.edu.vn/dashboard";
+      const ssoUrl = `https://sso.huytutor.edu.vn/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
+      return NextResponse.redirect(new URL(ssoUrl));
+    }
   }
 
   return NextResponse.next();

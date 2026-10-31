@@ -26,6 +26,7 @@ export function SiteHeader() {
 
   async function handleLogout() {
     await logoutApi();
+    window.location.href = "https://sso.huytutor.edu.vn/login?app=flashcard";
   }
 
   const customLogoText = branding?.allow_custom_branding ? branding.header_logo_text : null;
@@ -95,10 +96,14 @@ export function SiteHeader() {
         ) : (
           <>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Đăng nhập</Link>
+              <a href="https://sso.huytutor.edu.vn/login?app=flashcard&redirect=https://flashcard.huytutor.edu.vn/dashboard">
+                Đăng nhập
+              </a>
             </Button>
             <Button variant="brand" size="sm" asChild>
-              <Link href="/register">Đăng ký</Link>
+              <a href="https://sso.huytutor.edu.vn/register?app=flashcard&redirect=https://flashcard.huytutor.edu.vn/dashboard">
+                Đăng ký
+              </a>
             </Button>
           </>
         )}
@@ -106,4 +111,3 @@ export function SiteHeader() {
     </header>
   );
 }
-

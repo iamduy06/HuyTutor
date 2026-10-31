@@ -17,11 +17,16 @@ export async function POST(req: Request) {
   }
 
   const response = NextResponse.json({ success: true });
-  // Clear new HttpOnly cookies
+
+  // Clear Master SSO cookie (.huytutor.edu.vn)
+  response.cookies.set("ht_sso_token", "", { domain: ".huytutor.edu.vn", path: "/", maxAge: 0 });
+  response.cookies.set("ht_sso_token", "", { path: "/", maxAge: 0 });
+
+  // Clear local cookies
   response.cookies.set("hut_access_token", "", { path: "/", maxAge: 0 });
   response.cookies.set("hut_refresh_token", "", { path: "/", maxAge: 0 });
 
-  // Option B: Clean up legacy Supabase cookies if any
+  // Clean up legacy cookies if any
   response.cookies.set("sb-access-token", "", { path: "/", maxAge: 0 });
   response.cookies.set("sb-refresh-token", "", { path: "/", maxAge: 0 });
 

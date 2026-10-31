@@ -59,7 +59,7 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const res = await fetch("/api/me/profile", { headers });
+      const res = await fetch("/api/me/profile", { headers, credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         return data.user as UserProfile;
@@ -111,7 +111,7 @@ export function UserProvider({ children, initialUser }: UserProviderProps) {
 
   // Lắng nghe khi chuyển route (vd từ /login sang /dashboard)
   useEffect(() => {
-    if (!user && getClientToken()) {
+    if (!user) {
       refresh();
     }
   }, [pathname, user, refresh]);

@@ -46,6 +46,7 @@ export async function apiRequest<T>(
 
   const response = await fetch(url, {
     ...options,
+    credentials: options.credentials ?? 'include',
     headers,
     signal: options.signal ?? AbortSignal.timeout(15000),
   });
