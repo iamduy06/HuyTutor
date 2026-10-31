@@ -10,7 +10,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-bricolage",
-  weight: ["400", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
