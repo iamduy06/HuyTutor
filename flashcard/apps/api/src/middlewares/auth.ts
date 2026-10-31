@@ -39,6 +39,47 @@ function verifySsoJwt(token: string, secret: string): any {
 }
 
 /**
+ * Tính toán hạn mức thiết bị tối đa cho người dùng theo phân cấp:
+ * users.max_devices > groups.max_device_per_user > app_settings.global_max_devices > 3
+ */
+async function getUserDeviceQuota(admin: any, userId: string, profileMaxDevices?: number | null): Promise<number> {
+  if (typeof profileMaxDevices === 'number') {
+    return profileMaxDevices;
+  }
+
+  try {
+    const { data: userGroups } = await admin
+      .from('group_users')
+      .select('group_id, groups(max_device_per_user)')
+      .eq('user_id', userId);
+
+    if (userGroups && userGroups.length > 0) {
+      for (const ug of userGroups as any[]) {
+        const quota = ug.groups?.max_device_per_user;
+        if (typeof quota === 'number') {
+          return quota;
+        }
+      }
+    }
+  } catch {}
+
+  try {
+    const { data: setting } = await admin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'global_max_devices')
+      .maybeSingle();
+
+    if (setting?.value) {
+      const parsed = parseInt(setting.value, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch {}
+
+  return 3;
+}
+
+/**
  * Middleware requiring valid Bearer JWT.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -105,30 +146,89 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     memoryCache.set(cacheKey, authUser, 300);
   }
 
-  // 4. SEC-007: Device Binding Verification
-  // Check if client provided X-Device-Id and verify if still active in user_devices
-  const deviceId = (req.headers['x-device-id'] as string)?.trim() || '';
-  const isRegisterEndpoint =
-    (req.originalUrl && req.originalUrl.includes('/register-device')) ||
-    (req.path && req.path.includes('/register-device'));
+  // 4. SEC-007: Device Binding & Flashcard Quota Verification
+  // Admins bypass all device restrictions
+  if (authUser.role !== 'ADMIN') {
+    const cookieHeader = req.headers.cookie;
+    const deviceId =
+      (req.headers['x-device-id'] as string)?.trim() ||
+      (cookieHeader?.match(/(?:^|;\s*)hut_device_id=([^;]*)/)?.[1]
+        ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)hut_device_id=([^;]*)/)![1])
+        : '') ||
+      (cookieHeader?.match(/(?:^|;\s*)device_id=([^;]*)/)?.[1]
+        ? decodeURIComponent(cookieHeader.match(/(?:^|;\s*)device_id=([^;]*)/)![1])
+        : '');
 
-  if (deviceId && authUser.role !== 'ADMIN' && !isRegisterEndpoint) {
-    const admin = getAdminClient();
-    const { data: deviceRecord } = await admin
-      .from('user_devices')
-      .select('id')
-      .eq('user_id', authUser.id)
-      .eq('device_id', deviceId)
-      .maybeSingle();
+    const isRegisterEndpoint =
+      (req.originalUrl && req.originalUrl.includes('/register-device')) ||
+      (req.path && req.path.includes('/register-device'));
 
-    if (!deviceRecord) {
-      return res.status(401).json({
+    if (!deviceId && !isRegisterEndpoint) {
+      return res.status(403).json({
         success: false,
         error: {
-          code: 'DEVICE_REVOKED',
-          message: 'Thiết bị này đã bị Quản trị viên xoá quyền truy cập. Vui lòng đăng nhập lại.',
+          code: 'DEVICE_ID_REQUIRED',
+          message: 'Không tìm thấy định danh thiết bị truy cập.',
         },
       });
+    }
+
+    if (deviceId && !isRegisterEndpoint) {
+      const admin = getAdminClient();
+      const { data: deviceRecord } = await admin
+        .from('user_devices')
+        .select('id')
+        .eq('user_id', authUser.id)
+        .eq('device_id', deviceId)
+        .maybeSingle();
+
+      if (deviceRecord) {
+        // Device is already bound to Flashcard, update last_seen
+        admin
+          .from('user_devices')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', deviceRecord.id)
+          .then();
+      } else {
+        // Device is NOT in user_devices (e.g. logged into Shop from a new device, or revoked)
+        // Check user quota
+        const maxDevices = await getUserDeviceQuota(admin, authUser.id, authUser.max_devices);
+
+        const { count } = await admin
+          .from('user_devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+
+        const currentCount = count ?? 0;
+
+        if (currentCount >= maxDevices) {
+          // Reject device with 403 DEVICE_LIMIT_EXCEEDED
+          return res.status(403).json({
+            success: false,
+            error: {
+              code: 'DEVICE_LIMIT_EXCEEDED',
+              message: `Tài khoản của bạn đã đạt giới hạn tối đa ${maxDevices} thiết bị học Flashcard.`,
+              maxDevices,
+              currentCount,
+              ssoUrl: 'https://sso.huytutor.edu.vn/devices',
+            },
+          });
+        }
+
+        // Under quota: automatically register new device for Flashcard
+        const devName =
+          (req.headers['x-device-name'] as string) ||
+          (req.headers['user-agent'] ? req.headers['user-agent'].substring(0, 100) : 'Thiết bị Web');
+        const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || null;
+
+        await admin.from('user_devices').insert({
+          user_id: authUser.id,
+          device_id: deviceId,
+          device_name: devName,
+          ip_address: clientIp,
+          last_seen: new Date().toISOString(),
+        });
+      }
     }
   }
 

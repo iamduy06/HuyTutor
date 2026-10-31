@@ -58,11 +58,16 @@ export async function apiRequest<T>(
         ? errJson.error
         : errJson?.error?.message || `HTTP ${response.status}: Yêu cầu thất bại`;
 
-    // SEC-007: If device was revoked by admin, terminate session and force redirect to login
-    if (response.status === 401 && code === 'DEVICE_REVOKED') {
+    // SEC-007: If device was revoked or quota exceeded, terminate local state and redirect to SSO
+    if (
+      (response.status === 401 && code === 'DEVICE_REVOKED') ||
+      (response.status === 403 && code === 'DEVICE_LIMIT_EXCEEDED')
+    ) {
       if (typeof window !== 'undefined') {
         logoutApi();
-        window.location.href = '/login?error=device_revoked';
+        document.cookie = 'ht_sso_token=; path=/; domain=.huytutor.edu.vn; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'hut_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        window.location.href = 'https://sso.huytutor.edu.vn/devices';
       }
     }
 

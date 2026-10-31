@@ -44,8 +44,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 3. Redirect logged-in users away from /login and /register
-  if (["/login", "/register"].includes(path) && token) {
+  // 3. Redirect logged-in users away from /login and /register (unless error param is present)
+  const hasAuthError = request.nextUrl.searchParams.has("error");
+  if (["/login", "/register"].includes(path) && token && !hasAuthError) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
