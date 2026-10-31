@@ -44,6 +44,8 @@ authRouter.get('/me', requireAuth, getMe);
 authRouter.post('/verify-device', requireAuth, verifyDevice);
 authRouter.get('/devices', requireAuth, listDevices);
 authRouter.post('/devices/revoke-all', requireAuth, revokeAllSessions);
+authRouter.get('/sessions', requireAuth, listDevices);
+authRouter.delete('/sessions', requireAuth, revokeAllSessions);
 
 app.use('/api/auth', authRouter);
 

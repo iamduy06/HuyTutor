@@ -420,8 +420,10 @@ export async function listDevices(req: AuthenticatedRequest, res: Response): Pro
     res.json({
       success: true,
       quota,
+      maxDevices: quota,
       currentCount: devices.length,
       devices,
+      flashcardDevices: devices,
       sessions,
       canDeleteDevice: userPayload.role === 'ADMIN' // Chỉ Admin mới được xóa!
     });
