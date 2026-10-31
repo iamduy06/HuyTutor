@@ -13,12 +13,14 @@ import {
   UserSessionItem,
 } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || '';
+const rawApiBase = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = rawApiBase ? (rawApiBase as string).replace(/\/$/, '') : '';
+const rawAdminKey = import.meta.env.VITE_ADMIN_API_KEY;
+const ADMIN_API_KEY = rawAdminKey ? (rawAdminKey as string) : '';
 export const R2_DOMAIN = (
-  import.meta.env.VITE_R2_DOMAIN ||
-  import.meta.env.VITE_R2_PUBLIC_DOMAIN ||
-  'https://media.huytutor.edu.vn'
+  import.meta.env.VITE_R2_DOMAIN ? import.meta.env.VITE_R2_DOMAIN : (import.meta.env.VITE_R2_PUBLIC_DOMAIN ? import.meta.env.VITE_R2_PUBLIC_DOMAIN : 'https://media.huytutor.edu.vn')
+
+
 ).replace(/\/$/, '');
 
 export const SESSION_STORAGE_KEY = 'ht_session_token';

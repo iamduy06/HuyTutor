@@ -30,6 +30,14 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function getSsoUrl(): string {
+  const envUrl = import.meta.env.VITE_SSO_URL;
+  if (envUrl) {
+    return (envUrl as string).replace(/\/+$/, '');
+  }
+  return '';
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(() =>
@@ -40,10 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authModalTab, setAuthModalTab] = useState<AuthModalTab>('login');
 
   const refreshUser = async () => {
-    // 1. First check if logged in via SSO Master Cookie (.huytutor.edu.vn)
-    if (typeof window !== 'undefined' && window.location.hostname.includes('huytutor.edu.vn')) {
+    // 1. First check if logged in via SSO Master Cookie
+    const ssoBase = getSsoUrl();
+    if (typeof window !== 'undefined' && ssoBase) {
       try {
-        const ssoRes = await fetch('https://sso.huytutor.edu.vn/api/auth/me', {
+        const ssoRes = await fetch(`${ssoBase}/api/auth/me`, {
           credentials: 'include',
         });
         if (ssoRes.ok) {
@@ -52,13 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser({
               id: ssoData.user.id,
               email: ssoData.user.email,
-              fullName: ssoData.user.full_name || '',
-              phone: ssoData.user.phone || '',
+              fullName: ssoData.user.full_name ? ssoData.user.full_name : '',
+              phone: ssoData.user.phone ? ssoData.user.phone : '',
               role: ssoData.user.role === 'ADMIN' ? 'admin' : 'user',
-              customerGroup: ssoData.user.customer_group || 'Học sinh',
-              schoolOrOrg: ssoData.user.school_or_org || '',
-              defaultTaxCccd: ssoData.user.default_tax_cccd || '',
-              defaultInvoiceAddress: ssoData.user.default_invoice_address || '',
+              customerGroup: ssoData.user.customer_group ? ssoData.user.customer_group : 'Học sinh',
+              schoolOrOrg: ssoData.user.school_or_org ? ssoData.user.school_or_org : '',
+              defaultTaxCccd: ssoData.user.default_tax_cccd ? ssoData.user.default_tax_cccd : '',
+              defaultInvoiceAddress: ssoData.user.default_invoice_address ? ssoData.user.default_invoice_address : '',
               isActive: ssoData.user.is_active,
               lastLoginAt: ssoData.user.last_login_at,
               createdAt: ssoData.user.created_at,
@@ -98,9 +107,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const openAuthModal = (tab: AuthModalTab = 'login') => {
-    // On production domain, smoothly redirect to SSO Portal
-    if (typeof window !== 'undefined' && window.location.hostname.includes('huytutor.edu.vn')) {
-      const ssoUrl = `https://sso.huytutor.edu.vn/login?app=shop&redirect=${encodeURIComponent(window.location.href)}`;
+    const ssoBase = getSsoUrl();
+    if (typeof window !== 'undefined' && ssoBase) {
+      const ssoUrl = `${ssoBase}/login?app=shop&redirect=${encodeURIComponent(window.location.href)}`;
       window.location.href = ssoUrl;
       return;
     }
@@ -139,8 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      if (typeof window !== 'undefined' && window.location.hostname.includes('huytutor.edu.vn')) {
-        await fetch('https://sso.huytutor.edu.vn/api/auth/logout', {
+      const ssoBase = getSsoUrl();
+      if (typeof window !== 'undefined' && ssoBase) {
+        await fetch(`${ssoBase}/api/auth/logout`, {
           method: 'POST',
           credentials: 'include',
         });
@@ -159,8 +169,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logoutAllDevices = async () => {
     try {
-      if (typeof window !== 'undefined' && window.location.hostname.includes('huytutor.edu.vn')) {
-        await fetch('https://sso.huytutor.edu.vn/api/auth/sessions', {
+      const ssoBase = getSsoUrl();
+      if (typeof window !== 'undefined' && ssoBase) {
+        await fetch(`${ssoBase}/api/auth/sessions`, {
           method: 'DELETE',
           credentials: 'include',
         });
