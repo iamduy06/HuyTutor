@@ -1,11 +1,20 @@
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import dotenv from 'dotenv';
+dotenv.config();
+
+function getSupabaseUrl(): string {
+  return process.env.SUPABASE_URL!;
+}
+
+function getServiceKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY!;
+}
 
 export async function supabaseRest(endpoint: string, options: RequestInit = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${endpoint.replace(/^\//, '')}`;
+  const url = `${getSupabaseUrl()}/rest/v1/${endpoint.replace(/^\//, '')}`;
+  const key = getServiceKey();
   const headers = {
-    'apikey': SERVICE_KEY,
-    'Authorization': `Bearer ${SERVICE_KEY}`,
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
     'Content-Type': 'application/json',
     ...(options.headers || {})
   };
@@ -15,10 +24,11 @@ export async function supabaseRest(endpoint: string, options: RequestInit = {}) 
 }
 
 export async function supabaseAdminAuth(endpoint: string, options: RequestInit = {}) {
-  const url = `${SUPABASE_URL}/auth/v1/admin/${endpoint.replace(/^\//, '')}`;
+  const url = `${getSupabaseUrl()}/auth/v1/admin/${endpoint.replace(/^\//, '')}`;
+  const key = getServiceKey();
   const headers = {
-    'apikey': SERVICE_KEY,
-    'Authorization': `Bearer ${SERVICE_KEY}`,
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
     'Content-Type': 'application/json',
     ...(options.headers || {})
   };
