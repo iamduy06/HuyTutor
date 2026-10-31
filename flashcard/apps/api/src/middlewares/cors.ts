@@ -7,17 +7,16 @@ export const corsOptions: CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // SEC-015: Origin Validation & Safe Handling of Non-Browser Requests
     if (!origin) {
-      // In development/test, permit requests without Origin for tooling (curl, Postman, test runner)
       if (env.NODE_ENV !== 'production') {
         return callback(null, true);
       }
-      // In production, server-to-server calls (e.g. Next.js SSR) are permitted,
-      // but without reflecting or exposing permissive CORS headers to browsers
       return callback(null, true);
     }
 
     const normalized = origin.trim().replace(/\/+$/, '');
-    if (allowedOrigins.includes(normalized) || (env.NODE_ENV === 'development' && origin.startsWith('http://localhost'))) {
+    const isVercel = /^https:\/\/[a-zA-Z0-9_\-\.]+\.vercel(\.app)?$/.test(normalized);
+
+    if (allowedOrigins.includes(normalized) || isVercel || (env.NODE_ENV === 'development' && origin.startsWith('http://localhost'))) {
       callback(null, true);
     } else {
       callback(new Error(`CORS blocked for origin: ${origin}`));

@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  const token = request.cookies.get("hut_access_token")?.value || "";
+  // Read Master SSO Cookie (.huytutor.edu.vn) or fallback to local hut_access_token
+  const token =
+    request.cookies.get("ht_sso_token")?.value ||
+    request.cookies.get("hut_access_token")?.value ||
+    "";
 
   // 1. Inject Bearer Token for API proxy routes
   if (path.startsWith("/api/")) {
@@ -16,12 +20,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Option B (Clean Cutover Policy):
-  // Check if user has legacy Supabase cookies but no new hut_access_token
-  const allCookies = request.cookies.getAll();
-  const hasLegacyCookie = allCookies.some(c => c.name.startsWith("sb-"));
-
-  // 3. Protected user & admin routes
+  // 2. Protected user & admin routes
   const isProtectedPath =
     path.startsWith("/dashboard") ||
     path.startsWith("/profile") ||
@@ -32,21 +31,20 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPath) {
     if (!token) {
+      const host = request.headers.get("host") || "";
+      if (host.includes("huytutor.edu.vn")) {
+        const ssoUrl = `https://sso.huytutor.edu.vn/login?app=flashcard&redirect=${encodeURIComponent(request.url)}`;
+        return NextResponse.redirect(new URL(ssoUrl));
+      }
+
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", path);
-      const redirectRes = NextResponse.redirect(url);
-      // Clean up legacy cookies on response
-      allCookies.forEach(c => {
-        if (c.name.startsWith("sb-")) {
-          redirectRes.cookies.set(c.name, "", { path: "/", maxAge: 0 });
-        }
-      });
-      return redirectRes;
+      return NextResponse.redirect(url);
     }
   }
 
-  // 4. Redirect logged-in users away from /login and /register
+  // 3. Redirect logged-in users away from /login and /register
   if (["/login", "/register"].includes(path) && token) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

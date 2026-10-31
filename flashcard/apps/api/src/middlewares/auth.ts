@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { getSupabaseClient, getAdminClient } from '../config/supabase.js';
 import { memoryCache } from '../services/cacheService.js';
 import type { UserRole } from '@huytutor/shared';
@@ -16,6 +17,24 @@ declare global {
       user?: AuthenticatedUser;
       token?: string;
     }
+  }
+}
+
+function verifySsoJwt(token: string, secret: string): any {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [headerB64, payloadB64, sigB64] = parts;
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64url');
+    if (sigB64 !== expectedSig) return null;
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
   }
 }
 
@@ -39,11 +58,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   let authUser = memoryCache.get<AuthenticatedUser>(cacheKey);
 
   if (!authUser) {
-    // 2. Validate token via Supabase Auth
-    const supabase = getSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    let userId: string | null = null;
+    let userEmail: string = '';
 
-    if (error || !user) {
+    // 2. Validate token via SSO JWT (HS256)
+    const ssoSecret = process.env.JWT_SECRET;
+    const ssoPayload = ssoSecret ? verifySsoJwt(token, ssoSecret) : null;
+    if (ssoPayload?.sub) {
+      userId = ssoPayload.sub;
+      userEmail = ssoPayload.email || '';
+    } else {
+      // Fallback: Supabase GoTrue Auth
+      try {
+        const supabase = getSupabaseClient();
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (!error && user) {
+          userId = user.id;
+          userEmail = user.email ?? '';
+        }
+      } catch {}
+    }
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         error: { code: 'INVALID_TOKEN', message: 'Phiên làm việc hết hạn hoặc không hợp lệ' },
@@ -55,12 +91,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const { data: profile } = await admin
       .from('users')
       .select('role, max_devices')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     authUser = {
-      id: user.id,
-      email: user.email ?? '',
+      id: userId,
+      email: userEmail,
       role: (profile?.role as UserRole) ?? 'USER',
       max_devices: profile?.max_devices ?? null,
     };
@@ -119,20 +155,36 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
     return next();
   }
 
-  const supabase = getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser(token);
+  let userId: string | null = null;
+  let userEmail: string = '';
 
-  if (user) {
+  const ssoSecret = process.env.JWT_SECRET;
+  const ssoPayload = ssoSecret ? verifySsoJwt(token, ssoSecret) : null;
+  if (ssoPayload?.sub) {
+    userId = ssoPayload.sub;
+    userEmail = ssoPayload.email || '';
+  } else {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        userId = user.id;
+        userEmail = user.email ?? '';
+      }
+    } catch {}
+  }
+
+  if (userId) {
     const admin = getAdminClient();
     const { data: profile } = await admin
       .from('users')
       .select('role, max_devices')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     const authUser: AuthenticatedUser = {
-      id: user.id,
-      email: user.email ?? '',
+      id: userId,
+      email: userEmail,
       role: (profile?.role as UserRole) ?? 'USER',
       max_devices: profile?.max_devices ?? null,
     };
