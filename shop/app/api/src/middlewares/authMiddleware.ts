@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-function extractBearerToken(req: Request): string | null {
+export function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
@@ -19,6 +19,14 @@ function extractBearerToken(req: Request): string | null {
   const customToken = req.headers['x-session-token'];
   if (typeof customToken === 'string' && customToken.trim()) {
     return customToken.trim();
+  }
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const match = cookieHeader.match(/(?:^|;\s*)ht_sso_token=([^;]*)/);
+    if (match && match[1]) {
+      const decoded = decodeURIComponent(match[1]).trim();
+      if (decoded) return decoded;
+    }
   }
   return null;
 }

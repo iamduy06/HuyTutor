@@ -1,6 +1,7 @@
 import { supabaseAdmin, isSupabaseConfigured } from '../config/supabase';
 import { dbService, SeedUser, SeedUserSession } from './dbService';
 import { hashSha3_256, verifySha3_256, generateSecureToken } from '../utils/hash';
+import { verifySsoJwt } from '../utils/jwt';
 
 const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS);
 
@@ -25,7 +26,7 @@ export function toPublicUserProfile(user: SeedUser): PublicUserProfile {
     email: user.email,
     fullName: user.full_name,
     phone: user.phone || '',
-    role: user.role === 'admin' ? 'admin' : 'user',
+    role: String(user.role || '').toUpperCase() === 'ADMIN' ? 'admin' : 'user',
     customerGroup: user.customer_group || 'Giáo viên',
     schoolOrOrg: user.school_or_org || '',
     defaultTaxCccd: user.default_tax_cccd || '',
@@ -177,6 +178,36 @@ export const authService = {
   } | null> {
     const cleanToken = String(token || '').trim();
     if (!cleanToken) return null;
+
+    // 1. Kiểm tra nếu token là SSO JWT Token (HS256)
+    const jwtSecret = process.env.JWT_SECRET;
+    if (cleanToken.includes('.') && jwtSecret) {
+      const payload = verifySsoJwt(cleanToken, jwtSecret);
+      if (payload && payload.sub) {
+        let user = await dbService.getUserById(payload.sub);
+        if (!user && payload.email) {
+          user = await dbService.getUserByEmail(payload.email);
+        }
+        if (user && user.is_active !== false) {
+          const syntheticSession: SeedUserSession = {
+            id: `sso_${payload.sub}`,
+            user_id: user.id,
+            session_token: cleanToken,
+            user_agent: 'SSO Federated Client',
+            ip_address: '',
+            is_revoked: false,
+            created_at: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
+            last_active_at: new Date().toISOString(),
+            expires_at: payload.exp ? new Date(payload.exp * 1000).toISOString() : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          };
+          return {
+            user: toPublicUserProfile(user),
+            rawUser: user,
+            session: syntheticSession,
+          };
+        }
+      }
+    }
 
     const session = await dbService.getSessionByToken(cleanToken);
     if (!session || session.is_revoked) {

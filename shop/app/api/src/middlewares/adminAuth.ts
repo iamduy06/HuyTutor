@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
+import { extractBearerToken } from './authMiddleware';
 
 /**
  * Middleware bảo vệ các endpoint Quản trị (/api/admin/*).
  * Hỗ trợ:
- * 1. Session Token hợp lệ của tài khoản có role === 'admin' (Authorization: Bearer <session_token>)
+ * 1. Session Token / SSO Token hợp lệ của tài khoản có role === 'admin'
  * 2. Khóa dự phòng khẩn cấp qua header `x-admin-key` khớp với ADMIN_API_SECRET
  */
 export async function adminAuthMiddleware(
@@ -22,24 +23,20 @@ export async function adminAuthMiddleware(
       return;
     }
 
-    // 2. Kiểm tra Session Token từ Authorization Bearer
-    const authHeader = req.headers.authorization;
-    const bearerToken =
-      authHeader && authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7).trim()
-        : '';
+    // 2. Kiểm tra Session Token / SSO Token từ Authorization Bearer hoặc Cookie
+    const token = extractBearerToken(req) || '';
 
-    if (bearerToken) {
-      // Cho phép nếu bearerToken trùng với ADMIN_API_SECRET
-      if (bearerToken === configuredSecret) {
+    if (token) {
+      // Cho phép nếu token trùng với ADMIN_API_SECRET
+      if (token === configuredSecret) {
         next();
         return;
       }
 
-      const validated = await authService.validateSession(bearerToken);
+      const validated = await authService.validateSession(token);
       if (validated) {
         req.user = validated.user;
-        req.sessionToken = bearerToken;
+        req.sessionToken = token;
         if (validated.user.role === 'admin') {
           next();
           return;
