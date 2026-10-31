@@ -1,5 +1,5 @@
 export const APP_NAME     = "Huy Tutor Flashcard";
-export const APP_URL      = "https://www.huytutor.io.vn/";
+export const APP_URL      = "";
 export const FACEBOOK_URL = "https://web.facebook.com/huytutor";
 export const DEMO_LIMIT   = 10;
 

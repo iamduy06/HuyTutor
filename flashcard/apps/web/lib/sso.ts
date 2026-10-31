@@ -37,3 +37,4 @@ export function getCookieDomain(): string {
   }
   return "";
 }
+

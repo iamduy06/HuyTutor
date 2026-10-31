@@ -12,6 +12,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   CORS_ORIGIN: z.string().min(1),
   JWT_SECRET: z.string().optional(),
+  SSO_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
