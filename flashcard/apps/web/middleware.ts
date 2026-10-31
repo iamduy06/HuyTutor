@@ -63,6 +63,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 4. Centralized SSO Redirection for /devices
+  if (path === "/devices") {
+    const ssoBase = getSsoUrl();
+    if (ssoBase) {
+      return NextResponse.redirect(new URL(`${ssoBase}/devices`));
+    }
+  }
+
   return NextResponse.next();
 }
 

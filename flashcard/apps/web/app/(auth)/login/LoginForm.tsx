@@ -1,35 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { ShieldAlert, ExternalLink, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
-  const ssoBase = getSsoUrl();
-  const appBase = getAppUrl();
-
-  const nextParam = searchParams.get("next");
-  const next = nextParam
-    ? (nextParam.startsWith("http")
-        ? nextParam
-        : (appBase ? `${appBase}${nextParam.startsWith("/") ? nextParam : `/${nextParam}`}` : nextParam))
-    : (appBase ? `${appBase}/dashboard` : "/dashboard");
-
-  const ssoLoginUrl = ssoBase
-    ? `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(next)}`
-    : `/dashboard`;
-  const ssoDevicesUrl = ssoBase ? `${ssoBase}/devices` : `/devices`;
-
-  useEffect(() => {
-    // If not in error state, redirect automatically to Central SSO
-    if (!error) {
-      window.location.href = ssoLoginUrl;
-    }
-  }, [error, ssoLoginUrl]);
 
   if (error === "device_limit_exceeded") {
     return (
@@ -44,10 +22,10 @@ export function LoginForm() {
 
         <div className="space-y-3">
           <Button variant="brand" className="w-full justify-center gap-2" asChild>
-            <a href={ssoDevicesUrl}>
+            <Link href="/devices">
               <span>Quản lý thiết bị đã liên kết</span>
               <ExternalLink className="w-4 h-4" />
-            </a>
+            </Link>
           </Button>
 
           <Button variant="ghost" className="w-full text-xs text-gray-500" asChild>
@@ -60,35 +38,17 @@ export function LoginForm() {
     );
   }
 
-  if (error === "device_revoked") {
-    return (
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-amber-200 p-8 text-center">
-        <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600">
-          <ShieldAlert className="w-8 h-8" />
-        </div>
-        <h1 className="text-xl font-black text-gray-900 mb-2">Thiết bị đã bị hủy liên kết</h1>
-        <p className="text-xs text-gray-600 leading-relaxed mb-6">
-          Thiết bị này đã được Quản trị viên gỡ bỏ quyền truy cập. Vui lòng đăng nhập lại để cập nhật phiên.
-        </p>
-
-        <Button variant="brand" className="w-full justify-center gap-2" asChild>
-          <a href={ssoLoginUrl}>
-            <span>Đăng nhập lại qua SSO</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">
       <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-4" />
       <h2 className="text-lg font-bold text-gray-800 mb-1">Đang chuyển hướng đến Huy Tutor SSO...</h2>
-      <p className="text-xs text-muted-foreground mb-6">Hệ thống xác thực tập trung một tài khoản duy nhất.</p>
+      <p className="text-xs text-muted-foreground mb-6">Đăng nhập một tài khoản chung cho toàn bộ hệ thống.</p>
 
       <Button variant="brand-outline" size="sm" asChild>
-        <a href={ssoLoginUrl}>Bấm vào đây nếu trình duyệt không tự chuyển</a>
+        <Link href="/login" className="gap-2">
+          <span>Tiếp tục đăng nhập</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </Button>
     </div>
   );

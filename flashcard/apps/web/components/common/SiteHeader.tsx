@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 import { useBranding } from "@/components/common/BrandingContext";
-import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -25,18 +24,12 @@ export function SiteHeader() {
     return null;
   }
 
-  const ssoBase = getSsoUrl();
-  const appBase = getAppUrl();
-  const loginUrl = ssoBase
-    ? `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(appBase ? `${appBase}/dashboard` : "/dashboard")}`
-    : "/login";
-  const registerUrl = ssoBase
-    ? `${ssoBase}/register?app=flashcard&redirect=${encodeURIComponent(appBase ? `${appBase}/dashboard` : "/dashboard")}`
-    : "/register";
+  const loginUrl = "/login";
+  const registerUrl = "/register";
 
   async function handleLogout() {
     await logoutApi();
-    window.location.href = ssoBase ? `${ssoBase}/login?app=flashcard` : "/login";
+    window.location.href = "/login";
   }
 
   const customLogoText = branding?.allow_custom_branding ? branding.header_logo_text : null;
@@ -51,7 +44,7 @@ export function SiteHeader() {
             <Logo height={34} />
           )}
         </Link>
-        
+
         <nav className="hidden sm:flex items-center gap-1">
           <Link href="/" className="px-3 py-1.5 rounded-lg text-sm font-bold text-[#6b7280] hover:bg-[#fff0f4] hover:text-[#ed0046] transition-all">
             Trang chủ
@@ -106,14 +99,14 @@ export function SiteHeader() {
         ) : (
           <>
             <Button variant="ghost" size="sm" asChild>
-              <a href={loginUrl}>
+              <Link href={loginUrl}>
                 Đăng nhập
-              </a>
+              </Link>
             </Button>
             <Button variant="brand" size="sm" asChild>
-              <a href={registerUrl}>
+              <Link href={registerUrl}>
                 Đăng ký
-              </a>
+              </Link>
             </Button>
           </>
         )}

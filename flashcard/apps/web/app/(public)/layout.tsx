@@ -2,11 +2,13 @@ import { SiteHeader } from "@/components/common/SiteHeader";
 import { SiteFooter } from "@/components/common/SiteFooter";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  const shopUrl = process.env.SHOP_URL ? process.env.SHOP_URL : "";
+
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
       <main className="flex-1">{children}</main>
-      <SiteFooter />
+      <SiteFooter shopUrl={shopUrl} />
     </div>
   );
 }

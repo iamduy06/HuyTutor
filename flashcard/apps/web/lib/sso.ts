@@ -1,13 +1,9 @@
 /**
- * SSO and Application URL Utilities
+ * SSO and Application URL Utilities (Server Secret-driven)
  * Strictly reads from environment variables without using `||` fallbacks.
  */
 
 export function getSsoUrl(): string {
-  const nextPublicSso = process.env.NEXT_PUBLIC_SSO_URL;
-  if (nextPublicSso) {
-    return nextPublicSso.replace(/\/+$/, "");
-  }
   const ssoUrl = process.env.SSO_URL;
   if (ssoUrl) {
     return ssoUrl.replace(/\/+$/, "");
@@ -16,9 +12,9 @@ export function getSsoUrl(): string {
 }
 
 export function getAppUrl(): string {
-  const nextPublicAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (nextPublicAppUrl) {
-    return nextPublicAppUrl.replace(/\/+$/, "");
+  const appUrl = process.env.APP_URL;
+  if (appUrl) {
+    return appUrl.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined" && window.location.origin) {
     return window.location.origin.replace(/\/+$/, "");
@@ -27,14 +23,9 @@ export function getAppUrl(): string {
 }
 
 export function getCookieDomain(): string {
-  const nextPublicCookieDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
-  if (nextPublicCookieDomain) {
-    return nextPublicCookieDomain;
-  }
   const cookieDomain = process.env.COOKIE_DOMAIN;
   if (cookieDomain) {
     return cookieDomain;
   }
   return "";
 }
-
