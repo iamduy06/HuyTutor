@@ -2,7 +2,7 @@ import { supabaseAdmin, isSupabaseConfigured } from '../config/supabase';
 import { dbService, SeedUser, SeedUserSession } from './dbService';
 import { hashSha3_256, verifySha3_256, generateSecureToken } from '../utils/hash';
 
-const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
+const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS);
 
 export interface PublicUserProfile {
   id: string;
@@ -303,11 +303,7 @@ export const authService = {
       reset_password_expires_at: expiresAt,
     });
 
-    const baseOrigin = (
-      frontendOrigin ||
-      process.env.FRONTEND_URL ||
-      'https://huytutor.edu.vn'
-    ).replace(/\/$/, '');
+    const baseOrigin = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
     const resetLink = `${baseOrigin}/reset-password?token=${resetToken}`;
 
     if (isSupabaseConfigured && supabaseAdmin) {

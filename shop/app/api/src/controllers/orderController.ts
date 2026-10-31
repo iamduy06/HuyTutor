@@ -154,7 +154,7 @@ export const orderController = {
       const totalAmount = Math.max(0, subtotalAmount - discountAmount);
 
       const randomDigits = Math.floor(10000 + Math.random() * 90000);
-      const prefix = process.env.ORDER_CODE_PREFIX || 'DH';
+      const prefix = process.env.ORDER_CODE_PREFIX;
       const orderCode = `${prefix}${randomDigits}`;
 
       const chosenGateway: 'sepay' | 'paypal' =

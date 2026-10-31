@@ -30,7 +30,7 @@ export interface GoogleFormSyncResult {
  * - Người bán luôn là "Website"
  */
 export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleFormSyncResult> {
-  const formUrl = process.env.GOOGLE_FORM_ACTION_URL || DEFAULT_FORM_URL;
+  const formUrl = process.env.GOOGLE_FORM_ACTION_URL;
   const now = new Date();
   // Chuyển sang múi giờ Việt Nam (UTC+7)
   const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);

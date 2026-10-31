@@ -210,7 +210,7 @@ export const authController = {
   async forgotPassword(req: Request, res: Response): Promise<void> {
     try {
       const { email } = req.body;
-      const origin = String(req.headers.origin || process.env.FRONTEND_URL || 'https://huytutor.edu.vn');
+      const origin = String(process.env.FRONTEND_URL);
       const result = await authService.forgotPassword(email, origin);
       res.json(result);
     } catch (err: any) {

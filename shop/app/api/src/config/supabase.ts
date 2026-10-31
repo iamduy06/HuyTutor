@@ -3,9 +3,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
@@ -15,7 +14,7 @@ export const isSupabaseConfigured = Boolean(
 );
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseServiceKey)
+  ? createClient(supabaseUrl!, supabaseServiceKey!)
   : null;
 
 export const supabaseAdmin: SupabaseClient | null = supabase;

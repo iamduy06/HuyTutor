@@ -13,7 +13,7 @@ export async function adminAuthMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    const configuredSecret = process.env.ADMIN_API_SECRET || 'huytutor-admin-2026';
+    const configuredSecret = process.env.ADMIN_API_SECRET;
     const headerAdminKey = req.headers['x-admin-key'] as string | undefined;
 
     // 1. Kiểm tra nếu request truyền trực tiếp khóa bí mật x-admin-key hợp lệ

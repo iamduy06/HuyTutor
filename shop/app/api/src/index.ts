@@ -8,24 +8,31 @@ import { isR2Configured } from './services/r2Service';
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT);
 
-const configuredOrigins = (
-  process.env.CORS_ORIGINS ||
-  'https://huytutor.edu.vn,https://www.huytutor.edu.vn,http://localhost:5173,http://localhost:3000'
-)
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+const configuredOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
 
 const allowedOrigins: (string | RegExp)[] = [
   ...configuredOrigins.filter((o) => !o.includes('*')),
   /\.vercel\.app$/,
+  /\.vercel$/,
 ];
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const isAllowed = allowedOrigins.some((allowed) => {
+        if (allowed instanceof RegExp) return allowed.test(origin);
+        return allowed === origin;
+      });
+      if (isAllowed || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
