@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUrl } from "@/lib/apiUrl";
+import { getCookieDomain } from "@/lib/sso";
 
 export async function POST(req: Request) {
   try {
@@ -18,8 +19,11 @@ export async function POST(req: Request) {
 
   const response = NextResponse.json({ success: true });
 
-  // Clear Master SSO cookie (.huytutor.edu.vn)
-  response.cookies.set("ht_sso_token", "", { domain: ".huytutor.edu.vn", path: "/", maxAge: 0 });
+  // Clear Master SSO cookie
+  const cookieDomain = getCookieDomain();
+  if (cookieDomain) {
+    response.cookies.set("ht_sso_token", "", { domain: cookieDomain, path: "/", maxAge: 0 });
+  }
   response.cookies.set("ht_sso_token", "", { path: "/", maxAge: 0 });
 
   // Clear local cookies

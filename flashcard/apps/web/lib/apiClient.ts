@@ -1,6 +1,7 @@
 import { getApiUrl } from './apiUrl';
 import { getDeviceId } from './device';
 import { getClientToken, logoutApi } from './auth';
+import { getSsoUrl, getCookieDomain } from './sso';
 
 const BASE_URL = getApiUrl();
 
@@ -66,9 +67,14 @@ export async function apiRequest<T>(
     ) {
       if (typeof window !== 'undefined') {
         logoutApi();
-        document.cookie = 'ht_sso_token=; path=/; domain=.huytutor.edu.vn; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        const cookieDomain = getCookieDomain();
+        if (cookieDomain) {
+          document.cookie = `ht_sso_token=; path=/; domain=${cookieDomain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        }
+        document.cookie = 'ht_sso_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         document.cookie = 'hut_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        window.location.href = 'https://sso.huytutor.edu.vn/devices';
+        const ssoBase = getSsoUrl();
+        window.location.href = ssoBase ? `${ssoBase}/devices` : '/login';
       }
     }
 

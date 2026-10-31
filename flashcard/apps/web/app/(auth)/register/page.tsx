@@ -3,13 +3,19 @@
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export default function RegisterPage() {
-  const ssoRegisterUrl = "https://sso.huytutor.edu.vn/register?app=flashcard&redirect=https://flashcard.huytutor.edu.vn/dashboard";
+  const ssoBase = getSsoUrl();
+  const appBase = getAppUrl();
+  const targetUrl = appBase ? `${appBase}/dashboard` : "/dashboard";
+  const ssoRegisterUrl = ssoBase
+    ? `${ssoBase}/register?app=flashcard&redirect=${encodeURIComponent(targetUrl)}`
+    : "/login";
 
   useEffect(() => {
     window.location.href = ssoRegisterUrl;
-  }, []);
+  }, [ssoRegisterUrl]);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">

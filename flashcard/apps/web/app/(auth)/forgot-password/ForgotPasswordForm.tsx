@@ -3,13 +3,15 @@
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSsoUrl } from "@/lib/sso";
 
 export function ForgotPasswordForm() {
-  const ssoForgotUrl = "https://sso.huytutor.edu.vn/forgot-password?app=flashcard";
+  const ssoBase = getSsoUrl();
+  const ssoForgotUrl = ssoBase ? `${ssoBase}/forgot-password?app=flashcard` : "/login";
 
   useEffect(() => {
     window.location.href = ssoForgotUrl;
-  }, []);
+  }, [ssoForgotUrl]);
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">

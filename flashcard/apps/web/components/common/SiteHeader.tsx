@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UIModeToggle } from "@/components/common/UIModeToggle";
 import { Logo } from "@/components/common/Logo";
 import { useBranding } from "@/components/common/BrandingContext";
+import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -24,9 +25,18 @@ export function SiteHeader() {
     return null;
   }
 
+  const ssoBase = getSsoUrl();
+  const appBase = getAppUrl();
+  const loginUrl = ssoBase
+    ? `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(appBase ? `${appBase}/dashboard` : "/dashboard")}`
+    : "/login";
+  const registerUrl = ssoBase
+    ? `${ssoBase}/register?app=flashcard&redirect=${encodeURIComponent(appBase ? `${appBase}/dashboard` : "/dashboard")}`
+    : "/register";
+
   async function handleLogout() {
     await logoutApi();
-    window.location.href = "https://sso.huytutor.edu.vn/login?app=flashcard";
+    window.location.href = ssoBase ? `${ssoBase}/login?app=flashcard` : "/login";
   }
 
   const customLogoText = branding?.allow_custom_branding ? branding.header_logo_text : null;
@@ -96,12 +106,12 @@ export function SiteHeader() {
         ) : (
           <>
             <Button variant="ghost" size="sm" asChild>
-              <a href="https://sso.huytutor.edu.vn/login?app=flashcard&redirect=https://flashcard.huytutor.edu.vn/dashboard">
+              <a href={loginUrl}>
                 Đăng nhập
               </a>
             </Button>
             <Button variant="brand" size="sm" asChild>
-              <a href="https://sso.huytutor.edu.vn/register?app=flashcard&redirect=https://flashcard.huytutor.edu.vn/dashboard">
+              <a href={registerUrl}>
                 Đăng ký
               </a>
             </Button>

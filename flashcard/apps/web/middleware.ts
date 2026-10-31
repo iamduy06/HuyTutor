@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  // Read Master SSO Cookie (.huytutor.edu.vn) or fallback to local hut_access_token
-  const token =
-    request.cookies.get("ht_sso_token")?.value ||
-    request.cookies.get("hut_access_token")?.value ||
-    "";
+  // Read Master SSO Cookie or fallback to local hut_access_token
+  const ssoCookie = request.cookies.get("ht_sso_token");
+  const localCookie = request.cookies.get("hut_access_token");
+  const token = ssoCookie ? ssoCookie.value : (localCookie ? localCookie.value : "");
 
   // 1. Inject Bearer Token for API proxy routes
   if (path.startsWith("/api/")) {
@@ -31,14 +31,11 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPath) {
     if (!token) {
-      const host = request.headers.get("host") || "";
-      if (host.includes("huytutor.edu.vn")) {
-        const ssoUrl = `https://sso.huytutor.edu.vn/login?app=flashcard&redirect=${encodeURIComponent(request.url)}`;
-        return NextResponse.redirect(new URL(ssoUrl));
-      }
-
-      const ssoUrl = `https://sso.huytutor.edu.vn/login?app=flashcard&redirect=${encodeURIComponent(request.url)}`;
-      return NextResponse.redirect(new URL(ssoUrl));
+      const ssoBase = getSsoUrl();
+      const ssoUrl = ssoBase
+        ? `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(request.url)}`
+        : `/login?redirect=${encodeURIComponent(request.url)}`;
+      return NextResponse.redirect(new URL(ssoUrl, request.url));
     }
   }
 
@@ -51,11 +48,18 @@ export async function middleware(request: NextRequest) {
     if (!token && !hasAuthError) {
       const ssoRoute = path === "/register" ? "register" : path === "/forgot-password" ? "forgot-password" : "login";
       const nextParam = request.nextUrl.searchParams.get("next");
+      const appBase = getAppUrl();
       const redirectTarget = nextParam
-        ? (nextParam.startsWith("http") ? nextParam : `https://flashcard.huytutor.edu.vn${nextParam.startsWith("/") ? nextParam : `/${nextParam}`}`)
-        : "https://flashcard.huytutor.edu.vn/dashboard";
-      const ssoUrl = `https://sso.huytutor.edu.vn/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
-      return NextResponse.redirect(new URL(ssoUrl));
+        ? (nextParam.startsWith("http")
+            ? nextParam
+            : (appBase ? `${appBase}${nextParam.startsWith("/") ? nextParam : `/${nextParam}`}` : new URL(nextParam, request.url).toString()))
+        : (appBase ? `${appBase}/dashboard` : new URL("/dashboard", request.url).toString());
+
+      const ssoBase = getSsoUrl();
+      if (ssoBase) {
+        const ssoUrl = `${ssoBase}/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
+        return NextResponse.redirect(new URL(ssoUrl));
+      }
     }
   }
 

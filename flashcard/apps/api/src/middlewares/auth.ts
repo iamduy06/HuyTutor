@@ -120,7 +120,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const ssoPayload = ssoSecret ? verifySsoJwt(token, ssoSecret) : null;
     if (ssoPayload?.sub) {
       userId = ssoPayload.sub;
-      userEmail = ssoPayload.email || '';
+      userEmail = ssoPayload.email ? ssoPayload.email : '';
       ssoDeviceId = ssoPayload.device_id;
     } else {
       // Fallback: Supabase GoTrue Auth
@@ -219,6 +219,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         const currentCount = count ?? 0;
 
         if (currentCount >= maxDevices) {
+          const ssoBase = process.env.SSO_URL ? process.env.SSO_URL.replace(/\/+$/, '') : '';
+          const ssoDevicesUrl = ssoBase ? `${ssoBase}/devices` : '/devices';
+
           // Reject device with 403 DEVICE_LIMIT_EXCEEDED
           return res.status(403).json({
             success: false,
@@ -227,7 +230,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
               message: `Tài khoản của bạn đã đạt giới hạn tối đa ${maxDevices} thiết bị học Flashcard.`,
               maxDevices,
               currentCount,
-              ssoUrl: 'https://sso.huytutor.edu.vn/devices',
+              ssoUrl: ssoDevicesUrl,
             },
           });
         }
@@ -291,7 +294,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   const ssoPayload = ssoSecret ? verifySsoJwt(token, ssoSecret) : null;
   if (ssoPayload?.sub) {
     userId = ssoPayload.sub;
-    userEmail = ssoPayload.email || '';
+    userEmail = ssoPayload.email ? ssoPayload.email : '';
     ssoDeviceId = ssoPayload.device_id;
   } else {
     try {

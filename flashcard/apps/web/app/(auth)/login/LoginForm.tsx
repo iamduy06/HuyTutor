@@ -4,14 +4,25 @@ import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ShieldAlert, ExternalLink, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSsoUrl, getAppUrl } from "@/lib/sso";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
-  const next = searchParams.get("next") || "https://flashcard.huytutor.edu.vn/dashboard";
+  const ssoBase = getSsoUrl();
+  const appBase = getAppUrl();
 
-  const ssoLoginUrl = `https://sso.huytutor.edu.vn/login?app=flashcard&redirect=${encodeURIComponent(next)}`;
-  const ssoDevicesUrl = "https://sso.huytutor.edu.vn/devices";
+  const nextParam = searchParams.get("next");
+  const next = nextParam
+    ? (nextParam.startsWith("http")
+        ? nextParam
+        : (appBase ? `${appBase}${nextParam.startsWith("/") ? nextParam : `/${nextParam}`}` : nextParam))
+    : (appBase ? `${appBase}/dashboard` : "/dashboard");
+
+  const ssoLoginUrl = ssoBase
+    ? `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(next)}`
+    : `/dashboard`;
+  const ssoDevicesUrl = ssoBase ? `${ssoBase}/devices` : `/devices`;
 
   useEffect(() => {
     // If not in error state, redirect automatically to Central SSO
