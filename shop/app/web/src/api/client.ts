@@ -18,7 +18,7 @@ const API_BASE_URL = rawApiBase ? (rawApiBase as string).replace(/\/$/, '') : ''
 const rawAdminKey = import.meta.env.VITE_ADMIN_API_KEY;
 const ADMIN_API_KEY = rawAdminKey ? (rawAdminKey as string) : '';
 export const R2_DOMAIN = (
-  import.meta.env.VITE_R2_DOMAIN ? import.meta.env.VITE_R2_DOMAIN : (import.meta.env.VITE_R2_PUBLIC_DOMAIN ? import.meta.env.VITE_R2_PUBLIC_DOMAIN : 'https://media.huytutor.edu.vn')
+  import.meta.env.VITE_R2_DOMAIN ? import.meta.env.VITE_R2_DOMAIN : (import.meta.env.VITE_R2_PUBLIC_DOMAIN ? import.meta.env.VITE_R2_PUBLIC_DOMAIN : '')
 
 
 ).replace(/\/$/, '');
