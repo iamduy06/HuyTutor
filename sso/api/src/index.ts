@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { corsMiddleware } from './middlewares/cors.js';
@@ -24,7 +25,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 1. Health check cho Render Web Service & UptimeRobot
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'Huy Tutor Centralized SSO API Server',

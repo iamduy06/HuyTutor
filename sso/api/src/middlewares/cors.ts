@@ -1,11 +1,12 @@
 import cors from 'cors';
 
-const configuredOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+const rawCors = process.env.CORS_ORIGINS;
+const configuredOrigins = rawCors
+  ? rawCors.split(',').map((o: string) => o.trim()).filter(Boolean)
   : [];
 
 const allowedOrigins: (string | RegExp)[] = [
-  ...configuredOrigins.filter((o) => !o.includes('*')),
+  ...configuredOrigins.filter((o: string) => !o.includes('*')),
   'https://sso.huytutor.edu.vn',
   'https://flashcard.huytutor.edu.vn',
   'https://huytutor.edu.vn',
@@ -15,7 +16,7 @@ const allowedOrigins: (string | RegExp)[] = [
 ];
 
 export const corsMiddleware = cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     if (!origin) return callback(null, true);
 
     const isAllowed = allowedOrigins.some((allowed) => {
