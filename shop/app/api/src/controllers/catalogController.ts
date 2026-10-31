@@ -29,7 +29,7 @@ export const catalogController = {
           country: req.clientCountry || 'VN',
           recommendedGateway: req.recommendedGateway || 'sepay',
         },
-        mediaDomain: process.env.R2_PUBLIC_DOMAIN,
+        mediaDomain: process.env.R2_DOMAIN ? process.env.R2_DOMAIN : process.env.R2_PUBLIC_DOMAIN,
       });
     } catch (err: any) {
       res.status(500).json({
