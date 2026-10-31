@@ -1,0 +1,27 @@
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+export const TOKEN_TTL_SECONDS = 3 * 24 * 60 * 60; // 3 days (259,200 seconds)
+
+export interface JWTPayload {
+  sub: string;
+  email: string;
+  role: 'USER' | 'SUBADMIN' | 'ADMIN';
+  full_name?: string;
+  device_id?: string;
+}
+
+export function signToken(payload: JWTPayload): string {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: TOKEN_TTL_SECONDS,
+  });
+}
+
+export function verifyToken(token: string): JWTPayload | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
