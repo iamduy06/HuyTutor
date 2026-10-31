@@ -41,11 +41,12 @@ export async function calculateUserDeviceQuota(userId: string): Promise<number> 
     }
 
     // 3. Kiểm tra app_settings.global_max_devices
-    const settingsRes = await supabaseRest('app_settings?select=global_max_devices&limit=1');
+    const settingsRes = await supabaseRest('app_settings?key=eq.global_max_devices&select=value');
     if (settingsRes.ok) {
       const settings = (await settingsRes.json()) as any[];
-      if (settings && settings.length > 0 && settings[0].global_max_devices !== null && settings[0].global_max_devices !== undefined) {
-        return Number(settings[0].global_max_devices);
+      if (settings && settings.length > 0 && settings[0].value) {
+        const val = parseInt(settings[0].value, 10);
+        if (!isNaN(val) && val > 0) return val;
       }
     }
   } catch (err) {
