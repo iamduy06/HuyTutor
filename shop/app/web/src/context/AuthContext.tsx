@@ -81,25 +81,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const saved = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!saved) {
-      setUser(null);
-      setSessionToken(null);
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const res = await apiClient.getCurrentUser();
-      setUser(res.user);
-      setSessionToken(saved);
+      if (res && res.user) {
+        setUser(res.user);
+        const saved = typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null;
+        if (saved) setSessionToken(saved);
+        setIsLoading(false);
+        return;
+      }
     } catch {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      setUser(null);
-      setSessionToken(null);
-    } finally {
-      setIsLoading(false);
+      // User is not logged in via cookie or token
     }
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+    setUser(null);
+    setSessionToken(null);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -109,7 +109,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openAuthModal = (tab: AuthModalTab = 'login') => {
     const ssoBase = getSsoUrl();
     if (typeof window !== 'undefined' && ssoBase) {
-      const ssoUrl = `${ssoBase}/login?app=shop&redirect=${encodeURIComponent(window.location.href)}`;
+      const path = tab === 'register' ? '/register' : tab === 'forgot' ? '/forgot-password' : '/login';
+      const ssoUrl = `${ssoBase}${path}?app=shop&redirect=${encodeURIComponent(window.location.href)}`;
       window.location.href = ssoUrl;
       return;
     }

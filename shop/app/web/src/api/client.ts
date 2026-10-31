@@ -56,6 +56,7 @@ function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(buildApiUrl(path), {
+    credentials: 'include',
     ...init,
     headers: buildAuthHeaders({
       'Content-Type': 'application/json',
