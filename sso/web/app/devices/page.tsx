@@ -107,7 +107,7 @@ export default function DevicesPage() {
               {flashcardDevices.length} / {maxDevices === Infinity ? 'Không giới hạn' : maxDevices} máy
             </span>
           </div>
-          <span className="text-xs text-muted-foreground">Áp dụng cho flashcard.huytutor.edu.vn</span>
+          <span className="text-xs text-muted-foreground">Áp dụng cho ứng dụng Flashcard</span>
         </div>
 
         <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl mb-3 flex items-start gap-2">

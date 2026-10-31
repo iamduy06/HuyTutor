@@ -7,6 +7,7 @@ import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 function RegisterContent() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '';
+  const app = searchParams.get('app') || '';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,8 +43,12 @@ function RegisterContent() {
 
       if (redirectUrl) {
         window.location.href = redirectUrl;
+      } else if (app === 'flashcard') {
+        const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : 'https://flashcard.huytutor.edu.vn';
+        window.location.href = `${flashcardUrl.replace(/\/+$/, '')}/dashboard`;
       } else {
-        window.location.href = 'https://huytutor.edu.vn';
+        const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : 'https://huytutor.edu.vn';
+        window.location.href = shopUrl;
       }
     } catch (err: any) {
       console.error('[REGISTER_ERROR]', err);

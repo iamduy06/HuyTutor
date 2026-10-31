@@ -55,13 +55,14 @@ function LoginContent() {
       }
 
       // Successful login
-      // If redirect URL provided and is safe (*.huytutor.edu.vn or localhost), redirect there
       if (redirectUrl) {
         window.location.href = redirectUrl;
       } else if (app === 'flashcard') {
-        window.location.href = 'https://flashcard.huytutor.edu.vn/dashboard';
+        const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : 'https://flashcard.huytutor.edu.vn';
+        window.location.href = `${flashcardUrl.replace(/\/+$/, '')}/dashboard`;
       } else {
-        window.location.href = 'https://huytutor.edu.vn';
+        const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : 'https://huytutor.edu.vn';
+        window.location.href = shopUrl;
       }
     } catch (err: any) {
       console.error('[LOGIN_ERROR]', err);
