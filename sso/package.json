@@ -1,39 +1,11 @@
 {
-  "name": "huytutor-sso",
+  "name": "huytutor-sso-monorepo",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.6",
-    "@radix-ui/react-dropdown-menu": "^2.1.6",
-    "@radix-ui/react-label": "^2.1.2",
-    "@radix-ui/react-toast": "^1.2.6",
-    "bcryptjs": "^2.4.3",
-    "clsx": "^2.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "lucide-react": "^0.475.0",
-    "next": "^15.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.0.2",
-    "tailwindcss-animate": "^1.0.7"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.8",
-    "@types/node": "^22.13.5",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3"
+    "dev:web": "npm run dev --prefix web",
+    "dev:api": "npm run dev --prefix api",
+    "build:web": "npm run build --prefix web",
+    "build:api": "npm run build --prefix api"
   }
 }
-
