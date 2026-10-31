@@ -1,8 +1,8 @@
 import { SeedOrder } from './dbService';
 
-const SEPAY_BANK_NAME = process.env.SEPAY_BANK_NAME;
-const SEPAY_BANK_ACCOUNT = process.env.SEPAY_BANK_ACCOUNT;
-const SEPAY_ACCOUNT_HOLDER = process.env.SEPAY_ACCOUNT_HOLDER;
+const SEPAY_BANK_NAME = process.env.SEPAY_BANK_NAME!;
+const SEPAY_BANK_ACCOUNT = process.env.SEPAY_BANK_ACCOUNT!;
+const SEPAY_ACCOUNT_HOLDER = process.env.SEPAY_ACCOUNT_HOLDER!;
 const USD_EXCHANGE_RATE = Number(process.env.USD_EXCHANGE_RATE);
 
 export interface PaymentInitInfo {
@@ -49,8 +49,8 @@ export function buildPaymentInstruction(order: SeedOrder): PaymentInitInfo {
       qrImageUrl,
     },
     paypal: {
-      clientId: process.env.PAYPAL_CLIENT_ID,
-      mode: process.env.PAYPAL_MODE,
+      clientId: process.env.PAYPAL_CLIENT_ID!,
+      mode: process.env.PAYPAL_MODE!,
       amountUsd,
       currency: 'USD',
     },
