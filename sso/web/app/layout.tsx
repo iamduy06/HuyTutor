@@ -11,8 +11,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const shopUrl = process.env.NEXT_PUBLIC_SHOP_URL ? process.env.NEXT_PUBLIC_SHOP_URL : '/';
-  const flashcardUrl = process.env.NEXT_PUBLIC_FLASHCARD_URL ? process.env.NEXT_PUBLIC_FLASHCARD_URL : '';
+  const shopUrl = process.env.SHOP_URL ? process.env.SHOP_URL : '/';
+  const flashcardUrl = process.env.FLASHCARD_URL ? process.env.FLASHCARD_URL : '';
 
   return (
     <html lang="vi">
