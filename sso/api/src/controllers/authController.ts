@@ -24,7 +24,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     // 1. Tìm tài khoản trong public.users
     const userRes = await supabaseRest(
-      `users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,role,encrypted_password,full_name,phone,customer_group,is_active`
+      `users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,role,password_hash,full_name,phone,customer_group,is_active`
     );
 
     if (!userRes.ok) {
@@ -55,7 +55,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     // 2. So khớp mật khẩu bcrypt ($2a$, $2b$)
-    const isValid = await verifyPassword(password, user.encrypted_password);
+    const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       res.status(401).json({
         success: false,
@@ -188,7 +188,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify({
         email: cleanEmail,
-        encrypted_password: hashedPassword,
+        password_hash: hashedPassword,
         full_name: full_name.trim(),
         phone: phone?.trim() || null,
         school_or_org: school_or_org?.trim() || null,
@@ -211,7 +211,7 @@ export async function register(req: Request, res: Response): Promise<void> {
 
     // 4. Tự động gán vào nhóm mặc định
     try {
-      const defGroupRes = await supabaseRest('groups?is_default=eq.true&limit=1');
+      const defGroupRes = await supabaseRest('groups?name=eq.SYSTEM_REGISTERED&limit=1');
       if (defGroupRes.ok) {
         const defGroups = (await defGroupRes.json()) as any[];
         if (defGroups && defGroups.length > 0) {
@@ -405,7 +405,7 @@ export async function listDevices(req: AuthenticatedRequest, res: Response): Pro
 
     // 1. Lấy danh sách thiết bị Flashcard trong public.user_devices
     const devRes = await supabaseRest(
-      `user_devices?user_id=eq.${userPayload.sub}&order=created_at.desc`
+      `user_devices?user_id=eq.${userPayload.sub}&order=last_seen.desc`
     );
     const devices = devRes.ok ? ((await devRes.json()) as any[]) : [];
 

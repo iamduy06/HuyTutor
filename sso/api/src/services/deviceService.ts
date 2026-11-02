@@ -105,7 +105,7 @@ export async function checkAndRegisterDevice(params: {
 
   // 3. Truy vấn danh sách thiết bị đã đăng ký của user trong public.user_devices
   const devRes = await supabaseRest(
-    `user_devices?user_id=eq.${userId}&order=created_at.asc`
+    `user_devices?user_id=eq.${userId}&order=last_seen.asc`
   );
   const existingDevices: any[] = devRes.ok ? ((await devRes.json()) as any[]) : [];
 
@@ -113,11 +113,11 @@ export async function checkAndRegisterDevice(params: {
   const currentDevice = existingDevices.find((d) => d.device_id === deviceId);
 
   if (currentDevice) {
-    // Đã tồn tại: Cập nhật last_active_at và IP
+    // Đã tồn tại: Cập nhật last_seen và IP
     await supabaseRest(`user_devices?id=eq.${currentDevice.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
-        last_active_at: new Date().toISOString(),
+        last_seen: new Date().toISOString(),
         ip_address: ipAddress
       })
     });
@@ -152,10 +152,8 @@ export async function checkAndRegisterDevice(params: {
       user_id: userId,
       device_id: deviceId,
       device_name: deviceName,
-      user_agent: userAgent,
       ip_address: ipAddress,
-      is_active: true,
-      last_active_at: new Date().toISOString()
+      last_seen: new Date().toISOString()
     })
   });
 

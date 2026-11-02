@@ -23,7 +23,7 @@ export async function createSession(params: CreateSessionParams): Promise<void> 
       session_token: params.sessionToken,
       device_id: params.deviceId || null,
       device_name: params.deviceName || null,
-      app_name: params.appName || 'sso',
+      app_source: params.appName || 'sso',
       ip_address: params.ipAddress || null,
       user_agent: params.userAgent || null,
       expires_at: expiresAt,
