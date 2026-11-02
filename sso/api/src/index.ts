@@ -5,6 +5,12 @@ import dotenv from 'dotenv';
 import { corsMiddleware } from './middlewares/cors.js';
 import { requireAuth } from './middlewares/auth.js';
 import {
+  validate,
+  ssoLoginSchema,
+  ssoRegisterSchema,
+  ssoVerifyDeviceSchema,
+} from './middlewares/validate.js';
+import {
   login,
   register,
   logout,
@@ -38,11 +44,11 @@ app.get('/health', (_req: Request, res: Response) => {
 // 2. Authentication routes
 const authRouter = express.Router();
 
-authRouter.post('/login', login);
-authRouter.post('/register', register);
+authRouter.post('/login', validate({ body: ssoLoginSchema }), login);
+authRouter.post('/register', validate({ body: ssoRegisterSchema }), register);
 authRouter.post('/logout', logout);
 authRouter.get('/me', requireAuth, getMe);
-authRouter.post('/verify-device', requireAuth, verifyDevice);
+authRouter.post('/verify-device', requireAuth, validate({ body: ssoVerifyDeviceSchema }), verifyDevice);
 authRouter.get('/devices', requireAuth, listDevices);
 authRouter.post('/devices/revoke-all', requireAuth, revokeAllSessions);
 authRouter.get('/sessions', requireAuth, listDevices);
