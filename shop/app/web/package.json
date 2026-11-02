@@ -1,6 +1,6 @@
 {
   "name": "@huytutor/web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Frontend Web App cho huytutor.edu.vn (100% kết nối Database qua Backend API app/api)",
   "type": "module",
