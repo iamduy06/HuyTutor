@@ -154,6 +154,7 @@ export async function logoutApi(): Promise<void> {
       window.dispatchEvent(new Event("hut_auth_changed"));
     } catch {}
 
-    window.location.href = `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(window.location.origin + "/dashboard")}`;
+    // Redirect to Flashcard main home page / instead of SSO login
+    window.location.href = "/?logout=true";
   }
 }

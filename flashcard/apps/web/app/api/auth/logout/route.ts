@@ -90,9 +90,7 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const res = await performLogout(req);
-  const ssoBase = getSsoUrl();
-  const loginTarget = `${ssoBase}/login?app=flashcard`;
-  return NextResponse.redirect(new URL(loginTarget, req.url), {
+  return NextResponse.redirect(new URL("/?logout=true", req.url), {
     headers: res.headers,
   });
 }

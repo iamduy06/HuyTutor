@@ -36,7 +36,7 @@ export function SiteHeader() {
     try {
       await logoutApi();
     } catch {
-      window.location.href = "/login?logout=true";
+      window.location.href = "/?logout=true";
     }
   }
 

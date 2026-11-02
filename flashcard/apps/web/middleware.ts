@@ -3,12 +3,45 @@ import { getSsoUrl, getAppUrl, getCookieDomainList } from "@/lib/sso";
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // 1. Handle Logout Intent: Cleanly strip all cookies and land on Flashcard Home Page (/)
+  if (request.nextUrl.searchParams.has("logout")) {
+    const isProd = process.env.NODE_ENV === "production";
+    const host = request.headers.get("host");
+    const domainList = getCookieDomainList(host);
+
+    const clearOpts = {
+      path: "/",
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax" as const,
+      maxAge: 0,
+      expires: new Date(0),
+    };
+
+    const cookieNames = ["ht_sso_token", "hut_access_token", "hut_refresh_token", "hut_device_id"];
+
+    // Clean redirect to Flashcard home page without query parameters
+    const homeUrl = new URL("/", request.url);
+    const redirectRes = NextResponse.redirect(homeUrl);
+
+    for (const dom of domainList) {
+      for (const name of cookieNames) {
+        redirectRes.cookies.set(name, "", { ...clearOpts, domain: dom });
+      }
+    }
+    for (const name of cookieNames) {
+      redirectRes.cookies.set(name, "", clearOpts);
+    }
+    return redirectRes;
+  }
+
   // Read Master SSO Cookie or fallback to local hut_access_token
   const ssoCookie = request.cookies.get("ht_sso_token");
   const localCookie = request.cookies.get("hut_access_token");
   const token = ssoCookie ? ssoCookie.value : (localCookie ? localCookie.value : "");
 
-  // 1. Inject Bearer Token for API proxy routes
+  // 2. Inject Bearer Token for API proxy routes
   if (path.startsWith("/api/")) {
     if (!request.headers.get("authorization") && token) {
       const requestHeaders = new Headers(request.headers);
@@ -20,7 +53,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Protected user & admin routes
+  // 3. Protected user & admin routes
   const isProtectedPath =
     path.startsWith("/dashboard") ||
     path.startsWith("/profile") ||
@@ -39,15 +72,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 3. Centralized SSO Redirection for Auth Routes (/login, /register, /forgot-password)
+  // 4. Centralized SSO Redirection for Auth Routes (/login, /register, /forgot-password)
   const hasAuthError = request.nextUrl.searchParams.has("error");
-  const isLogoutIntent = request.nextUrl.searchParams.has("logout");
 
   if (["/login", "/register", "/forgot-password"].includes(path)) {
-    if (token && !hasAuthError && !isLogoutIntent) {
+    if (token && !hasAuthError) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if ((!token || isLogoutIntent) && !hasAuthError) {
+    if (!token && !hasAuthError) {
       const ssoRoute = path === "/register" ? "register" : path === "/forgot-password" ? "forgot-password" : "login";
       const nextParam = request.nextUrl.searchParams.get("next");
       const appBase = getAppUrl();
@@ -60,38 +92,12 @@ export async function middleware(request: NextRequest) {
       const ssoBase = getSsoUrl();
       if (ssoBase) {
         const ssoUrl = `${ssoBase}/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
-        const redirectRes = NextResponse.redirect(new URL(ssoUrl));
-        if (isLogoutIntent) {
-          const isProd = process.env.NODE_ENV === "production";
-          const host = request.headers.get("host");
-          const domainList = getCookieDomainList(host);
-
-          const clearOpts = {
-            path: "/",
-            httpOnly: true,
-            secure: isProd,
-            sameSite: "lax" as const,
-            maxAge: 0,
-            expires: new Date(0),
-          };
-
-          const cookieNames = ["ht_sso_token", "hut_access_token", "hut_refresh_token", "hut_device_id"];
-
-          for (const dom of domainList) {
-            for (const name of cookieNames) {
-              redirectRes.cookies.set(name, "", { ...clearOpts, domain: dom });
-            }
-          }
-          for (const name of cookieNames) {
-            redirectRes.cookies.set(name, "", clearOpts);
-          }
-        }
-        return redirectRes;
+        return NextResponse.redirect(new URL(ssoUrl));
       }
     }
   }
 
-  // 4. Centralized SSO Redirection for /devices
+  // 5. Centralized SSO Redirection for /devices
   if (path === "/devices") {
     const ssoBase = getSsoUrl();
     if (ssoBase) {
