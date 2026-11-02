@@ -21,8 +21,12 @@ const nextConfig = {
     const rawApiUrl = process.env.API_URL;
     if (!rawApiUrl) return [];
     const trimmed = rawApiUrl.replace(/\/+$/, "");
-    const baseApi = trimmed.replace(/\/api\/v1$/, "");
+    const baseApi = trimmed.replace(/\/api(\/v1)?$/, "");
     return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${baseApi}/api/v1/:path*`,
+      },
       {
         source: "/api/:path*",
         destination: `${baseApi}/api/:path*`,
