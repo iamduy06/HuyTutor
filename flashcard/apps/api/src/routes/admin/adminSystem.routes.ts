@@ -7,7 +7,16 @@ import { parseDateToISO, parseStringArray } from '../../utils/importUtils.js';
 import * as XLSX from 'xlsx';
 import { validate } from '../../middlewares/validate.js';
 import { exportLimiter } from '../../middlewares/rateLimiter.js';
-import { adminExportQuerySchema, adminAppSettingsSchema, generatePassword } from '@huytutor/shared';
+import {
+  adminExportQuerySchema,
+  adminAppSettingsSchema,
+  adminPatchDevicesSchema,
+  adminDeleteDevicesSchema,
+  adminImportUsersSchema,
+  adminImportDecksSchema,
+  adminImportGroupsSchema,
+  generatePassword,
+} from '@huytutor/shared';
 
 const router = Router();
 router.use('/admin', requireAuth, requireRole('ADMIN'));
@@ -77,7 +86,7 @@ router.get('/admin/devices', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/devices
-router.patch('/admin/devices', async (req: Request, res: Response) => {
+router.patch('/admin/devices', validate({ body: adminPatchDevicesSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const supabase = getAdminClient();
 
@@ -101,7 +110,7 @@ router.patch('/admin/devices', async (req: Request, res: Response) => {
 });
 
 // DELETE /admin/devices
-router.delete('/admin/devices', async (req: Request, res: Response) => {
+router.delete('/admin/devices', validate({ body: adminDeleteDevicesSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const supabase = getAdminClient();
 
@@ -142,7 +151,7 @@ router.get('/admin/references', async (_req: Request, res: Response) => {
 // ─── IMPORTS ─────────────────────────────────────────────────────────────────
 
 // POST /admin/import/users
-router.post('/admin/import/users', async (req: Request, res: Response) => {
+router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const rows = Array.isArray(body) ? body : [body];
   const supabase = getAdminClient();
@@ -238,7 +247,7 @@ router.post('/admin/import/users', async (req: Request, res: Response) => {
 });
 
 // POST /admin/import/decks
-router.post('/admin/import/decks', async (req: Request, res: Response) => {
+router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const rows = Array.isArray(body) ? body : [body];
   const supabase = getAdminClient();
@@ -302,7 +311,7 @@ router.post('/admin/import/decks', async (req: Request, res: Response) => {
 });
 
 // POST /admin/import/groups
-router.post('/admin/import/groups', async (req: Request, res: Response) => {
+router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }), async (req: Request, res: Response) => {
   const body = req.body;
   const rows = Array.isArray(body) ? body : [body];
   const supabase = getAdminClient();

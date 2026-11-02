@@ -7,7 +7,7 @@ import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
 import { validate } from '../../middlewares/validate.js';
 import { memoryCache } from '../../services/cacheService.js';
-import { generatePassword, adminCreateUserSchema, adminUpdateUserSchema } from '@huytutor/shared';
+import { generatePassword, adminCreateUserSchema, adminUpdateUserSchema, idParamSchema } from '@huytutor/shared';
 
 const router = Router();
 router.use('/admin', requireAuth, requireRole('ADMIN'));
@@ -143,7 +143,7 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
 });
 
 // PATCH /admin/users/:id
-router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), async (req: Request, res: Response) => {
+router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUpdateUserSchema }), async (req: Request, res: Response) => {
   const admin = req.user!;
   const id = req.params.id as string;
   const body = req.body;
@@ -296,7 +296,7 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
 });
 
 // DELETE /admin/users/:id
-router.delete('/admin/users/:id', async (req: Request, res: Response) => {
+router.delete('/admin/users/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const admin = req.user!;
   const id = req.params.id as string;
 

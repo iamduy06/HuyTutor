@@ -5,6 +5,7 @@ import { requireRole } from '../../middlewares/roleGuard.js';
 import { getAdminClient } from '../../config/supabase.js';
 import { validate } from '../../middlewares/validate.js';
 import {
+  idParamSchema,
   adminCreateDeckGroupSchema,
   adminUpdateDeckGroupSchema,
   adminCreateGroupSchema,
@@ -63,7 +64,7 @@ router.patch('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSche
 });
 
 // DELETE /admin/deck-groups/:id
-router.delete('/admin/deck-groups/:id', async (req: Request, res: Response) => {
+router.delete('/admin/deck-groups/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const supabase = getAdminClient();
 
@@ -156,7 +157,7 @@ router.patch('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), as
 });
 
 // DELETE /admin/groups/:id
-router.delete('/admin/groups/:id', async (req: Request, res: Response) => {
+router.delete('/admin/groups/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const { id } = req.params;
   const supabase = getAdminClient();
 

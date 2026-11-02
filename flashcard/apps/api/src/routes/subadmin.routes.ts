@@ -9,7 +9,8 @@ import {
   generatePassword, 
   subadminCreateUserSchema, 
   subadminUpdateUserSchema, 
-  subadminBrandingSchema 
+  subadminBrandingSchema,
+  idParamSchema 
 } from '@huytutor/shared';
 
 const router = Router();
@@ -315,7 +316,7 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
 });
 
 // PATCH /subadmin/users/:id
-router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema }), async (req: Request, res: Response) => {
+router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: subadminUpdateUserSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const id = req.params.id as string;
 
@@ -485,7 +486,7 @@ router.patch('/subadmin/users/:id', validate({ body: subadminUpdateUserSchema })
 });
 
 // DELETE /subadmin/users/:id
-router.delete('/subadmin/users/:id', async (req: Request, res: Response) => {
+router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const me = req.user!;
   const id = req.params.id as string;
 

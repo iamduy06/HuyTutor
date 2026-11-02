@@ -99,6 +99,59 @@ export const adminExportQuerySchema = z.object({
   format: z.enum(["json", "json_full", "csv", "xlsx"]).optional(),
 });
 
+export const idParamSchema = z.object({
+  id: z.string().uuid("ID phải là định dạng UUID hợp lệ"),
+});
+
+export const adminPatchDevicesSchema = z.object({
+  global_max_devices: z.union([z.coerce.number().int().min(1), z.string()]).optional(),
+  user_id: z.string().uuid("user_id phải là UUID hợp lệ").optional(),
+  max_devices: z.union([z.coerce.number().int().min(1), z.null()]).optional(),
+});
+
+export const adminDeleteDevicesSchema = z.object({
+  user_id: z.string().uuid("user_id phải là UUID hợp lệ"),
+  device_id: z.string().trim().max(128).optional(),
+});
+
+export const adminImportUserItemSchema = z.object({
+  email: z.string().email("Email không đúng định dạng"),
+  password: z.string().optional(),
+  group_id: z.string().optional(),
+  role: z.enum(["USER", "SUBADMIN", "ADMIN"]).optional(),
+  deck: z.union([z.string(), z.array(z.string())]).optional(),
+  expire_at: z.string().optional(),
+});
+
+export const adminImportUsersSchema = z.union([
+  adminImportUserItemSchema,
+  z.array(adminImportUserItemSchema),
+]);
+
+export const adminImportDeckItemSchema = z.object({
+  title: z.string().min(1, "Tên bộ đề không được để trống"),
+  description: z.string().optional().nullable(),
+  level: z.string().optional().nullable(),
+  access_level: z.record(z.any()).optional(),
+});
+
+export const adminImportDecksSchema = z.union([
+  adminImportDeckItemSchema,
+  z.array(adminImportDeckItemSchema),
+]);
+
+export const adminImportGroupItemSchema = z.object({
+  group_name: z.string().min(1, "Tên nhóm không được để trống"),
+  user_email_or_id: z.string().optional(),
+  deck_name_or_id: z.string().optional(),
+  deck_expire_at: z.string().optional(),
+});
+
+export const adminImportGroupsSchema = z.union([
+  adminImportGroupItemSchema,
+  z.array(adminImportGroupItemSchema),
+]);
+
 export const adminAssignUserDeckSchema = z.object({
   userId: z.string().min(1, "userId là bắt buộc"),
   deckIds: z.array(z.string()),

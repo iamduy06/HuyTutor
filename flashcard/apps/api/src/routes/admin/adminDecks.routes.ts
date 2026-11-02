@@ -7,6 +7,7 @@ import { getWordCountMap, computeLevelStr, invalidateWordCountCache } from '../.
 import { validate } from '../../middlewares/validate.js';
 import { 
   extractTabs, 
+  idParamSchema,
   createDeckSchema, 
   updateDeckSchema, 
   saveFlashcardContentSchema,
@@ -155,7 +156,7 @@ router.post('/admin/decks', validate({ body: createDeckSchema }), async (req: Re
 });
 
 // GET /admin/decks/:id
-router.get('/admin/decks/:id', async (req: Request, res: Response) => {
+router.get('/admin/decks/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const supabase = getAdminClient();
 
@@ -170,7 +171,7 @@ router.get('/admin/decks/:id', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/decks/:id
-router.patch('/admin/decks/:id', validate({ body: updateDeckSchema }), async (req: Request, res: Response) => {
+router.patch('/admin/decks/:id', validate({ params: idParamSchema, body: updateDeckSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
@@ -188,7 +189,7 @@ router.patch('/admin/decks/:id', validate({ body: updateDeckSchema }), async (re
 });
 
 // DELETE /admin/decks/:id
-router.delete('/admin/decks/:id', async (req: Request, res: Response) => {
+router.delete('/admin/decks/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const supabase = getAdminClient();
 
