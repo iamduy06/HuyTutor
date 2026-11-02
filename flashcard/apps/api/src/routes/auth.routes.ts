@@ -197,37 +197,51 @@ router.post(
   validate({ body: registerAuthSchema }),
   async (req: Request, res: Response) => {
     const { email, password, full_name } = req.body;
-    const anonClient = getSupabaseClient();
+    const cleanEmail = email.trim().toLowerCase();
     const admin = getAdminClient();
 
-    const { data, error } = await anonClient.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name },
-      },
-    });
+    // 1. Check if user already exists
+    const { data: existingUser } = await admin
+      .from('users')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle();
 
-    if (error) {
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        error: { code: 'REGISTRATION_FAILED', message: error.message },
+        error: { code: 'USER_ALREADY_EXISTS', message: 'Email này đã được sử dụng trên hệ thống.' },
       });
     }
 
-    if (data.user) {
-      await admin.from('users').upsert({
-        id: data.user.id,
-        email,
+    // 2. Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 3. Create user in public.users
+    const { data: newUser, error: createErr } = await admin
+      .from('users')
+      .insert({
+        email: cleanEmail,
+        password_hash: hashedPassword,
+        full_name: full_name?.trim() ?? '',
         role: 'USER',
-      }, { onConflict: 'id' });
+        is_active: true,
+      })
+      .select('id, email, full_name, role')
+      .single();
+
+    if (createErr || !newUser) {
+      return res.status(500).json({
+        success: false,
+        error: { code: 'REGISTRATION_FAILED', message: createErr?.message ?? 'Không thể khởi tạo tài khoản mới.' },
+      });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Mã xác thực 6 số đã được gửi tới email của bạn.',
-      email,
-      user: data.user ? { id: data.user.id, email: data.user.email } : null,
+      message: 'Đăng ký tài khoản thành công.',
+      email: cleanEmail,
+      user: { id: newUser.id, email: newUser.email },
     });
   }
 );
@@ -237,44 +251,13 @@ router.post(
   '/auth/verify-otp',
   authLimiter,
   validate({ body: verifyOtpAuthSchema }),
-  async (req: Request, res: Response) => {
-    const { email, token, type } = req.body;
-    const anonClient = getSupabaseClient();
-    const admin = getAdminClient();
-
-    const { data, error } = await anonClient.auth.verifyOtp({
-      email,
-      token,
-      type: type as any,
-    });
-
-    if (error || !data.user) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_OTP', message: error?.message || 'Mã xác thực không hợp lệ hoặc đã hết hạn' },
-      });
-    }
-
-    const { data: profile } = await admin
-      .from('users')
-      .select('role')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    return res.status(200).json({
-      success: true,
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        role: profile?.role ?? 'USER',
-        full_name: (data.user.user_metadata?.full_name as string) ?? '',
+  async (_req: Request, res: Response) => {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'USE_SSO',
+        message: 'Sử dụng SSO portal để xác thực tài khoản của bạn.',
       },
-      session: data.session ? {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        expires_at: data.session.expires_at,
-        expires_in: data.session.expires_in,
-      } : null,
     });
   }
 );
@@ -284,22 +267,10 @@ router.post(
   '/auth/forgot-password',
   authLimiter,
   validate({ body: forgotPasswordAuthSchema }),
-  async (req: Request, res: Response) => {
-    const { email } = req.body;
-    const anonClient = getSupabaseClient();
-
-    const { error } = await anonClient.auth.resetPasswordForEmail(email);
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'RESET_REQUEST_FAILED', message: error.message },
-      });
-    }
-
+  async (_req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
-      message: 'Mã xác nhận khôi phục mật khẩu đã được gửi tới email của bạn.',
+      message: 'Khôi phục mật khẩu được xử lý tập trung tại SSO portal.',
     });
   }
 );
@@ -309,43 +280,13 @@ router.post(
   '/auth/reset-password',
   authLimiter,
   validate({ body: resetPasswordAuthSchema }),
-  async (req: Request, res: Response) => {
-    const { email, token, new_password } = req.body;
-    const anonClient = getSupabaseClient();
-    const admin = getAdminClient();
-
-    // 1. Verify OTP for recovery
-    const { data: verifyData, error: verifyErr } = await anonClient.auth.verifyOtp({
-      email,
-      token,
-      type: 'recovery',
-    });
-
-    if (verifyErr || !verifyData.user) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_OTP', message: verifyErr?.message || 'Mã xác thực không hợp lệ hoặc đã hết hạn' },
-      });
-    }
-
-    // 2. Update password
-    const { error: updateErr } = await admin.auth.admin.updateUserById(verifyData.user.id, {
-      password: new_password,
-    });
-
-    if (updateErr) {
-      return res.status(500).json({
-        success: false,
-        error: { code: 'UPDATE_PASSWORD_FAILED', message: updateErr.message },
-      });
-    }
-
-    // Invalidate old tokens in RAM cache (SEC-013)
-    memoryCache.invalidateUserTokens(verifyData.user.id);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Mật khẩu đã được cập nhật thành công. Vui lòng đăng nhập lại.',
+  async (_req: Request, res: Response) => {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'USE_SSO',
+        message: 'Sử dụng SSO portal để đặt lại mật khẩu của bạn.',
+      },
     });
   }
 );
@@ -507,64 +448,15 @@ router.post(
   '/auth/update-password',
   authLimiter,
   requireAuth,
-  validate({ body: updatePasswordSchema }),
-  async (req: Request, res: Response) => {
-    const user = req.user!;
-    const { password, current_password, is_recovery } = req.body;
-    const admin = getAdminClient();
-
-    if (!is_recovery) {
-      if (!current_password) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'CURRENT_PASSWORD_REQUIRED', message: 'Vui lòng nhập mật khẩu hiện tại' },
-        });
-      }
-
-      const { data: userRecord } = await admin
-        .from('users')
-        .select('id, password_hash')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      let passwordValid = false;
-      if (userRecord?.password_hash) {
-        passwordValid = await bcrypt.compare(current_password, userRecord.password_hash);
-      } else {
-        const anonClient = getSupabaseClient();
-        const { error: signInErr } = await anonClient.auth.signInWithPassword({
-          email: user.email,
-          password: current_password,
-        });
-        passwordValid = !signInErr;
-      }
-
-      if (!passwordValid) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'INVALID_CURRENT_PASSWORD', message: 'Mật khẩu hiện tại không chính xác' },
-        });
-      }
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const { error: dbUpdateErr } = await admin
-      .from('users')
-      .update({ password_hash: hashedPassword })
-      .eq('id', user.id);
-
-    if (dbUpdateErr) {
-      return res.status(500).json({
-        success: false,
-        error: { code: 'UPDATE_PASSWORD_FAILED', message: dbUpdateErr.message },
-      });
-    }
-
-    await admin.auth.admin.updateUserById(user.id, { password }).catch(() => {});
-
-    return res.status(200).json({
-      success: true,
-      message: 'Mật khẩu đã được cập nhật thành công.',
+  async (_req: Request, res: Response) => {
+    const ssoUrl = env.SSO_URL || '';
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'USE_SSO',
+        message: 'Sử dụng SSO portal để đổi mật khẩu của bạn',
+        ...(ssoUrl ? { sso_url: `${ssoUrl}/change-password` } : {}),
+      },
     });
   }
 );

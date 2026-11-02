@@ -1,3 +1,5 @@
+import { getSsoUrl } from "./sso";
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -108,17 +110,19 @@ export async function resetPasswordApi(body: {
 }
 
 export async function logoutApi(): Promise<void> {
-  const ssoBase = "https://sso.huytutor.edu.vn";
+  const ssoBase = getSsoUrl();
 
   // 1. Send direct browser request to SSO Portal to revoke session and delete SSO cookie
-  try {
-    await fetch(`${ssoBase}/api/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      mode: "cors",
-    });
-  } catch {
-    /* Ignore cross-origin network error */
+  if (ssoBase) {
+    try {
+      await fetch(`${ssoBase}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        mode: "cors",
+      });
+    } catch {
+      /* Ignore cross-origin network error */
+    }
   }
 
   // 2. Send request to Flashcard internal logout endpoint to clear all local cookies

@@ -1,25 +1,25 @@
 /**
  * SSO and Application URL Utilities (Server Secret-driven)
- * Strictly reads from environment variables with intelligent fallback to production domains.
+ * Strictly reads from environment variables without hardcoded URLs.
  */
 
 export function getSsoUrl(): string {
-  const ssoUrl = process.env.SSO_URL || process.env.NEXT_PUBLIC_SSO_URL;
+  const ssoUrl = process.env.SSO_URL;
   if (ssoUrl) {
     return ssoUrl.replace(/\/+$/, "");
   }
-  return "https://sso.huytutor.edu.vn";
+  return "";
 }
 
 export function getAppUrl(): string {
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = process.env.APP_URL;
   if (appUrl) {
     return appUrl.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined" && window.location.origin) {
     return window.location.origin.replace(/\/+$/, "");
   }
-  return "https://flashcard.huytutor.edu.vn";
+  return "";
 }
 
 export function getCookieDomain(): string {
