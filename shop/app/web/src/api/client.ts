@@ -13,14 +13,12 @@ import {
   UserSessionItem,
 } from '../types';
 
-const rawApiBase = import.meta.env.VITE_API_BASE_URL;
+const rawApiBase = import.meta.env.API_BASE_URL;
 const API_BASE_URL = rawApiBase ? (rawApiBase as string).replace(/\/$/, '') : '';
-const rawAdminKey = import.meta.env.VITE_ADMIN_API_KEY;
+const rawAdminKey = import.meta.env.ADMIN_API_KEY;
 const ADMIN_API_KEY = rawAdminKey ? (rawAdminKey as string) : '';
 export const R2_DOMAIN = (
-  import.meta.env.VITE_R2_DOMAIN ? (import.meta.env.VITE_R2_DOMAIN as string) : ''
-
-
+  import.meta.env.R2_DOMAIN ? (import.meta.env.R2_DOMAIN as string) : ''
 ).replace(/\/$/, '');
 
 export const SESSION_STORAGE_KEY = 'ht_session_token';

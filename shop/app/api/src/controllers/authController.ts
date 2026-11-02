@@ -1,67 +1,29 @@
 import { Request, Response } from 'express';
 import { authService } from '../services/authService';
 
-function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.socket?.remoteAddress || '127.0.0.1';
-}
-
 export const authController = {
   /**
    * POST /api/auth/register
    */
-  async register(req: Request, res: Response): Promise<void> {
-    try {
-      const { email, password, fullName, phone, customerGroup, schoolOrOrg } = req.body;
-      const result = await authService.register({
-        email,
-        password,
-        fullName,
-        phone,
-        customerGroup,
-        schoolOrOrg,
-        userAgent: String(req.headers['user-agent'] || 'Trình duyệt Web'),
-        ipAddress: getClientIp(req),
-      });
-
-      res.status(201).json({
-        ok: true,
-        ...result,
-      });
-    } catch (err: any) {
-      res.status(400).json({
-        ok: false,
-        error: err?.message || 'Lỗi đăng ký tài khoản.',
-      });
-    }
+  async register(_req: Request, res: Response): Promise<void> {
+    const ssoUrl = process.env.SSO_URL || '';
+    res.status(400).json({
+      ok: false,
+      error: 'Sử dụng SSO portal để đăng ký tài khoản của bạn.',
+      ...(ssoUrl ? { sso_url: `${ssoUrl}/register` } : {}),
+    });
   },
 
   /**
    * POST /api/auth/login
    */
-  async login(req: Request, res: Response): Promise<void> {
-    try {
-      const { email, password } = req.body;
-      const result = await authService.login({
-        email,
-        password,
-        userAgent: String(req.headers['user-agent'] || 'Trình duyệt Web'),
-        ipAddress: getClientIp(req),
-      });
-
-      res.json({
-        ok: true,
-        ...result,
-      });
-    } catch (err: any) {
-      res.status(401).json({
-        ok: false,
-        error: err?.message || 'Đăng nhập không thành công.',
-      });
-    }
+  async login(_req: Request, res: Response): Promise<void> {
+    const ssoUrl = process.env.SSO_URL || '';
+    res.status(400).json({
+      ok: false,
+      error: 'Sử dụng SSO portal để đăng nhập tài khoản của bạn.',
+      ...(ssoUrl ? { sso_url: `${ssoUrl}/login` } : {}),
+    });
   },
 
   /**
@@ -183,58 +145,36 @@ export const authController = {
   /**
    * POST /api/auth/change-password
    */
-  async changePassword(req: Request, res: Response): Promise<void> {
-    try {
-      if (!req.user) {
-        res.status(401).json({ ok: false, error: 'Chưa đăng nhập.' });
-        return;
-      }
-      const { currentPassword, newPassword } = req.body;
-      const result = await authService.changePassword({
-        userId: req.user.id,
-        currentPassword,
-        newPassword,
-      });
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({
-        ok: false,
-        error: err?.message || 'Lỗi đổi mật khẩu.',
-      });
-    }
+  async changePassword(_req: Request, res: Response): Promise<void> {
+    const ssoUrl = process.env.SSO_URL || '';
+    res.status(400).json({
+      ok: false,
+      error: 'Sử dụng SSO portal để đổi mật khẩu của bạn.',
+      ...(ssoUrl ? { sso_url: `${ssoUrl}/change-password` } : {}),
+    });
   },
 
   /**
    * POST /api/auth/forgot-password
    */
-  async forgotPassword(req: Request, res: Response): Promise<void> {
-    try {
-      const { email } = req.body;
-      const origin = String(process.env.FRONTEND_URL);
-      const result = await authService.forgotPassword(email, origin);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({
-        ok: false,
-        error: err?.message || 'Lỗi gửi yêu cầu khôi phục mật khẩu.',
-      });
-    }
+  async forgotPassword(_req: Request, res: Response): Promise<void> {
+    const ssoUrl = process.env.SSO_URL || '';
+    res.status(400).json({
+      ok: false,
+      error: 'Sử dụng SSO portal để khôi phục mật khẩu của bạn.',
+      ...(ssoUrl ? { sso_url: `${ssoUrl}/forgot-password` } : {}),
+    });
   },
 
   /**
    * POST /api/auth/reset-password
    */
-  async resetPassword(req: Request, res: Response): Promise<void> {
-    try {
-      const { token, newPassword } = req.body;
-      const result = await authService.resetPassword(token, newPassword);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({
-        ok: false,
-        error: err?.message || 'Lỗi đặt lại mật khẩu.',
-      });
-    }
+  async resetPassword(_req: Request, res: Response): Promise<void> {
+    const ssoUrl = process.env.SSO_URL || '';
+    res.status(400).json({
+      ok: false,
+      error: 'Sử dụng SSO portal để đặt lại mật khẩu của bạn.',
+      ...(ssoUrl ? { sso_url: `${ssoUrl}/reset-password` } : {}),
+    });
   },
 };
-

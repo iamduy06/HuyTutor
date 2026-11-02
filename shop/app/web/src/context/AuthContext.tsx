@@ -31,7 +31,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function getSsoUrl(): string {
-  const envUrl = import.meta.env.VITE_SSO_URL;
+  const envUrl = import.meta.env.SSO_URL;
   if (envUrl) {
     return (envUrl as string).replace(/\/+$/, '');
   }

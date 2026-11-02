@@ -13,6 +13,14 @@ import {
 
 type LibraryTab = 'library' | 'orders' | 'sessions' | 'profile';
 
+function getSsoUrl(): string {
+  const envUrl = import.meta.env.SSO_URL;
+  if (envUrl) {
+    return (envUrl as string).replace(/\/+$/, '');
+  }
+  return '';
+}
+
 export const MyLibraryPage: React.FC = () => {
   const { user, isAdmin, logout, logoutAllDevices, setUserState } = useAuth();
   const { showToast, products, setSampleModalProduct } = useStore();
@@ -43,12 +51,6 @@ export const MyLibraryPage: React.FC = () => {
     user?.defaultInvoiceAddress || ''
   );
   const [savingProfile, setSavingProfile] = useState(false);
-
-  // Form đổi mật khẩu
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [changingPass, setChangingPass] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -127,34 +129,6 @@ export const MyLibraryPage: React.FC = () => {
       showToast(err?.message || 'Lỗi lưu thông tin hồ sơ.');
     } finally {
       setSavingProfile(false);
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 6) {
-      showToast('Mật khẩu mới phải có ít nhất 6 ký tự.');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      showToast('Mật khẩu mới xác nhận không khớp.');
-      return;
-    }
-
-    setChangingPass(true);
-    try {
-      const res = await apiClient.changePassword({
-        currentPassword,
-        newPassword,
-      });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmNewPassword('');
-      showToast(res.message);
-    } catch (err: any) {
-      showToast(err?.message || 'Lỗi đổi mật khẩu.');
-    } finally {
-      setChangingPass(false);
     }
   };
 
@@ -602,62 +576,23 @@ export const MyLibraryPage: React.FC = () => {
                 </button>
               </form>
 
-              {/* Cột phải: Đổi mật khẩu */}
-              <form
-                onSubmit={handleChangePassword}
-                className="lg:col-span-5 bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-3.5"
-              >
+              {/* Cột phải: Đổi mật khẩu qua SSO */}
+              <div className="lg:col-span-5 bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-3.5">
                 <h2 className="text-sm font-extrabold text-[#e60049] uppercase border-b border-gray-100 pb-2">
                   Đổi mật khẩu bảo mật
                 </h2>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Mật khẩu hiện tại *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-[#e60049]"
-                  />
+                <div className="pt-2">
+                  <a
+                    href={`${getSsoUrl()}/change-password?redirect=${encodeURIComponent(
+                      typeof window !== 'undefined' ? window.location.href : ''
+                    )}`}
+                    className="inline-flex items-center gap-2 bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-5 py-2.5 rounded-sm transition"
+                  >
+                    <span>Sử dụng SSO portal để đổi mật khẩu của bạn</span>
+                    <span>→</span>
+                  </a>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Mật khẩu mới (tối thiểu 6 ký tự) *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-[#e60049]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Nhập lại mật khẩu mới *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-[#e60049]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={changingPass}
-                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-5 py-2.5 rounded-sm transition"
-                >
-                  {changingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu mới'}
-                </button>
-              </form>
+              </div>
             </div>
           )}
         </>
