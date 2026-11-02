@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { env } from './config/env.js';
-import { corsOptions } from './middlewares/cors.js';
+import { corsSecurityMiddleware } from './middlewares/cors.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { globalLimiter } from './middlewares/rateLimiter.js';
 import apiRouter from './routes/index.js';
@@ -29,7 +29,7 @@ app.get('/api/health', healthHandler);
 app.get('/health', healthHandler);
 
 app.use(helmet());
-app.use(cors(corsOptions));
+app.use(corsSecurityMiddleware);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
