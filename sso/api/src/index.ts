@@ -47,6 +47,7 @@ const authRouter = express.Router();
 authRouter.post('/login', validate({ body: ssoLoginSchema }), login);
 authRouter.post('/register', validate({ body: ssoRegisterSchema }), register);
 authRouter.post('/logout', logout);
+authRouter.get('/logout', logout);
 authRouter.get('/me', requireAuth, getMe);
 authRouter.post('/verify-device', requireAuth, validate({ body: ssoVerifyDeviceSchema }), verifyDevice);
 authRouter.get('/devices', requireAuth, listDevices);

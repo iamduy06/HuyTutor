@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSsoUrl, getAppUrl } from "@/lib/sso";
+import { getSsoUrl, getAppUrl, getCookieDomainList } from "@/lib/sso";
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -62,8 +62,10 @@ export async function middleware(request: NextRequest) {
         const ssoUrl = `${ssoBase}/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
         const redirectRes = NextResponse.redirect(new URL(ssoUrl));
         if (isLogoutIntent) {
-          const cookieDomain = process.env.COOKIE_DOMAIN;
           const isProd = process.env.NODE_ENV === "production";
+          const host = request.headers.get("host");
+          const domainList = getCookieDomainList(host);
+
           const clearOpts = {
             path: "/",
             httpOnly: true,
@@ -72,12 +74,17 @@ export async function middleware(request: NextRequest) {
             maxAge: 0,
             expires: new Date(0),
           };
-          if (cookieDomain) {
-            redirectRes.cookies.set("ht_sso_token", "", { ...clearOpts, domain: cookieDomain });
-            redirectRes.cookies.set("hut_access_token", "", { ...clearOpts, domain: cookieDomain });
+
+          const cookieNames = ["ht_sso_token", "hut_access_token", "hut_refresh_token", "hut_device_id"];
+
+          for (const dom of domainList) {
+            for (const name of cookieNames) {
+              redirectRes.cookies.set(name, "", { ...clearOpts, domain: dom });
+            }
           }
-          redirectRes.cookies.set("ht_sso_token", "", clearOpts);
-          redirectRes.cookies.set("hut_access_token", "", clearOpts);
+          for (const name of cookieNames) {
+            redirectRes.cookies.set(name, "", clearOpts);
+          }
         }
         return redirectRes;
       }

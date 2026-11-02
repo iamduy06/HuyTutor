@@ -383,6 +383,12 @@ router.post('/auth/logout', requireAuth, async (req: Request, res: Response) => 
   if (req.user?.id) {
     memoryCache.invalidateUserTokens(req.user.id);
   }
+  if (req.token) {
+    try {
+      const admin = getAdminClient();
+      await admin.from('user_sessions').update({ is_revoked: true }).eq('session_token', req.token);
+    } catch {}
+  }
   return res.status(200).json({ success: true });
 });
 

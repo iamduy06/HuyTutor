@@ -108,6 +108,20 @@ export async function resetPasswordApi(body: {
 }
 
 export async function logoutApi(): Promise<void> {
+  const ssoBase = "https://sso.huytutor.edu.vn";
+
+  // 1. Send direct browser request to SSO Portal to revoke session and delete SSO cookie
+  try {
+    await fetch(`${ssoBase}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      mode: "cors",
+    });
+  } catch {
+    /* Ignore cross-origin network error */
+  }
+
+  // 2. Send request to Flashcard internal logout endpoint to clear all local cookies
   try {
     await fetch("/api/auth/logout", {
       method: "POST",
@@ -115,25 +129,31 @@ export async function logoutApi(): Promise<void> {
     });
   } catch {
     /* Ignore error */
-  } finally {
-    clearClientToken();
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("hut_auth_token");
-        localStorage.removeItem("hut_user");
-        sessionStorage.clear();
+  }
 
-        // Expire non-httpOnly client cookies across domain variations
-        const past = "Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = `ht_sso_token=; path=/; expires=${past};`;
-        document.cookie = `ht_sso_token=; path=/; domain=.huytutor.edu.vn; expires=${past};`;
-        document.cookie = `hut_access_token=; path=/; expires=${past};`;
-        document.cookie = `hut_access_token=; path=/; domain=.huytutor.edu.vn; expires=${past};`;
+  // 3. Purge all client-side storage & state
+  clearClientToken();
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("hut_auth_token");
+      localStorage.removeItem("hut_user");
+      sessionStorage.clear();
 
-        window.dispatchEvent(new Event("hut_auth_changed"));
-      } catch {}
+      // Expire non-httpOnly client cookies across domain variations
+      const past = "Thu, 01 Jan 1970 00:00:00 GMT";
+      const domains = [".huytutor.edu.vn", "huytutor.edu.vn", window.location.hostname, `.${window.location.hostname}`, ""];
+      const cookieNames = ["ht_sso_token", "hut_access_token", "hut_refresh_token", "hut_device_id", "sb-access-token", "sb-refresh-token"];
 
-      window.location.href = "/login?logout=true";
-    }
+      for (const name of cookieNames) {
+        for (const dom of domains) {
+          const domStr = dom ? `; domain=${dom}` : "";
+          document.cookie = `${name}=; path=/${domStr}; expires=${past}; max-age=0`;
+        }
+      }
+
+      window.dispatchEvent(new Event("hut_auth_changed"));
+    } catch {}
+
+    window.location.href = `${ssoBase}/login?app=flashcard&redirect=${encodeURIComponent(window.location.origin + "/dashboard")}`;
   }
 }

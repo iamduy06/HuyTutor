@@ -141,8 +141,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
-    // 3. Retrieve user role & metadata from public.users
+    // 3. Retrieve user role & metadata from public.users and verify session status
     const admin = getAdminClient();
+
+    try {
+      const { data: sessionRecord } = await admin
+        .from('user_sessions')
+        .select('is_revoked, expires_at')
+        .eq('session_token', token)
+        .maybeSingle();
+
+      if (
+        sessionRecord &&
+        (sessionRecord.is_revoked === true ||
+          (sessionRecord.expires_at && new Date(sessionRecord.expires_at).getTime() < Date.now()))
+      ) {
+        return res.status(401).json({
+          success: false,
+          error: { code: 'SESSION_REVOKED', message: 'Phiên làm việc đã bị thu hồi hoặc đã hết hạn.' },
+        });
+      }
+    } catch {}
+
     const { data: profile } = await admin
       .from('users')
       .select('role, max_devices')

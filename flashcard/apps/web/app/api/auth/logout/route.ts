@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getApiUrl } from "@/lib/apiUrl";
-import { getCookieDomain, getSsoUrl } from "@/lib/sso";
+import { getCookieDomainList, getSsoUrl } from "@/lib/sso";
 
 async function performLogout(req: Request) {
   const cookieStore = await cookies();
@@ -48,7 +48,8 @@ async function performLogout(req: Request) {
   const response = NextResponse.json({ success: true, message: "Logged out successfully" });
 
   const isProd = process.env.NODE_ENV === "production";
-  const cookieDomain = getCookieDomain();
+  const host = req.headers.get("host");
+  const domainList = getCookieDomainList(host);
 
   const clearOptions = {
     path: "/",
@@ -59,22 +60,26 @@ async function performLogout(req: Request) {
     expires: new Date(0),
   };
 
+  const cookieNames = [
+    "ht_sso_token",
+    "hut_access_token",
+    "hut_refresh_token",
+    "hut_device_id",
+    "sb-access-token",
+    "sb-refresh-token",
+  ];
+
   // 2. Comprehensive Cookie Invalidation across all possible domain levels
-  if (cookieDomain) {
-    response.cookies.set("ht_sso_token", "", { ...clearOptions, domain: cookieDomain });
-    response.cookies.set("hut_access_token", "", { ...clearOptions, domain: cookieDomain });
-    response.cookies.set("hut_refresh_token", "", { ...clearOptions, domain: cookieDomain });
+  for (const dom of domainList) {
+    for (const name of cookieNames) {
+      response.cookies.set(name, "", { ...clearOptions, domain: dom });
+    }
   }
 
-  // Host-only cookie invalidation
-  response.cookies.set("ht_sso_token", "", clearOptions);
-  response.cookies.set("hut_access_token", "", clearOptions);
-  response.cookies.set("hut_refresh_token", "", clearOptions);
-  response.cookies.set("hut_device_id", "", clearOptions);
-
-  // Legacy cookies cleanup
-  response.cookies.set("sb-access-token", "", clearOptions);
-  response.cookies.set("sb-refresh-token", "", clearOptions);
+  // Host-only cookie invalidation (no domain attribute)
+  for (const name of cookieNames) {
+    response.cookies.set(name, "", clearOptions);
+  }
 
   return response;
 }
@@ -86,9 +91,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const res = await performLogout(req);
   const ssoBase = getSsoUrl();
-  const loginTarget = ssoBase
-    ? `${ssoBase}/login?app=flashcard`
-    : "/login?logout=true";
+  const loginTarget = `${ssoBase}/login?app=flashcard`;
   return NextResponse.redirect(new URL(loginTarget, req.url), {
     headers: res.headers,
   });

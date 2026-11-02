@@ -289,16 +289,25 @@ export async function logout(req: AuthenticatedRequest, res: Response): Promise<
     }
 
     const isProd = process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN;
+    const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
 
-    res.cookie('ht_sso_token', '', {
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
+    const clearOpts = {
       path: '/',
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
-      maxAge: 0
-    });
+      sameSite: 'lax' as const,
+      maxAge: 0,
+      expires: new Date(0),
+    };
+
+    // 1. Clear on root domain (.huytutor.edu.vn and huytutor.edu.vn)
+    res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain });
+    if (cookieDomain.startsWith('.')) {
+      res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain.slice(1) });
+    }
+
+    // 2. Clear host-only (no domain specified)
+    res.cookie('ht_sso_token', '', clearOpts);
 
     res.json({ success: true, message: 'Đăng xuất thành công.' });
   } catch (err: any) {
