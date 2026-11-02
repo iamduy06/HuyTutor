@@ -1,7 +1,7 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes';
+import { corsGuardMiddleware } from './middlewares/corsGuard';
 import { isSupabaseConfigured } from './config/supabase';
 import { isR2Configured } from './services/r2Service';
 
@@ -10,32 +10,8 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT);
 
-const configuredOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
-  : [];
-
-const allowedOrigins: (string | RegExp)[] = [
-  ...configuredOrigins.filter((o) => !o.includes('*')),
-  /\.vercel\.app$/,
-  /\.vercel$/,
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed instanceof RegExp) return allowed.test(origin);
-        return allowed === origin;
-      });
-      if (isAllowed || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        return callback(null, true);
-      }
-      return callback(null, false);
-    },
-    credentials: true,
-  })
-);
+// Áp dụng bảo vệ Strict Origin & Chặn CLI (curl, python, scripts)
+app.use(corsGuardMiddleware);
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
@@ -52,16 +28,11 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Mount toàn bộ API dưới prefix /api
+// Gắn toàn bộ router nghiệp vụ (/api/auth, /api/user, /api/catalog, /api/orders, /api/admin, /api/webhook)
 app.use('/api', apiRouter);
 
 app.listen(PORT, () => {
-  console.log(`[HuyTutor Backend API] Listening on http://localhost:${PORT}`);
-  console.log(
-    `[HuyTutor Backend API] 100% Database flows routed through Backend (${
-      isSupabaseConfigured ? 'Supabase PostgreSQL' : 'Local Persistent DB + Seed'
-    })`
-  );
+  console.log(`[Huy Tutor Shop API] Server listening on port ${PORT}`);
 });
 
 export default app;
