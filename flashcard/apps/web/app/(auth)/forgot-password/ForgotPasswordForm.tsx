@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getSsoUrl } from "@/lib/sso";
 
 export function ForgotPasswordForm() {
+  const ssoForgotUrl = `${getSsoUrl()}/forgot-password`;
+
+  useEffect(() => {
+    window.location.href = ssoForgotUrl;
+  }, [ssoForgotUrl]);
+
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">
       <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-4" />
@@ -12,7 +20,7 @@ export function ForgotPasswordForm() {
       <p className="text-xs text-muted-foreground mb-6">Khôi phục mật khẩu tài khoản hệ thống Huy Tutor.</p>
 
       <Button variant="brand-outline" size="sm" asChild>
-        <Link href="/forgot-password">Bấm vào đây nếu trình duyệt không tự chuyển</Link>
+        <Link href={ssoForgotUrl}>Bấm vào đây nếu trình duyệt không tự chuyển</Link>
       </Button>
     </div>
   );

@@ -5,6 +5,8 @@ import { verifyPassword, hashPassword } from '../utils/hash.js';
 import { checkAndRegisterDevice, calculateUserDeviceQuota } from '../services/deviceService.js';
 import { createSession, revokeSession, revokeAllUserSessions } from '../services/sessionService.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.js';
+import { sendSignupVerificationOtp, sendPasswordResetOtp } from '../services/emailService.js';
+import { createVerificationToken, recordTokenView, consumeTokenFinal } from '../services/tokenService.js';
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -259,6 +261,13 @@ export async function register(req: Request, res: Response): Promise<void> {
       maxAge: THREE_DAYS_MS
     });
 
+    // 6. Gửi email xác nhận đăng ký tài khoản qua custom verification token
+    createVerificationToken({ userId: newUser.id, email: cleanEmail, type: 'confirm_signup' })
+      .then((signupToken) => sendSignupVerificationOtp(cleanEmail, signupToken))
+      .catch((err) => {
+        console.warn('[SSO_REGISTER_EMAIL_WARN]', err);
+      });
+
     res.json({
       success: true,
       token,
@@ -471,5 +480,235 @@ export async function revokeAllSessions(req: AuthenticatedRequest, res: Response
   } catch (err: any) {
     console.error('[REVOKE_ALL_ERROR]', err);
     res.status(500).json({ success: false, error: 'Lỗi khi thu hồi phiên đăng nhập.' });
+  }
+}
+
+/**
+ * Gửi mã xác thực khôi phục mật khẩu qua Email (SMTP)
+ * Sinh verification token gắn với SSO để xác thực
+ */
+export async function forgotPassword(req: Request, res: Response): Promise<void> {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_EMAIL', message: 'Vui lòng cung cấp email.' } });
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const userRes = await supabaseRest(
+      `users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,is_active`
+    );
+
+    if (userRes.ok) {
+      const users = (await userRes.json()) as any[];
+      if (users && users.length > 0 && users[0].is_active !== false) {
+        const user = users[0];
+        const token = await createVerificationToken({
+          userId: user.id,
+          email: cleanEmail,
+          type: 'reset_password',
+        });
+
+        await sendPasswordResetOtp(cleanEmail, token);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Mã xác nhận khôi phục mật khẩu đã được gửi tới email của bạn.',
+    });
+  } catch (err: any) {
+    console.error('[FORGOT_PASSWORD_ERROR]', err);
+    res.status(500).json({ success: false, error: { message: 'Lỗi khi xử lý yêu cầu khôi phục mật khẩu.' } });
+  }
+}
+
+/**
+ * Kiểm tra và xác thực token trên SSO portal
+ */
+export async function verifyToken(req: Request, res: Response): Promise<void> {
+  try {
+    const token = ((req.query.token as string) || req.body?.token || '').trim();
+    if (!token) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_TOKEN', message: 'Thiếu mã token xác thực.' },
+      });
+      return;
+    }
+
+    const result = await recordTokenView(token);
+
+    if (!result.valid) {
+      res.status(400).json({
+        success: false,
+        error: { code: result.reason ?? 'INVALID_TOKEN', message: result.message },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      valid: true,
+      views: result.views,
+      maxViews: result.maxViews,
+      remainingViews: result.remainingViews,
+      email: result.email,
+    });
+  } catch (err: any) {
+    console.error('[VERIFY_TOKEN_ERROR]', err);
+    res.status(500).json({ success: false, error: { message: 'Lỗi khi xác thực token.' } });
+  }
+}
+
+export const verifyOtp = verifyToken;
+
+/**
+ * Đặt lại mật khẩu mới sau khi xác thực token
+ * Tiêu thụ và hủy hoàn toàn token để không thể sử dụng lại
+ */
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  try {
+    const { token, new_password } = req.body;
+    if (!token || !new_password) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_FIELDS', message: 'Thiếu mã xác thực hoặc mật khẩu mới.' },
+      });
+      return;
+    }
+
+    const cleanToken = token.trim();
+    const result = await consumeTokenFinal(cleanToken);
+
+    if (!result.valid || !result.userId) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: result.message ?? 'Mã xác thực không hợp lệ hoặc đã hết hạn.' },
+      });
+      return;
+    }
+
+    const hashedPassword = await hashPassword(new_password);
+    await supabaseRest(`users?id=eq.${result.userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        password_hash: hashedPassword,
+        reset_password_token: null,
+        reset_password_expires_at: null,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+
+    // Revoke all active sessions so all previous logins are terminated
+    await revokeAllUserSessions(result.userId);
+
+    res.json({
+      success: true,
+      message: 'Mật khẩu đã được cập nhật thành công. Vui lòng đăng nhập lại.',
+    });
+  } catch (err: any) {
+    console.error('[RESET_PASSWORD_ERROR]', err);
+    res.status(500).json({ success: false, error: { message: 'Đã có lỗi xảy ra, vui lòng thử lại.' } });
+  }
+}
+
+/**
+ * Đổi mật khẩu cho người dùng đang đăng nhập (Change Password)
+ * Xử lý tập trung tại SSO, xác thực mật khẩu hiện tại bằng bcrypt
+ */
+export async function changePassword(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const userPayload = req.user;
+    if (!userPayload?.sub) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' },
+      });
+      return;
+    }
+
+    const { current_password, new_password, password } = req.body;
+    const finalNewPassword = (new_password || password || '').trim();
+
+    if (!current_password || !finalNewPassword) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Vui lòng nhập đầy đủ thông tin.' },
+      });
+      return;
+    }
+
+    if (finalNewPassword.length < 6) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Mật khẩu mới phải từ 6 ký tự trở lên.' },
+      });
+      return;
+    }
+
+    // 1. Tìm thông tin người dùng trong public.users
+    const userRes = await supabaseRest(
+      `users?id=eq.${userPayload.sub}&select=id,password_hash`
+    );
+
+    if (!userRes.ok) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Đã có lỗi xảy ra, vui lòng thử lại.' },
+      });
+      return;
+    }
+
+    const users = (await userRes.json()) as any[];
+    if (!users || users.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Tài khoản không tồn tại.' },
+      });
+      return;
+    }
+
+    const dbUser = users[0];
+
+    // 2. So khớp mật khẩu hiện tại bằng bcrypt
+    const isValid = await verifyPassword(current_password, dbUser.password_hash);
+    if (!isValid) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Mật khẩu hiện tại không chính xác.' },
+      });
+      return;
+    }
+
+    // 3. Hash mật khẩu mới và cập nhật vào public.users
+    const hashed = await hashPassword(finalNewPassword);
+    const updateRes = await supabaseRest(`users?id=eq.${userPayload.sub}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        password_hash: hashed,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+
+    if (!updateRes.ok) {
+      res.status(500).json({
+        success: false,
+        error: { message: 'Đã có lỗi xảy ra, vui lòng thử lại.' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Đổi mật khẩu thành công.',
+    });
+  } catch (err: any) {
+    console.error('[CHANGE_PASSWORD_ERROR]', err);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Đã có lỗi xảy ra, vui lòng thử lại.' },
+    });
   }
 }

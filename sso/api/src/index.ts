@@ -9,6 +9,10 @@ import {
   ssoLoginSchema,
   ssoRegisterSchema,
   ssoVerifyDeviceSchema,
+  ssoForgotPasswordSchema,
+  ssoVerifyOtpSchema,
+  ssoResetPasswordSchema,
+  ssoChangePasswordSchema,
 } from './middlewares/validate.js';
 import {
   login,
@@ -17,7 +21,12 @@ import {
   getMe,
   verifyDevice,
   listDevices,
-  revokeAllSessions
+  revokeAllSessions,
+  forgotPassword,
+  verifyOtp,
+  verifyToken,
+  resetPassword,
+  changePassword,
 } from './controllers/authController.js';
 
 dotenv.config();
@@ -48,6 +57,14 @@ authRouter.post('/login', validate({ body: ssoLoginSchema }), login);
 authRouter.post('/register', validate({ body: ssoRegisterSchema }), register);
 authRouter.post('/logout', logout);
 authRouter.get('/logout', logout);
+authRouter.post('/forgot-password', validate({ body: ssoForgotPasswordSchema }), forgotPassword);
+authRouter.get('/verify-token', verifyToken);
+authRouter.post('/verify-token', verifyToken);
+authRouter.get('/verify-otp', verifyOtp);
+authRouter.post('/verify-otp', validate({ body: ssoVerifyOtpSchema }), verifyOtp);
+authRouter.post('/reset-password', validate({ body: ssoResetPasswordSchema }), resetPassword);
+authRouter.post('/change-password', requireAuth, validate({ body: ssoChangePasswordSchema }), changePassword);
+authRouter.post('/update-password', requireAuth, validate({ body: ssoChangePasswordSchema }), changePassword);
 authRouter.get('/me', requireAuth, getMe);
 authRouter.post('/verify-device', requireAuth, validate({ body: ssoVerifyDeviceSchema }), verifyDevice);
 authRouter.get('/devices', requireAuth, listDevices);

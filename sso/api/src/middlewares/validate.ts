@@ -94,3 +94,45 @@ export const ssoVerifyDeviceSchema = z.object({
     .max(128),
   device_name: z.string().trim().max(100).optional(),
 });
+
+export const ssoForgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email không được để trống')
+    .email('Định dạng email không hợp lệ')
+    .max(100, 'Email tối đa 100 ký tự'),
+});
+
+export const ssoVerifyOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email('Định dạng email không hợp lệ')
+    .max(100, 'Email tối đa 100 ký tự')
+    .optional(),
+  token: z.string().trim().min(6, 'Mã token phải có ít nhất 6 ký tự').max(100),
+  type: z.enum(['signup', 'recovery', 'email_change', 'invite']).optional().default('recovery'),
+});
+
+export const ssoResetPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email('Định dạng email không hợp lệ')
+    .max(100)
+    .optional(),
+  token: z.string().trim().min(6, 'Mã xác thực phải có ít nhất 6 ký tự').max(100),
+  new_password: z
+    .string()
+    .min(6, 'Mật khẩu mới phải từ 6 ký tự trở lên')
+    .max(100, 'Mật khẩu tối đa 100 ký tự'),
+});
+
+export const ssoChangePasswordSchema = z.object({
+  current_password: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+  new_password: z
+    .string()
+    .min(6, 'Mật khẩu mới phải từ 6 ký tự trở lên')
+    .max(100, 'Mật khẩu tối đa 100 ký tự'),
+});

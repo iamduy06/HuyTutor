@@ -5,14 +5,7 @@ const CLI_TOOL_REGEX = /^(curl|wget|python|httpie|postmanruntime|insomnia|aiohtt
 
 function getConfiguredOrigins(): string[] {
   const rawCors = process.env.CORS_ORIGINS;
-  if (!rawCors) {
-    return [
-      'https://sso.huytutor.edu.vn',
-      'https://flashcard.huytutor.edu.vn',
-      'https://huytutor.edu.vn',
-      'https://www.huytutor.edu.vn'
-    ];
-  }
+  if (!rawCors) return [];
   return rawCors
     .split(',')
     .map((o) => o.trim().replace(/\/+$/, ''))
