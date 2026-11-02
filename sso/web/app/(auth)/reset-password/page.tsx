@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -8,6 +8,8 @@ function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
 
+  const [checkingToken, setCheckingToken] = useState(true);
+  const [tokenValid, setTokenValid] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -15,10 +17,56 @@ function ResetPasswordContent() {
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    if (!token) {
+      setCheckingToken(false);
+      setTokenValid(false);
+      return;
+    }
+
+    let active = true;
+
+    async function checkToken() {
+      try {
+        const res = await fetch(`/api/auth/verify-token?token=${encodeURIComponent(token)}`, {
+          method: 'GET',
+        });
+        const data = await res.json();
+
+        if (!active) return;
+
+        if (res.ok && data.success && data.valid) {
+          setTokenValid(true);
+        } else {
+          setTokenValid(false);
+          setErrorMsg(data.error?.message || 'Liên kết không hợp lệ hoặc đã hết hạn.');
+        }
+      } catch {
+        if (!active) return;
+        setTokenValid(false);
+        setErrorMsg('Đã có lỗi xảy ra, vui lòng thử lại.');
+      } finally {
+        if (active) {
+          setCheckingToken(false);
+        }
+      }
+    }
+
+    checkToken();
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirmPassword) {
       setErrorMsg('Mật khẩu nhập lại không khớp.');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg('Mật khẩu mới phải từ 6 ký tự trở lên.');
       return;
     }
 
@@ -34,7 +82,7 @@ function ResetPasswordContent() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMsg(data.error || 'Lỗi đặt lại mật khẩu.');
+        setErrorMsg(data.error?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.');
         setLoading(false);
         return;
       }
@@ -42,17 +90,29 @@ function ResetPasswordContent() {
       setSuccess(true);
       setLoading(false);
     } catch {
-      setErrorMsg('Lỗi kết nối máy chủ.');
+      setErrorMsg('Đã có lỗi xảy ra, vui lòng thử lại.');
       setLoading(false);
     }
   }
 
-  if (!token) {
+  if (checkingToken) {
+    return (
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-4" />
+        <h2 className="text-base font-bold text-gray-900 mb-1">Đang kiểm tra liên kết...</h2>
+        <p className="text-xs text-muted-foreground">Vui lòng chờ trong giây lát.</p>
+      </div>
+    );
+  }
+
+  if (!token || !tokenValid) {
     return (
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center">
         <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
         <h2 className="text-base font-bold text-gray-900 mb-1">Liên kết không hợp lệ</h2>
-        <p className="text-xs text-muted-foreground mb-4">Mã khôi phục không tồn tại hoặc đã hết hạn.</p>
+        <p className="text-xs text-muted-foreground mb-4">
+          {errorMsg || 'Liên kết xác thực không tồn tại hoặc đã hết hạn.'}
+        </p>
         <a href="/forgot-password" className="text-xs text-brand font-bold hover:underline">
           Gửi lại yêu cầu khôi phục
         </a>

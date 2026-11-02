@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMsg(data.error || 'Lỗi gửi yêu cầu khôi phục.');
+        setErrorMsg(data.error?.message || data.error || 'Đã có lỗi xảy ra, vui lòng thử lại.');
         setLoading(false);
         return;
       }
@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
       setSent(true);
       setLoading(false);
     } catch {
-      setErrorMsg('Không thể kết nối máy chủ.');
+      setErrorMsg('Đã có lỗi xảy ra, vui lòng thử lại.');
       setLoading(false);
     }
   }
