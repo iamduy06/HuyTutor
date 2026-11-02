@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { env } from '../config/env.js';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
@@ -28,13 +31,70 @@ router.post(
     const anonClient = getSupabaseClient();
     const admin = getAdminClient();
 
-    // 1. Authenticate with Supabase Auth
-    const { data: authData, error: authError } = await anonClient.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // 1. Authenticate with master public.users table or fallback to Supabase GoTrue Auth
+    let user: { id: string; email: string; role: UserRole; max_devices?: number | null; full_name?: string } | null = null;
+    let sessionToken: string = '';
+    let sessionExpiresAt: number = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
 
-    if (authError || !authData.user || !authData.session) {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data: dbUser } = await admin
+      .from('users')
+      .select('id, email, password_hash, role, max_devices, full_name, is_active')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (dbUser && dbUser.password_hash) {
+      const isValid = await bcrypt.compare(password, dbUser.password_hash);
+      if (isValid && dbUser.is_active !== false) {
+        user = {
+          id: dbUser.id,
+          email: dbUser.email,
+          role: (dbUser.role as UserRole) ?? 'USER',
+          max_devices: dbUser.max_devices ?? null,
+          full_name: dbUser.full_name ?? '',
+        };
+        const secret = env.JWT_SECRET || 'secret';
+        const now = Math.floor(Date.now() / 1000);
+        const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+        const payload = Buffer.from(JSON.stringify({
+          sub: user.id,
+          email: user.email,
+          role: user.role,
+          device_id,
+          iat: now,
+          exp: now + 7 * 24 * 3600,
+        })).toString('base64url');
+        const sig = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+        sessionToken = `${header}.${payload}.${sig}`;
+      }
+    }
+
+    if (!user) {
+      const { data: authData, error: authError } = await anonClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (!authError && authData.user && authData.session) {
+        const { data: profile } = await admin
+          .from('users')
+          .select('role, max_devices, full_name')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        user = {
+          id: authData.user.id,
+          email: authData.user.email ?? email,
+          role: (profile?.role as UserRole) ?? 'USER',
+          max_devices: profile?.max_devices ?? null,
+          full_name: profile?.full_name ?? (authData.user.user_metadata?.full_name as string) ?? '',
+        };
+        sessionToken = authData.session.access_token;
+        sessionExpiresAt = authData.session.expires_at ?? (Math.floor(Date.now() / 1000) + 7 * 24 * 3600);
+      }
+    }
+
+    if (!user || !sessionToken) {
       return res.status(401).json({
         success: false,
         error: {
@@ -44,17 +104,7 @@ router.post(
       });
     }
 
-    const user = authData.user;
-    const session = authData.session;
-
-    // 2. Fetch profile from public.users
-    const { data: profile } = await admin
-      .from('users')
-      .select('role, max_devices')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    const role = (profile?.role as UserRole) ?? 'USER';
+    const role = user.role;
 
     // 3. Atomic Device Limit Enforcement (Admins bypass limit)
     if (role !== 'ADMIN') {
@@ -64,7 +114,7 @@ router.post(
         .eq('key', 'global_max_devices')
         .single();
 
-      const maxDevices = profile?.max_devices ?? parseInt(setting?.value ?? '3', 10);
+      const maxDevices = user.max_devices ?? parseInt(setting?.value ?? '3', 10);
 
       const { data: existing } = await admin
         .from('user_devices')
@@ -129,13 +179,12 @@ router.post(
         id: user.id,
         email: user.email,
         role,
-        full_name: (user.user_metadata?.full_name as string) ?? '',
+        full_name: user.full_name ?? '',
       },
       session: {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-        expires_in: session.expires_in,
+        access_token: sessionToken,
+        expires_at: sessionExpiresAt,
+        expires_in: 7 * 24 * 3600,
       },
     });
   }
@@ -466,13 +515,25 @@ router.post(
         });
       }
 
-      const anonClient = getSupabaseClient();
-      const { error: signInErr } = await anonClient.auth.signInWithPassword({
-        email: user.email,
-        password: current_password,
-      });
+      const { data: userRecord } = await admin
+        .from('users')
+        .select('id, password_hash')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      if (signInErr) {
+      let passwordValid = false;
+      if (userRecord?.password_hash) {
+        passwordValid = await bcrypt.compare(current_password, userRecord.password_hash);
+      } else {
+        const anonClient = getSupabaseClient();
+        const { error: signInErr } = await anonClient.auth.signInWithPassword({
+          email: user.email,
+          password: current_password,
+        });
+        passwordValid = !signInErr;
+      }
+
+      if (!passwordValid) {
         return res.status(400).json({
           success: false,
           error: { code: 'INVALID_CURRENT_PASSWORD', message: 'Mật khẩu hiện tại không chính xác' },
@@ -480,14 +541,20 @@ router.post(
       }
     }
 
-    const { error } = await admin.auth.admin.updateUserById(user.id, { password });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { error: dbUpdateErr } = await admin
+      .from('users')
+      .update({ password_hash: hashedPassword })
+      .eq('id', user.id);
 
-    if (error) {
+    if (dbUpdateErr) {
       return res.status(500).json({
         success: false,
-        error: { code: 'UPDATE_PASSWORD_FAILED', message: error.message },
+        error: { code: 'UPDATE_PASSWORD_FAILED', message: dbUpdateErr.message },
       });
     }
+
+    await admin.auth.admin.updateUserById(user.id, { password }).catch(() => {});
 
     return res.status(200).json({
       success: true,

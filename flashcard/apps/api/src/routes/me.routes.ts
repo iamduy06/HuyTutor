@@ -79,7 +79,7 @@ router.get('/me/dashboard', requireAuth, async (req: Request, res: Response) => 
     admin
       .from('decks')
       .select('id, title, description, level, access_level')
-      .or('access_level->public.eq.true,access_level->auth.eq.true')
+      .or('access_level->>public.eq.true,access_level->>auth.eq.true')
       .order('created_at', { ascending: true }),
   ]);
 

@@ -25,6 +25,7 @@ const healthHandler = (_req: Request, res: Response) => {
   });
 };
 app.get('/api/v1/health', healthHandler);
+app.get('/api/health', healthHandler);
 app.get('/health', healthHandler);
 
 app.use(helmet());
@@ -34,9 +35,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply global rate limiter to all API endpoints
 app.use('/api/v1', globalLimiter);
+app.use('/api', globalLimiter);
 
 // Main API Router under /api/v1 and root fallback
 app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
 // Global Error Handler for Express 5 native async error handling

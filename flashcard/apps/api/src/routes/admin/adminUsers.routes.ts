@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
@@ -86,8 +88,12 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
   const password = body.password?.trim() || 'goidangkyflashcard';
   const supabase = getAdminClient();
 
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email,
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Optionally create in Supabase Auth GoTrue for backward-compat
+  const { data: authUser } = await supabase.auth.admin.createUser({
+    email: cleanEmail,
     password,
     email_confirm: true,
     user_metadata: {
@@ -95,20 +101,19 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
       created_by_admin: true,
       skip_system_group: !!(group_id && group_id !== 'none'),
     },
-  });
+  }).catch(() => ({ data: null }));
 
-  if (authError) return res.status(400).json({ error: authError.message });
+  const userId = authUser?.user?.id || crypto.randomUUID();
 
-  const userId = authUser.user.id;
+  const { data: insertedUser, error: insertErr } = await supabase.from('users').upsert({
+    id: userId,
+    email: cleanEmail,
+    password_hash: hashedPassword,
+    role,
+    max_devices: max_devices !== undefined && max_devices !== null && max_devices !== '' ? Number(max_devices) : null,
+  }).select().single();
 
-  if (max_devices !== undefined && max_devices !== null && max_devices !== '') {
-    await supabase.from('users').upsert({
-      id: userId,
-      email,
-      role,
-      max_devices: Number(max_devices),
-    });
-  }
+  if (insertErr) return res.status(400).json({ error: insertErr.message });
 
   if (group_id && group_id !== 'none') {
     await supabase.from('group_users').insert({
@@ -134,7 +139,7 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
     }
   }
 
-  return res.status(200).json({ user: authUser.user, tempPassword: password });
+  return res.status(200).json({ user: authUser?.user ?? insertedUser, tempPassword: password });
 });
 
 // PATCH /admin/users/:id
@@ -147,8 +152,9 @@ router.patch('/admin/users/:id', validate({ body: adminUpdateUserSchema }), asyn
   // Reset password
   if (body.action === 'reset_password') {
     const newPassword = generatePassword(8);
-    const { error } = await supabase.auth.admin.updateUserById(id, { password: newPassword });
-    if (error) return res.status(400).json({ error: error.message });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', id);
+    await supabase.auth.admin.updateUserById(id, { password: newPassword }).catch(() => {});
     memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ tempPassword: newPassword });
   }
@@ -299,8 +305,8 @@ router.delete('/admin/users/:id', async (req: Request, res: Response) => {
   }
 
   const supabase = getAdminClient();
-  const { error } = await supabase.auth.admin.deleteUser(id);
-  if (error) return res.status(400).json({ error: error.message });
+  await supabase.from('users').delete().eq('id', id);
+  await supabase.auth.admin.deleteUser(id).catch(() => {});
   memoryCache.invalidateUserTokens(id);
   return res.status(200).json({ success: true });
 });
