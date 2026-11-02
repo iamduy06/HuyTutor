@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Shield } from "lucide-react";
@@ -27,9 +28,16 @@ export function SiteHeader() {
   const loginUrl = "/login";
   const registerUrl = "/register";
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   async function handleLogout() {
-    await logoutApi();
-    window.location.href = "/login";
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logoutApi();
+    } catch {
+      window.location.href = "/login?logout=true";
+    }
   }
 
   const customLogoText = branding?.allow_custom_branding ? branding.header_logo_text : null;
@@ -92,8 +100,15 @@ export function SiteHeader() {
             <Button variant="ghost" size="sm" asChild>
               <Link href="/profile"><User className="w-4 h-4" /></Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              title="Đăng xuất"
+              aria-label="Đăng xuất"
+            >
+              <LogOut className={`w-4 h-4 ${isLoggingOut ? "animate-spin text-brand" : ""}`} />
             </Button>
           </>
         ) : (

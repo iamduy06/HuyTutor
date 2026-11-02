@@ -41,11 +41,13 @@ export async function middleware(request: NextRequest) {
 
   // 3. Centralized SSO Redirection for Auth Routes (/login, /register, /forgot-password)
   const hasAuthError = request.nextUrl.searchParams.has("error");
+  const isLogoutIntent = request.nextUrl.searchParams.has("logout");
+
   if (["/login", "/register", "/forgot-password"].includes(path)) {
-    if (token && !hasAuthError) {
+    if (token && !hasAuthError && !isLogoutIntent) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if (!token && !hasAuthError) {
+    if ((!token || isLogoutIntent) && !hasAuthError) {
       const ssoRoute = path === "/register" ? "register" : path === "/forgot-password" ? "forgot-password" : "login";
       const nextParam = request.nextUrl.searchParams.get("next");
       const appBase = getAppUrl();
@@ -58,7 +60,26 @@ export async function middleware(request: NextRequest) {
       const ssoBase = getSsoUrl();
       if (ssoBase) {
         const ssoUrl = `${ssoBase}/${ssoRoute}?app=flashcard&redirect=${encodeURIComponent(redirectTarget)}`;
-        return NextResponse.redirect(new URL(ssoUrl));
+        const redirectRes = NextResponse.redirect(new URL(ssoUrl));
+        if (isLogoutIntent) {
+          const cookieDomain = process.env.COOKIE_DOMAIN;
+          const isProd = process.env.NODE_ENV === "production";
+          const clearOpts = {
+            path: "/",
+            httpOnly: true,
+            secure: isProd,
+            sameSite: "lax" as const,
+            maxAge: 0,
+            expires: new Date(0),
+          };
+          if (cookieDomain) {
+            redirectRes.cookies.set("ht_sso_token", "", { ...clearOpts, domain: cookieDomain });
+            redirectRes.cookies.set("hut_access_token", "", { ...clearOpts, domain: cookieDomain });
+          }
+          redirectRes.cookies.set("ht_sso_token", "", clearOpts);
+          redirectRes.cookies.set("hut_access_token", "", clearOpts);
+        }
+        return redirectRes;
       }
     }
   }
