@@ -1,37 +1,138 @@
-import cors from 'cors';
+import type { Request, Response, NextFunction } from 'express';
 
-const rawCors = process.env.CORS_ORIGINS;
-const configuredOrigins = rawCors
-  ? rawCors.split(',').map((o: string) => o.trim()).filter(Boolean)
-  : [];
+// Strict regex identifying command-line and automated testing tools
+const CLI_TOOL_REGEX = /^(curl|wget|python|httpie|postmanruntime|insomnia|aiohttp|urllib|requests)/i;
 
-const allowedOrigins: (string | RegExp)[] = configuredOrigins.map((o: string) => {
-  if (o.includes('*')) {
-    return new RegExp('^' + o.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+function getConfiguredOrigins(): string[] {
+  const rawCors = process.env.CORS_ORIGINS;
+  if (!rawCors) {
+    return [
+      'https://sso.huytutor.edu.vn',
+      'https://flashcard.huytutor.edu.vn',
+      'https://huytutor.edu.vn',
+      'https://www.huytutor.edu.vn'
+    ];
   }
-  return o;
-});
+  return rawCors
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+}
 
-export const corsMiddleware = cors({
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin) return callback(null, true);
+export function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  const clean = origin.trim().replace(/\/+$/, '');
 
-    const isAllowed = allowedOrigins.some((allowed) => {
-      if (allowed instanceof RegExp) return allowed.test(origin);
-      return allowed === origin;
+  // 1. Local development environments
+  if (
+    clean.startsWith('http://localhost') ||
+    clean.startsWith('http://127.0.0.1')
+  ) {
+    return true;
+  }
+
+  // 2. Official production & staging subdomains of huytutor.edu.vn
+  if (/^https:\/\/([a-zA-Z0-9_\-\.]+\.)?huytutor\.edu\.vn$/.test(clean)) {
+    return true;
+  }
+
+  // 3. Vercel deployment preview and production domains
+  if (/^https:\/\/([a-zA-Z0-9_\-\.]+\.)?vercel\.app$/.test(clean) || clean === 'https://vercel.app') {
+    return true;
+  }
+
+  // 4. Configured origins from environment variables
+  const configured = getConfiguredOrigins();
+  return configured.some((allowed) => {
+    if (allowed.includes('*')) {
+      const reg = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+      return reg.test(clean);
+    }
+    return allowed === clean;
+  });
+}
+
+/**
+ * Strict Security Guard Middleware:
+ * - Blocks automated command-line tools (curl, wget, python, postman) from direct invocation
+ * - Enforces Origin & Referer domain whitelist
+ * - Emits strict CORS headers for legitimate browser frontends
+ */
+export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Exempt health-check endpoint for Render / UptimeRobot monitoring
+  if (req.path === '/health') {
+    next();
+    return;
+  }
+
+  const userAgent = req.headers['user-agent'] || '';
+
+  // 1. Block command-line tools (curl, wget, python, postman, etc.)
+  if (CLI_TOOL_REGEX.test(userAgent)) {
+    res.status(403).json({
+      success: false,
+      error: {
+        code: 'CLI_ACCESS_FORBIDDEN',
+        message: 'Truy cập bằng dòng lệnh hoặc công cụ tự động (curl, CLI, scripts) bị chặn vì lý do an toàn.'
+      }
     });
+    return;
+  }
 
-    if (
-      isAllowed ||
-      origin.startsWith('http://localhost') ||
-      origin.startsWith('http://127.0.0.1')
-    ) {
-      return callback(null, true);
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+
+  // 2. Validate Origin if present
+  if (origin) {
+    if (!isOriginAllowed(origin)) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'CORS_ORIGIN_DENIED',
+          message: `Tên miền không được phép truy cập (CORS Origin Blocked: ${origin}).`
+        }
+      });
+      return;
     }
 
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Device-Id']
-});
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, X-Device-Id, X-Device-Name, X-Session-Token, X-Admin-Key'
+    );
+  } else if (referer) {
+    // 3. Validate Referer if present (e.g. from navigations or standard browser requests)
+    try {
+      const refOrigin = new URL(referer).origin;
+      if (!isOriginAllowed(refOrigin)) {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'CORS_REFERER_DENIED',
+            message: 'Nguồn truy cập (Referer) không thuộc danh sách tên miền được phép.'
+          }
+        });
+        return;
+      }
+    } catch {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'INVALID_REFERER',
+          message: 'Tiêu đề Referer không hợp lệ.'
+        }
+      });
+      return;
+    }
+  }
+
+  // 4. Handle CORS Preflight request immediately
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+}
