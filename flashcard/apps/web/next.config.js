@@ -17,6 +17,10 @@ const nextConfig = {
     ],
   },
   transpilePackages: ["@huytutor/shared"],
+  env: {
+    SSO_URL: process.env.SSO_URL,
+    APP_URL: process.env.APP_URL,
+  },
   async rewrites() {
     const rawApiUrl = process.env.API_URL;
     if (!rawApiUrl) return [];

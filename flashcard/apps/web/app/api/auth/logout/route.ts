@@ -70,15 +70,27 @@ async function performLogout(req: Request) {
   ];
 
   // 2. Comprehensive Cookie Invalidation across all possible domain levels
-  for (const dom of domainList) {
-    for (const name of cookieNames) {
-      response.cookies.set(name, "", { ...clearOptions, domain: dom });
-    }
-  }
+  // Use response.headers.append('Set-Cookie', ...) to guarantee all domain variations are sent
+  // without Next.js response.cookies map overriding them
+  const pastDate = "Thu, 01 Jan 1970 00:00:00 GMT";
+  const secureFlag = isProd ? "; Secure" : "";
 
-  // Host-only cookie invalidation (no domain attribute)
   for (const name of cookieNames) {
-    response.cookies.set(name, "", clearOptions);
+    // Host-only cookie invalidation
+    response.headers.append(
+      "Set-Cookie",
+      `${name}=; Path=/; Expires=${pastDate}; Max-Age=0; HttpOnly${secureFlag}; SameSite=Lax`
+    );
+
+    // Domain-scoped cookie invalidation
+    for (const dom of domainList) {
+      if (dom) {
+        response.headers.append(
+          "Set-Cookie",
+          `${name}=; Path=/; Domain=${dom}; Expires=${pastDate}; Max-Age=0; HttpOnly${secureFlag}; SameSite=Lax`
+        );
+      }
+    }
   }
 
   return response;

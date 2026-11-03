@@ -35,8 +35,10 @@ export function SiteHeader() {
     setIsLoggingOut(true);
     try {
       await logoutApi();
-    } catch {
-      window.location.href = "/?logout=true";
+    } catch (e) {
+      console.error("[LOGOUT_ERROR]", e);
+    } finally {
+      window.location.href = "/api/auth/logout";
     }
   }
 
