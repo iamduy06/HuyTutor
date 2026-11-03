@@ -154,14 +154,14 @@ export const Header: React.FC = () => {
                   onClick={() => setMenuOpen((prev) => !prev)}
                   className="px-2.5 py-1 rounded-sm border border-gray-300 bg-white hover:border-[#e60049] text-gray-800 text-[11px] font-bold transition"
                 >
-                  {user.fullName}
+                  {user.fullName?.trim() || user.email?.split('@')[0] || 'Tài khoản'}
                 </button>
 
                 {menuOpen && (
                   <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-md shadow-xl py-1.5 z-50 text-xs">
                     <div className="px-3 py-1.5 border-b border-gray-100">
                       <div className="font-extrabold text-gray-900 truncate">
-                        {user.fullName}
+                        {user.fullName?.trim() || user.email?.split('@')[0] || 'Tài khoản'}
                       </div>
                       <div className="text-[10px] text-gray-500 truncate">{user.email}</div>
                     </div>
