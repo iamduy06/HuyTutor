@@ -6,6 +6,7 @@ import { AdminHomepageCms } from '../components/AdminHomepageCms';
 import { AdminCategoryCms } from '../components/AdminCategoryCms';
 import { AdminComboCms } from '../components/AdminComboCms';
 import { AdminFlashcardCms } from '../components/AdminFlashcardCms';
+import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import {
@@ -48,7 +49,7 @@ export const AdminPage: React.FC = () => {
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<
-    'homepage_cms' | 'category_cms' | 'combo_cms' | 'flashcard_cms' | 'products' | 'orders' | 'mapping' | 'users' | 'configs'
+    'homepage_cms' | 'category_cms' | 'combo_cms' | 'flashcard_cms' | 'utility_cms' | 'products' | 'orders' | 'mapping' | 'users' | 'configs'
   >('homepage_cms');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -625,6 +626,25 @@ export const AdminPage: React.FC = () => {
 
               <button
                 type="button"
+                onClick={() => setActiveTab('utility_cms')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'utility_cms'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>5. Cấu hình Trang Tiện ích</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'utility_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  5 trang
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('products')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'products'
@@ -632,7 +652,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>5. Quản lý Sản phẩm</span>
+                <span>6. Quản lý Sản phẩm</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'products' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -651,7 +671,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>6. Quản lý Đơn hàng</span>
+                <span>7. Quản lý Đơn hàng</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'orders' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -670,7 +690,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>7. Đối soát &amp; Tự động</span>
+                <span>8. Đối soát &amp; Tự động</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'mapping' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -689,7 +709,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>8. Thành viên &amp; Phân quyền</span>
+                <span>9. Thành viên &amp; Phân quyền</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'users' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -708,7 +728,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>9. Menu Header &amp; Footer</span>
+                <span>10. Menu Header &amp; Footer</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'configs' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -773,6 +793,9 @@ export const AdminPage: React.FC = () => {
 
             {/* TAB FLASHCARD CMS */}
             {activeTab === 'flashcard_cms' && <AdminFlashcardCms />}
+
+            {/* TAB UTILITY PAGES CMS */}
+            {activeTab === 'utility_cms' && <AdminUtilityPagesCms />}
 
             {/* TAB 1: QUẢN LÝ SẢN PHẨM & 5 ĐỊNH DẠNG */}
             {activeTab === 'products' && (

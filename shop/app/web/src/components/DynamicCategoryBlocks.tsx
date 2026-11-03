@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   CategoryBannerBlockConfig,
   CategoryBlockItem,
@@ -7,8 +7,13 @@ import {
   CategoryNoticeBlockConfig,
   CategorySectionBlockConfig,
   CategorySectionCardItem,
+  GiftAnchorItem,
+  GiftDonateCtaConfig,
+  GiftFormEmbedConfig,
+  GiftHeroAnchorsConfig,
   Product,
 } from '../types';
+import { Link } from 'react-router-dom';
 import { SmartLink } from './SmartLink';
 
 /**
@@ -22,6 +27,55 @@ export function buildInitialCategoryBlocks(
   if (Array.isArray(category.blocks) && category.blocks.length > 0) {
     return [...category.blocks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
+
+  if (category.slug === 'gifts') {
+    return [
+      {
+        id: 'block_gift_hero',
+        type: 'gift_hero_anchors',
+        title_label: 'Tiêu đề & Nút chuyển mục',
+        is_active: true,
+        sort_order: 1,
+        config: {
+          title: 'Tài liệu miễn phí',
+          subtitle: '',
+          anchors: [
+            { id: 'anc_1', label: 'Đề chính thức', target_url: '/gifts/de-thi-chinh-thuc' },
+            { id: 'anc_2', label: 'Đề trường, sở', target_url: '/gifts/de-truong-so' },
+            { id: 'anc_3', label: '200 câu collocations', target_url: '/gifts/200-cau-collocations' },
+            { id: 'anc_4', label: '100 câu idioms', target_url: '/gifts/100-cau-idioms' },
+            { id: 'anc_5', label: '296 collocations', target_url: '/gifts/296-collocations' },
+          ],
+        } as GiftHeroAnchorsConfig,
+      },
+      {
+        id: 'block_gift_form',
+        type: 'gift_form_embed',
+        title_label: 'Khung nhúng Form nhận quà',
+        is_active: true,
+        sort_order: 2,
+        config: {
+          form_title: 'Nhận tài liệu miễn phí từ Huy Tutor',
+          form_url: '',
+          iframe_height: 750,
+        } as GiftFormEmbedConfig,
+      },
+      {
+        id: 'block_gift_donate',
+        type: 'gift_donate_cta',
+        title_label: 'Khung kêu gọi Ủng hộ tác giả',
+        is_active: true,
+        sort_order: 3,
+        config: {
+          prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
+          button_text: 'Ủng hộ tác giả',
+          target_url: '/donate',
+          is_active: true,
+        } as GiftDonateCtaConfig,
+      },
+    ];
+  }
+
 
   // Tự động gom nhóm các sản phẩm theo sub_section
   const sectionMap = new Map<string, Product[]>();
@@ -397,6 +451,172 @@ export const CategoryNoticeBlock: React.FC<{
         <h3 className="font-extrabold text-xs sm:text-sm">{config.title}</h3>
       )}
       <p className="text-xs sm:text-[13px] leading-relaxed whitespace-pre-line">{config.content}</p>
+    </section>
+  );
+};
+
+
+/**
+ * ============================================================================
+ * CÁC COMPONENT DÒNG TRANG TẶNG QUÀ CẤP 1 (GIFTS BLOCKS)
+ * ============================================================================
+ */
+
+export const GiftHeroAnchorsBlock: React.FC<{
+  config?: GiftHeroAnchorsConfig | null;
+}> = ({ config }) => {
+  if (!config) return null;
+
+  return (
+    <section className="text-center pt-6 pb-2 space-y-6">
+      <h1 className="text-xl sm:text-2xl font-extrabold text-[#e60049] tracking-tight">
+        {config.title || 'Tài liệu miễn phí'}
+      </h1>
+      {config.subtitle && (
+        <p className="text-xs text-gray-600 max-w-lg mx-auto">{config.subtitle}</p>
+      )}
+
+      {/* Cụm nút Anchor chuẩn mẫu Ảnh 2 */}
+      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-2xl mx-auto">
+        {(config.anchors || []).map((anc) => (
+          <Link
+            key={anc.id}
+            to={anc.target_url || '#'}
+            className="bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] sm:text-xs font-bold px-4 py-2 rounded-sm shadow-sm transition transform hover:-translate-y-0.5"
+          >
+            {anc.label}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+export const GiftFormEmbedBlock: React.FC<{
+  config?: GiftFormEmbedConfig | null;
+}> = ({ config }) => {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('Giáo viên THPT');
+  const [submitted, setSubmitted] = useState(false);
+
+  if (!config) return null;
+
+  // Nếu có form_url (Google Form nhúng): render Iframe
+  if (config.form_url?.trim()) {
+    return (
+      <section className="max-w-2xl mx-auto bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <iframe
+          src={config.form_url}
+          title={config.form_title || 'Nhận tài liệu miễn phí'}
+          width="100%"
+          height={config.iframe_height || 750}
+          className="w-full border-0"
+        >
+          Đang tải form...
+        </iframe>
+      </section>
+    );
+  }
+
+  // Mẫu Form nội bộ chuẩn giao diện Ảnh 2 (Zero-Downtime, không cần Google Form ngoài)
+  return (
+    <section className="max-w-xl mx-auto bg-white border border-gray-200 rounded-md p-6 shadow-sm space-y-4">
+      <div className="border-b border-gray-100 pb-3">
+        <h2 className="text-sm sm:text-base font-extrabold text-gray-900 text-center">
+          {config.form_title || 'Nhận tài liệu miễn phí từ Huy Tutor'}
+        </h2>
+        <p className="text-[11px] text-gray-500 text-center mt-1">
+          Hệ thống sẽ gửi file Word &amp; PDF trực tiếp vào hòm thư Gmail của bạn
+        </p>
+      </div>
+
+      {submitted ? (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-xs text-center space-y-1">
+          <div className="font-bold">✔ Đã tiếp nhận đăng ký nhận tài liệu!</div>
+          <div>Vui lòng kiểm tra hộp thư đến (hoặc hòm thư Spam) sau ít phút.</div>
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSubmitted(true);
+          }}
+          className="space-y-4 text-xs"
+        >
+          <div>
+            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+              Địa chỉ Email của bạn *
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email..."
+              className="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:border-[#e60049] outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-700 mb-2">
+              Quý thầy/cô/bạn đang là? *
+            </label>
+            <div className="space-y-2 pl-1">
+              {[
+                'Giáo viên Tiểu học',
+                'Giáo viên Trung học cơ sở',
+                'Giáo viên Trung học phổ thông',
+                'Chuyên viên',
+                'Học sinh',
+                'Sinh viên',
+                'Gia sư',
+                'Phụ huynh học sinh',
+              ].map((item) => (
+                <label key={item} className="flex items-center gap-2 cursor-pointer text-gray-700">
+                  <input
+                    type="radio"
+                    name="role"
+                    value={item}
+                    checked={role === item}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="accent-[#e60049]"
+                  />
+                  <span>{item}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold py-2.5 rounded-sm transition shadow-sm text-xs"
+          >
+            Gửi yêu cầu nhận tài liệu
+          </button>
+        </form>
+      )}
+    </section>
+  );
+};
+
+export const GiftDonateCtaBlock: React.FC<{
+  config?: GiftDonateCtaConfig | null;
+}> = ({ config }) => {
+  if (!config || config.is_active === false) return null;
+
+  return (
+    <section className="text-center py-6 border-t border-gray-100 space-y-3">
+      <p className="text-xs font-bold text-gray-800">
+        {config.prompt_text || 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!'}
+      </p>
+      <div>
+        <Link
+          to={config.target_url || '/donate'}
+          className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white text-xs font-bold px-6 py-2 rounded-sm transition shadow-sm"
+        >
+          {config.button_text || 'Ủng hộ tác giả'}
+        </Link>
+      </div>
     </section>
   );
 };

@@ -187,6 +187,12 @@ export interface SiteConfigs {
   homepage_blocks?: HomepageBlockItem[];
   combo_page_blocks?: ComboPageBlockItem[];
   flashcard_page_blocks?: FlashcardPageBlockItem[];
+  gift_page_blocks?: CategoryBlockItem[];
+  terms_page_config?: TermsPageConfig;
+  faq_page_config?: FaqPageConfig;
+  hc_rewards_page_config?: HcRewardsPageConfig;
+  soan_tai_lieu_page_config?: SoanTaiLieuPageConfig;
+  donate_page_config?: DonatePageConfig;
   [key: string]: any;
 }
 
@@ -210,7 +216,10 @@ export type CategoryBlockType =
   | 'category_hero'
   | 'category_section'
   | 'category_banner'
-  | 'category_notice';
+  | 'category_notice'
+  | 'gift_hero_anchors'
+  | 'gift_form_embed'
+  | 'gift_donate_cta';
 
 export interface CategoryBlockItem {
   id: string;
@@ -402,7 +411,10 @@ export type ProductDetailBlockType =
   | 'topic_accordion'
   | 'sample_groups'
   | 'bottom_cta'
-  | 'related_products';
+  | 'related_products'
+  | 'gift_preview_download'
+  | 'gift_cross_sell'
+  | 'gift_donate_cta';
 
 export interface ProductDetailBlockItem {
   id: string;
@@ -613,6 +625,108 @@ export interface FlashcardPageBlockItem {
     | FlashcardBannerBlockConfig;
 }
 
+
+/**
+ * ============================================================================
+ * CẤU HÌNH CÁC KHỐI DÒNG TRANG TẶNG QUÀ (GIFTS BUILDER)
+ * ============================================================================
+ */
+
+export interface GiftAnchorItem {
+  id: string;
+  label: string;
+  target_url: string;
+}
+
+export interface GiftHeroAnchorsConfig {
+  title: string;
+  subtitle?: string;
+  anchors: GiftAnchorItem[];
+}
+
+export interface GiftFormEmbedConfig {
+  form_title?: string;
+  form_url: string;
+  iframe_height?: number;
+}
+
+export interface GiftDonateCtaConfig {
+  prompt_text: string;
+  button_text: string;
+  target_url: string;
+  is_active: boolean;
+}
+
+export interface GiftCrossSellConfig {
+  heading: string;
+  product_ids: string[];
+}
+
+/**
+ * ============================================================================
+ * CẤU HÌNH 5 TRANG TIỆN ÍCH (UTILITY PAGES BUILDER)
+ * ============================================================================
+ */
+
+export interface TermsSectionItem {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface TermsPageConfig {
+  title: string;
+  description: string;
+  sections: TermsSectionItem[];
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface FaqPageConfig {
+  title: string;
+  description: string;
+  faqs: FaqItem[];
+}
+
+export interface HcRewardBenefitItem {
+  id: string;
+  title: string;
+  desc: string;
+}
+
+export interface HcRewardsPageConfig {
+  title: string;
+  description: string;
+  benefits: HcRewardBenefitItem[];
+  lookup_title?: string;
+}
+
+export interface SoanTaiLieuCommitmentItem {
+  id: string;
+  title: string;
+  desc: string;
+}
+
+export interface SoanTaiLieuPageConfig {
+  title: string;
+  description: string;
+  commitments: SoanTaiLieuCommitmentItem[];
+  form_title?: string;
+}
+
+export interface DonatePageConfig {
+  title: string;
+  message: string;
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  default_amount?: number;
+}
+
 export interface Product {
   id: string;
   category_id: string;
@@ -639,6 +753,9 @@ export interface Product {
   is_featured: boolean;
   is_combo_eligible: boolean;
   is_active: boolean;
+  is_free?: boolean;
+  download_url?: string;
+  cross_sell_product_ids?: string[];
   formats: ProductFormat[];
   detail_blocks?: ProductDetailBlockItem[];
 }

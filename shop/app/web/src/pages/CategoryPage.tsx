@@ -6,6 +6,9 @@ import {
   CategoryHeroBlock,
   CategoryNoticeBlock,
   CategorySectionBlock,
+  GiftHeroAnchorsBlock,
+  GiftFormEmbedBlock,
+  GiftDonateCtaBlock,
 } from '../components/DynamicCategoryBlocks';
 import { useStore } from '../context/StoreContext';
 import {
@@ -14,6 +17,9 @@ import {
   CategoryItem,
   CategoryNoticeBlockConfig,
   CategorySectionBlockConfig,
+  GiftHeroAnchorsConfig,
+  GiftFormEmbedConfig,
+  GiftDonateCtaConfig,
 } from '../types';
 
 export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug: propSlug }) => {
@@ -94,6 +100,27 @@ export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug
                   <CategoryNoticeBlock
                     key={block.id}
                     config={block.config as CategoryNoticeBlockConfig}
+                  />
+                );
+              case 'gift_hero_anchors':
+                return (
+                  <GiftHeroAnchorsBlock
+                    key={block.id}
+                    config={block.config as GiftHeroAnchorsConfig}
+                  />
+                );
+              case 'gift_form_embed':
+                return (
+                  <GiftFormEmbedBlock
+                    key={block.id}
+                    config={block.config as GiftFormEmbedConfig}
+                  />
+                );
+              case 'gift_donate_cta':
+                return (
+                  <GiftDonateCtaBlock
+                    key={block.id}
+                    config={block.config as GiftDonateCtaConfig}
                   />
                 );
               default:

@@ -18,6 +18,9 @@ import {
   CategoryHeroBlock,
   CategoryNoticeBlock,
   CategorySectionBlock,
+  GiftHeroAnchorsBlock,
+  GiftFormEmbedBlock,
+  GiftDonateCtaBlock,
 } from './DynamicCategoryBlocks';
 import { normalizeTargetUrl } from './SmartLink';
 
@@ -44,6 +47,21 @@ const CATEGORY_BLOCK_META: Record<
     label: 'PHẦN MỞ RỘNG: Hộp Ghi chú & Lưu ý',
     badgeColor: 'bg-amber-600 text-white',
     desc: 'Hộp văn bản thông báo hoặc ghi chú ngắn với nền hồng, xám hoặc trắng.',
+  },
+  gift_hero_anchors: {
+    label: 'QUÀ TẶNG: Tiêu đề & Cụm nút Anchor chuyển mục',
+    badgeColor: 'bg-emerald-600 text-white',
+    desc: 'Tiêu đề lớn Tài liệu miễn phí và danh sách các nút đỏ bo góc dẫn đến từng chuyên mục quà tặng.',
+  },
+  gift_form_embed: {
+    label: 'QUÀ TẶNG: Khung Form nhận tài liệu miễn phí',
+    badgeColor: 'bg-pink-600 text-white',
+    desc: 'Nhúng Google Form hoặc form nội bộ để khách hàng nhập Gmail và chọn nghề nghiệp nhận file.',
+  },
+  gift_donate_cta: {
+    label: 'QUÀ TẶNG: Khung kêu gọi Ủng hộ tác giả (Donate CTA)',
+    badgeColor: 'bg-red-600 text-white',
+    desc: 'Dòng text kêu gọi ủng hộ tác giả kèm nút đỏ dẫn trực tiếp sang trang /donate.',
   },
 };
 
@@ -222,6 +240,49 @@ export const AdminCategoryCms: React.FC = () => {
             bg_style: 'pink',
             is_active: true,
           } as CategoryNoticeBlockConfig,
+        };
+      case 'gift_hero_anchors':
+        return {
+          id,
+          type,
+          title_label: CATEGORY_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            title: 'Tài liệu miễn phí',
+            subtitle: '',
+            anchors: [
+              { id: 'anc_1', label: 'Đề chính thức', target_url: '/gifts/de-thi-chinh-thuc' },
+              { id: 'anc_2', label: 'Đề trường, sở', target_url: '/gifts/de-truong-so' },
+            ],
+          },
+        };
+      case 'gift_form_embed':
+        return {
+          id,
+          type,
+          title_label: CATEGORY_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            form_title: 'Nhận tài liệu miễn phí từ Huy Tutor',
+            form_url: '',
+            iframe_height: 750,
+          },
+        };
+      case 'gift_donate_cta':
+        return {
+          id,
+          type,
+          title_label: CATEGORY_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
+            button_text: 'Ủng hộ tác giả',
+            target_url: '/donate',
+            is_active: true,
+          },
         };
     }
   };

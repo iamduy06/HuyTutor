@@ -9,7 +9,10 @@ import {
   RelatedProductsBlock,
   SampleGroupsBlock,
   TopicAccordionBlock,
+  GiftPreviewDownloadBlock,
+  GiftCrossSellBlock,
 } from '../components/DynamicProductDetailBlocks';
+import { GiftDonateCtaBlock } from '../components/DynamicCategoryBlocks';
 import { useStore } from '../context/StoreContext';
 import { Product, SamplePreviewGroup, UiFormatCode } from '../types';
 
@@ -165,6 +168,35 @@ export const ProductDetailPage: React.FC = () => {
               selectedFormat={selectedFormat}
               onBuyNow={(fmt) => buyNow(product, fmt, 1)}
               onAddToCart={(fmt) => addToCart(product, fmt, 1)}
+            />
+          );
+        }
+
+        if (block.type === 'gift_preview_download') {
+          return (
+            <GiftPreviewDownloadBlock
+              key={block.id}
+              config={block.config}
+              product={product}
+            />
+          );
+        }
+
+        if (block.type === 'gift_cross_sell') {
+          return (
+            <GiftCrossSellBlock
+              key={block.id}
+              config={block.config}
+              allProducts={products}
+            />
+          );
+        }
+
+        if (block.type === 'gift_donate_cta') {
+          return (
+            <GiftDonateCtaBlock
+              key={block.id}
+              config={block.config}
             />
           );
         }

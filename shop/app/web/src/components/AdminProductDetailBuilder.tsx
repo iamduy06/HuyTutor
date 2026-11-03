@@ -67,6 +67,21 @@ const DETAIL_BLOCK_META: Record<
     badgeColor: 'bg-teal-600 text-white',
     desc: 'Lưới 3 cột giới thiệu các tài liệu liên quan ở cuối trang.',
   },
+  gift_preview_download: {
+    label: 'QUÀ TẶNG: Xem thử Watermark & Nút Tải ngay',
+    badgeColor: 'bg-emerald-600 text-white',
+    desc: 'Hiển thị các trang đọc thử kèm nút Tải ngay màu đỏ lớn cho tài liệu miễn phí.',
+  },
+  gift_cross_sell: {
+    label: 'QUÀ TẶNG: Gợi ý tài liệu có phí bán kèm (Cross-sell)',
+    badgeColor: 'bg-amber-600 text-white',
+    desc: 'Lưới 3 cột gợi ý các tài liệu trọng tâm có phí để kích thích mua hàng.',
+  },
+  gift_donate_cta: {
+    label: 'QUÀ TẶNG: Kêu gọi ủng hộ tác giả (Donate CTA)',
+    badgeColor: 'bg-red-600 text-white',
+    desc: 'Dòng text kêu gọi ủng hộ tác giả kèm nút chuyển đến trang /donate.',
+  },
 };
 
 function collectBlockR2Urls(block: ProductDetailBlockItem): string[] {
@@ -283,6 +298,48 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
           config: cfg,
         };
       }
+      case 'gift_preview_download':
+        return {
+          id,
+          type,
+          title_label: DETAIL_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            title: product.title || 'Đề thi chính thức môn Tiếng Anh',
+            subtitle: product.short_desc || 'File Word + File PDF có lời giải chi tiết',
+            download_url: product.download_url || product.sample_pdf_url || '',
+            preview_images: product.preview_images || [],
+            sample_pdf_url: product.sample_pdf_url || '',
+            watermark_text: product.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+          },
+        };
+      case 'gift_cross_sell':
+        return {
+          id,
+          type,
+          title_label: DETAIL_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            heading: 'Các bộ đề thi thử nổi bật do Huy Tutor biên soạn',
+            product_ids: product.cross_sell_product_ids || [],
+          },
+        };
+      case 'gift_donate_cta':
+        return {
+          id,
+          type,
+          title_label: DETAIL_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
+            button_text: 'Ủng hộ tác giả',
+            target_url: '/donate',
+            is_active: true,
+          },
+        };
     }
   };
 

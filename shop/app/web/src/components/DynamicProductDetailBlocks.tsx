@@ -24,6 +24,52 @@ export function buildInitialDetailBlocksFromProduct(product: Product): ProductDe
     return [...product.detail_blocks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
 
+  // Tự động nhận diện Chế độ Quà tặng (Free Gift Mode)
+  if (product.category_slug === 'gifts' || product.is_free) {
+    return [
+      {
+        id: 'block_gift_preview_dl',
+        type: 'gift_preview_download',
+        title_label: 'Xem thử Watermark & Nút Tải ngay',
+        is_active: true,
+        sort_order: 1,
+        config: {
+          title: product.title || 'Đề thi chính thức môn Tiếng Anh',
+          subtitle: product.short_desc || 'File Word + File PDF có lời giải chi tiết',
+          download_url: product.download_url || product.sample_pdf_url || '',
+          preview_images: product.preview_images || [],
+          sample_pdf_url: product.sample_pdf_url || '',
+          watermark_text: product.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+        },
+      },
+      {
+        id: 'block_gift_cross_sell',
+        type: 'gift_cross_sell',
+        title_label: 'Gợi ý tài liệu có phí bán kèm (Cross-sell)',
+        is_active: true,
+        sort_order: 2,
+        config: {
+          heading: 'Các bộ đề thi thử nổi bật do Huy Tutor biên soạn',
+          product_ids: product.cross_sell_product_ids || [],
+        },
+      },
+      {
+        id: 'block_gift_donate',
+        type: 'gift_donate_cta',
+        title_label: 'Kêu gọi ủng hộ tác giả (Donate CTA)',
+        is_active: true,
+        sort_order: 3,
+        config: {
+          prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
+          button_text: 'Ủng hộ tác giả',
+          target_url: '/donate',
+          is_active: true,
+        },
+      },
+    ];
+  }
+
+
   const sampleGroups: SamplePreviewGroup[] = [];
   if (product.preview_type === 'pdf' && product.sample_pdf_url?.trim()) {
     sampleGroups.push({
@@ -809,3 +855,142 @@ export const RelatedProductsBlock: React.FC<{
   );
 };
 
+
+
+/**
+ * ============================================================================
+ * CÁC COMPONENT DÒNG TRANG TẶNG QUÀ CẤP 2 (FREE GIFT DETAIL BLOCKS)
+ * ============================================================================
+ */
+
+export const GiftPreviewDownloadBlock: React.FC<{
+  config?: any;
+  product: Product;
+}> = ({ config, product }) => {
+  const title = config?.title || product.title;
+  const subtitle = config?.subtitle || product.short_desc;
+  const downloadUrl = config?.download_url || product.download_url || product.sample_pdf_url;
+  const images = config?.preview_images?.length > 0 ? config.preview_images : product.preview_images || [];
+
+  return (
+    <section className="space-y-6">
+      {/* Tiêu đề & Phụ đề chuẩn mẫu Ảnh 3 */}
+      <div className="text-center space-y-1">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-[#e60049] tracking-tight">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="text-xs text-gray-600 font-medium">{subtitle}</p>
+        )}
+      </div>
+
+      {/* Danh sách các trang xem thử Watermark xếp dọc */}
+      <div className="max-w-[720px] mx-auto space-y-6">
+        {images.length > 0 ? (
+          images.map((imgUrl: string, idx: number) => (
+            <div
+              key={idx}
+              className="relative bg-white border-2 border-red-200 rounded-sm overflow-hidden shadow-md"
+            >
+              <div className="bg-[#e60049] text-white text-[10px] font-bold py-1 px-3 flex items-center justify-between">
+                <span>HUY TUTOR - TÀI LIỆU TIẾNG ANH</span>
+                <span>Trang {idx + 1} / {images.length}</span>
+              </div>
+              <img
+                src={imgUrl}
+                alt={'Trang ' + (idx + 1)}
+                className="w-full h-auto object-contain block select-none pointer-events-none"
+              />
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <span className="text-red-600/15 font-black text-2xl sm:text-3xl uppercase tracking-widest rotate-[-30deg] select-none">
+                  {config?.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR'}
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="bg-white border-2 border-red-200 rounded-sm p-8 text-center text-xs text-gray-500 shadow-sm">
+            {product.sample_pdf_url ? (
+              <iframe
+                src={product.sample_pdf_url}
+                title="Bản đọc thử PDF"
+                className="w-full h-[600px] border-0"
+              />
+            ) : (
+              'Đang cập nhật các trang đọc thử...'
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Nút to màu đỏ: TẢI NGAY */}
+      <div className="max-w-[720px] mx-auto text-center pt-2">
+        <a
+          href={downloadUrl || '#'}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block w-full sm:w-auto min-w-[320px] bg-[#e60049] hover:bg-[#cc0041] text-white font-black text-sm uppercase py-3.5 px-8 rounded-sm shadow-md transition transform hover:-translate-y-0.5 tracking-wider text-center"
+        >
+          Tải ngay
+        </a>
+      </div>
+    </section>
+  );
+};
+
+export const GiftCrossSellBlock: React.FC<{
+  config?: any;
+  allProducts?: Product[];
+}> = ({ config, allProducts = [] }) => {
+  const heading = config?.heading || 'Các bộ đề mới nhất, bám sát form đề thi thật';
+  const targetIds: string[] = config?.product_ids || [];
+
+  const crossProducts =
+    targetIds.length > 0
+      ? allProducts.filter((p) => targetIds.includes(p.id) || targetIds.includes(p.slug))
+      : allProducts.filter((p) => p.category_slug !== 'gifts').slice(0, 3);
+
+  if (crossProducts.length === 0) return null;
+
+  return (
+    <section className="max-w-[720px] mx-auto pt-8 border-t border-gray-100 space-y-4">
+      <h2 className="text-center text-xs sm:text-sm font-extrabold text-[#e60049] uppercase">
+        {heading}
+      </h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {crossProducts.map((p) => (
+          <div
+            key={p.id}
+            className="bg-white border border-gray-200 rounded-md p-3 text-center space-y-2 shadow-2xs hover:border-[#e60049] transition"
+          >
+            <div className="h-32 flex items-center justify-center">
+              {p.thumbnail_url ? (
+                <img
+                  src={p.thumbnail_url}
+                  alt={p.title}
+                  className="max-h-28 w-auto object-contain drop-shadow"
+                />
+              ) : (
+                <div className="w-20 h-28 bg-gray-100 rounded flex items-center justify-center text-gray-400 font-bold text-[10px]">
+                  Bìa sách
+                </div>
+              )}
+            </div>
+
+            <div className="text-[11px] font-bold text-gray-800 line-clamp-2 min-h-[32px]">
+              {p.title}
+            </div>
+
+            <SmartLink
+              to={'/' + p.category_slug + '/' + p.slug}
+              className="block w-full py-1.5 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-2xs"
+            >
+              Xem chi tiết
+            </SmartLink>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
