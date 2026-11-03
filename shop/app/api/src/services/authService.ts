@@ -189,17 +189,23 @@ export const authService = {
     if (cleanToken.includes('.') && jwtSecret) {
       const payload = verifySsoJwt(cleanToken, jwtSecret);
       if (payload && payload.sub) {
+        // Kiểm tra xem phiên này đã bị thu hồi trong public.user_sessions chưa
+        const dbSession = await dbService.getSessionByToken(cleanToken);
+        if (dbSession && (dbSession.is_revoked || new Date(dbSession.expires_at).getTime() <= Date.now())) {
+          return null;
+        }
+
         let user = await dbService.getUserById(payload.sub);
         if (!user && payload.email) {
           user = await dbService.getUserByEmail(payload.email);
         }
         if (user && user.is_active !== false) {
           const syntheticSession: SeedUserSession = {
-            id: `sso_${payload.sub}`,
+            id: dbSession?.id || `sso_${payload.sub}`,
             user_id: user.id,
             session_token: cleanToken,
-            user_agent: 'SSO Federated Client',
-            ip_address: '',
+            user_agent: dbSession?.user_agent || 'SSO Federated Client',
+            ip_address: dbSession?.ip_address || '',
             is_revoked: false,
             created_at: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
             last_active_at: new Date().toISOString(),
