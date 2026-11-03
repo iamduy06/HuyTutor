@@ -13,6 +13,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().min(1),
   JWT_SECRET: z.string().optional(),
   SSO_URL: z.string().optional(),
+  ADMIN_API_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
