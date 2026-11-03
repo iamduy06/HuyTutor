@@ -492,3 +492,4 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
     </div>
   );
 };
+
