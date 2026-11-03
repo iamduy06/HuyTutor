@@ -10,6 +10,7 @@ import {
   ssoRegisterSchema,
   ssoVerifyDeviceSchema,
   ssoForgotPasswordSchema,
+  ssoResendVerificationSchema,
   ssoVerifyOtpSchema,
   ssoResetPasswordSchema,
   ssoChangePasswordSchema,
@@ -24,6 +25,7 @@ import {
   revokeAllSessions,
   revokeSingleSession,
   forgotPassword,
+  resendVerification,
   verifyOtp,
   verifyToken,
   resetPassword,
@@ -59,6 +61,7 @@ authRouter.post('/register', validate({ body: ssoRegisterSchema }), register);
 authRouter.post('/logout', logout);
 authRouter.get('/logout', logout);
 authRouter.post('/forgot-password', validate({ body: ssoForgotPasswordSchema }), forgotPassword);
+authRouter.post('/resend-verification', validate({ body: ssoResendVerificationSchema }), resendVerification);
 authRouter.get('/verify-token', verifyToken);
 authRouter.post('/verify-token', verifyToken);
 authRouter.get('/verify-otp', verifyOtp);

@@ -84,9 +84,11 @@ function getTransporter(): Transporter {
   return cachedTransporter;
 }
 
-export function renderConfirmSignupTemplate(token: string): string {
+export function renderConfirmSignupTemplate(token: string, email?: string): string {
   const ssoUrl = getSsoBaseUrl();
-  const confirmUrl = `${ssoUrl}/api/auth/verify-token?token=${token}&type=signup`;
+  const confirmUrl = email
+    ? `${ssoUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`
+    : `${ssoUrl}/verify-email?token=${token}`;
 
   const tokenHtml = `
     <a href="${confirmUrl}" style="color: #ed0046; text-decoration: none; font-size: 0.45em; letter-spacing: 2px; font-weight: 800; display: inline-block; word-break: break-all;">XÁC THỰC TÀI KHOẢN</a>
@@ -430,11 +432,13 @@ export async function sendEmail(options: {
 
 export async function sendSignupVerificationOtp(email: string, token: string): Promise<boolean> {
   const ssoUrl = getSsoBaseUrl();
-  const html = renderConfirmSignupTemplate(token);
+  const cleanEmail = email.trim().toLowerCase();
+  const html = renderConfirmSignupTemplate(token, cleanEmail);
+  const confirmUrl = `${ssoUrl}/verify-email?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
   return sendEmail({
-    to: email,
-    subject: 'Confirm Your Signup',
-    text: `Vui lòng xác nhận đăng ký tài khoản của bạn: ${ssoUrl}/api/auth/verify-token?token=${token}&type=signup`,
+    to: cleanEmail,
+    subject: 'Xác thực tài khoản Huy Tutor của bạn',
+    text: `Vui lòng xác thực tài khoản của bạn bằng cách truy cập liên kết: ${confirmUrl}`,
     html,
   });
 }
@@ -444,8 +448,8 @@ export async function sendPasswordResetOtp(email: string, token: string): Promis
   const html = renderResetPasswordTemplate(token);
   return sendEmail({
     to: email,
-    subject: 'Reset Password',
-    text: `Vui lòng sử dụng liên kết sau để đặt lại mật khẩu: ${ssoUrl}/reset-password?token=${token}`,
+    subject: 'Khôi phục mật khẩu tài khoản Huy Tutor',
+    text: `Vui lòng sử dụng liên kết sau để đặt lại mật khẩu mới: ${ssoUrl}/reset-password?token=${token}`,
     html,
   });
 }

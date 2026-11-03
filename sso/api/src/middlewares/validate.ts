@@ -118,6 +118,15 @@ export const ssoForgotPasswordSchema = z.object({
     .max(100, 'Email tối đa 100 ký tự'),
 });
 
+export const ssoResendVerificationSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email không được để trống')
+    .email('Định dạng email không hợp lệ')
+    .max(100, 'Email tối đa 100 ký tự'),
+});
+
 export const ssoVerifyOtpSchema = z.object({
   email: z
     .string()

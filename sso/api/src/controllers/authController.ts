@@ -51,7 +51,11 @@ export async function login(req: Request, res: Response): Promise<void> {
     if (user.is_active === false) {
       res.status(403).json({
         success: false,
-        error: { code: 'ACCOUNT_LOCKED', message: 'Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ.' }
+        error: {
+          code: 'ACCOUNT_NOT_ACTIVATED',
+          message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực tài khoản trước khi đăng nhập.',
+          email: user.email,
+        }
       });
       return;
     }
@@ -184,23 +188,45 @@ export async function register(req: Request, res: Response): Promise<void> {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Kiểm tra email trùng
-    const checkRes = await supabaseRest(`users?email=eq.${encodeURIComponent(cleanEmail)}&select=id`);
-    if (checkRes.ok) {
-      const existing = (await checkRes.json()) as any[];
-      if (existing && existing.length > 0) {
+    // 1. Kiểm tra tài khoản đã tồn tại hay chưa
+    const checkRes = await supabaseRest(`users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,is_active`);
+    if (!checkRes.ok) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'DATABASE_ERROR', message: 'Lỗi máy chủ khi kiểm tra tài khoản.' }
+      });
+      return;
+    }
+
+    const existing = (await checkRes.json()) as any[];
+    if (existing && existing.length > 0) {
+      const u = existing[0];
+      if (u.is_active === false) {
         res.status(409).json({
           success: false,
-          error: { code: 'EMAIL_EXISTS', message: 'Email này đã được sử dụng trên hệ thống.' }
+          error: {
+            code: 'ACCOUNT_EXISTS_UNACTIVATED',
+            message: 'Tài khoản với email này đã được đăng ký nhưng chưa kích hoạt qua email. Vui lòng kiểm tra email kích hoạt hoặc đăng nhập.',
+            email: cleanEmail,
+          }
         });
         return;
       }
+
+      res.status(409).json({
+        success: false,
+        error: {
+          code: 'EMAIL_EXISTS',
+          message: 'Tài khoản với email này đã tồn tại trên hệ thống. Vui lòng chuyển sang trang Đăng nhập hoặc Quên mật khẩu.',
+        }
+      });
+      return;
     }
 
     // 2. Hash mật khẩu bằng bcrypt
     const hashedPassword = await hashPassword(password);
 
-    // 3. Tạo tài khoản mới trong public.users
+    // 3. Tạo tài khoản mới trong public.users với is_active: false (Chưa kích hoạt)
     const finalFullName = full_name?.trim() || cleanEmail.split('@')[0];
 
     const createRes = await supabaseRest('users', {
@@ -214,7 +240,7 @@ export async function register(req: Request, res: Response): Promise<void> {
         school_or_org: school_or_org?.trim() || null,
         customer_group: customer_group || 'Học sinh',
         role: 'USER',
-        is_active: true
+        is_active: false // Luôn chưa kích hoạt khi mới đăng ký!
       })
     });
 
@@ -248,53 +274,20 @@ export async function register(req: Request, res: Response): Promise<void> {
       console.warn('[Auto-assign group warning]', gErr);
     }
 
-    // 5. Cấp Token và Cookie 3 ngày
-    const token = signToken({
-      sub: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-      full_name: newUser.full_name
-    });
-
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '127.0.0.1';
-    const userAgent = req.headers['user-agent'] || 'Unknown Browser';
-
-    await createSession({
+    // 5. Gửi email xác thực tài khoản qua custom verification token
+    const signupToken = await createVerificationToken({
       userId: newUser.id,
-      sessionToken: token,
-      appName: 'sso',
-      ipAddress: clientIp,
-      userAgent
+      email: cleanEmail,
+      type: 'confirm_signup'
     });
+    await sendSignupVerificationOtp(cleanEmail, signupToken);
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN;
-
-    res.cookie('ht_sso_token', token, {
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
-      path: '/',
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: THREE_DAYS_MS
-    });
-
-    // 6. Gửi email xác nhận đăng ký tài khoản qua custom verification token
-    createVerificationToken({ userId: newUser.id, email: cleanEmail, type: 'confirm_signup' })
-      .then((signupToken) => sendSignupVerificationOtp(cleanEmail, signupToken))
-      .catch((err) => {
-        console.warn('[SSO_REGISTER_EMAIL_WARN]', err);
-      });
-
+    // 6. Trả về thông báo thành công và yêu cầu xác thực email (KHÔNG cấp JWT, KHÔNG set cookie)
     res.json({
       success: true,
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        role: newUser.role,
-        full_name: newUser.full_name
-      }
+      require_verification: true,
+      email: cleanEmail,
+      message: 'Đăng ký tài khoản thành công! Vui lòng kiểm tra email để kích hoạt tài khoản của bạn.'
     });
   } catch (err: any) {
     console.error('[SSO_REGISTER_ERROR]', err);
@@ -555,19 +548,42 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       `users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,is_active`
     );
 
-    if (userRes.ok) {
-      const users = (await userRes.json()) as any[];
-      if (users && users.length > 0 && users[0].is_active !== false) {
-        const user = users[0];
-        const token = await createVerificationToken({
-          userId: user.id,
-          email: cleanEmail,
-          type: 'reset_password',
-        });
-
-        await sendPasswordResetOtp(cleanEmail, token);
-      }
+    if (!userRes.ok) {
+      res.status(500).json({ success: false, error: { message: 'Lỗi truy vấn cơ sở dữ liệu.' } });
+      return;
     }
+
+    const users = (await userRes.json()) as any[];
+    if (!users || users.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Tài khoản với email này không tồn tại trên hệ thống. Vui lòng kiểm tra lại email hoặc đăng ký tài khoản mới.',
+        },
+      });
+      return;
+    }
+
+    const user = users[0];
+    if (user.is_active === false) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACCOUNT_NOT_ACTIVATED',
+          message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để kích hoạt tài khoản.',
+        },
+      });
+      return;
+    }
+
+    const token = await createVerificationToken({
+      userId: user.id,
+      email: cleanEmail,
+      type: 'reset_password',
+    });
+
+    await sendPasswordResetOtp(cleanEmail, token);
 
     res.json({
       success: true,
@@ -580,11 +596,74 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 }
 
 /**
+ * Gửi lại email xác thực kích hoạt tài khoản (Resend Verification Email)
+ */
+export async function resendVerification(req: Request, res: Response): Promise<void> {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_EMAIL', message: 'Vui lòng cung cấp email.' },
+      });
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const userRes = await supabaseRest(
+      `users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,is_active`
+    );
+
+    if (!userRes.ok) {
+      res.status(500).json({ success: false, error: { message: 'Lỗi truy vấn cơ sở dữ liệu.' } });
+      return;
+    }
+
+    const users = (await userRes.json()) as any[];
+    if (!users || users.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'Địa chỉ email này chưa được đăng ký trên hệ thống.' },
+      });
+      return;
+    }
+
+    const user = users[0];
+    if (user.is_active === true) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'ALREADY_ACTIVATED', message: 'Tài khoản này đã được kích hoạt. Bạn có thể đăng nhập ngay.' },
+      });
+      return;
+    }
+
+    const token = await createVerificationToken({
+      userId: user.id,
+      email: cleanEmail,
+      type: 'confirm_signup',
+    });
+
+    await sendSignupVerificationOtp(cleanEmail, token);
+
+    res.json({
+      success: true,
+      message: 'Email xác thực đã được gửi lại tới hộp thư của bạn. Vui lòng kiểm tra hộp thư đến và thư mục Spam.',
+    });
+  } catch (err: any) {
+    console.error('[RESEND_VERIFICATION_ERROR]', err);
+    res.status(500).json({ success: false, error: { message: 'Lỗi khi gửi lại email xác thực.' } });
+  }
+}
+
+/**
  * Kiểm tra và xác thực token trên SSO portal
  */
 export async function verifyToken(req: Request, res: Response): Promise<void> {
   try {
     const token = ((req.query.token as string) || req.body?.token || '').trim();
+    const type = ((req.query.type as string) || req.body?.type || '').trim();
+    const email = ((req.query.email as string) || req.body?.email || '').trim().toLowerCase();
+
     if (!token) {
       res.status(400).json({
         success: false,
@@ -593,11 +672,60 @@ export async function verifyToken(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Xử lý kích hoạt tài khoản đăng ký (type = signup)
+    if (type === 'signup') {
+      if (email) {
+        const checkRes = await supabaseRest(`users?email=eq.${encodeURIComponent(email)}&select=id,is_active`);
+        if (checkRes.ok) {
+          const users = (await checkRes.json()) as any[];
+          if (users && users.length > 0 && users[0].is_active === true) {
+            res.json({
+              success: true,
+              valid: true,
+              already_verified: true,
+              message: 'Tài khoản của bạn đã được kích hoạt thành công.',
+              email,
+            });
+            return;
+          }
+        }
+      }
+
+      const result = await consumeTokenFinal(token);
+      if (!result.valid || !result.userId) {
+        res.status(400).json({
+          success: false,
+          valid: false,
+          error: { code: 'INVALID_TOKEN', message: result.message || 'Mã xác thực không hợp lệ hoặc đã hết hạn.' },
+        });
+        return;
+      }
+
+      // Kích hoạt tài khoản người dùng
+      await supabaseRest(`users?id=eq.${result.userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      res.json({
+        success: true,
+        valid: true,
+        message: 'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.',
+        email: result.email || email,
+      });
+      return;
+    }
+
+    // Mặc định: Ghi nhận lượt xem token (reset_password)
     const result = await recordTokenView(token);
 
     if (!result.valid) {
       res.status(400).json({
         success: false,
+        valid: false,
         error: { code: result.reason ?? 'INVALID_TOKEN', message: result.message },
       });
       return;
@@ -641,6 +769,22 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
       res.status(400).json({
         success: false,
         error: { code: 'INVALID_TOKEN', message: result.message ?? 'Mã xác thực không hợp lệ hoặc đã hết hạn.' },
+      });
+      return;
+    }
+
+    // Kiểm tra tài khoản có tồn tại trong database không
+    const userRes = await supabaseRest(`users?id=eq.${result.userId}&select=id,email,is_active`);
+    if (!userRes.ok) {
+      res.status(500).json({ success: false, error: { message: 'Lỗi máy chủ khi kiểm tra tài khoản.' } });
+      return;
+    }
+
+    const users = (await userRes.json()) as any[];
+    if (!users || users.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'Tài khoản người dùng không tồn tại trên hệ thống.' },
       });
       return;
     }
