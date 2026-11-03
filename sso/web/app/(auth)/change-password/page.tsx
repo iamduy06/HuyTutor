@@ -62,33 +62,38 @@ function ChangePasswordContent() {
   }
 
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
+    <div className="w-full max-w-md bg-white rounded-sm border border-gray-200 shadow-xs p-6 sm:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-[#1a1a2e] tracking-tight flex items-center gap-2">
-          <KeyRound className="w-6 h-6 text-brand" /> Đổi mật khẩu
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-xs border border-gray-200">
+            Bảo mật
+          </span>
+        </div>
+        <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-brand" /> Đổi mật khẩu
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="text-xs text-gray-500 mt-1">
           Cập nhật mật khẩu tài khoản hệ thống Huy Tutor.
         </p>
       </div>
 
       {errorMsg && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs flex items-center gap-2">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xs text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {success ? (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
-          <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-green-800 mb-1">Đổi mật khẩu thành công!</h3>
-          <p className="text-xs text-green-700 mb-4">
-            Mật khẩu mới đã được cập nhật trên toàn bộ hệ thống Huy Tutor.
+        <div className="p-4 bg-green-50 border border-green-200 rounded-xs text-center space-y-2">
+          <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto" />
+          <h3 className="text-sm font-bold text-green-800">Đổi mật khẩu thành công!</h3>
+          <p className="text-xs text-green-700 leading-relaxed mb-3">
+            Mật khẩu mới đã được cập nhật đồng bộ trên toàn bộ hệ thống Huy Tutor.
           </p>
           <a
             href={redirectUrl || '/'}
-            className="inline-block px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand-dark"
+            className="inline-block px-4 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-xs transition shadow-xs uppercase tracking-wide"
           >
             Quay lại
           </a>
@@ -96,7 +101,9 @@ function ChangePasswordContent() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Mật khẩu hiện tại</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Mật khẩu hiện tại
+            </label>
             <div className="relative">
               <input
                 type={showCurrentPw ? 'text' : 'password'}
@@ -104,12 +111,13 @@ function ChangePasswordContent() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Nhập mật khẩu hiện tại"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand pr-10"
+                className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowCurrentPw(!showCurrentPw)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                tabIndex={-1}
               >
                 {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -117,20 +125,24 @@ function ChangePasswordContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Mật khẩu mới</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Mật khẩu mới (tối thiểu 6 ký tự)
+            </label>
             <div className="relative">
               <input
                 type={showNewPw ? 'text' : 'password'}
                 required
+                minLength={6}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Tối thiểu 6 ký tự"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand pr-10"
+                placeholder="Nhập mật khẩu mới"
+                className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowNewPw(!showNewPw)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                tabIndex={-1}
               >
                 {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -138,30 +150,27 @@ function ChangePasswordContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Xác nhận mật khẩu mới</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Xác nhận mật khẩu mới
+            </label>
             <input
               type="password"
               required
+              minLength={6}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Nhập lại mật khẩu mới"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 bg-brand text-white font-bold text-sm rounded-xl hover:bg-brand-dark transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-brand/20 mt-2"
+            className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs font-bold text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide mt-2"
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang xử lý...</span>
-              </>
-            ) : (
-              'Cập nhật mật khẩu'
-            )}
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            <span>Cập nhật mật khẩu</span>
           </button>
         </form>
       )}
@@ -173,9 +182,9 @@ export default function ChangePasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8 text-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-4" />
-          <h2 className="text-base font-bold text-gray-900 mb-1">Đang tải...</h2>
+        <div className="w-full max-w-md bg-white rounded-sm border border-gray-200 shadow-xs p-8 text-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-brand mx-auto mb-3" />
+          <h2 className="text-sm font-bold text-gray-900 mb-1">Đang tải...</h2>
         </div>
       }
     >

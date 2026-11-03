@@ -185,6 +185,7 @@ export interface SiteConfigs {
   homepage_notice_text?: HomepageNoticeTextConfig;
   homepage_bottom_banner?: HomepageBottomBannerConfig;
   homepage_blocks?: HomepageBlockItem[];
+  combo_page_blocks?: ComboPageBlockItem[];
   [key: string]: any;
 }
 
@@ -409,6 +410,95 @@ export interface ProductDetailBlockItem {
   is_active: boolean;
   sort_order: number;
   config: any;
+}
+
+/**
+ * ============================================================================
+ * CẤU HÌNH CÁC KHỐI ĐỘNG CHO TRANG COMBO THPT (COMBO PAGE BUILDER)
+ * ============================================================================
+ */
+
+export type ComboBlockType =
+  | 'combo_hero'
+  | 'combo_packages'
+  | 'combo_sections'
+  | 'combo_bottom_cta'
+  | 'combo_banner'
+  | 'combo_notice';
+
+export interface ComboHeroBlockConfig {
+  top_slogan: string;
+  bottom_slogan: string;
+  mode: 'image_banner' | 'custom_builder';
+  banner_image_url?: string;
+  headline?: string;
+  sub_headline?: string;
+  badge_text?: string;
+  book_cover_urls?: string[];
+  gradient_theme?: 'amber' | 'rose' | 'indigo' | 'emerald';
+}
+
+export interface ComboPackageItem {
+  id: string;
+  title: string;
+  discount_badge: string;
+  format_badge: string;
+  tag_text: string;
+  product_ids: string[];
+  custom_cover_urls?: string[];
+  action_type: 'open_checkout' | 'add_to_cart';
+}
+
+export interface ComboPackagesBlockConfig {
+  section_title: string;
+  sub_text: string;
+  packages: ComboPackageItem[];
+}
+
+export interface ComboSectionGroupItem {
+  id: string;
+  title: string;
+  description?: string;
+  product_ids: string[];
+}
+
+export interface ComboSectionsBlockConfig {
+  group_header?: string;
+  groups: ComboSectionGroupItem[];
+}
+
+export interface ComboBottomCtaBlockConfig {
+  btn_title: string;
+  discount_text: string;
+  note_text: string;
+  target_package_id?: string;
+}
+
+export interface ComboBannerBlockConfig {
+  banner_url: string;
+  link_url?: string;
+  alt_text?: string;
+}
+
+export interface ComboNoticeBlockConfig {
+  content: string;
+  badge_label?: string;
+  theme?: 'pink' | 'amber' | 'sky' | 'emerald';
+}
+
+export interface ComboPageBlockItem {
+  id: string;
+  type: ComboBlockType;
+  title_label: string;
+  is_active: boolean;
+  sort_order: number;
+  config:
+    | ComboHeroBlockConfig
+    | ComboPackagesBlockConfig
+    | ComboSectionsBlockConfig
+    | ComboBottomCtaBlockConfig
+    | ComboBannerBlockConfig
+    | ComboNoticeBlockConfig;
 }
 
 export interface Product {

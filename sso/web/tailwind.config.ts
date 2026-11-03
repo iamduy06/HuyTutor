@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -18,30 +17,29 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
         brand: {
-          DEFAULT: "#ed0046",
-          dark: "#c0003a",
-          light: "#fff0f4",
-          mid: "#ffd6e4",
+          DEFAULT: "#e60049",
+          hover: "#cc0041",
+          soft: "#fff5f7",
+          footer: "#fff0f3",
+          dark: "#cc0041",
+          light: "#fff5f7",
         },
       },
+      fontFamily: {
+        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        none: "0px",
+        '2xs': "1px",
+        xs: "2px",
+        sm: "3px",
+        md: "4px",
+        lg: "6px",
+      },
+      boxShadow: {
+        '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'xs': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
       },
     },
   },
@@ -49,4 +47,3 @@ const config: Config = {
 };
 
 export default config;
-
