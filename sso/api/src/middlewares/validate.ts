@@ -62,29 +62,43 @@ export const ssoLoginSchema = z.object({
   device_name: z.string().trim().max(100).optional(),
 });
 
-export const ssoRegisterSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email không được để trống')
-    .email('Định dạng email không hợp lệ')
-    .max(100, 'Email tối đa 100 ký tự'),
-  password: z
-    .string()
-    .min(6, 'Mật khẩu phải từ 6 ký tự trở lên')
-    .max(100, 'Mật khẩu tối đa 100 ký tự'),
-  full_name: z
-    .string()
-    .trim()
-    .min(2, 'Họ và tên phải có ít nhất 2 ký tự')
-    .max(100, 'Họ và tên tối đa 100 ký tự'),
-  phone: z.string().trim().max(20).optional().nullable(),
-  school_or_org: z.string().trim().max(150).optional().nullable(),
-  customer_group: z
-    .enum(['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'])
-    .optional()
-    .default('Học sinh'),
-});
+export const ssoRegisterSchema = z
+  .object({
+    email: z
+      .string()
+      .trim()
+      .min(1, 'Email không được để trống')
+      .email('Định dạng email không hợp lệ')
+      .max(100, 'Email tối đa 100 ký tự'),
+    password: z
+      .string()
+      .min(6, 'Mật khẩu phải từ 6 ký tự trở lên')
+      .max(100, 'Mật khẩu tối đa 100 ký tự'),
+    confirm_password: z
+      .string()
+      .min(6, 'Mật khẩu xác nhận phải từ 6 ký tự trở lên')
+      .max(100, 'Mật khẩu tối đa 100 ký tự')
+      .optional(),
+    full_name: z
+      .string()
+      .trim()
+      .max(100, 'Họ và tên tối đa 100 ký tự')
+      .optional()
+      .nullable(),
+    phone: z.string().trim().max(20).optional().nullable(),
+    school_or_org: z.string().trim().max(150).optional().nullable(),
+    customer_group: z
+      .enum(['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'])
+      .optional()
+      .default('Học sinh'),
+  })
+  .refine(
+    (data) => !data.confirm_password || data.password === data.confirm_password,
+    {
+      message: 'Mật khẩu xác nhận không khớp.',
+      path: ['confirm_password'],
+    }
+  );
 
 export const ssoVerifyDeviceSchema = z.object({
   device_id: z
