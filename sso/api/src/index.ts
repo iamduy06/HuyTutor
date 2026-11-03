@@ -22,6 +22,7 @@ import {
   verifyDevice,
   listDevices,
   revokeAllSessions,
+  revokeSingleSession,
   forgotPassword,
   verifyOtp,
   verifyToken,
@@ -70,6 +71,7 @@ authRouter.post('/verify-device', requireAuth, validate({ body: ssoVerifyDeviceS
 authRouter.get('/devices', requireAuth, listDevices);
 authRouter.post('/devices/revoke-all', requireAuth, revokeAllSessions);
 authRouter.get('/sessions', requireAuth, listDevices);
+authRouter.delete('/sessions/:id', requireAuth, revokeSingleSession);
 authRouter.delete('/sessions', requireAuth, revokeAllSessions);
 
 app.use('/api/auth', authRouter);

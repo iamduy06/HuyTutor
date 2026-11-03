@@ -10,7 +10,7 @@ export interface PublicUserProfile {
   email: string;
   fullName: string;
   phone: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'subadmin';
   customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
   schoolOrOrg: string;
   defaultTaxCccd: string;
@@ -26,7 +26,12 @@ export function toPublicUserProfile(user: SeedUser): PublicUserProfile {
     email: user.email,
     fullName: user.full_name,
     phone: user.phone || '',
-    role: String(user.role || '').toLowerCase() === 'admin' ? 'admin' : 'user',
+    role:
+      String(user.role || '').toLowerCase() === 'admin'
+        ? 'admin'
+        : String(user.role || '').toLowerCase() === 'subadmin'
+          ? 'subadmin'
+          : 'user',
     customerGroup: user.customer_group || 'Giáo viên',
     schoolOrOrg: user.school_or_org || '',
     defaultTaxCccd: user.default_tax_cccd || '',

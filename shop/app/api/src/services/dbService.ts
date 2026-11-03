@@ -2013,6 +2013,34 @@ export const dbService = {
     return count;
   },
 
+  async getActiveSessionCountMap(): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    const nowIso = new Date().toISOString();
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_sessions')
+        .select('user_id')
+        .eq('is_revoked', false)
+        .gt('expires_at', nowIso);
+      if (!error && data) {
+        for (const s of data) {
+          if (s.user_id) {
+            counts.set(s.user_id, (counts.get(s.user_id) || 0) + 1);
+          }
+        }
+        return counts;
+      }
+    }
+    const db = loadLocalDb();
+    const now = new Date();
+    for (const s of db.user_sessions) {
+      if (!s.is_revoked && new Date(s.expires_at) > now) {
+        counts.set(s.user_id, (counts.get(s.user_id) || 0) + 1);
+      }
+    }
+    return counts;
+  },
+
   async getUserSessions(userId: string): Promise<SeedUserSession[]> {
     const now = new Date();
     if (shouldTrySupabaseAuth() && supabaseAdmin) {

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Smartphone, Monitor, ShieldAlert, LogOut, CheckCircle2, Loader2, Info } from 'lucide-react';
+import { Smartphone, Monitor, ShieldAlert, LogOut, CheckCircle2, Loader2, Info, ArrowLeft, Store, BookOpen, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function DevicesPage() {
   const [loading, setLoading] = useState(true);
@@ -9,6 +10,7 @@ export default function DevicesPage() {
   const [flashcardDevices, setFlashcardDevices] = useState<any[]>([]);
   const [maxDevices, setMaxDevices] = useState<number>(3);
   const [actionLoading, setActionLoading] = useState(false);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   async function loadData() {
@@ -34,23 +36,26 @@ export default function DevicesPage() {
     loadData();
   }, []);
 
-  async function handleRevokeAll() {
-    if (!confirm('Bạn có chắc chắn muốn đăng xuất khỏi tất cả thiết bị? Toàn bộ các phiên đăng nhập khác sẽ bị vô hiệu hóa.')) {
-      return;
-    }
+  async function handleRevokeAll(appFilter?: 'shop' | 'flashcard') {
+    const promptMsg = appFilter === 'shop'
+      ? 'Bạn có chắc chắn muốn đăng xuất khỏi tất cả phiên của Shop?'
+      : appFilter === 'flashcard'
+      ? 'Bạn có chắc chắn muốn đăng xuất khỏi tất cả phiên Flashcard?'
+      : 'Bạn có chắc chắn muốn đăng xuất khỏi tất cả thiết bị trên toàn hệ thống?';
+
+    if (!confirm(promptMsg)) return;
 
     setActionLoading(true);
     try {
-      const res = await fetch('/api/auth/sessions', { method: 'DELETE' });
+      const url = appFilter ? `/api/auth/sessions?app=${appFilter}` : '/api/auth/sessions';
+      const res = await fetch(url, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         setMsg({
           type: 'success',
-          text: 'Đã đăng xuất toàn bộ phiên thành công! Lưu ý: Danh sách thiết bị học Flashcard vẫn được bảo lưu quota.'
+          text: data.message || 'Đã thu hồi các phiên thành công!'
         });
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
+        await loadData();
       } else {
         setMsg({ type: 'error', text: data.error || 'Lỗi khi đăng xuất các thiết bị.' });
       }
@@ -58,6 +63,25 @@ export default function DevicesPage() {
       setMsg({ type: 'error', text: 'Lỗi mạng khi thực hiện thao tác.' });
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleRevokeSingle(sessionId: string) {
+    if (!confirm('Bạn có chắc muốn thu hồi phiên đăng nhập này?')) return;
+    setRevokingId(sessionId);
+    try {
+      const res = await fetch(`/api/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setMsg({ type: 'success', text: 'Đã thu hồi phiên đăng nhập thành công.' });
+        await loadData();
+      } else {
+        setMsg({ type: 'error', text: data.error || 'Không thể thu hồi phiên.' });
+      }
+    } catch {
+      setMsg({ type: 'error', text: 'Lỗi mạng khi thu hồi phiên.' });
+    } finally {
+      setRevokingId(null);
     }
   }
 
@@ -70,19 +94,26 @@ export default function DevicesPage() {
     );
   }
 
+  const shopSessions = sessions.filter((s) => s.app_source !== 'flashcard');
+  const flashcardSessions = sessions.filter((s) => s.app_source === 'flashcard');
+
   return (
-    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-8">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+    <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border-2 border-[#f0e0e7] p-6 sm:p-8">
+      {/* Top Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-100">
         <div>
-          <h1 className="text-2xl font-black text-[#1a1a2e] tracking-tight">Quản lý Thiết bị & Phiên</h1>
-          <p className="text-muted-foreground text-xs mt-1">
-            Theo dõi các phiên đang đăng nhập trên toàn hệ thống Huy Tutor.
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-black text-[#1a1a2e] tracking-tight">Quản lý Thiết bị &amp; Phiên</h1>
+            <span className="text-[10px] bg-brand text-white font-extrabold px-2 py-0.5 rounded-full">SSO Central</span>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Trung tâm quản lý phiên đăng nhập và bảo mật thiết bị trên toàn hệ sinh thái Huy Tutor.
           </p>
         </div>
         <button
-          onClick={handleRevokeAll}
+          onClick={() => handleRevokeAll()}
           disabled={actionLoading}
-          className="px-3.5 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-red-200 disabled:opacity-50"
+          className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-red-200 disabled:opacity-50"
         >
           {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
           <span>Đăng xuất tất cả phiên</span>
@@ -98,88 +129,160 @@ export default function DevicesPage() {
         </div>
       )}
 
-      {/* SECTION 1: FLASHCARD BOUND DEVICES (LIMITED) */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
+      {/* SECTION 1: PHÂN HỆ FLASHCARD */}
+      <div className="mb-8 p-5 bg-gradient-to-br from-pink-50/50 to-white rounded-2xl border border-pink-200/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-gray-900">Thiết bị học Flashcard</h2>
-            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-light text-brand">
-              {flashcardDevices.length} / {maxDevices === Infinity ? 'Không giới hạn' : maxDevices} máy
-            </span>
+            <div className="p-1.5 bg-brand text-white rounded-lg">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-gray-900">1. Phân hệ Flashcard Học tập</h2>
+              <p className="text-[11px] text-muted-foreground">Có chính sách bảo vệ tài khoản &amp; giới hạn phần cứng chống gian lận</p>
+            </div>
           </div>
-          <span className="text-xs text-muted-foreground">Áp dụng cho ứng dụng Flashcard</span>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-brand text-white shadow-sm">
+              Quota: {flashcardDevices.length} / {maxDevices === Infinity ? 'Không giới hạn' : maxDevices} máy
+            </span>
+            {flashcardSessions.length > 0 && (
+              <button
+                onClick={() => handleRevokeAll('flashcard')}
+                disabled={actionLoading}
+                className="px-2.5 py-1 bg-white hover:bg-pink-100 text-brand text-[11px] font-bold rounded-lg border border-pink-300 transition"
+              >
+                Đăng xuất Flashcard
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl mb-3 flex items-start gap-2">
+        <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl mb-4 flex items-start gap-2">
           <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-800 leading-relaxed">
-            Học viên được liên kết tối đa <strong>{maxDevices} thiết bị</strong> học Flashcard. Khi bạn đăng xuất phiên, thông số thiết bị vẫn được bảo lưu. Để gỡ thiết bị cũ đổi máy mới, vui lòng liên hệ Admin.
+            Học viên được liên kết tối đa <strong>{maxDevices} thiết bị</strong> học Flashcard. Khi bạn đăng xuất phiên, thông số thiết bị vẫn được bảo lưu để giữ nguyên hạn mức phần cứng.
           </p>
         </div>
 
-        <div className="space-y-2">
-          {flashcardDevices.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-3 text-center bg-gray-50 rounded-xl">
-              Chưa có thiết bị nào kích hoạt học Flashcard.
-            </p>
-          ) : (
-            flashcardDevices.map((dev) => (
-              <div key={dev.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-200 text-brand">
-                    {dev.device_name?.includes('Phone') || dev.device_name?.includes('Android') ? (
-                      <Smartphone className="w-4 h-4" />
-                    ) : (
-                      <Monitor className="w-4 h-4" />
-                    )}
+        {/* Danh sách thiết bị phần cứng liên kết */}
+        <div className="mb-4">
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Thiết bị phần cứng đã liên kết</h3>
+          <div className="space-y-2">
+            {flashcardDevices.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2 text-center bg-white rounded-xl border border-dashed border-gray-200">
+                Chưa có thiết bị nào kích hoạt học Flashcard.
+              </p>
+            ) : (
+              flashcardDevices.map((dev) => (
+                <div key={dev.id} className="p-2.5 bg-white rounded-xl border border-pink-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-pink-50 rounded-lg text-brand border border-pink-100">
+                      {dev.device_name?.includes('Phone') || dev.device_name?.includes('Android') ? (
+                        <Smartphone className="w-4 h-4" />
+                      ) : (
+                        <Monitor className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-800">{dev.device_name || 'Thiết bị Web'}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Hoạt động lần cuối: {new Date(dev.last_seen).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-800">{dev.device_name || 'Thiết bị Web'}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Hoạt động lần cuối: {new Date(dev.last_seen).toLocaleString('vi-VN')}
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                    Đã bảo lưu Quota
+                  </span>
                 </div>
-                <span className="text-[11px] font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
-                  Đã liên kết
-                </span>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Danh sách phiên Flashcard đang mở */}
+        <div>
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Phiên Flashcard đang mở ({flashcardSessions.length})</h3>
+          <div className="space-y-2">
+            {flashcardSessions.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2 text-center bg-white rounded-xl border border-dashed border-gray-200">
+                Không có phiên Flashcard nào đang mở.
+              </p>
+            ) : (
+              flashcardSessions.map((sess) => (
+                <div key={sess.id} className="p-2.5 bg-white rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-gray-800 truncate">{sess.device_name || 'Trình duyệt'}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">IP: {sess.ip_address || 'Ẩn'}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate">{sess.user_agent}</p>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeSingle(sess.id)}
+                    disabled={revokingId === sess.id}
+                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                    title="Thu hồi phiên này"
+                  >
+                    {revokingId === sess.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* SECTION 2: ACTIVE SESSIONS (SHOP + FLASHCARD) */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-gray-900">Các phiên đăng nhập đang hoạt động</h2>
-          <span className="text-xs text-muted-foreground">Shop không giới hạn số phiên</span>
+      {/* SECTION 2: PHÂN HỆ HUY TUTOR SHOP */}
+      <div className="p-5 bg-gradient-to-br from-blue-50/50 to-white rounded-2xl border border-blue-200/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-600 text-white rounded-lg">
+              <Store className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-gray-900">2. Phân hệ Huy Tutor Shop</h2>
+              <p className="text-[11px] text-muted-foreground">Không giới hạn thiết bị • Cho phép đăng nhập tự do mua tài liệu</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+              Không giới hạn thiết bị
+            </span>
+            {shopSessions.length > 0 && (
+              <button
+                onClick={() => handleRevokeAll('shop')}
+                disabled={actionLoading}
+                className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-300 transition"
+              >
+                Đăng xuất Shop
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">
-          {sessions.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-3 text-center bg-gray-50 rounded-xl">
-              Không có phiên hoạt động nào.
+          {shopSessions.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic py-2 text-center bg-white rounded-xl border border-dashed border-gray-200">
+              Không có phiên Shop nào đang mở.
             </p>
           ) : (
-            sessions.map((sess) => (
-              <div key={sess.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-800">
-                      {sess.app_source === 'flashcard' ? 'Flashcard Học tập' : 'Huy Tutor Shop'}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-gray-200 text-gray-700 font-medium">
-                      IP: {sess.ip_address || 'Ẩn'}
-                    </span>
+            shopSessions.map((sess) => (
+              <div key={sess.id} className="p-2.5 bg-white rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-gray-800 truncate">{sess.device_name || 'Trình duyệt Shop'}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">IP: {sess.ip_address || 'Ẩn'}</span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-sm">
-                    {sess.user_agent || 'Trình duyệt Web'}
-                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">{sess.user_agent}</p>
                 </div>
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  Hết hạn: {new Date(sess.expires_at).toLocaleDateString('vi-VN')}
-                </span>
+                <button
+                  onClick={() => handleRevokeSingle(sess.id)}
+                  disabled={revokingId === sess.id}
+                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                  title="Thu hồi phiên này"
+                >
+                  {revokingId === sess.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                </button>
               </div>
             ))
           )}
@@ -188,4 +291,3 @@ export default function DevicesPage() {
     </div>
   );
 }
-

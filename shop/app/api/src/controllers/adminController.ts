@@ -414,16 +414,14 @@ export const adminController = {
    */
   async getUsers(_req: Request, res: Response): Promise<void> {
     try {
-      const users = await dbService.getAllUsers();
-      const enrichedUsers = await Promise.all(
-        users.map(async (u) => {
-          const sessions = await dbService.getUserSessions(u.id);
-          return {
-            ...toPublicUserProfile(u),
-            activeSessions: sessions.length,
-          };
-        })
-      );
+      const [users, sessionCountMap] = await Promise.all([
+        dbService.getAllUsers(),
+        dbService.getActiveSessionCountMap(),
+      ]);
+      const enrichedUsers = users.map((u) => ({
+        ...toPublicUserProfile(u),
+        activeSessions: sessionCountMap.get(u.id) || 0,
+      }));
 
       res.json({
         ok: true,
@@ -447,8 +445,11 @@ export const adminController = {
       const { role, isActive } = req.body;
 
       const updates: Record<string, any> = {};
-      if (role === 'user' || role === 'admin') {
-        updates.role = role;
+      if (role) {
+        const rUpper = String(role).toUpperCase();
+        if (rUpper === 'ADMIN' || rUpper === 'SUBADMIN' || rUpper === 'USER') {
+          updates.role = rUpper;
+        }
       }
       if (typeof isActive === 'boolean') {
         updates.is_active = isActive;

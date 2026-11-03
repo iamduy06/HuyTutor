@@ -174,31 +174,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    try {
-      const ssoBase = getSsoUrl();
-
-      // 1. Gửi request trực tiếp tới SSO Portal để thu hồi phiên và xóa Master Cookie
-      if (typeof window !== 'undefined' && ssoBase) {
-        try {
-          await fetch(`${ssoBase}/api/auth/logout`, {
-            method: 'POST',
-            credentials: 'include',
-            mode: 'cors',
-          });
-        } catch {
-          // Bỏ qua lỗi mạng
-        }
-      }
-
-      // 2. Gửi request tới Shop backend API để nhận các header Set-Cookie xóa
+    // 1. Optimistic Client State Cleanup: Cập nhật giao diện đăng xuất NGAY LẬP TỨC (tức thì)
+    setUser(null);
+    setSessionToken(null);
+    if (typeof window !== 'undefined') {
       try {
-        await apiClient.logout();
-      } catch {
-        // Bỏ qua lỗi mạng
-      }
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.clear();
 
-      // 3. Xóa các cookie non-httpOnly phía client trên mọi domain
-      if (typeof window !== 'undefined') {
         const past = 'Thu, 01 Jan 1970 00:00:00 GMT';
         const domains = ['.huytutor.edu.vn', 'huytutor.edu.vn', window.location.hostname, `.${window.location.hostname}`, ''];
         const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
@@ -208,16 +191,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             document.cookie = `${name}=; path=/${domStr}; expires=${past}; max-age=0`;
           }
         }
+      } catch {
+        // ignore
       }
+    }
+
+    // 2. Thu hồi phiên trên SSO Portal và Shop API song song trong nền (timeout 2s)
+    try {
+      const ssoBase = getSsoUrl();
+      const revokePromises: Promise<any>[] = [];
+
+      if (typeof window !== 'undefined' && ssoBase) {
+        revokePromises.push(
+          fetch(`${ssoBase}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+            mode: 'cors',
+            signal: AbortSignal.timeout(2000),
+          }).catch(() => {})
+        );
+      }
+
+      revokePromises.push(apiClient.logout().catch(() => {}));
+
+      await Promise.allSettled(revokePromises);
     } catch {
-      // ignore network error on logout
-    } finally {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-        sessionStorage.clear();
-      }
-      setSessionToken(null);
-      setUser(null);
+      // ignore background network error
     }
   };
 

@@ -4,6 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { SmartLink } from './SmartLink';
 
+function getSsoUrl(): string {
+  const envUrl = import.meta.env.SSO_URL;
+  if (envUrl) {
+    return (envUrl as string).replace(/\/+$/, '');
+  }
+  return '';
+}
+
 export const Header: React.FC = () => {
   const {
     menus,
@@ -174,13 +182,14 @@ export const Header: React.FC = () => {
                       Tủ sách của tôi
                     </Link>
 
-                    <Link
-                      to="/my-library?tab=sessions"
+                    <a
+                      href={`${getSsoUrl()}/devices`}
                       onClick={() => setMenuOpen(false)}
-                      className="block px-3 py-2 text-gray-700 hover:bg-[#fff5f7] hover:text-[#e60049] font-semibold"
+                      className="flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-[#fff5f7] hover:text-[#e60049] font-semibold"
                     >
-                      Quản lý phiên đăng nhập
-                    </Link>
+                      <span>Quản lý thiết bị &amp; Phiên</span>
+                      <span className="text-[10px] bg-pink-100 text-[#e60049] font-extrabold px-1.5 py-0.5 rounded">SSO</span>
+                    </a>
 
                     {isAdmin && (
                       <Link

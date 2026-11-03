@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 
 export const ProtectedRoute: React.FC<{
   children: React.ReactNode;
-  allowedRoles?: Array<'user' | 'admin'>;
-}> = ({ children, allowedRoles = ['user', 'admin'] }) => {
+  allowedRoles?: Array<'user' | 'admin' | 'subadmin'>;
+}> = ({ children, allowedRoles = ['user', 'admin', 'subadmin'] }) => {
   const { user, isLoading, openAuthModal } = useAuth();
 
   if (isLoading) {

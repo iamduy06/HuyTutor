@@ -3,7 +3,7 @@ import { supabaseRest } from '../config/db.js';
 import { signToken, type JWTPayload } from '../config/jwt.js';
 import { verifyPassword, hashPassword } from '../utils/hash.js';
 import { checkAndRegisterDevice, calculateUserDeviceQuota } from '../services/deviceService.js';
-import { createSession, revokeSession, revokeAllUserSessions } from '../services/sessionService.js';
+import { createSession, revokeSession, revokeAllUserSessions, revokeSessionById, revokeUserSessionsByApp } from '../services/sessionService.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.js';
 import { sendSignupVerificationOtp, sendPasswordResetOtp } from '../services/emailService.js';
 import { createVerificationToken, recordTokenView, consumeTokenFinal } from '../services/tokenService.js';
@@ -454,11 +454,22 @@ export async function listDevices(req: AuthenticatedRequest, res: Response): Pro
 
 /**
  * Thu hồi toàn bộ phiên đăng nhập của người dùng (Đăng xuất khỏi tất cả phiên)
+ * Hoặc thu hồi riêng theo phân hệ ứng dụng (app = 'shop' | 'flashcard')
  * Giữ nguyên bản ghi phần cứng trong user_devices.
  */
 export async function revokeAllSessions(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const userPayload = req.user!;
+    const appFilter = (req.query.app as string | undefined)?.toLowerCase();
+
+    if (appFilter && (appFilter === 'shop' || appFilter === 'flashcard')) {
+      await revokeUserSessionsByApp(userPayload.sub, appFilter);
+      res.json({
+        success: true,
+        message: `Đã đăng xuất khỏi toàn bộ phiên ${appFilter === 'shop' ? 'Huy Tutor Shop' : 'Flashcard'}.`
+      });
+      return;
+    }
 
     await revokeAllUserSessions(userPayload.sub);
 
@@ -480,6 +491,31 @@ export async function revokeAllSessions(req: AuthenticatedRequest, res: Response
     });
   } catch (err: any) {
     console.error('[REVOKE_ALL_ERROR]', err);
+    res.status(500).json({ success: false, error: 'Lỗi khi thu hồi phiên đăng nhập.' });
+  }
+}
+
+/**
+ * Thu hồi một phiên đăng nhập cụ thể theo ID
+ */
+export async function revokeSingleSession(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const userPayload = req.user!;
+    const sessionId = String(req.params.id || '');
+
+    if (!sessionId) {
+      res.status(400).json({ success: false, error: 'Thiếu mã định danh phiên.' });
+      return;
+    }
+
+    await revokeSessionById(sessionId, userPayload.sub);
+
+    res.json({
+      success: true,
+      message: 'Đã thu hồi phiên đăng nhập thành công.'
+    });
+  } catch (err: any) {
+    console.error('[REVOKE_SINGLE_SESSION_ERROR]', err);
     res.status(500).json({ success: false, error: 'Lỗi khi thu hồi phiên đăng nhập.' });
   }
 }

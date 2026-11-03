@@ -43,6 +43,26 @@ export async function revokeSession(sessionToken: string): Promise<void> {
 }
 
 /**
+ * Thu hồi một phiên đăng nhập theo ID của phiên
+ */
+export async function revokeSessionById(sessionId: string, userId: string): Promise<void> {
+  await supabaseRest(`user_sessions?id=eq.${encodeURIComponent(sessionId)}&user_id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_revoked: true })
+  });
+}
+
+/**
+ * Thu hồi phiên theo phân hệ ứng dụng (app_source: 'shop' | 'flashcard')
+ */
+export async function revokeUserSessionsByApp(userId: string, appSource: string): Promise<void> {
+  await supabaseRest(`user_sessions?user_id=eq.${encodeURIComponent(userId)}&app_source=eq.${encodeURIComponent(appSource)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_revoked: true })
+  });
+}
+
+/**
  * Thu hồi TOÀN BỘ phiên đăng nhập của người dùng
  * QUY TẮC BẢO MẬT & CHỐNG GIAN LẬN:
  * Chỉ cập nhật is_revoked = true trong public.user_sessions.

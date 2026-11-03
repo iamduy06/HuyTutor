@@ -17,7 +17,7 @@ services:
       - key: R2_DOMAIN
         value: https://media.huytutor.edu.vn
       - key: GOOGLE_FORM_ACTION_URL
-        value: https://docs.google.com/forms/d/e/1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q/formResponse
+        value: https://docs.google.com/forms/d/e/1FAIpQLScsBXOdGDBBwAiGOrEdj-KnfyOuP7QkSa4j2aQnApqqbekFkQ/formResponse
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

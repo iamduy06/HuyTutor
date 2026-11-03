@@ -1,9 +1,6 @@
 import { mapFormatToGoogleFormNote, UiFormatCode } from '../constants/formatMapping';
 import { dbService, SeedOrder } from './dbService';
 
-const DEFAULT_FORM_URL =
-  'https://docs.google.com/forms/d/e/1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q/formResponse';
-
 export interface GoogleFormSyncResult {
   orderCode: string;
   allSuccess: boolean;
@@ -30,7 +27,10 @@ export interface GoogleFormSyncResult {
  * - Người bán luôn là "Website"
  */
 export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleFormSyncResult> {
-  const formUrl = process.env.GOOGLE_FORM_ACTION_URL!;
+  const formUrl = process.env.GOOGLE_FORM_ACTION_URL;
+  if (!formUrl) {
+    throw new Error('Missing required environment variable: GOOGLE_FORM_ACTION_URL');
+  }
   const now = new Date();
   // Chuyển sang múi giờ Việt Nam (UTC+7)
   const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);

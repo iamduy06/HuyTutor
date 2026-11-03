@@ -485,7 +485,7 @@ export const apiClient = {
 
   async updateAdminUserRole(
     userId: string,
-    payload: { role?: 'user' | 'admin'; isActive?: boolean }
+    payload: { role?: 'user' | 'admin' | 'subadmin'; isActive?: boolean }
   ): Promise<{
     ok: boolean;
     user: UserProfile;

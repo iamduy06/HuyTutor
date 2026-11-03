@@ -520,7 +520,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   phone: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'subadmin';
   customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
   schoolOrOrg: string;
   defaultTaxCccd: string;

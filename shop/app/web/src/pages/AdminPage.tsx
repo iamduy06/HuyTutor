@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
@@ -64,6 +64,11 @@ export const AdminPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<'ALL' | 'admin' | 'subadmin' | 'user'>('ALL');
+  const [userStatusFilter, setUserStatusFilter] = useState<'ALL' | 'active' | 'blocked'>('ALL');
+  const [userPage, setUserPage] = useState(1);
+  const USERS_PER_PAGE = 20;
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
 
   // State cho Tab 5: Cấu hình Menu Header & Footer
@@ -438,12 +443,16 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleToggleUserRole = async (u: AdminUserRecord) => {
-    const nextRole = u.role === 'admin' ? 'user' : 'admin';
+  const handleUpdateUserRole = async (
+    u: AdminUserRecord,
+    nextRole: 'admin' | 'subadmin' | 'user'
+  ) => {
     try {
       const res = await apiClient.updateAdminUserRole(u.id, { role: nextRole });
       showToast(res.message);
-      await loadOverview();
+      setAdminUsers((prev) =>
+        prev.map((item) => (item.id === u.id ? { ...item, role: nextRole } : item))
+      );
     } catch (err: any) {
       showToast(err?.message || 'Lỗi đổi quyền thành viên.');
     }
@@ -451,9 +460,12 @@ export const AdminPage: React.FC = () => {
 
   const handleToggleUserActive = async (u: AdminUserRecord) => {
     try {
-      const res = await apiClient.updateAdminUserRole(u.id, { isActive: !u.isActive });
+      const nextActive = !u.isActive;
+      const res = await apiClient.updateAdminUserRole(u.id, { isActive: nextActive });
       showToast(res.message);
-      await loadOverview();
+      setAdminUsers((prev) =>
+        prev.map((item) => (item.id === u.id ? { ...item, isActive: nextActive } : item))
+      );
     } catch (err: any) {
       showToast(err?.message || 'Lỗi cập nhật trạng thái thành viên.');
     }
@@ -463,11 +475,40 @@ export const AdminPage: React.FC = () => {
     try {
       const res = await apiClient.revokeAdminUserSessions(u.id);
       showToast(res.message);
-      await loadOverview();
+      setAdminUsers((prev) =>
+        prev.map((item) => (item.id === u.id ? { ...item, activeSessions: 0 } : item))
+      );
     } catch (err: any) {
       showToast(err?.message || 'Lỗi thu hồi phiên đăng nhập.');
     }
   };
+
+  const filteredAdminUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    return adminUsers.filter((u) => {
+      const matchesSearch =
+        !q ||
+        (u.fullName || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.phone || '').includes(q);
+
+      const matchesRole =
+        userRoleFilter === 'ALL' || u.role === userRoleFilter;
+
+      const matchesStatus =
+        userStatusFilter === 'ALL' ||
+        (userStatusFilter === 'active' && u.isActive) ||
+        (userStatusFilter === 'blocked' && !u.isActive);
+
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [adminUsers, userSearch, userRoleFilter, userStatusFilter]);
+
+  const totalUserPages = Math.max(1, Math.ceil(filteredAdminUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (userPage - 1) * USERS_PER_PAGE;
+    return filteredAdminUsers.slice(start, start + USERS_PER_PAGE);
+  }, [filteredAdminUsers, userPage]);
 
   return (
     <div className="bg-gray-50 min-h-screen pb-14">
@@ -1554,26 +1595,80 @@ export const AdminPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: QUẢN LÝ THÀNH VIÊN, PHÂN QUYỀN & SESSION */}
+        {/* TAB 6: QUẢN LÝ THÀNH VIÊN, PHÂN QUYỀN & SESSION */}
         {activeTab === 'users' && (
           <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
                 <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                  Quản lý Thành viên, Phân quyền (User / Admin) &amp; Phiên đăng nhập
+                  Quản lý Thành viên, Phân quyền &amp; Phiên đăng nhập
                 </h2>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Toàn bộ mật khẩu được băm bằng SHA3-256 và quản lý phiên trực tiếp trong bảng{' '}
-                  <code>public.user_sessions</code>.
+                  Đồng bộ người dùng hệ thống. Quản lý vai trò (Admin / Subadmin / User) và thu hồi phiên làm việc.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={loadOverview}
-                className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-2 rounded-sm transition"
-              >
-                Làm mới danh sách
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-pink-50 text-[#e60049] font-bold px-2.5 py-1 rounded border border-pink-100">
+                  Tổng: {adminUsers.length} tài khoản
+                </span>
+                <button
+                  type="button"
+                  onClick={loadOverview}
+                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-1.5 rounded-sm transition shadow-sm"
+                >
+                  Làm mới danh sách
+                </button>
+              </div>
+            </div>
+
+            {/* Bộ lọc & Tìm kiếm */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-gray-50 p-3 rounded border border-gray-200 text-xs">
+              <div className="sm:col-span-6">
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Tìm kiếm</label>
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => {
+                    setUserSearch(e.target.value);
+                    setUserPage(1);
+                  }}
+                  placeholder="Tìm theo họ tên, email, số điện thoại..."
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Vai trò</label>
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => {
+                    setUserRoleFilter(e.target.value as any);
+                    setUserPage(1);
+                  }}
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-[#e60049]"
+                >
+                  <option value="ALL">Tất cả vai trò</option>
+                  <option value="admin">Quản trị viên (Admin)</option>
+                  <option value="subadmin">Quản lý nhóm (Subadmin)</option>
+                  <option value="user">Học viên / User</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Trạng thái</label>
+                <select
+                  value={userStatusFilter}
+                  onChange={(e) => {
+                    setUserStatusFilter(e.target.value as any);
+                    setUserPage(1);
+                  }}
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-[#e60049]"
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="active">Đang hoạt động</option>
+                  <option value="blocked">Đã khóa</option>
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1582,80 +1677,136 @@ export const AdminPage: React.FC = () => {
                   <tr className="bg-gray-100 text-gray-800 font-bold">
                     <th className="border border-gray-200 p-2.5 text-left">Họ tên &amp; Email</th>
                     <th className="border border-gray-200 p-2.5 text-left">Nhóm / SĐT</th>
-                    <th className="border border-gray-200 p-2.5 text-center">Vai trò (Role)</th>
-                    <th className="border border-gray-200 p-2.5 text-center">Session đang mở</th>
+                    <th className="border border-gray-200 p-2.5 text-center">Vai trò hiện tại</th>
+                    <th className="border border-gray-200 p-2.5 text-center">Phiên mở</th>
                     <th className="border border-gray-200 p-2.5 text-center">Trạng thái</th>
-                    <th className="border border-gray-200 p-2.5 text-right">Thao tác quản trị</th>
+                    <th className="border border-gray-200 p-2.5 text-right">Phân quyền &amp; Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {adminUsers.map((u) => (
-                    <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="border border-gray-200 p-2.5">
-                        <div className="font-bold text-gray-900">{u.fullName}</div>
-                        <div className="text-[11px] text-gray-500">{u.email}</div>
-                      </td>
-                      <td className="border border-gray-200 p-2.5">
-                        <div className="font-semibold text-gray-700">{u.customerGroup}</div>
-                        <div className="text-[11px] text-gray-500">{u.phone || '—'}</div>
-                      </td>
-                      <td className="border border-gray-200 p-2.5 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-sm text-[10px] font-extrabold uppercase ${
-                            u.role === 'admin'
-                              ? 'bg-[#e60049] text-white'
-                              : 'bg-gray-200 text-gray-800'
-                          }`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="border border-gray-200 p-2.5 text-center font-bold text-gray-800">
-                        {u.activeSessions} phiên
-                      </td>
-                      <td className="border border-gray-200 p-2.5 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
-                            u.isActive
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {u.isActive ? 'HOẠT ĐỘNG' : 'ĐÃ KHÓA'}
-                        </span>
-                      </td>
-                      <td className="border border-gray-200 p-2.5 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUserRole(u)}
-                            className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
-                          >
-                            {u.role === 'admin' ? 'Chuyển sang User' : 'Cấp quyền Admin'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUserActive(u)}
-                            className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
-                          >
-                            {u.isActive ? 'Khóa tài khoản' : 'Mở khóa'}
-                          </button>
-                          {u.activeSessions > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRevokeAllUserSessions(u)}
-                              className="border border-[#e60049] text-[#e60049] hover:bg-[#e60049] hover:text-white font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
-                            >
-                              Thu hồi Session
-                            </button>
-                          )}
-                        </div>
+                  {paginatedUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-gray-500">
+                        Không tìm thấy tài khoản nào phù hợp với bộ lọc.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    paginatedUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="border border-gray-200 p-2.5">
+                          <div className="font-bold text-gray-900">{u.fullName || 'Chưa đặt tên'}</div>
+                          <div className="text-[11px] text-gray-500">{u.email}</div>
+                        </td>
+                        <td className="border border-gray-200 p-2.5">
+                          <div className="font-semibold text-gray-700">{u.customerGroup || 'Giáo viên'}</div>
+                          <div className="text-[11px] text-gray-500">{u.phone || '—'}</div>
+                        </td>
+                        <td className="border border-gray-200 p-2.5 text-center">
+                          {u.role === 'admin' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-[#e60049] text-white">
+                              ADMIN
+                            </span>
+                          )}
+                          {u.role === 'subadmin' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-purple-600 text-white">
+                              SUBADMIN
+                            </span>
+                          )}
+                          {u.role === 'user' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-gray-100 text-gray-700 border border-gray-300">
+                              USER
+                            </span>
+                          )}
+                        </td>
+                        <td className="border border-gray-200 p-2.5 text-center font-bold text-gray-800">
+                          {u.activeSessions} phiên
+                        </td>
+                        <td className="border border-gray-200 p-2.5 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                              u.isActive
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {u.isActive ? 'HOẠT ĐỘNG' : 'ĐÃ KHÓA'}
+                          </span>
+                        </td>
+                        <td className="border border-gray-200 p-2.5 text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <select
+                              value={u.role}
+                              onChange={(e) =>
+                                handleUpdateUserRole(
+                                  u,
+                                  e.target.value as 'admin' | 'subadmin' | 'user'
+                                )
+                              }
+                              className="text-[11px] font-bold border border-gray-300 rounded px-2 py-1 bg-white hover:border-[#e60049] cursor-pointer focus:outline-none"
+                            >
+                              <option value="user">Gán: USER</option>
+                              <option value="subadmin">Gán: SUBADMIN</option>
+                              <option value="admin">Gán: ADMIN</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserActive(u)}
+                              className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
+                            >
+                              {u.isActive ? 'Khóa' : 'Mở khóa'}
+                            </button>
+
+                            {u.activeSessions > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeAllUserSessions(u)}
+                                className="border border-[#e60049] text-[#e60049] hover:bg-[#e60049] hover:text-white font-bold text-[11px] px-2.5 py-1 rounded-sm transition"
+                              >
+                                Thu hồi Session
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Phân trang */}
+            {totalUserPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200 text-xs">
+                <span className="text-gray-600">
+                  Hiển thị {(userPage - 1) * USERS_PER_PAGE + 1} -{' '}
+                  {Math.min(userPage * USERS_PER_PAGE, filteredAdminUsers.length)} trong tổng số{' '}
+                  <strong>{filteredAdminUsers.length}</strong> thành viên
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={userPage <= 1}
+                    onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                    className="border border-gray-300 px-2.5 py-1 rounded disabled:opacity-40 hover:bg-gray-100 font-medium"
+                  >
+                    ← Trước
+                  </button>
+                  <span className="px-2 font-bold text-gray-800">
+                    {userPage} / {totalUserPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={userPage >= totalUserPages}
+                    onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
+                    className="border border-gray-300 px-2.5 py-1 rounded disabled:opacity-40 hover:bg-gray-100 font-medium"
+                  >
+                    Sau →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

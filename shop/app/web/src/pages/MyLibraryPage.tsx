@@ -8,10 +8,9 @@ import {
   OrderRecord,
   UiFormatCode,
   UserLibraryItem,
-  UserSessionItem,
 } from '../types';
 
-type LibraryTab = 'library' | 'orders' | 'sessions' | 'profile';
+type LibraryTab = 'library' | 'orders' | 'profile';
 
 function getSsoUrl(): string {
   const envUrl = import.meta.env.SSO_URL;
@@ -28,14 +27,13 @@ export const MyLibraryPage: React.FC = () => {
 
   const initialTab = (searchParams.get('tab') as LibraryTab) || 'library';
   const [activeTab, setActiveTab] = useState<LibraryTab>(
-    ['library', 'orders', 'sessions', 'profile'].includes(initialTab)
+    ['library', 'orders', 'profile'].includes(initialTab)
       ? initialTab
       : 'library'
   );
 
   const [libraryItems, setLibraryItems] = useState<UserLibraryItem[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [sessions, setSessions] = useState<UserSessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [formatFilter, setFormatFilter] = useState<'ALL' | UiFormatCode>('ALL');
 
@@ -55,14 +53,12 @@ export const MyLibraryPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [libRes, ordRes, sessRes] = await Promise.all([
+      const [libRes, ordRes] = await Promise.all([
         apiClient.getUserLibrary(),
         apiClient.getUserOrders(),
-        apiClient.getSessions(),
       ]);
       setLibraryItems(libRes.items);
       setOrders(ordRes.orders);
-      setSessions(sessRes.sessions);
     } catch (err: any) {
       showToast(err?.message || 'Lỗi tải dữ liệu tài khoản.');
     } finally {
@@ -90,26 +86,7 @@ export const MyLibraryPage: React.FC = () => {
     setSearchParams({ tab });
   };
 
-  const handleRevokeSession = async (sessionId: string, isCurrent: boolean) => {
-    try {
-      if (isCurrent) {
-        await logout();
-        showToast('Đã đăng xuất phiên hiện tại.');
-        return;
-      }
-      const res = await apiClient.revokeSession(sessionId);
-      showToast(res.message);
-      const sessRes = await apiClient.getSessions();
-      setSessions(sessRes.sessions);
-    } catch (err: any) {
-      showToast(err?.message || 'Không thể thu hồi phiên đăng nhập.');
-    }
-  };
 
-  const handleRevokeAllSessions = async () => {
-    await logoutAllDevices();
-    showToast('Đã thu hồi toàn bộ phiên đăng nhập trên mọi thiết bị.');
-  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,8 +129,7 @@ export const MyLibraryPage: React.FC = () => {
             </span>
           </h1>
           <p className="text-xs text-gray-600 mt-1">
-            Gmail nhận tài liệu: <strong>{user?.email}</strong> • Thiết bị đang hoạt động:{' '}
-            <strong>{sessions.length} phiên</strong>
+            Gmail nhận tài liệu: <strong>{user?.email}</strong>
           </p>
         </div>
 
@@ -199,17 +175,6 @@ export const MyLibraryPage: React.FC = () => {
           }`}
         >
           Lịch sử đơn hàng ({orders.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSelectTab('sessions')}
-          className={`px-4 py-2 rounded-sm text-xs font-bold transition ${
-            activeTab === 'sessions'
-              ? 'bg-[#e60049] text-white'
-              : 'bg-white text-gray-700 border border-gray-300 hover:border-[#e60049]'
-          }`}
-        >
-          Quản lý Phiên đăng nhập ({sessions.length})
         </button>
         <button
           type="button"
@@ -405,71 +370,7 @@ export const MyLibraryPage: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 3: QUẢN LÝ PHIÊN ĐĂNG NHẬP (SESSIONS) */}
-          {activeTab === 'sessions' && (
-            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    Các thiết bị &amp; Phiên đăng nhập đang hoạt động
-                  </h2>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    Kiểm tra và thu hồi quyền truy cập trên các thiết bị lạ bất kỳ lúc nào.
-                  </p>
-                </div>
-                {sessions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={handleRevokeAllSessions}
-                    className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-2 rounded-sm transition"
-                  >
-                    Đăng xuất toàn bộ thiết bị
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-2.5">
-                {sessions.map((sess) => (
-                  <div
-                    key={sess.id}
-                    className={`p-3.5 rounded-md border flex flex-wrap items-center justify-between gap-3 ${
-                      sess.isCurrent
-                        ? 'border-[#e60049] bg-[#fff5f7]'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900">
-                          {sess.userAgent}
-                        </span>
-                        {sess.isCurrent && (
-                          <span className="bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
-                            Thiết bị hiện tại
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-gray-500">
-                        IP: <strong>{sess.ipAddress || '127.0.0.1'}</strong> • Đăng nhập lúc:{' '}
-                        {new Date(sess.createdAt).toLocaleString('vi-VN')} • Hoạt động gần
-                        nhất: {new Date(sess.lastActiveAt).toLocaleString('vi-VN')}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRevokeSession(sess.id, sess.isCurrent)}
-                      className="border border-[#e60049] text-[#e60049] hover:bg-[#e60049] hover:text-white font-bold text-xs px-3 py-1.5 rounded-sm transition"
-                    >
-                      {sess.isCurrent ? 'Đăng xuất phiên này' : 'Thu hồi phiên'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: HỒ SƠ CÁ NHÂN & ĐỔI MẬT KHẨU */}
+          {/* TAB 3: HỒ SƠ CÁ NHÂN & ĐỔI MẬT KHẨU */}
           {activeTab === 'profile' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Cột trái: Thông tin cá nhân & Hóa đơn */}
