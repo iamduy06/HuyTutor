@@ -655,6 +655,108 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
 
                           <div>
                             <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Tỷ lệ Khung hình (Aspect Ratio)
+                            </label>
+                            <select
+                              value={cfg.ratio_mode === 'auto' ? 'auto' : (cfg.ratio_mode === 'custom' ? 'custom' : (cfg.preset_ratio || '3:4'))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateBlockConfig<ProductHeroBlockConfig>(idx, (c) => {
+                                  if (val === 'auto') {
+                                    return { ...c, ratio_mode: 'auto' };
+                                  } else if (val === 'custom') {
+                                    return { ...c, ratio_mode: 'custom', custom_ratio_w: c.custom_ratio_w || 5, custom_ratio_h: c.custom_ratio_h || 7 };
+                                  } else {
+                                    return { ...c, ratio_mode: 'preset', preset_ratio: val as any };
+                                  }
+                                });
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2.5 py-1.5 text-xs bg-white font-semibold"
+                            >
+                              <option value="3:4">3 : 4 (Chuẩn bìa sách 600x800)</option>
+                              <option value="4:3">4 : 3 (Khổ ngang 800x600)</option>
+                              <option value="1:1">1 : 1 (Vuông 800x800)</option>
+                              <option value="16:9">16 : 9 (Banner ngang 1280x720)</option>
+                              <option value="auto">Auto (Ôm theo tỷ lệ ảnh gốc - Không crop)</option>
+                              <option value="custom">Tùy biến W : H nhập tay</option>
+                            </select>
+                          </div>
+
+                          {cfg.ratio_mode === 'custom' && (
+                            <div className="col-span-1 sm:col-span-2 flex items-center gap-2 bg-pink-50 p-2 rounded border border-pink-200">
+                              <span className="text-xs font-bold text-gray-700">Tỷ lệ tự do:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={cfg.custom_ratio_w || 5}
+                                onChange={(e) =>
+                                  updateBlockConfig<ProductHeroBlockConfig>(idx, (c) => ({
+                                    ...c,
+                                    custom_ratio_w: Number(e.target.value) || 1,
+                                  }))
+                                }
+                                className="w-16 border border-gray-300 rounded px-2 py-1 text-xs text-center font-bold bg-white"
+                                placeholder="W"
+                              />
+                              <span className="font-bold text-gray-500">:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={cfg.custom_ratio_h || 7}
+                                onChange={(e) =>
+                                  updateBlockConfig<ProductHeroBlockConfig>(idx, (c) => ({
+                                    ...c,
+                                    custom_ratio_h: Number(e.target.value) || 1,
+                                  }))
+                                }
+                                className="w-16 border border-gray-300 rounded px-2 py-1 text-xs text-center font-bold bg-white"
+                                placeholder="H"
+                              />
+                              <span className="text-[11px] text-gray-500">(VD: 5:7, 2:3, 7:10)</span>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Chiều rộng tối đa (Max-Width: {cfg.max_width_px || 360}px)
+                            </label>
+                            <input
+                              type="range"
+                              min="200"
+                              max="600"
+                              step="20"
+                              value={cfg.max_width_px || 360}
+                              onChange={(e) =>
+                                updateBlockConfig<ProductHeroBlockConfig>(idx, (c) => ({
+                                  ...c,
+                                  max_width_px: Number(e.target.value),
+                                }))
+                              }
+                              className="w-full accent-[#e60049]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Chế độ co giãn ảnh (Object Fit)
+                            </label>
+                            <select
+                              value={cfg.object_fit || 'cover'}
+                              onChange={(e) =>
+                                updateBlockConfig<ProductHeroBlockConfig>(idx, (c) => ({
+                                  ...c,
+                                  object_fit: e.target.value as 'cover' | 'contain',
+                                }))
+                              }
+                              className="w-full border border-gray-300 rounded-sm px-2.5 py-1.5 text-xs bg-white font-semibold"
+                            >
+                              <option value="cover">Cover (Tràn viền lấp đầy khung - Full tấm)</option>
+                              <option value="contain">Contain (Giữ nguyên toàn bộ chi tiết)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
                               Ghi đè chữ trong Badge Giá (Để trống sẽ tự tính theo Định dạng)
                             </label>
                             <input

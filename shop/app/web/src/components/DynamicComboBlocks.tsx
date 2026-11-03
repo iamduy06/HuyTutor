@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
+import { ProductImageFrame } from './ProductImageFrame';
 import {
   ComboBannerBlockConfig,
   ComboBottomCtaBlockConfig,
@@ -437,19 +438,22 @@ export const ComboSectionsBlock: React.FC<{
                     key={prod.id}
                     className="flex flex-col items-center justify-between space-y-2.5"
                   >
-                    {/* Ảnh bìa đứng độc lập nguyên bản */}
+                    {/* Ảnh bìa đứng độc lập với khung hình chuẩn bo tròn 16px, viền xám, đổ bóng & Khung đè */}
                     <SmartLink to={targetUrl} className="block w-full">
-                      {prod.thumbnail_url ? (
-                        <img
-                          src={prod.thumbnail_url}
-                          alt={prod.title}
-                          className="w-full h-auto object-contain rounded-md shadow-sm hover:opacity-95 transition"
-                        />
-                      ) : (
-                        <div className="w-full aspect-[3/4] bg-gradient-to-br from-pink-500 to-rose-600 rounded-md flex items-center justify-center text-white text-xs font-bold p-3 text-center shadow-sm">
-                          {prod.title}
-                        </div>
-                      )}
+                      <ProductImageFrame
+                        src={prod.thumbnail_url}
+                        alt={prod.title}
+                        ratioMode="preset"
+                        presetRatio="3:4"
+                        rounded="2xl"
+                        showBorder={true}
+                        showShadow={true}
+                        hoverEffect={true}
+                        productId={prod.id}
+                        customCampaignFrameUrl={prod.custom_campaign_frame_url}
+                        disableCampaignFrame={prod.disable_campaign_frame}
+                        fallbackText={prod.title}
+                      />
                     </SmartLink>
 
                     {/* Nút Đọc thử màu đỏ full-width */}

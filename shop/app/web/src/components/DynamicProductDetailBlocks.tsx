@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ProductImageFrame } from './ProductImageFrame';
 import {
   BottomCtaBlockConfig,
   formatVnd,
@@ -304,13 +305,29 @@ export const ProductHeroBlock: React.FC<{
               )}
             </div>
           ) : (
-            /* Chế độ mặc định (standalone): Ảnh tải lên đứng độc lập một mình, không nhốt trong khung */
+            /* Chế độ mặc định (standalone): Khung hình chuẩn bo tròn 16px, viền xám, đổ bóng & Khung đè Campaign thích ứng */
             displayImage && (
-              <img
-                src={displayImage}
-                alt={displayTitle}
-                className="w-full h-auto max-h-[320px] object-contain rounded-xl block mx-auto"
-              />
+              <div className="w-full flex justify-center">
+                <ProductImageFrame
+                  src={displayImage}
+                  alt={displayTitle}
+                  ratioMode={config.ratio_mode || product.image_frame_config?.ratio_mode || 'preset'}
+                  presetRatio={config.preset_ratio || product.image_frame_config?.preset_ratio || '3:4'}
+                  customRatioW={config.custom_ratio_w || product.image_frame_config?.custom_ratio_w}
+                  customRatioH={config.custom_ratio_h || product.image_frame_config?.custom_ratio_h}
+                  maxWidthPx={config.max_width_px || product.image_frame_config?.max_width_px || 360}
+                  objectFit={config.object_fit || product.image_frame_config?.object_fit || 'cover'}
+                  rounded={product.image_frame_config?.border_rounded || '2xl'}
+                  showBorder={product.image_frame_config?.show_border !== false}
+                  showShadow={product.image_frame_config?.show_shadow !== false}
+                  hoverEffect={true}
+                  productId={product.id}
+                  customCampaignFrameUrl={product.custom_campaign_frame_url}
+                  disableCampaignFrame={product.disable_campaign_frame}
+                  badgeText={displayBadge}
+                  fallbackText="Tài liệu"
+                />
+              </div>
             )
           )}
         </div>
@@ -964,18 +981,21 @@ export const GiftCrossSellBlock: React.FC<{
             key={p.id}
             className="bg-white border border-gray-200 rounded-md p-3 text-center space-y-2 shadow-2xs hover:border-[#e60049] transition"
           >
-            <div className="h-32 flex items-center justify-center">
-              {p.thumbnail_url ? (
-                <img
-                  src={p.thumbnail_url}
-                  alt={p.title}
-                  className="max-h-28 w-auto object-contain drop-shadow"
-                />
-              ) : (
-                <div className="w-20 h-28 bg-gray-100 rounded flex items-center justify-center text-gray-400 font-bold text-[10px]">
-                  Bìa sách
-                </div>
-              )}
+            <div className="w-full flex items-center justify-center mb-2">
+              <ProductImageFrame
+                src={p.thumbnail_url}
+                alt={p.title}
+                ratioMode="preset"
+                presetRatio="3:4"
+                rounded="xl"
+                maxWidthPx={120}
+                showBorder={true}
+                showShadow={true}
+                productId={p.id}
+                customCampaignFrameUrl={p.custom_campaign_frame_url}
+                disableCampaignFrame={p.disable_campaign_frame}
+                fallbackText="Bìa sách"
+              />
             </div>
 
             <div className="text-[11px] font-bold text-gray-800 line-clamp-2 min-h-[32px]">

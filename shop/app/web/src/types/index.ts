@@ -175,6 +175,37 @@ export interface HomepageBlockItem {
   config: any;
 }
 
+/**
+ * ============================================================================
+ * CẤU HÌNH KHUNG HÌNH (IMAGE FRAME) & KHUNG ĐÈ CHIẾN DỊCH (CAMPAIGN OVERLAY)
+ * ============================================================================
+ */
+export type AspectRatioMode = 'preset' | 'custom' | 'auto';
+export type PresetAspectRatio = '3:4' | '4:3' | '1:1' | '16:9' | '3:1' | '1:1.414';
+
+export interface ImageFrameConfig {
+  ratio_mode?: AspectRatioMode;
+  preset_ratio?: PresetAspectRatio;
+  custom_ratio_w?: number;
+  custom_ratio_h?: number;
+  max_width_px?: number;
+  object_fit?: 'cover' | 'contain';
+  border_rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+  show_border?: boolean;
+  show_shadow?: boolean;
+}
+
+export type CampaignFramePreset = 'tet' | 'sale' | 'exam' | 'christmas';
+
+export interface CampaignFrameConfig {
+  is_enabled: boolean;
+  frame_type: 'preset' | 'custom';
+  preset_name?: CampaignFramePreset;
+  custom_frame_url?: string;
+  scope: 'global' | 'specific';
+  applied_product_ids?: string[];
+}
+
 export interface SiteConfigs {
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
@@ -193,6 +224,7 @@ export interface SiteConfigs {
   hc_rewards_page_config?: HcRewardsPageConfig;
   soan_tai_lieu_page_config?: SoanTaiLieuPageConfig;
   donate_page_config?: DonatePageConfig;
+  campaign_frame?: CampaignFrameConfig;
   [key: string]: any;
 }
 
@@ -309,6 +341,12 @@ export interface ProductSpec {
 export interface ProductHeroBlockConfig {
   image_mode?: 'standalone' | 'card_box';
   image_url?: string;
+  ratio_mode?: AspectRatioMode;
+  preset_ratio?: PresetAspectRatio;
+  custom_ratio_w?: number;
+  custom_ratio_h?: number;
+  max_width_px?: number;
+  object_fit?: 'cover' | 'contain';
   badge_text?: string;
   cover_tag?: string;
   title?: string;
@@ -758,6 +796,9 @@ export interface Product {
   cross_sell_product_ids?: string[];
   formats: ProductFormat[];
   detail_blocks?: ProductDetailBlockItem[];
+  image_frame_config?: ImageFrameConfig;
+  custom_campaign_frame_url?: string;
+  disable_campaign_frame?: boolean;
 }
 
 export interface CartItem {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ProductImageFrame } from './ProductImageFrame';
 import {
   CategoryBannerBlockConfig,
   CategoryBlockItem,
@@ -353,22 +354,20 @@ export const CategorySectionBlock: React.FC<{
                   )}
                 </div>
               ) : (
-                /* Chế độ Mặc định: Ảnh đứng độc lập nguyên bản (không bị bó khung nhỏ hay chữ mẫu) */
-                <SmartLink
-                  to={item.target_url}
-                  className="bg-white rounded-lg border border-gray-200 p-3 min-h-[160px] flex items-center justify-center shadow-2xs hover:border-gray-300 transition overflow-hidden group"
-                >
-                  {item.image_url && item.image_url.trim() ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.display_title || ''}
-                      className="max-h-[145px] w-auto max-w-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200 block mx-auto"
-                    />
-                  ) : (
-                    <div className="w-full h-28 bg-gray-100 rounded border border-dashed flex items-center justify-center text-gray-400 font-bold text-[11px]">
-                      Tài liệu
-                    </div>
-                  )}
+                /* Chế độ Mặc định: Khung hình chuẩn bo tròn 16px, viền xám, đổ bóng & Khung đè Campaign */
+                <SmartLink to={item.target_url} className="block w-full">
+                  <ProductImageFrame
+                    src={item.image_url}
+                    alt={item.display_title || ''}
+                    ratioMode="preset"
+                    presetRatio="3:4"
+                    rounded="2xl"
+                    showBorder={true}
+                    showShadow={true}
+                    hoverEffect={true}
+                    badgeText={item.badge_text}
+                    fallbackText="Tài liệu"
+                  />
                 </SmartLink>
               )}
 
