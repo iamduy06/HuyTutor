@@ -156,12 +156,28 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password, full_name, phone, school_or_org, customer_group } = req.body;
+    const { email, password, confirm_password, full_name, phone, school_or_org, customer_group } = req.body;
 
-    if (!email || !password || !full_name) {
+    if (!email || !password) {
       res.status(400).json({
         success: false,
-        error: { code: 'MISSING_FIELDS', message: 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu.' }
+        error: { code: 'MISSING_FIELDS', message: 'Vui lòng điền đầy đủ Email và Mật khẩu.' }
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_PASSWORD', message: 'Mật khẩu phải có tối thiểu 6 ký tự.' }
+      });
+      return;
+    }
+
+    if (confirm_password && confirm_password !== password) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'PASSWORD_MISMATCH', message: 'Mật khẩu xác nhận không khớp.' }
       });
       return;
     }
@@ -185,13 +201,15 @@ export async function register(req: Request, res: Response): Promise<void> {
     const hashedPassword = await hashPassword(password);
 
     // 3. Tạo tài khoản mới trong public.users
+    const finalFullName = full_name?.trim() || cleanEmail.split('@')[0];
+
     const createRes = await supabaseRest('users', {
       method: 'POST',
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify({
         email: cleanEmail,
         password_hash: hashedPassword,
-        full_name: full_name.trim(),
+        full_name: finalFullName,
         phone: phone?.trim() || null,
         school_or_org: school_or_org?.trim() || null,
         customer_group: customer_group || 'Học sinh',
