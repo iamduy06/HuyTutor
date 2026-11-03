@@ -56,23 +56,26 @@ export function slugifyText(text: string): string {
  * (tên trang cấp 1 (nếu có) + tên trang cấp 2 (nếu có) + 10 số ngẫu nhiên) + ext
  * Tuyệt đối không dùng tên file gốc trong link R2 theo yêu cầu.
  */
-export function generateR2FileName(params: {
+/**
+ * Tạo tên file ngẫu nhiên là một số ngẫu nhiên 12 chữ số theo yêu cầu:
+ * Ví dụ: 592819401824.png, 810482910385.pdf
+ * Tuyệt đối không đặt tên file gốc, không ghép slug; tên file là 12 chữ số ngẫu nhiên.
+ */
+export function generateR2FileName(params?: {
   pageLevel1?: string;
   pageLevel2?: string;
-  originalFileName: string;
-}): string {
+  originalFileName?: string;
+} | string): string {
+  const originalFileName = typeof params === 'string' ? params : params?.originalFileName;
   const ext = (
-    params.originalFileName.includes('.')
-      ? params.originalFileName.substring(params.originalFileName.lastIndexOf('.'))
+    originalFileName && originalFileName.includes('.')
+      ? originalFileName.substring(originalFileName.lastIndexOf('.'))
       : '.png'
   ).toLowerCase();
 
-  const slug1 = slugifyText(params.pageLevel1 || '');
-  const slug2 = slugifyText(params.pageLevel2 || '');
-  const random10 = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-
-  const parts = [slug1, slug2, random10].filter(Boolean);
-  return `${parts.join('_')}${ext}`;
+  // Sinh số ngẫu nhiên chính xác 12 chữ số (từ 100000000000 đến 999999999999)
+  const random12Digits = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+  return `${random12Digits}${ext}`;
 }
 
 /**

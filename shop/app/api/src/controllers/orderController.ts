@@ -89,6 +89,18 @@ export const orderController = {
       }
       const selectedFormat: UiFormatCode = selectedFormatRaw;
 
+      // 2.1 Quy tắc đơn hàng: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1
+      if (selectedFormat !== 'Flashcard') {
+        if (items.length !== 1 || Number(items[0]?.quantity || 1) !== 1) {
+          res.status(400).json({
+            ok: false,
+            error:
+              'Quy tắc đặt hàng: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1. Vui lòng kiểm tra lại giỏ hàng.',
+          });
+          return;
+        }
+      }
+
       // 3. Kiểm tra điều kiện Xuất hóa đơn VAT
       const isInvoiceRequested = Boolean(needInvoice);
       if (isInvoiceRequested) {

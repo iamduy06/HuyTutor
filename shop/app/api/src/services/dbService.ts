@@ -1479,24 +1479,27 @@ export const dbService = {
 
   async createOrder(order: SeedOrder): Promise<SeedOrder> {
     if (isSupabaseConfigured && supabaseAdmin) {
+      const customerNoteParts: string[] = [];
+      if (order.customer_group) customerNoteParts.push(`[Nhóm: ${order.customer_group}]`);
+      if (order.selected_format) customerNoteParts.push(`[Định dạng: ${order.selected_format}]`);
+      if (order.flashcard_quantity) customerNoteParts.push(`[Số lượng FC: ${order.flashcard_quantity}]`);
+
       const insertPayload: Record<string, any> = {
         order_code: order.order_code,
         customer_name: order.customer_name,
         customer_email: order.customer_email,
-        customer_phone: order.customer_phone,
-        customer_group: order.customer_group,
-        selected_format: order.selected_format,
-        flashcard_quantity: order.flashcard_quantity,
-        need_invoice: order.need_invoice,
-        invoice_tax_or_cccd: order.invoice_tax_or_cccd,
-        invoice_address: order.invoice_address,
-        subtotal_amount: order.subtotal_amount,
-        discount_percent: order.discount_percent,
-        discount_amount: order.discount_amount,
-        total_amount: order.total_amount,
-        payment_method: order.payment_method,
-        payment_status: order.payment_status,
-        google_form_submitted: order.google_form_submitted,
+        customer_phone: order.customer_phone || '',
+        customer_note: customerNoteParts.join(' '),
+        need_invoice: Boolean(order.need_invoice),
+        invoice_company: '',
+        invoice_tax_code: order.invoice_tax_or_cccd || '',
+        invoice_address: order.invoice_address || '',
+        total_amount: order.subtotal_amount || order.total_amount,
+        discount_amount: order.discount_amount || 0,
+        final_amount: order.total_amount,
+        status: order.payment_status === 'paid' ? 'completed' : 'pending',
+        payment_status: order.payment_status || 'pending',
+        payment_method: order.payment_method || 'vietqr',
       };
       if (order.user_id) {
         insertPayload.user_id = order.user_id;
@@ -1514,7 +1517,7 @@ export const dbService = {
           await supabaseAdmin.from('order_items').insert({
             order_id: insertedOrder.id,
             product_title: item.product_title,
-            google_form_product_name: item.google_form_product_name,
+            google_form_product_name: item.google_form_product_name || '',
             format_code: item.format_code,
             unit_price: item.unit_price,
             quantity: item.quantity,
@@ -1640,7 +1643,18 @@ export const dbService = {
   ): Promise<SeedOrder | null> {
     const normalized = orderCode.trim().toUpperCase();
     if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin.from('orders').update(updates).eq('order_code', normalized);
+      const supabaseUpdates: Record<string, any> = {};
+      if (updates.payment_status !== undefined) {
+        supabaseUpdates.payment_status = updates.payment_status;
+        if (updates.payment_status === 'paid') {
+          supabaseUpdates.status = 'completed';
+        }
+      }
+      if (updates.paid_at !== undefined) {
+        supabaseUpdates.paid_at = updates.paid_at;
+      }
+      supabaseUpdates.updated_at = new Date().toISOString();
+      await supabaseAdmin.from('orders').update(supabaseUpdates).eq('order_code', normalized);
     }
 
     const db = loadLocalDb();
