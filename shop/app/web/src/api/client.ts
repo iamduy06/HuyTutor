@@ -35,9 +35,6 @@ function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
   if (savedToken) {
     headers['Authorization'] = `Bearer ${savedToken}`;
   }
-  if (ADMIN_API_KEY) {
-    headers['x-admin-key'] = ADMIN_API_KEY;
-  }
   if (extra) {
     const entries =
       extra instanceof Headers

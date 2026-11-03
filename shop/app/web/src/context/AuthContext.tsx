@@ -131,9 +131,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(false);
             return;
           }
+        } else if (ssoRes.status === 401 || ssoRes.status === 403) {
+          // Phiên SSO đã bị thu hồi hoặc đã đăng xuất từ Flashcard/SSO portal
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+          }
+          setUser(null);
+          setSessionToken(null);
+          setIsLoading(false);
+          return;
         }
       } catch {
-        // Fallback to local storage / shop api if SSO check fails
+        // Fallback to local storage / shop api if SSO check fails (e.g. offline)
       }
     }
 
@@ -163,6 +172,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshUser();
+
+    // Tự động kiểm tra và đồng bộ trạng thái đăng xuất khi chuyển tab về Shop
+    const handleSyncOnTabFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener('focus', handleSyncOnTabFocus);
+    document.addEventListener('visibilitychange', handleSyncOnTabFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleSyncOnTabFocus);
+      document.removeEventListener('visibilitychange', handleSyncOnTabFocus);
+    };
   }, []);
 
   const openAuthModal = (tab: AuthModalTab = 'login') => {
