@@ -54,13 +54,61 @@ export const authController = {
   },
 
   /**
-   * POST /api/auth/logout
+   * POST /api/auth/logout & GET /api/auth/logout
+   * Đăng xuất phiên hiện tại và xóa sạch cookie đa domain (.huytutor.edu.vn)
    */
   async logout(req: Request, res: Response): Promise<void> {
     try {
       if (req.sessionToken) {
         await authService.logout(req.sessionToken);
       }
+
+      // Thông báo đồng bộ tới SSO API (nếu có cấu hình SSO_URL)
+      const ssoUrl = process.env.SSO_URL;
+      if (ssoUrl && req.sessionToken) {
+        try {
+          await fetch(`${ssoUrl.replace(/\/+$/, '')}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${req.sessionToken}`,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(2000),
+          });
+        } catch {
+          /* Bỏ qua lỗi kết nối nền tới SSO */
+        }
+      }
+
+      // Hủy toàn bộ cookie phiên trên mọi cấp độ domain (.huytutor.edu.vn, huytutor.edu.vn, host-only)
+      const isProd = process.env.NODE_ENV === 'production';
+      const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
+
+      const clearOpts = {
+        path: '/',
+        httpOnly: true,
+        secure: isProd,
+        sameSite: 'lax' as const,
+        maxAge: 0,
+        expires: new Date(0),
+      };
+
+      const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
+
+      for (const name of cookieNames) {
+        res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
+        if (cookieDomain.startsWith('.')) {
+          res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+        }
+        res.cookie(name, '', clearOpts);
+      }
+
+      if (req.method === 'GET') {
+        const frontendUrl = process.env.FRONTEND_URL || '/';
+        res.redirect(`${frontendUrl.replace(/\/+$/, '')}/?logout=true`);
+        return;
+      }
+
       res.json({
         ok: true,
         message: 'Đã đăng xuất khỏi phiên hiện tại.',
@@ -83,6 +131,45 @@ export const authController = {
         return;
       }
       const result = await authService.logoutAll(req.user.id);
+
+      const ssoUrl = process.env.SSO_URL;
+      if (ssoUrl && req.sessionToken) {
+        try {
+          await fetch(`${ssoUrl.replace(/\/+$/, '')}/api/auth/sessions`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${req.sessionToken}`,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(2000),
+          });
+        } catch {
+          /* Bỏ qua lỗi kết nối nền tới SSO */
+        }
+      }
+
+      const isProd = process.env.NODE_ENV === 'production';
+      const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
+
+      const clearOpts = {
+        path: '/',
+        httpOnly: true,
+        secure: isProd,
+        sameSite: 'lax' as const,
+        maxAge: 0,
+        expires: new Date(0),
+      };
+
+      const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
+
+      for (const name of cookieNames) {
+        res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
+        if (cookieDomain.startsWith('.')) {
+          res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+        }
+        res.cookie(name, '', clearOpts);
+      }
+
       res.json({
         ok: true,
         revokedCount: result.revokedCount,

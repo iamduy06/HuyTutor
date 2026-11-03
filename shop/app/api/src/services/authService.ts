@@ -26,7 +26,7 @@ export function toPublicUserProfile(user: SeedUser): PublicUserProfile {
     email: user.email,
     fullName: user.full_name,
     phone: user.phone || '',
-    role: String(user.role || '').toUpperCase() === 'ADMIN' ? 'admin' : 'user',
+    role: String(user.role || '').toLowerCase() === 'admin' ? 'admin' : 'user',
     customerGroup: user.customer_group || 'Giáo viên',
     schoolOrOrg: user.school_or_org || '',
     defaultTaxCccd: user.default_tax_cccd || '',

@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: ssoData.user.email,
               fullName: ssoData.user.full_name ? ssoData.user.full_name : '',
               phone: ssoData.user.phone ? ssoData.user.phone : '',
-              role: ssoData.user.role === 'ADMIN' ? 'admin' : 'user',
+              role: String(ssoData.user.role || '').toLowerCase() === 'admin' ? 'admin' : 'user',
               customerGroup: ssoData.user.customer_group ? ssoData.user.customer_group : 'Học sinh',
               schoolOrOrg: ssoData.user.school_or_org ? ssoData.user.school_or_org : '',
               defaultTaxCccd: ssoData.user.default_tax_cccd ? ssoData.user.default_tax_cccd : '',
@@ -150,19 +150,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       const ssoBase = getSsoUrl();
+
+      // 1. Gửi request trực tiếp tới SSO Portal để thu hồi phiên và xóa Master Cookie
       if (typeof window !== 'undefined' && ssoBase) {
-        await fetch(`${ssoBase}/api/auth/logout`, {
-          method: 'POST',
-          credentials: 'include',
-        });
+        try {
+          await fetch(`${ssoBase}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+            mode: 'cors',
+          });
+        } catch {
+          // Bỏ qua lỗi mạng
+        }
       }
-      if (localStorage.getItem(SESSION_STORAGE_KEY)) {
+
+      // 2. Gửi request tới Shop backend API để nhận các header Set-Cookie xóa
+      try {
         await apiClient.logout();
+      } catch {
+        // Bỏ qua lỗi mạng
+      }
+
+      // 3. Xóa các cookie non-httpOnly phía client trên mọi domain
+      if (typeof window !== 'undefined') {
+        const past = 'Thu, 01 Jan 1970 00:00:00 GMT';
+        const domains = ['.huytutor.edu.vn', 'huytutor.edu.vn', window.location.hostname, `.${window.location.hostname}`, ''];
+        const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
+        for (const name of cookieNames) {
+          for (const dom of domains) {
+            const domStr = dom ? `; domain=${dom}` : '';
+            document.cookie = `${name}=; path=/${domStr}; expires=${past}; max-age=0`;
+          }
+        }
       }
     } catch {
       // ignore network error on logout
     } finally {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.clear();
+      }
       setSessionToken(null);
       setUser(null);
     }
@@ -172,18 +199,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const ssoBase = getSsoUrl();
       if (typeof window !== 'undefined' && ssoBase) {
-        await fetch(`${ssoBase}/api/auth/sessions`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
+        try {
+          await fetch(`${ssoBase}/api/auth/sessions`, {
+            method: 'DELETE',
+            credentials: 'include',
+            mode: 'cors',
+          });
+        } catch {
+          // ignore
+        }
       }
-      if (localStorage.getItem(SESSION_STORAGE_KEY)) {
+      try {
         await apiClient.logoutAll();
+      } catch {
+        // ignore
       }
     } catch {
       // ignore network error
     } finally {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.clear();
+      }
       setSessionToken(null);
       setUser(null);
     }
