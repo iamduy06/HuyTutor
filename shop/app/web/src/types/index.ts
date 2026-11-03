@@ -186,6 +186,7 @@ export interface SiteConfigs {
   homepage_bottom_banner?: HomepageBottomBannerConfig;
   homepage_blocks?: HomepageBlockItem[];
   combo_page_blocks?: ComboPageBlockItem[];
+  flashcard_page_blocks?: FlashcardPageBlockItem[];
   [key: string]: any;
 }
 
@@ -499,6 +500,117 @@ export interface ComboPageBlockItem {
     | ComboBottomCtaBlockConfig
     | ComboBannerBlockConfig
     | ComboNoticeBlockConfig;
+}
+
+
+/**
+ * ============================================================================
+ * CẤU HÌNH CÁC KHỐI ĐỘNG CHO TRANG FLASHCARD (FLASHCARD PAGE BUILDER)
+ * ============================================================================
+ */
+
+export type FlashcardBlockType =
+  | 'flashcard_hero'
+  | 'flashcard_features'
+  | 'flashcard_free_tier'
+  | 'flashcard_pricing_packages'
+  | 'flashcard_group_pricing'
+  | 'flashcard_contact_notice'
+  | 'flashcard_banner';
+
+export interface FlashcardHeroBlockConfig {
+  title: string;
+  subtitle?: string;
+  badge_text?: string;
+  video_type: 'youtube' | 'r2_video' | 'cover_only';
+  youtube_url_or_id?: string;
+  r2_video_url?: string;
+  cover_image_url?: string;
+  video_title?: string;
+}
+
+export interface FlashcardFeaturesBlockConfig {
+  bg_color?: string;
+  demo_card: {
+    unit_title: string;
+    word: string;
+    phonetic: string;
+    meaning: string;
+    image_url?: string;
+  };
+  cta_button: {
+    text: string;
+    action_type: 'link' | 'buy_package';
+    target_url?: string;
+    package_price?: number;
+    package_title?: string;
+  };
+  features: string[];
+}
+
+export interface FlashcardFreeTierBlockConfig {
+  title: string;
+  description: string;
+  rules_title?: string;
+  rules: string[];
+}
+
+export interface FlashcardIndividualPackageItem {
+  id: string;
+  label: string;
+  price: number;
+  price_text?: string;
+  badge_text?: string;
+  cover_image?: string;
+  is_popular?: boolean;
+}
+
+export interface FlashcardPricingBlockConfig {
+  title: string;
+  benefit_text: string;
+  packages: FlashcardIndividualPackageItem[];
+}
+
+export interface FlashcardGroupTierRow {
+  tier_name: string;
+  prices: string[];
+}
+
+export interface FlashcardGroupPricingBlockConfig {
+  columns: string[];
+  tiers: FlashcardGroupTierRow[];
+  cta_button_text?: string;
+  default_price?: number;
+  default_title?: string;
+}
+
+export interface FlashcardContactNoticeBlockConfig {
+  bulk_order_text: string;
+  delivery_notice_text: string;
+  custom_email?: string;
+  custom_fanpage_url?: string;
+}
+
+export interface FlashcardBannerBlockConfig {
+  banner_url: string;
+  link_url?: string;
+  alt_text?: string;
+}
+
+export interface FlashcardPageBlockItem {
+  id: string;
+  type: FlashcardBlockType;
+  title_label: string;
+  is_active: boolean;
+  sort_order: number;
+  config:
+    | FlashcardHeroBlockConfig
+    | FlashcardFeaturesBlockConfig
+    | FlashcardFreeTierBlockConfig
+    | FlashcardPricingBlockConfig
+    | FlashcardGroupPricingBlockConfig
+    | FlashcardContactNoticeBlockConfig
+    | FlashcardBannerBlockConfig;
 }
 
 export interface Product {
