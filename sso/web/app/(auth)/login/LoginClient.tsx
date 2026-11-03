@@ -14,26 +14,59 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
   const searchParams = useSearchParams();
   const app = searchParams.get('app') || '';
   const redirectUrl = searchParams.get('redirect') || '';
+  const initialEmail = searchParams.get('email') || '';
+  const isVerified = searchParams.get('verified') === 'true';
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [unactivatedEmail, setUnactivatedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<{ message: string; contactUrl: string } | null>(null);
+
+  async function handleResendActivation() {
+    const targetEmail = unactivatedEmail || email.trim().toLowerCase();
+    if (!targetEmail || resending) return;
+    setResending(true);
+    setResendStatus(null);
+
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendStatus('Đã gửi lại email kích hoạt! Vui lòng kiểm tra hộp thư (cả mục Spam).');
+      } else {
+        setResendStatus(data.error?.message || 'Không thể gửi email kích hoạt.');
+      }
+    } catch {
+      setResendStatus('Lỗi kết nối máy chủ.');
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
     setBlocked(null);
+    setUnactivatedEmail(null);
+    setResendStatus(null);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: cleanEmail,
           password,
           device_id: getDeviceId(),
           device_name: getDeviceName(),
@@ -50,6 +83,13 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
             message: data.error.message || 'Tài khoản đã đạt giới hạn thiết bị.',
             contactUrl: data.error.contactUrl || 'https://web.facebook.com/huytutor',
           });
+          setLoading(false);
+          return;
+        }
+
+        if (data.error?.code === 'ACCOUNT_NOT_ACTIVATED') {
+          setUnactivatedEmail(data.error?.email || cleanEmail);
+          setErrorMsg(data.error?.message || 'Tài khoản chưa được kích hoạt qua email.');
           setLoading(false);
           return;
         }
@@ -137,10 +177,40 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
         </div>
       )}
 
+      {isVerified && (
+        <div className="mb-5 p-3 rounded-xs bg-green-50 border border-green-200 text-xs text-green-700 flex items-start gap-2">
+          <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-green-600" />
+          <span>Tài khoản của bạn đã được xác thực thành công! Vui lòng nhập mật khẩu để đăng nhập.</span>
+        </div>
+      )}
+
       {errorMsg && (
-        <div className="mb-5 p-3 rounded-xs bg-red-50 border border-red-200 text-xs text-red-600 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>{errorMsg}</span>
+        <div className="mb-5 p-3 rounded-xs bg-red-50 border border-red-200 text-xs text-red-600 flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{errorMsg}</span>
+          </div>
+          {unactivatedEmail && (
+            <div className="pt-2 border-t border-red-200/80 flex items-center justify-between">
+              <span className="text-[11px] text-red-700">Chưa nhận được email?</span>
+              <button
+                type="button"
+                onClick={handleResendActivation}
+                disabled={resending}
+                className="text-xs font-bold text-brand hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
+              >
+                {resending && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>Gửi lại mã kích hoạt</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {resendStatus && (
+        <div className="mb-4 p-3 rounded-xs bg-blue-50 border border-blue-200 text-xs text-blue-700 flex items-start gap-2">
+          <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-600" />
+          <span>{resendStatus}</span>
         </div>
       )}
 
