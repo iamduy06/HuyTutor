@@ -39,7 +39,8 @@ function ResetPasswordContent() {
           setTokenValid(true);
         } else {
           setTokenValid(false);
-          setErrorMsg(data.error?.message || 'Liên kết không hợp lệ hoặc đã hết hạn.');
+          const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Liên kết không hợp lệ hoặc đã hết hạn.');
+          setErrorMsg(errorText);
         }
       } catch {
         if (!active) return;
@@ -82,7 +83,8 @@ function ResetPasswordContent() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMsg(data.error?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        setErrorMsg(errorText);
         setLoading(false);
         return;
       }

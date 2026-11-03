@@ -23,7 +23,8 @@ export default function ForgotPasswordPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMsg(data.error?.message || data.error || 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        setErrorMsg(errorText);
         setLoading(false);
         return;
       }

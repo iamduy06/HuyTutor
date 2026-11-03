@@ -16,13 +16,18 @@ export default function DevicesPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/sessions');
+      if (res.status === 401) {
+        window.location.href = `/login?redirect=${encodeURIComponent('/devices')}`;
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setSessions(data.sessions || []);
         setFlashcardDevices(data.flashcardDevices || []);
         setMaxDevices(data.maxDevices || 3);
       } else {
-        setMsg({ type: 'error', text: data.error || 'Vui lòng đăng nhập để xem thông tin thiết bị.' });
+        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Vui lòng đăng nhập để xem thông tin thiết bị.');
+        setMsg({ type: 'error', text: errorText });
       }
     } catch {
       setMsg({ type: 'error', text: 'Không thể kết nối máy chủ.' });
@@ -56,7 +61,8 @@ export default function DevicesPage() {
         });
         await loadData();
       } else {
-        setMsg({ type: 'error', text: data.error || 'Lỗi khi đăng xuất các thiết bị.' });
+        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Lỗi khi đăng xuất các thiết bị.');
+        setMsg({ type: 'error', text: errorText });
       }
     } catch {
       setMsg({ type: 'error', text: 'Lỗi mạng khi thực hiện thao tác.' });
@@ -75,7 +81,8 @@ export default function DevicesPage() {
         setMsg({ type: 'success', text: 'Đã thu hồi phiên đăng nhập thành công.' });
         await loadData();
       } else {
-        setMsg({ type: 'error', text: data.error || 'Không thể thu hồi phiên.' });
+        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Không thể thu hồi phiên.');
+        setMsg({ type: 'error', text: errorText });
       }
     } catch {
       setMsg({ type: 'error', text: 'Lỗi mạng khi thu hồi phiên.' });
