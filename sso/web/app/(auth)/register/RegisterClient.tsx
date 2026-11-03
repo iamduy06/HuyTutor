@@ -16,26 +16,36 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setErrorMsg('');
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Mật khẩu phải có tối thiểu 6 ký tự.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: email.trim().toLowerCase(),
           password,
-          full_name: fullName,
-          phone,
+          confirm_password: confirmPassword,
         }),
       });
 
@@ -101,20 +111,6 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-xs font-bold text-gray-700 mb-1">
-            Họ và tên
-          </label>
-          <input
-            type="text"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Nguyễn Văn A"
-            className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-700 mb-1">
             Email
           </label>
           <input
@@ -124,19 +120,6 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@example.com"
-            className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-700 mb-1">
-            Số điện thoại (tùy chọn)
-          </label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="0912 345 678"
             className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
           />
         </div>
@@ -159,7 +142,7 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
             <button
               type="button"
               onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
               tabIndex={-1}
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -167,10 +150,36 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
           </div>
         </div>
 
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-1">
+            Xác nhận lại mật khẩu
+          </label>
+          <div className="relative">
+            <input
+              type={showConfirmPw ? 'text' : 'password'}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPw(!showConfirmPw)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              tabIndex={-1}
+            >
+              {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs font-bold text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
+          className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs font-bold text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide cursor-pointer"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           <span>Tạo tài khoản</span>
