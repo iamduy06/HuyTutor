@@ -1551,10 +1551,37 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
                                           key={imgIdx}
                                           className="bg-white border border-gray-200 rounded-sm p-1.5 flex flex-col justify-between shadow-sm"
                                         >
-                                          <div className="relative">
+                                          <div className="relative group">
                                             <span className="absolute top-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm">
                                               Trang {imgIdx + 1}
                                             </span>
+                                            {/* Nút X ở góc trên bên phải preview ảnh để xóa khỏi R2 */}
+                                            <button
+                                              type="button"
+                                              title="Xóa trang ảnh này khỏi Cloudflare R2"
+                                              onClick={() => {
+                                                if (imgUrl) {
+                                                  apiClient.deleteR2File(imgUrl).catch(() => {});
+                                                }
+                                                updateBlockConfig<SampleGroupsBlockConfig>(
+                                                  idx,
+                                                  (c) => {
+                                                    const list = [...(c.groups || [])];
+                                                    list[gIdx] = {
+                                                      ...list[gIdx],
+                                                      images: (list[gIdx].images || []).filter(
+                                                        (_, i) => i !== imgIdx
+                                                      ),
+                                                    };
+                                                    return { ...c, groups: list };
+                                                  }
+                                                );
+                                                showToast('Đã xóa vĩnh viễn trang ảnh khỏi R2.');
+                                              }}
+                                              className="absolute top-1 right-1 z-10 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center font-black text-[10px] shadow border border-white cursor-pointer transition transform hover:scale-110"
+                                            >
+                                              ✕
+                                            </button>
                                             <img
                                               src={imgUrl}
                                               alt={`Trang ${imgIdx + 1}`}

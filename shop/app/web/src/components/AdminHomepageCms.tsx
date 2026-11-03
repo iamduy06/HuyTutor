@@ -23,6 +23,7 @@ import {
   TopBannerBlock,
 } from './DynamicHomepageBlocks';
 import { normalizeTargetUrl } from './SmartLink';
+import { R2ImageUploader } from './R2ImageUploader';
 
 const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string; desc: string }> = {
   hero: {
@@ -431,21 +432,20 @@ export const AdminHomepageCms: React.FC = () => {
         </div>
       </div>
 
-      {/* DANH SÁCH CÁC KHUNG VÀ SẮP XẾP THỨ TỰ (REORDER & ADD NEW) */}
-      <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+      {/* THANH ĐIỀU HƯỚNG CÁC KHỐI NỘI DUNG (TITLE KHỐI - MÔ TẢ KHỐI) */}
+      <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-2.5">
           <div>
             <h3 className="text-xs font-black uppercase text-gray-900 tracking-wider">
-              Danh sách thứ tự các khung hiển thị trên Trang chủ ({blocks.length} khung)
+              Cấu trúc các khối nội dung Trang chủ ({blocks.length} khối)
             </h3>
             <p className="text-[11px] text-gray-500">
-              Bấm ▲ Lên hoặc ▼ Xuống để thay đổi vị trí khung trên trang chủ. Bấm vào khung để chỉnh sửa nội dung chi tiết.
+              Chọn khối để chỉnh sửa chi tiết. Tiêu đề khối - mô tả khối rõ ràng, dễ nhìn cho quản trị viên.
             </p>
           </div>
 
-          {/* Nút thêm khung mới */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-600">+ Thêm khung:</span>
+            <span className="text-xs font-bold text-gray-600">+ Thêm khối:</span>
             <select
               defaultValue=""
               onChange={(e) => {
@@ -469,115 +469,25 @@ export const AdminHomepageCms: React.FC = () => {
           </div>
         </div>
 
-        {/* Danh sách các card khung với nút Di chuyển Lên/Xuống */}
-        <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
           {blocks.map((block, idx) => {
             const isSelected = block.id === currentBlock?.id;
-            const info = BLOCK_TYPE_LABELS[block.type] || {
-              name: block.type,
-              color: 'bg-gray-700 text-white',
-              desc: '',
-            };
-
+            const info = BLOCK_TYPE_LABELS[block.type];
             return (
-              <div
+              <button
                 key={block.id}
-                className={`flex items-center justify-between p-3 rounded-md border transition ${
+                type="button"
+                onClick={() => setSelectedBlockId(block.id)}
+                className={`px-3 py-1.5 rounded-sm text-xs font-bold transition flex items-center gap-1.5 ${
                   isSelected
-                    ? 'border-[#e60049] bg-pink-50/40 shadow-sm ring-1 ring-[#e60049]'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? 'bg-[#e60049] text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
                 }`}
               >
-                {/* Vị trí thứ tự & Nút Reorder */}
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => handleMoveBlockUp(idx)}
-                      className="text-gray-500 hover:text-[#e60049] disabled:opacity-20 text-[11px] p-0.5 font-bold leading-none"
-                      title="Di chuyển lên"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === blocks.length - 1}
-                      onClick={() => handleMoveBlockDown(idx)}
-                      className="text-gray-500 hover:text-[#e60049] disabled:opacity-20 text-[11px] p-0.5 font-bold leading-none"
-                      title="Di chuyển xuống"
-                    >
-                      ▼
-                    </button>
-                  </div>
-
-                  <span className="font-mono text-xs font-extrabold text-gray-500 w-6">
-                    #{idx + 1}
-                  </span>
-
-                  <span
-                    className={`text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 ${info.color}`}
-                  >
-                    {block.type}
-                  </span>
-
-                  {/* Input tên gợi nhớ */}
-                  <input
-                    type="text"
-                    value={block.title_label || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setBlocks((prev) =>
-                        prev.map((b) => (b.id === block.id ? { ...b, title_label: val } : b))
-                      );
-                    }}
-                    placeholder={info.name}
-                    className="text-xs font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-[#e60049] outline-none px-1 py-0.5 bg-transparent min-w-[200px]"
-                  />
-                </div>
-
-                {/* Các nút hành động bên phải */}
-                <div className="flex items-center gap-3">
-                  {/* Công tắc Bật/Tắt */}
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={block.is_active}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setBlocks((prev) =>
-                          prev.map((b) => (b.id === block.id ? { ...b, is_active: checked } : b))
-                        );
-                      }}
-                      className="rounded text-[#e60049]"
-                    />
-                    <span>{block.is_active ? 'Đang hiện' : 'Ẩn'}</span>
-                  </label>
-
-                  {/* Nút Chọn để chỉnh sửa */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBlockId(block.id)}
-                    className={`text-xs font-bold px-3 py-1 rounded-sm transition ${
-                      isSelected
-                        ? 'bg-[#e60049] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {isSelected ? 'Đang sửa' : 'Cấu hình chi tiết'}
-                  </button>
-
-                  {/* Nút Xóa */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteBlock(block.id)}
-                    className="text-gray-400 hover:text-red-600 text-xs font-bold px-1.5"
-                    title="Xóa khung này"
-                  >
-                    Xóa
-                  </button>
-                </div>
-              </div>
+                <span>#{idx + 1}</span>
+                <span>{block.title_label || info?.name || block.type}</span>
+                {!block.is_active && <span className="text-[10px] opacity-75">(Ẩn)</span>}
+              </button>
             );
           })}
         </div>
@@ -601,18 +511,63 @@ export const AdminHomepageCms: React.FC = () => {
         >
           {currentBlock ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              {/* Header chuẩn: Title khối - Mô tả của khối đó */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
                 <div>
-                  <span className="text-[10px] font-black uppercase text-[#e60049] tracking-wider">
-                    ĐANG CẤU HÌNH KHỐI NỘI DUNG #{currentBlockIndex + 1}
-                  </span>
-                  <h3 className="font-extrabold text-sm text-gray-900 mt-0.5">
-                    {currentBlock.title_label || BLOCK_TYPE_LABELS[currentBlock.type]?.name}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#e60049] text-white">
+                      Khối #{currentBlockIndex + 1}: {currentBlock.type}
+                    </span>
+                    <h3 className="font-extrabold text-sm text-gray-900">
+                      {currentBlock.title_label || BLOCK_TYPE_LABELS[currentBlock.type]?.name}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {BLOCK_TYPE_LABELS[currentBlock.type]?.desc}
+                  </p>
                 </div>
-                <span className="text-[11px] text-gray-500">
-                  Loại: <strong>{currentBlock.type}</strong>
-                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentBlockIndex === 0}
+                    onClick={() => handleMoveBlockUp(currentBlockIndex)}
+                    className="p-1 px-2 border border-gray-300 rounded-sm text-xs font-bold disabled:opacity-30 hover:bg-gray-100"
+                    title="Di chuyển khối lên"
+                  >
+                    ▲ Lên
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentBlockIndex === blocks.length - 1}
+                    onClick={() => handleMoveBlockDown(currentBlockIndex)}
+                    className="p-1 px-2 border border-gray-300 rounded-sm text-xs font-bold disabled:opacity-30 hover:bg-gray-100"
+                    title="Di chuyển khối xuống"
+                  >
+                    ▼ Xuống
+                  </button>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer ml-1">
+                    <input
+                      type="checkbox"
+                      checked={currentBlock.is_active}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setBlocks((prev) =>
+                          prev.map((b) => (b.id === currentBlock.id ? { ...b, is_active: checked } : b))
+                        );
+                      }}
+                      className="w-4 h-4 accent-[#e60049] rounded cursor-pointer"
+                    />
+                    <span>{currentBlock.is_active ? 'Bật' : 'Ẩn'}</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBlock(currentBlock.id)}
+                    className="ml-1 text-xs text-red-600 hover:text-red-700 font-bold px-2 py-1 rounded border border-red-200 hover:bg-red-50 cursor-pointer"
+                  >
+                    🗑️ Xóa
+                  </button>
+                </div>
               </div>
 
               {/* 1. KHUNG ĐEN: HERO TOP */}

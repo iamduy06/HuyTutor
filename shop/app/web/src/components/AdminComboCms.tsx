@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
+import { R2ImageUploader } from './R2ImageUploader';
 import {
   ComboBannerBlockConfig,
   ComboBlockType,
@@ -318,14 +319,17 @@ export const AdminComboCms: React.FC = () => {
                 block.is_active ? 'border-gray-200' : 'border-gray-200 opacity-60 bg-gray-50'
               }`}
             >
-              {/* Block Header Toolbar */}
+              {/* Block Header Toolbar: Title khối - Mô tả của khối đó */}
               <div className="p-3.5 flex flex-wrap items-center justify-between gap-3 bg-gray-50 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-black text-gray-500 w-5">#{index + 1}</span>
-                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor}`}>
-                    {block.type}
-                  </span>
-                  <span className="text-xs font-bold text-gray-900">{meta.label}</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-gray-500 w-5">#{index + 1}</span>
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor}`}>
+                      {block.type}
+                    </span>
+                    <h3 className="text-xs font-black text-gray-900">{meta.label}</h3>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">{meta.desc}</p>
                 </div>
 
                 <div className="flex items-center gap-1.5">

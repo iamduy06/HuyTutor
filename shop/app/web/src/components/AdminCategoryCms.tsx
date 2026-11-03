@@ -23,6 +23,7 @@ import {
   GiftDonateCtaBlock,
 } from './DynamicCategoryBlocks';
 import { normalizeTargetUrl } from './SmartLink';
+import { R2ImageUploader } from './R2ImageUploader';
 
 const CATEGORY_BLOCK_META: Record<
   CategoryBlockType,
@@ -447,16 +448,21 @@ export const AdminCategoryCms: React.FC = () => {
 
       {/* Form Cấu hình Chi tiết Trang cấp 1 */}
       <form onSubmit={handleSaveCategory} className="space-y-6">
-        {/* Thông tin cơ bản */}
+        {/* KHỐI 1: THÔNG TIN CƠ SỞ TRANG CẤP 1 */}
         <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
           <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#e60049]">
-                THÔNG TIN CƠ SỞ TRANG CẤP 1
-              </span>
-              <h2 className="text-sm font-black text-gray-900 mt-0.5">
-                Cấu hình: {editingCategory.name || 'Trang cấp 1 mới'}
-              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#e60049] text-white">
+                  KHỐI 1: THÔNG TIN CƠ SỞ
+                </span>
+                <h2 className="text-sm font-black text-gray-900">
+                  Cấu hình: {editingCategory.name || 'Trang cấp 1 mới'}
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Thiết lập tên hiển thị, đường dẫn tĩnh slug và thứ tự của trang danh mục cấp 1 trên toàn hệ thống.
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -626,20 +632,24 @@ export const AdminCategoryCms: React.FC = () => {
                         : 'border-gray-200 bg-gray-50 opacity-75'
                     }`}
                   >
-                    {/* Header bar của từng Block */}
-                    <div className="bg-gray-100 border-b border-gray-200 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-gray-500">#{idx + 1}</span>
-                        <span
-                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-sm ${meta.badgeColor}`}
-                        >
-                          {meta.label}
-                        </span>
-                        {!block.is_active && (
-                          <span className="text-[10px] bg-gray-300 text-gray-700 font-bold px-1.5 py-0.5 rounded-sm">
-                            Đang ẩn
+                    {/* Header bar của từng Block: Title khối - Mô tả của khối đó */}
+                    <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-gray-500">#{idx + 1}</span>
+                          <span
+                            className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor}`}
+                          >
+                            {block.type}
                           </span>
-                        )}
+                          <h4 className="text-xs font-black text-gray-900">{meta.label}</h4>
+                          {!block.is_active && (
+                            <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-1.5 py-0.5 rounded-sm">
+                              Đang ẩn
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">{meta.desc}</p>
                       </div>
 
                       <div className="flex items-center gap-1.5">

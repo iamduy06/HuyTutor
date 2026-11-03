@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
+import { apiClient } from '../api/client';
 import {
   CampaignFrameConfig,
   CampaignFramePreset,
@@ -7,6 +8,7 @@ import {
   PresetAspectRatio,
 } from '../types';
 import { ProductImageFrame } from './ProductImageFrame';
+import { R2ImageUploader } from './R2ImageUploader';
 
 export const AdminCampaignFrameCms: React.FC = () => {
   const { siteConfigs, updateSiteConfig, products, showToast } = useStore();
@@ -54,7 +56,7 @@ export const AdminCampaignFrameCms: React.FC = () => {
     setConfig((prev) => ({ ...prev, [field]: val }));
   };
 
-  // Upload file PNG khung đè riêng lên Cloudflare R2
+  // Upload file PNG khung đè riêng lên Cloudflare R2 (Đặt tên ngẫu nhiên 12 số)
   const handleUploadCustomFrame = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -65,30 +67,36 @@ export const AdminCampaignFrameCms: React.FC = () => {
 
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', 'campaign');
-
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (res.ok && data.url) {
-        updateField('custom_frame_url', data.url);
+      const oldUrl = config.custom_frame_url;
+      const res = await apiClient.uploadFile(file, { folder: 'campaign' });
+      if (res && res.url) {
+        updateField('custom_frame_url', res.url);
         updateField('frame_type', 'custom');
-        showToast('Tải lên khung đè chiến dịch thành công!');
+        showToast('Đã tải lên khung đè với tên 12 số ngẫu nhiên lên R2 thành công!');
+        if (oldUrl && oldUrl !== res.url) {
+          apiClient.deleteR2File(oldUrl).catch(() => {});
+        }
       } else {
-        showToast(data.message || 'Lỗi tải ảnh lên');
+        showToast('Lỗi tải ảnh lên Cloudflare R2');
       }
     } catch (err: any) {
       showToast('Lỗi kết nối khi tải ảnh: ' + err.message);
     } finally {
       setIsUploading(false);
       e.target.value = '';
+    }
+  };
+
+  // Xóa vĩnh viễn file khung đè khỏi Cloudflare R2 (không chỉ là bỏ link)
+  const handleDeleteCustomFrame = async () => {
+    if (!config.custom_frame_url) return;
+    const oldUrl = config.custom_frame_url;
+    try {
+      await apiClient.deleteR2File(oldUrl);
+      updateField('custom_frame_url', '');
+      showToast('Đã xóa vĩnh viễn file khung đè khỏi Cloudflare R2!');
+    } catch (err: any) {
+      showToast('Lỗi xóa file trên R2: ' + err.message);
     }
   };
 
@@ -111,16 +119,16 @@ export const AdminCampaignFrameCms: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-red-600 via-pink-600 to-rose-700 rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Top Action Bar chuẩn: Title trang - Mô tả trang */}
+      <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">🎨</span>
-            <h2 className="text-xl font-bold tracking-tight">
-              Quản Trị Khung Hình Sản Phẩm & Khung Đè Chiến Dịch (Campaign Overlay)
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#e60049] animate-pulse"></span>
+            <h2 className="text-sm font-extrabold text-[#e60049] uppercase tracking-wide">
+              Quản Trị Khung Hình & Khung Đè Chiến Dịch (Campaign Overlay CMS)
             </h2>
           </div>
-          <p className="text-xs text-pink-100 max-w-2xl leading-relaxed">
+          <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
             Quy chuẩn khung hình bo tròn 16px, viền xám, đổ bóng 3D, hỗ trợ thiết kế full tấm.
             Bật/tắt lớp khung đè sự kiện (Tết, Sale, Mùa thi, Giáng Sinh) tức thì cho toàn bộ website
             mà không cần phải sửa hàng trăm ảnh sản phẩm gốc. Tự do tùy biến tỷ lệ và độ phân giải.
@@ -148,11 +156,16 @@ export const AdminCampaignFrameCms: React.FC = () => {
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">
-                  1. Kích hoạt Khung Đè Chiến Dịch (Campaign Overlay)
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Gạt công tắc để bật hoặc tắt khung đè trên toàn bộ website
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
+                    KHỐI 1
+                  </span>
+                  <h3 className="text-sm font-black text-gray-900">
+                    Kích Hoạt Khung Đè Chiến Dịch (Campaign Master Switch)
+                  </h3>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Gạt công tắc để bật hoặc tắt lớp khung chiến dịch trên toàn bộ website hoặc từng sản phẩm.
                 </p>
               </div>
 
@@ -177,9 +190,19 @@ export const AdminCampaignFrameCms: React.FC = () => {
 
           {/* Card 2: Lựa chọn Khung Chiến Dịch */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">
-              2. Chọn Khung Chiến Dịch Hiển Thị
-            </h3>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-blue-600 text-white">
+                  KHỐI 2
+                </span>
+                <h3 className="text-sm font-black text-gray-900">
+                  Chọn Loại Khung Chiến Dịch & Tải File PNG Lên R2
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Lựa chọn một trong 4 mẫu thiết kế có sẵn hoặc tải file ảnh PNG trong suốt riêng lên Cloudflare R2.
+              </p>
+            </div>
 
             {/* Radio Mode */}
             <div className="flex gap-4">
@@ -258,14 +281,25 @@ export const AdminCampaignFrameCms: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-gray-600">
-                    Hoặc dán URL file PNG khung đè (Cloudflare R2):
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] font-semibold text-gray-600">
+                      URL file PNG khung đè (Cloudflare R2 - 12 chữ số):
+                    </label>
+                    {config.custom_frame_url && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteCustomFrame}
+                        className="text-[10px] text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
+                      >
+                        🗑️ Xóa vĩnh viễn file khỏi R2
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={config.custom_frame_url || ''}
                     onChange={(e) => updateField('custom_frame_url', e.target.value)}
-                    placeholder="https://pub-xxx.r2.dev/campaign/frame-tet-2026.png"
+                    placeholder="https://media.huytutor.edu.vn/campaign/123456789012.png"
                     className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#e60049]"
                   />
                 </div>
@@ -280,9 +314,19 @@ export const AdminCampaignFrameCms: React.FC = () => {
 
           {/* Card 3: Phạm vi áp dụng */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">
-              3. Phạm Vi Áp Dụng Khung Chiến Dịch
-            </h3>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-emerald-600 text-white">
+                  KHỐI 3
+                </span>
+                <h3 className="text-sm font-black text-gray-900">
+                  Phạm Vi Áp Dụng Khung Chiến Dịch
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Áp dụng toàn bộ hệ thống (Global) hoặc chỉ định đích danh từng tài liệu được hiển thị khung đè.
+              </p>
+            </div>
 
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-gray-800 cursor-pointer">

@@ -8,6 +8,7 @@ import { AdminComboCms } from '../components/AdminComboCms';
 import { AdminFlashcardCms } from '../components/AdminFlashcardCms';
 import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminCampaignFrameCms } from '../components/AdminCampaignFrameCms';
+import { R2ImageUploader } from '../components/R2ImageUploader';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import {
@@ -829,16 +830,26 @@ export const AdminPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Cột trái: Danh sách sản phẩm trong DB */}
             <div className="lg:col-span-5 bg-white border border-gray-200 rounded-md p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h2 className="text-xs font-extrabold text-[#e60049] uppercase">
-                  Danh sách tài liệu ({products.length})
-                </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-gray-800 text-white">
+                      DANH SÁCH
+                    </span>
+                    <h2 className="text-xs font-black text-gray-900 uppercase">
+                      Kho Tài liệu ({products.length})
+                    </h2>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Chọn tài liệu để chỉnh sửa hoặc bấm tạo mới.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleResetNewProduct}
-                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-3 py-1.5 rounded-sm"
+                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-3 py-1.5 rounded-sm shadow-xs"
                 >
-                  Thêm tài liệu mới
+                  + Thêm tài liệu mới
                 </button>
               </div>
 
@@ -919,23 +930,28 @@ export const AdminPage: React.FC = () => {
               onSubmit={handleSaveProduct}
               className="lg:col-span-7 bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-5"
             >
-              <div className="border-b border-gray-200 pb-3 flex items-center justify-between">
+              <div className="border-b border-gray-200 pb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    {editingProduct.id
-                      ? `Chỉnh sửa: ${editingProduct.title}`
-                      : 'Tạo tài liệu mới vào Database'}
-                  </h2>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Mọi thay đổi sẽ được cập nhật trực tiếp vào hệ thống
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
+                      {editingProduct.id ? 'BIÊN TẬP' : 'TẠO MỚI'}
+                    </span>
+                    <h2 className="text-sm font-black text-gray-900 uppercase">
+                      {editingProduct.id
+                        ? `Chỉnh sửa: ${editingProduct.title}`
+                        : 'Tạo tài liệu mới vào Database'}
+                    </h2>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Thiết lập thông tin sách, ảnh bìa Cloudflare R2, giá 5 định dạng và các khối đọc thử.
                   </p>
                 </div>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-2 rounded-sm transition"
+                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-2 rounded-sm transition shadow-xs"
                 >
-                  {saving ? 'Đang lưu...' : 'Lưu cấu hình sản phẩm'}
+                  {saving ? 'Đang lưu...' : '💾 Lưu cấu hình sản phẩm'}
                 </button>
               </div>
 
@@ -1042,50 +1058,36 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. Link Ảnh bìa Thumbnail (Cloudflare R2): Cho phép Paste Link hoặc Upload trực tiếp lên R2 */}
-              <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-4 space-y-2.5">
-                <label className="block text-xs font-extrabold text-[#e60049]">
-                  Link Ảnh bìa Thumbnail (Cloudflare R2 - media.huytutor.edu.vn)
-                </label>
-                <p className="text-[11px] text-gray-600">
-                  Hỗ trợ dán trực tiếp link ảnh có sẵn hoặc chọn ảnh từ máy tính để tải thẳng lên
-                  lưu trữ Cloudflare R2:
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={editingProduct.thumbnail_url || ''}
-                    onChange={(e) =>
-                      setEditingProduct((prev) => ({
-                        ...prev,
-                        thumbnail_url: e.target.value,
-                      }))
-                    }
-                    placeholder="https://media.huytutor.edu.vn/thumbnails/bia-sach.png"
-                    className="flex-1 border border-gray-300 rounded-sm px-3 py-2 text-xs bg-white"
-                  />
-                  <label className="shrink-0 bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-2 rounded-sm cursor-pointer text-center">
-                    {uploadingThumb ? 'Đang tải lên R2...' : 'Tải ảnh lên R2'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleThumbnailFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-                {editingProduct.thumbnail_url && (
-                  <div className="flex items-center gap-3 pt-1">
-                    <img
-                      src={editingProduct.thumbnail_url}
-                      alt="Preview Thumbnail"
-                      className="w-12 h-16 object-cover rounded-sm border border-gray-300"
-                    />
-                    <span className="text-[11px] text-emerald-700 font-semibold break-all">
-                      Đang sử dụng: {editingProduct.thumbnail_url}
+              {/* KHỐI 2: ẢNH BÌA THUMBNAIL (CLOUDFLARE R2) */}
+              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-xs space-y-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-600 text-white">
+                      KHỐI 2
                     </span>
+                    <h3 className="text-xs font-black text-gray-900 uppercase">
+                      Ảnh Bìa Thumbnail (Cloudflare R2 - media.huytutor.edu.vn)
+                    </h3>
                   </div>
-                )}
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Tải ảnh bìa sách lên Cloudflare R2 với tên ngẫu nhiên 12 số. Khi có ảnh preview, bấm dấu ✕ ở góc trên bên phải để xóa vĩnh viễn khỏi R2.
+                  </p>
+                </div>
+
+                <R2ImageUploader
+                  imageUrl={editingProduct.thumbnail_url}
+                  onUrlChange={(url) =>
+                    setEditingProduct((prev) => ({
+                      ...prev,
+                      thumbnail_url: url,
+                    }))
+                  }
+                  folder="thumbnails"
+                  pageLevel1={editingProduct.category_name || 'San pham'}
+                  pageLevel2={editingProduct.title || editingProduct.slug || 'Thumbnail'}
+                  fitMode="contain"
+                  maxPreviewHeight="max-h-40"
+                />
               </div>
 
               {/* 3. Bảng cấu hình 5 Định dạng & Giá riêng biệt + Ánh xạ Google Form tự động */}
@@ -1478,9 +1480,21 @@ export const AdminPage: React.FC = () => {
         {/* TAB 2: QUẢN LÝ ĐƠN HÀNG & BẮN LẠI 14 ENTRY GOOGLE FORM */}
         {activeTab === 'orders' && (
           <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-            <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-              Danh sách Đơn hàng &amp; Trạng thái Đồng bộ 14 Entry Google Form
-            </h2>
+            <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
+                    QUẢN LÝ ĐƠN HÀNG
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 uppercase">
+                    Danh Sách Đơn Hàng &amp; Trạng Thái Đồng Bộ 14 Entry Google Form
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Theo dõi danh sách khách hàng đặt mua, trạng thái thanh toán VietQR / PayPal và đồng bộ dữ liệu vào Google Sheet.
+                </p>
+              </div>
+            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse border border-gray-200">
@@ -1575,12 +1589,21 @@ export const AdminPage: React.FC = () => {
         {/* TAB 3: BẢNG ĐỐI SOÁT 14 ENTRY GOOGLE FORM */}
         {activeTab === 'mapping' && (
           <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-            <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-              Bảng đối soát 14 Entry IDs Google Form (`1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q`)
-            </h2>
-            <p className="text-xs text-gray-600">
-              Hệ thống tự động đồng bộ đơn hàng vào Google Form ngay sau khi xác nhận thanh toán thành công:
-            </p>
+            <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-600 text-white">
+                    ĐỐI SOÁT GOOGLE FORM
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 uppercase">
+                    Bảng Đối Soát 14 Entry IDs Google Form
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Kiểm tra khớp nối 14 trường dữ liệu đơn hàng và định dạng khi đồng bộ tự động sang Google Sheet (`1FAIpQLSdz1BLDnkEDLz0fWfhkLhB6SknNSVFUI6UDsLU2cEvIKTVN2Q`).
+                </p>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse border border-gray-200">
                 <thead>
@@ -1696,10 +1719,15 @@ export const AdminPage: React.FC = () => {
           <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
-                <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                  Quản lý Thành viên, Phân quyền &amp; Phiên đăng nhập
-                </h2>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-600 text-white">
+                    QUẢN TRỊ TÀI KHOẢN
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 uppercase">
+                    Quản Lý Thành Viên, Phân Quyền &amp; Phiên Đăng Nhập
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
                   Đồng bộ người dùng hệ thống. Quản lý vai trò (Admin / Subadmin / User) và thu hồi phiên làm việc.
                 </p>
               </div>

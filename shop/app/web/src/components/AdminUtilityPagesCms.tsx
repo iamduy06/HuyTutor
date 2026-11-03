@@ -263,6 +263,21 @@ export const AdminUtilityPagesCms: React.FC = () => {
       {/* SUB-TAB 1: ĐIỀU KHOẢN DỊCH VỤ */}
       {activeSubTab === 'terms' && (
         <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
+          <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
+                  TRANG 1: /terms
+                </span>
+                <h3 className="text-sm font-black text-gray-900 uppercase">
+                  Điều Khoản Sử Dụng & Chính Sách Bản Quyền
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Quy định về bản quyền sở hữu trí tuệ, phạm vi sử dụng tài liệu và chính sách cấp quyền tự động qua email.
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-gray-700 mb-1">

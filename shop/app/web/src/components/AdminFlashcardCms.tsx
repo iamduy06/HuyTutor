@@ -20,6 +20,49 @@ import {
   formatVnd,
 } from '../types';
 
+import { R2ImageUploader } from './R2ImageUploader';
+
+const FLASHCARD_BLOCK_META: Record<
+  FlashcardBlockType,
+  { label: string; desc: string; badgeColor: string }
+> = {
+  flashcard_hero: {
+    label: 'Video Giới thiệu & Slogan Đầu Trang',
+    desc: 'Tiêu đề, phụ đề và nhúng video YouTube hoặc ảnh bìa giới thiệu phương pháp học Flashcard thông minh.',
+    badgeColor: 'bg-[#e60049] text-white',
+  },
+  flashcard_features: {
+    label: 'Tính Năng & Điểm Nổi Bật',
+    desc: 'Danh sách các tính năng nổi bật (Âm thanh bản xứ, thuật toán lặp lại ngắt quãng, theo dõi tiến độ).',
+    badgeColor: 'bg-blue-600 text-white',
+  },
+  flashcard_free_tier: {
+    label: 'Gói Trải Nghiệm Học Thử Miễn Phí',
+    desc: 'Khu vực cho phép học sinh hoặc giáo viên trải nghiệm flashcard miễn phí mà không cần thanh toán.',
+    badgeColor: 'bg-emerald-600 text-white',
+  },
+  flashcard_pricing_packages: {
+    label: 'Gói Trả Phí Cá Nhân',
+    desc: 'Cấu hình các gói tài khoản cá nhân (1 năm, 2 năm, 3 năm) kèm giá niêm yết và quyền lợi chi tiết.',
+    badgeColor: 'bg-amber-600 text-white',
+  },
+  flashcard_group_pricing: {
+    label: 'Bảng Giá Quy Mô Nhóm & Nút Đăng Ký',
+    desc: 'Ma trận giá chiết khấu theo số lượng tài khoản (Nhóm 2-10, 11-50, >50) và nút bấm thanh toán nhanh.',
+    badgeColor: 'bg-purple-600 text-white',
+  },
+  flashcard_contact_notice: {
+    label: 'Hướng Dẫn & Kênh Hỗ Trợ Đăng Ký Lớn',
+    desc: 'Ghi chú gửi quyền qua email và thông tin liên hệ báo giá trường học cho số lượng lớn học sinh.',
+    badgeColor: 'bg-zinc-700 text-white',
+  },
+  flashcard_banner: {
+    label: 'Banner Quảng Cáo / Sự Kiện',
+    desc: 'Banner hình ảnh full-width chèn vào giữa các phần trên trang Flashcard.',
+    badgeColor: 'bg-sky-600 text-white',
+  },
+};
+
 export const AdminFlashcardCms: React.FC = () => {
   const { siteConfigs, updateSiteConfig, showToast } = useStore();
 
@@ -419,14 +462,20 @@ export const AdminFlashcardCms: React.FC = () => {
 
               return (
                 <div className="space-y-5">
-                  <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+                  {/* Header chuẩn: Title khối - Mô tả của khối đó */}
+                  <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-xs font-bold text-gray-900 uppercase">
-                        Cấu hình: {currentBlock.title_label}
-                      </h3>
-                      <span className="text-[10px] text-gray-400 font-mono">
-                        Mã khối: {currentBlock.id} ({currentBlock.type})
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
+                          {currentBlock.type}
+                        </span>
+                        <h3 className="text-sm font-black text-gray-900">
+                          {currentBlock.title_label || FLASHCARD_BLOCK_META[currentBlock.type]?.label}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {FLASHCARD_BLOCK_META[currentBlock.type]?.desc}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-2">
