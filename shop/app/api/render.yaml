@@ -3,8 +3,8 @@ services:
     name: huytutor-api
     env: node
     plan: free
-    rootDir: app/api
-    buildCommand: npm install && npm run build
+    rootDir: shop/app/api
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /health
     envVars:

@@ -19,11 +19,11 @@ export interface GoogleFormSyncResult {
  * Đảm bảo mapping chính xác:
  * - Word -> Word dài
  * - PDF -> PDF dài
- * - Flashcard -> Flashcard (kèm số lượng tài khoản ở entry.242891304)
+ * - Flashcard -> Flashcard (kèm số lượng tài khoản ở entry.112780521)
  * - Trang tính -> Trang tính
  * - Thiết kế -> Thiết kế
  * - Địa chỉ & MST/CCCD chỉ điền khi need_invoice = true, ngược lại để trống ""
- * - Trừ điểm tích lũy & Đơn vị khác luôn để trống ""
+ * - Điểm khuyến mãi đã sử dụng & Đơn vị khác luôn để trống ""
  * - Người bán luôn là "Website"
  */
 export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleFormSyncResult> {
@@ -58,11 +58,11 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
       'entry.906534887': mappedNote, // 8. Ghi chú (Word dài / PDF dài / Flashcard / Trang tính / Thiết kế)
       'entry.1610762805': order.customer_email, // 9. Gmail đã xác thực 2 lớp
       'entry.1680953650': order.customer_group, // 10. Nhóm khách hàng
-      'entry.112780521': '', // 11. Trừ điểm tích lũy (luôn để trống)
-      'entry.242891304':
+      'entry.112780521':
         order.selected_format === 'Flashcard' && order.flashcard_quantity
           ? String(order.flashcard_quantity)
-          : '', // 12. Số lượng (chỉ điền khi là Flashcard)
+          : '', // 11. Số lượng (chỉ điền khi là Flashcard)
+      'entry.242891304': '', // 12. Điểm khuyến mãi đã sử dụng (luôn để trống)
       'entry.317416358': '', // 13. Đơn vị khác (luôn để trống)
       'entry.118891792': 'Website', // 14. Người bán (luôn là Website)
     };
