@@ -346,7 +346,8 @@ export async function getMe(req: AuthenticatedRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      user: users[0]
+      user: users[0],
+      token: req.token || ''
     });
   } catch (err: any) {
     console.error('[SSO_ME_ERROR]', err);

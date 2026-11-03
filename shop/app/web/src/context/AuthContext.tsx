@@ -48,6 +48,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authModalTab, setAuthModalTab] = useState<AuthModalTab>('login');
 
   const refreshUser = async () => {
+    // 0. Extract sso_token or token from URL if redirected from SSO login
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('sso_token') || urlParams.get('token');
+        if (urlToken) {
+          localStorage.setItem(SESSION_STORAGE_KEY, urlToken);
+          setSessionToken(urlToken);
+          urlParams.delete('sso_token');
+          urlParams.delete('token');
+          const newSearch = urlParams.toString();
+          const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+          window.history.replaceState({}, '', newUrl);
+        }
+      } catch {
+        // ignore url parsing issues
+      }
+    }
+
     // 1. First check if logged in via SSO Master Cookie
     const ssoBase = getSsoUrl();
     if (typeof window !== 'undefined' && ssoBase) {
@@ -58,6 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (ssoRes.ok) {
           const ssoData = await ssoRes.json();
           if (ssoData.success && ssoData.user) {
+            if (ssoData.token) {
+              localStorage.setItem(SESSION_STORAGE_KEY, ssoData.token);
+              setSessionToken(ssoData.token);
+            }
             setUser({
               id: ssoData.user.id,
               email: ssoData.user.email,
@@ -77,14 +100,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch {
-        // Fallback to local storage if SSO check fails
+        // Fallback to local storage / shop api if SSO check fails
       }
     }
 
     try {
       const res = await apiClient.getCurrentUser();
       if (res && res.user) {
-        setUser(res.user);
+        setUser({
+          ...res.user,
+          role: String(res.user.role || '').toLowerCase() === 'admin' ? 'admin' : 'user',
+        });
         const saved = typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null;
         if (saved) setSessionToken(saved);
         setIsLoading(false);

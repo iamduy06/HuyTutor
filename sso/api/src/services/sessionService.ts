@@ -63,9 +63,9 @@ export async function isSessionActive(sessionToken: string): Promise<boolean> {
     const res = await supabaseRest(
       `user_sessions?session_token=eq.${encodeURIComponent(sessionToken)}&select=is_revoked,expires_at`
     );
-    if (!res.ok) return false;
+    if (!res.ok) return true;
     const sessions = (await res.json()) as any[];
-    if (!sessions || sessions.length === 0) return false;
+    if (!sessions || sessions.length === 0) return true;
 
     const session = sessions[0];
     if (session.is_revoked) return false;

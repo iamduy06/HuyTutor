@@ -47,7 +47,15 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
       }
 
       if (redirectUrl) {
-        window.location.href = redirectUrl;
+        try {
+          const urlObj = new URL(redirectUrl, window.location.origin);
+          if (data.token) {
+            urlObj.searchParams.set('sso_token', data.token);
+          }
+          window.location.href = urlObj.toString();
+        } catch {
+          window.location.href = redirectUrl;
+        }
       } else if (app === 'flashcard' && defaultFlashcardUrl) {
         window.location.href = `${defaultFlashcardUrl.replace(/\/+$/, '')}/dashboard`;
       } else if (defaultShopUrl) {

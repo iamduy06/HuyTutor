@@ -17,18 +17,12 @@ export async function adminAuthMiddleware(
     const configuredSecret = process.env.ADMIN_API_SECRET;
     const headerAdminKey = req.headers['x-admin-key'] as string | undefined;
 
-    // 1. Kiểm tra nếu request truyền trực tiếp khóa bí mật x-admin-key hợp lệ
-    if (headerAdminKey && headerAdminKey === configuredSecret) {
-      next();
-      return;
-    }
-
-    // 2. Kiểm tra Session Token / SSO Token từ Authorization Bearer hoặc Cookie
+    // 1. Kiểm tra Session Token / SSO Token từ Authorization Bearer hoặc Cookie trước
     const token = extractBearerToken(req) || '';
 
     if (token) {
       // Cho phép nếu token trùng với ADMIN_API_SECRET
-      if (token === configuredSecret) {
+      if (configuredSecret && token === configuredSecret) {
         next();
         return;
       }
@@ -43,10 +37,16 @@ export async function adminAuthMiddleware(
         }
         res.status(403).json({
           ok: false,
-          error: 'Tài khoản của bạn không có quyền Quản trị viên (Admin Required).',
+          error: 'Tài khoản của bạn không có quyền Quản trị viên (Chỉ Admin mới có thể truy cập khu vực này).',
         });
         return;
       }
+    }
+
+    // 2. Khóa dự phòng cho server-to-server / cron nội bộ khi không có session người dùng
+    if (headerAdminKey && configuredSecret && headerAdminKey === configuredSecret) {
+      next();
+      return;
     }
 
     res.status(401).json({
