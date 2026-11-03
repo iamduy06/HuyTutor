@@ -15,6 +15,7 @@ import {
   UiFormatCode,
 } from '../types';
 import { SmartLink } from './SmartLink';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Khởi tạo danh sách các khối (detail_blocks) từ dữ liệu thực tế của sản phẩm
@@ -236,7 +237,10 @@ export const ProductHeroBlock: React.FC<{
   onBuyNow: (fmt: UiFormatCode) => void;
   onAddToCart: (fmt: UiFormatCode) => void;
 }> = ({ config, product, selectedFormat, onSelectFormat, onBuyNow, onAddToCart }) => {
+  const { isItemInLibrary } = useAuth();
   if (!config || config.is_active === false) return null;
+
+  const isAlreadyOwned = isItemInLibrary && isItemInLibrary(product.slug, selectedFormat);
 
   const activeFormats =
     Array.isArray(product.formats) && product.formats.filter((f) => f.is_active).length > 0
@@ -395,6 +399,24 @@ export const ProductHeroBlock: React.FC<{
           )}
         </div>
       </div>
+
+      {/* Cảnh báo đã sở hữu trong Tủ sách cá nhân */}
+      {isAlreadyOwned && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-md flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚠️</span>
+            <span>
+              Bạn đã sở hữu tài liệu này ở định dạng <strong>{selectedFormat}</strong> trong Tủ sách cá nhân.
+            </span>
+          </div>
+          <SmartLink
+            to="/my-library"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded text-xs transition"
+          >
+            Vào Tủ sách tải về ↗
+          </SmartLink>
+        </div>
+      )}
 
       {/* Cụm Nút Đặt Hàng / Mua Ngay & Link Phụ (Trải rộng chuẩn mẫu huytutor.io.vn) */}
       <div className="space-y-2.5 pt-1">

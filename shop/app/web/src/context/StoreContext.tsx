@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
 import { apiClient } from '../api/client';
 import {
   CartItem,
@@ -31,6 +32,7 @@ interface StoreContextValue {
   selectedCartItems: CartItem[];
   selectedFormats: UiFormatCode[];
   hasFormatConflict: boolean;
+  hasMultipleProductsConflict: boolean;
   subtotalAmount: number;
   discountPercent: number;
   discountAmount: number;
@@ -66,6 +68,7 @@ const DEFAULT_SITE_CONFIGS: SiteConfigs = {
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isItemInLibrary } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [menus, setMenus] = useState<MenuItem[]>([]);
@@ -97,9 +100,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
+    const isTechnical =
+      /supabase|pgrst|postgres|database|syntax|column|relation|table|uuid|stack|jwt|token|bearer|crypto|sha3|sha256|500|502|503|504|econnrefused|failed to fetch|networkerror|internal server/i.test(
+        msg
+      );
+    const isAdmin =
+      typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+    const displayMsg =
+      !isAdmin && isTechnical
+        ? 'Đã có lỗi xảy ra. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.'
+        : msg;
+
+    setToastMessage(displayMsg);
     window.setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
+      setToastMessage((prev) => (prev === displayMsg ? null : prev));
     }, 3200);
   };
 
@@ -177,8 +192,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addToCart = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
+    if (isItemInLibrary && isItemInLibrary(product.slug, formatCode)) {
+      showToast(
+        `⚠️ CẢNH BÁO: Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Bạn có thể vào Tủ sách để tải về mà không cần mua lại.`
+      );
+    }
+
     const unitPrice = resolveFormatPrice(product, formatCode);
     const cartItemId = `${product.slug}__${formatCode}`;
+
+    if (formatCode !== 'Flashcard') {
+      setCartItems((prev) => {
+        const hasOtherItem = prev.some((it) => it.cartItemId !== cartItemId);
+        if (hasOtherItem) {
+          showToast(
+            `⚠️ Quy tắc: Trừ Flashcard, mỗi đơn chỉ được đặt 1 sản phẩm. Giỏ hàng đã được chọn tài liệu mới.`
+          );
+        }
+        return [
+          {
+            cartItemId,
+            productId: product.id,
+            slug: product.slug,
+            categorySlug: product.category_slug,
+            code: product.code,
+            title: product.title,
+            googleFormProductName: product.google_form_product_name || product.title,
+            formatCode,
+            unitPrice,
+            quantity: 1,
+            selected: true,
+            isComboEligible: product.is_combo_eligible,
+          },
+        ];
+      });
+
+      if (!isItemInLibrary || !isItemInLibrary(product.slug, formatCode)) {
+        showToast(`Đã thêm "${product.title}" (${formatCode}) vào giỏ hàng.`);
+      }
+      return;
+    }
 
     setCartItems((prev) => {
       const existingIdx = prev.findIndex((item) => item.cartItemId === cartItemId);
@@ -211,34 +264,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ];
     });
 
-    showToast(`Đã thêm "${product.title}" (${formatCode}) vào giỏ hàng.`);
+    showToast(`Đã thêm gói Flashcard "${product.title}" vào giỏ hàng.`);
   };
 
   const buyNow = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
+    if (isItemInLibrary && isItemInLibrary(product.slug, formatCode)) {
+      showToast(
+        `⚠️ CẢNH BÁO: Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Bạn có thể vào Tủ sách để tải về mà không cần mua lại.`
+      );
+    }
+
     const unitPrice = resolveFormatPrice(product, formatCode);
     const cartItemId = `${product.slug}__${formatCode}`;
 
-    setCartItems((prev) => {
-      // Để đảm bảo quy tắc Single-Format khi bấm Mua ngay, chỉ tích chọn các sản phẩm cùng định dạng hoặc sản phẩm vừa bấm
-      const deselectedOtherFormats = prev.map((it) => ({
-        ...it,
-        selected: it.formatCode === formatCode ? it.selected : false,
-      }));
-
-      const existingIdx = deselectedOtherFormats.findIndex((it) => it.cartItemId === cartItemId);
-      if (existingIdx >= 0) {
-        const next = [...deselectedOtherFormats];
-        next[existingIdx] = {
-          ...next[existingIdx],
-          quantity: Math.max(next[existingIdx].quantity, quantity),
-          unitPrice,
-          selected: true,
-        };
-        return next;
-      }
-
-      return [
-        ...deselectedOtherFormats,
+    if (formatCode !== 'Flashcard') {
+      setCartItems([
         {
           cartItemId,
           productId: product.id,
@@ -249,12 +289,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           googleFormProductName: product.google_form_product_name || product.title,
           formatCode,
           unitPrice,
-          quantity,
+          quantity: 1,
           selected: true,
           isComboEligible: product.is_combo_eligible,
         },
-      ];
-    });
+      ]);
+    } else {
+      setCartItems((prev) => {
+        const deselectedOtherFormats = prev.map((it) => ({
+          ...it,
+          selected: it.formatCode === 'Flashcard' ? it.selected : false,
+        }));
+        const existingIdx = deselectedOtherFormats.findIndex((it) => it.cartItemId === cartItemId);
+        if (existingIdx >= 0) {
+          const next = [...deselectedOtherFormats];
+          next[existingIdx] = {
+            ...next[existingIdx],
+            quantity: Math.max(next[existingIdx].quantity, quantity),
+            unitPrice,
+            selected: true,
+          };
+          return next;
+        }
+        return [
+          ...deselectedOtherFormats,
+          {
+            cartItemId,
+            productId: product.id,
+            slug: product.slug,
+            categorySlug: product.category_slug,
+            code: product.code,
+            title: product.title,
+            googleFormProductName: product.google_form_product_name || product.title,
+            formatCode,
+            unitPrice,
+            quantity,
+            selected: true,
+            isComboEligible: product.is_combo_eligible,
+          },
+        ];
+      });
+    }
 
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
@@ -278,14 +353,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateCartItemQty = (cartItemId: string, delta: number) => {
-    setCartItems((prev) =>
-      prev
-        .map((item) =>
-          item.cartItemId === cartItemId
-            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-            : item
-        )
-    );
+    setCartItems((prev) => {
+      const target = prev.find((it) => it.cartItemId === cartItemId);
+      if (target && target.formatCode !== 'Flashcard' && delta > 0) {
+        showToast(`Định dạng ${target.formatCode} chỉ cho phép đặt số lượng 1 mỗi đơn.`);
+        return prev;
+      }
+      return prev.map((item) =>
+        item.cartItemId === cartItemId
+          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+          : item
+      );
+    });
   };
 
   const removeCartItem = (cartItemId: string) => {
@@ -307,6 +386,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const hasFormatConflict = selectedFormats.length > 1;
+
+  // Quy tắc: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được đặt tối đa 1 sản phẩm với số lượng 1
+  const hasMultipleProductsConflict = useMemo(() => {
+    const isNonFlashcard = selectedFormats.some((fmt) => fmt !== 'Flashcard');
+    if (!isNonFlashcard) return false;
+    return selectedCartItems.length > 1 || selectedCartItems.some((it) => it.quantity > 1);
+  }, [selectedFormats, selectedCartItems]);
 
   const { subtotalAmount, discountPercent, discountAmount, totalAmount } = useMemo(() => {
     const subtotal = selectedCartItems.reduce(
@@ -351,6 +437,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         selectedCartItems,
         selectedFormats,
         hasFormatConflict,
+        hasMultipleProductsConflict,
         subtotalAmount,
         discountPercent,
         discountAmount,

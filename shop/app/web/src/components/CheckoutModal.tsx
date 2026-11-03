@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
+import { getClientErrorMessage } from '../utils/errorHandler';
 import {
   formatVnd,
   OrderRecord,
@@ -17,6 +18,7 @@ export const CheckoutModal: React.FC = () => {
     selectedCartItems,
     selectedFormats,
     hasFormatConflict,
+    hasMultipleProductsConflict,
     subtotalAmount,
     discountPercent,
     discountAmount,
@@ -117,6 +119,13 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
+    if (hasMultipleProductsConflict) {
+      setFormError(
+        'Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1. Vui lòng điều chỉnh lại giỏ hàng.'
+      );
+      return;
+    }
+
     const email1 = customerEmail.trim().toLowerCase();
     const email2 = customerEmailConfirm.trim().toLowerCase();
     if (!email1 || email1 !== email2) {
@@ -157,7 +166,7 @@ export const CheckoutModal: React.FC = () => {
       setPaymentInfo(response.paymentInstruction);
       showToast(`Đã tạo đơn hàng ${response.order.order_code}.`);
     } catch (err: any) {
-      setFormError(err?.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');
+      setFormError(getClientErrorMessage(err, 'Không thể tạo đơn hàng. Vui lòng thử lại sau.'));
     } finally {
       setSubmitting(false);
     }

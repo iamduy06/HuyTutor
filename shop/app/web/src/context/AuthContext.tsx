@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { apiClient, SESSION_STORAGE_KEY } from '../api/client';
-import { UserProfile } from '../types';
+import { UserProfile, UserLibraryItem, UiFormatCode } from '../types';
 
 export type AuthModalTab = 'login' | 'register' | 'forgot';
 
@@ -26,6 +26,9 @@ interface AuthContextValue {
   logoutAllDevices: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setUserState: (user: UserProfile | null) => void;
+  userLibrary: UserLibraryItem[];
+  refreshLibrary: () => Promise<void>;
+  isItemInLibrary: (slugOrId: string, formatCode: UiFormatCode) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -46,6 +49,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<AuthModalTab>('login');
+  const [userLibrary, setUserLibrary] = useState<UserLibraryItem[]>([]);
+
+  const refreshLibrary = async () => {
+    try {
+      const res = await apiClient.getUserLibrary();
+      if (res && Array.isArray(res.items)) {
+        setUserLibrary(res.items);
+      }
+    } catch {
+      setUserLibrary([]);
+    }
+  };
+
+  const isItemInLibrary = (slugOrId: string, formatCode: UiFormatCode): boolean => {
+    if (!userLibrary || userLibrary.length === 0) return false;
+    const clean = String(slugOrId || '').toLowerCase().trim();
+    return userLibrary.some(
+      (it) =>
+        ((it.product_slug || (it as any).productSlug || '').toLowerCase().trim() === clean || it.id === clean) &&
+        ((it.format_code || (it as any).formatCode) === formatCode)
+    );
+  };
+
+  useEffect(() => {
+    if (user) {
+      refreshLibrary();
+    } else {
+      setUserLibrary([]);
+    }
+  }, [user]);
 
   const refreshUser = async () => {
     // 0. Extract sso_token or token from URL if redirected from SSO login
@@ -268,6 +301,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logoutAllDevices,
         refreshUser,
         setUserState: setUser,
+        userLibrary,
+        refreshLibrary,
+        isItemInLibrary,
       }}
     >
       {children}

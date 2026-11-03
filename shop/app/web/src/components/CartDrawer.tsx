@@ -1,8 +1,10 @@
 import React from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { FORMAT_TO_GOOGLE_FORM_MAP, formatVnd, UiFormatCode } from '../types';
+import { formatVnd, UiFormatCode } from '../types';
 
 export const CartDrawer: React.FC = () => {
+  const { isItemInLibrary } = useAuth();
   const {
     isCartOpen,
     setIsCartOpen,
@@ -11,6 +13,7 @@ export const CartDrawer: React.FC = () => {
     selectedCartItems,
     selectedFormats,
     hasFormatConflict,
+    hasMultipleProductsConflict,
     subtotalAmount,
     discountPercent,
     discountAmount,
@@ -27,8 +30,11 @@ export const CartDrawer: React.FC = () => {
     new Set(cartItems.map((item) => item.formatCode))
   ) as UiFormatCode[];
 
+  const isCheckoutDisabled =
+    selectedCartItems.length === 0 || hasFormatConflict || hasMultipleProductsConflict;
+
   const handleProceedCheckout = () => {
-    if (selectedCartItems.length === 0 || hasFormatConflict) return;
+    if (isCheckoutDisabled) return;
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
   };
@@ -85,78 +91,103 @@ export const CartDrawer: React.FC = () => {
               Giỏ hàng của bạn đang trống. Hãy chọn tài liệu và định dạng cần mua.
             </div>
           ) : (
-            cartItems.map((item) => (
-              <div
-                key={item.cartItemId}
-                className={`p-3.5 rounded-md border transition ${
-                  item.selected
-                    ? 'border-[#e60049] bg-[#fff5f7]/40'
-                    : 'border-gray-200 bg-white opacity-75'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={item.selected}
-                    onChange={() => toggleCartItemSelect(item.cartItemId)}
-                    className="mt-1 accent-[#e60049] w-4 h-4 cursor-pointer"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-block bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
-                        Định dạng: {item.formatCode}
-                      </span>
-                      <span className="text-[10px] text-gray-500 font-medium">
-                        Ghi chú Form: {FORMAT_TO_GOOGLE_FORM_MAP[item.formatCode]}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xs font-bold text-gray-900 mt-1.5 leading-snug">
-                      {item.title}
-                    </h3>
-
-                    <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-100">
-                      <span className="text-xs font-extrabold text-[#e60049]">
-                        {formatVnd(item.unitPrice * item.quantity)}
-                      </span>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => updateCartItemQty(item.cartItemId, -1)}
-                          className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
-                        >
-                          -
-                        </button>
-                        <span className="text-xs font-bold w-6 text-center">
-                          {item.quantity}
+            cartItems.map((item) => {
+              const alreadyOwned = isItemInLibrary && isItemInLibrary(item.slug, item.formatCode);
+              return (
+                <div
+                  key={item.cartItemId}
+                  className={`p-3.5 rounded-md border transition ${
+                    item.selected
+                      ? 'border-[#e60049] bg-[#fff5f7]/40'
+                      : 'border-gray-200 bg-white opacity-75'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={item.selected}
+                      onChange={() => toggleCartItemSelect(item.cartItemId)}
+                      className="mt-1 accent-[#e60049] w-4 h-4 cursor-pointer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div>
+                        <span className="inline-block bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
+                          Định dạng: {item.formatCode}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => updateCartItemQty(item.cartItemId, 1)}
-                          className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeCartItem(item.cartItemId)}
-                          className="ml-2 text-[11px] text-gray-500 hover:text-[#e60049] font-semibold"
-                        >
-                          Xóa
-                        </button>
+                      </div>
+
+                      <h3 className="text-xs font-bold text-gray-900 mt-1.5 leading-snug">
+                        {item.title}
+                      </h3>
+
+                      {/* Cảnh báo nếu đã sở hữu trong Tủ sách */}
+                      {alreadyOwned && (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-800 font-semibold flex items-start gap-1.5 leading-snug">
+                          <span className="shrink-0">⚠️</span>
+                          <span>
+                            Bạn đã sở hữu tài liệu này ({item.formatCode}) trong Tủ sách cá nhân! Hãy kiểm tra Tủ sách trước khi thanh toán lại.
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-100">
+                        <span className="text-xs font-extrabold text-[#e60049]">
+                          {formatVnd(item.unitPrice * item.quantity)}
+                        </span>
+
+                        {item.formatCode === 'Flashcard' ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updateCartItemQty(item.cartItemId, -1)}
+                              className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-bold w-6 text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateCartItemQty(item.cartItemId, 1)}
+                              className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeCartItem(item.cartItemId)}
+                              className="ml-2 text-[11px] text-gray-500 hover:text-[#e60049] font-semibold"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                              SL: 1 (Cố định 1 tài liệu/đơn)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeCartItem(item.cartItemId)}
+                              className="text-[11px] text-gray-500 hover:text-[#e60049] font-semibold"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
         {/* Cảnh báo Quy tắc Single-Format nếu tích chọn lẫn lộn nhiều định dạng */}
         {hasFormatConflict && (
-          <div className="mx-5 mb-3 p-3 bg-[#fff0f3] border border-[#e60049] rounded-md text-[11px] text-[#e60049] leading-relaxed">
+          <div className="mx-5 mb-2 p-3 bg-[#fff0f3] border border-[#e60049] rounded-md text-[11px] text-[#e60049] leading-relaxed">
             <p className="font-extrabold uppercase mb-1">
               Quy tắc thanh toán đồng nhất 1 định dạng:
             </p>
@@ -168,7 +199,19 @@ export const CartDrawer: React.FC = () => {
           </div>
         )}
 
-        {/* Tổng kết & Nút Tiến hành thanh toán (Thuần chữ, không icon) */}
+        {/* Cảnh báo Giới hạn 1 sản phẩm cho non-Flashcard */}
+        {hasMultipleProductsConflict && (
+          <div className="mx-5 mb-2 p-3 bg-red-50 border border-red-400 rounded-md text-[11px] text-red-700 leading-relaxed">
+            <p className="font-extrabold uppercase mb-1">
+              ⚠️ Giới hạn đơn hàng (Trừ Flashcard):
+            </p>
+            <p>
+              Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt <strong>tối đa 1 sản phẩm</strong> với số lượng 1. Vui lòng chỉ chọn 1 tài liệu để tiếp tục thanh toán.
+            </p>
+          </div>
+        )}
+
+        {/* Tổng kết & Nút Tiến hành thanh toán */}
         <div className="p-5 border-t border-gray-200 bg-gray-50 space-y-2">
           <div className="flex justify-between text-xs text-gray-600">
             <span>Tạm tính ({selectedCartItems.length} mục đã chọn):</span>
@@ -189,10 +232,10 @@ export const CartDrawer: React.FC = () => {
 
           <button
             type="button"
-            disabled={selectedCartItems.length === 0 || hasFormatConflict}
+            disabled={isCheckoutDisabled}
             onClick={handleProceedCheckout}
             className={`w-full py-2.5 rounded-sm font-bold text-xs text-white transition ${
-              selectedCartItems.length === 0 || hasFormatConflict
+              isCheckoutDisabled
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-[#e60049] hover:bg-[#cc0041]'
             }`}
