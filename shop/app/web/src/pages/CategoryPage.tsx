@@ -1,26 +1,9 @@
 import React, { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import {
-  buildInitialCategoryBlocks,
-  CategoryBannerBlock,
-  CategoryHeroBlock,
-  CategoryNoticeBlock,
-  CategorySectionBlock,
-  GiftHeroAnchorsBlock,
-  GiftFormEmbedBlock,
-  GiftDonateCtaBlock,
-} from '../components/DynamicCategoryBlocks';
+import { buildInitialCategoryBlocks } from '../components/DynamicCategoryBlocks';
+import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
-import {
-  CategoryBannerBlockConfig,
-  CategoryHeroBlockConfig,
-  CategoryItem,
-  CategoryNoticeBlockConfig,
-  CategorySectionBlockConfig,
-  GiftHeroAnchorsConfig,
-  GiftFormEmbedConfig,
-  GiftDonateCtaConfig,
-} from '../types';
+import { CategoryItem } from '../types';
 
 export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug: propSlug }) => {
   const params = useParams<{ categorySlug?: string }>();
@@ -51,12 +34,6 @@ export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug
     return buildInitialCategoryBlocks(categoryInfo, categoryProducts);
   }, [categoryInfo, categoryProducts]);
 
-  const activeSections = useMemo(() => {
-    return blocks
-      .filter((b) => b.is_active && b.type === 'category_section')
-      .map((b) => b.config as CategorySectionBlockConfig);
-  }, [blocks]);
-
   return (
     <main className="max-w-[960px] mx-auto px-4 py-8 sm:py-10 space-y-10">
       {isLoading ? (
@@ -68,65 +45,14 @@ export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug
           Chưa có tài liệu nào trong danh mục này.
         </div>
       ) : (
-        blocks
-          .filter((b) => b.is_active)
-          .map((block) => {
-            switch (block.type) {
-              case 'category_hero':
-                return (
-                  <CategoryHeroBlock
-                    key={block.id}
-                    config={block.config as CategoryHeroBlockConfig}
-                    sections={activeSections}
-                  />
-                );
-              case 'category_section':
-                return (
-                  <CategorySectionBlock
-                    key={block.id}
-                    config={block.config as CategorySectionBlockConfig}
-                    allCategoryProducts={categoryProducts}
-                  />
-                );
-              case 'category_banner':
-                return (
-                  <CategoryBannerBlock
-                    key={block.id}
-                    config={block.config as CategoryBannerBlockConfig}
-                  />
-                );
-              case 'category_notice':
-                return (
-                  <CategoryNoticeBlock
-                    key={block.id}
-                    config={block.config as CategoryNoticeBlockConfig}
-                  />
-                );
-              case 'gift_hero_anchors':
-                return (
-                  <GiftHeroAnchorsBlock
-                    key={block.id}
-                    config={block.config as GiftHeroAnchorsConfig}
-                  />
-                );
-              case 'gift_form_embed':
-                return (
-                  <GiftFormEmbedBlock
-                    key={block.id}
-                    config={block.config as GiftFormEmbedConfig}
-                  />
-                );
-              case 'gift_donate_cta':
-                return (
-                  <GiftDonateCtaBlock
-                    key={block.id}
-                    config={block.config as GiftDonateCtaConfig}
-                  />
-                );
-              default:
-                return null;
-            }
-          })
+        <UniversalBlockRenderer
+          blocks={blocks}
+          context={{
+            pageType: 'category',
+            category: categoryInfo,
+            allProducts: categoryProducts,
+          }}
+        />
       )}
     </main>
   );

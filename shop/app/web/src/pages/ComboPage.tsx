@@ -1,25 +1,8 @@
 import React, { useMemo } from 'react';
-import {
-  buildInitialComboBlocks,
-  ComboBannerBlock,
-  ComboBottomCtaBlock,
-  ComboHeroBlock,
-  ComboNoticeBlock,
-  ComboPackagesBlock,
-  ComboSectionsBlock,
-} from '../components/DynamicComboBlocks';
+import { buildInitialComboBlocks } from '../components/DynamicComboBlocks';
+import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
-import {
-  ComboBannerBlockConfig,
-  ComboBottomCtaBlockConfig,
-  ComboHeroBlockConfig,
-  ComboNoticeBlockConfig,
-  ComboPackageItem,
-  ComboPackagesBlockConfig,
-  ComboSectionsBlockConfig,
-  Product,
-  UiFormatCode,
-} from '../types';
+import { ComboPackageItem, ComboPackagesBlockConfig, Product, UiFormatCode } from '../types';
 
 export const ComboPage: React.FC = () => {
   const { products, siteConfigs, addToCart, setIsCartOpen } = useStore();
@@ -59,68 +42,16 @@ export const ComboPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-12">
-      {blocks
-        .filter((b) => b.is_active !== false)
-        .map((block) => {
-          switch (block.type) {
-            case 'combo_hero':
-              return (
-                <ComboHeroBlock
-                  key={block.id}
-                  config={block.config as ComboHeroBlockConfig}
-                  onActionClick={handleSelectFirstCombo}
-                />
-              );
-
-            case 'combo_packages':
-              return (
-                <main key={block.id} className="max-w-[920px] mx-auto px-4 py-4 space-y-10">
-                  <ComboPackagesBlock
-                    config={block.config as ComboPackagesBlockConfig}
-                    allProducts={products}
-                    onSelectPackage={handleSelectPackage}
-                  />
-                </main>
-              );
-
-            case 'combo_sections':
-              return (
-                <main key={block.id} className="max-w-[920px] mx-auto px-4 py-4 space-y-10">
-                  <ComboSectionsBlock
-                    config={block.config as ComboSectionsBlockConfig}
-                    allProducts={products}
-                  />
-                </main>
-              );
-
-            case 'combo_bottom_cta':
-              return (
-                <ComboBottomCtaBlock
-                  key={block.id}
-                  config={block.config as ComboBottomCtaBlockConfig}
-                  onActionClick={handleSelectFirstCombo}
-                />
-              );
-
-            case 'combo_banner':
-              return (
-                <main key={block.id} className="max-w-[920px] mx-auto px-4">
-                  <ComboBannerBlock config={block.config as ComboBannerBlockConfig} />
-                </main>
-              );
-
-            case 'combo_notice':
-              return (
-                <main key={block.id} className="max-w-[920px] mx-auto px-4">
-                  <ComboNoticeBlock config={block.config as ComboNoticeBlockConfig} />
-                </main>
-              );
-
-            default:
-              return null;
-          }
-        })}
+    <div className="pb-12 space-y-6">
+      <UniversalBlockRenderer
+        blocks={blocks}
+        context={{
+          pageType: 'combo',
+          allProducts: products,
+        }}
+        onOpenComboCheckout={handleSelectPackage}
+        onTriggerComboBuy={handleSelectFirstCombo}
+      />
     </div>
   );
 };

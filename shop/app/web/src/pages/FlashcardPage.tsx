@@ -1,24 +1,9 @@
 import React, { useMemo } from 'react';
-import {
-  buildInitialFlashcardBlocks,
-  FlashcardBannerBlock,
-  FlashcardContactNoticeBlock,
-  FlashcardFeaturesBlock,
-  FlashcardFreeTierBlock,
-  FlashcardGroupPricingBlock,
-  FlashcardHeroBlock,
-  FlashcardPricingBlock,
-} from '../components/DynamicFlashcardBlocks';
+import { buildInitialFlashcardBlocks } from '../components/DynamicFlashcardBlocks';
+import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
 import {
-  FlashcardBannerBlockConfig,
-  FlashcardContactNoticeBlockConfig,
-  FlashcardFeaturesBlockConfig,
-  FlashcardFreeTierBlockConfig,
-  FlashcardGroupPricingBlockConfig,
-  FlashcardHeroBlockConfig,
   FlashcardIndividualPackageItem,
-  FlashcardPricingBlockConfig,
   Product,
 } from '../types';
 
@@ -80,93 +65,19 @@ export const FlashcardPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-12">
-      {blocks
-        .filter((b) => b.is_active !== false)
-        .map((block) => {
-          switch (block.type) {
-            case 'flashcard_hero':
-              return (
-                <FlashcardHeroBlock
-                  key={block.id}
-                  config={block.config as FlashcardHeroBlockConfig}
-                />
-              );
-
-            case 'flashcard_features': {
-              const featConfig = block.config as FlashcardFeaturesBlockConfig;
-              return (
-                <FlashcardFeaturesBlock
-                  key={block.id}
-                  config={featConfig}
-                  onCtaClick={() => {
-                    if (featConfig.cta_button.action_type === 'link' && featConfig.cta_button.target_url) {
-                      window.open(featConfig.cta_button.target_url, '_blank');
-                    } else {
-                      handleRegisterFlashcard(
-                        featConfig.cta_button.package_price || 100000,
-                        featConfig.cta_button.package_title || 'Flashcard Huy Tutor - Gói 1 Năm'
-                      );
-                    }
-                  }}
-                />
-              );
-            }
-
-            case 'flashcard_free_tier':
-              return (
-                <main key={block.id} className="max-w-[760px] mx-auto px-4 pt-10">
-                  <FlashcardFreeTierBlock config={block.config as FlashcardFreeTierBlockConfig} />
-                </main>
-              );
-
-            case 'flashcard_pricing_packages':
-              return (
-                <main key={block.id} className="max-w-[760px] mx-auto px-4 pt-6">
-                  <FlashcardPricingBlock
-                    config={block.config as FlashcardPricingBlockConfig}
-                    onSelectPackage={handleSelectPackage}
-                  />
-                </main>
-              );
-
-            case 'flashcard_group_pricing': {
-              const groupConfig = block.config as FlashcardGroupPricingBlockConfig;
-              return (
-                <main key={block.id} className="max-w-[760px] mx-auto px-4">
-                  <FlashcardGroupPricingBlock
-                    config={groupConfig}
-                    onRegisterGroup={() =>
-                      handleRegisterFlashcard(
-                        groupConfig.default_price || 100000,
-                        groupConfig.default_title || 'Flashcard từ vựng - tổng hợp mọi tài liệu'
-                      )
-                    }
-                  />
-                </main>
-              );
-            }
-
-            case 'flashcard_contact_notice':
-              return (
-                <main key={block.id} className="max-w-[760px] mx-auto px-4 pt-4">
-                  <FlashcardContactNoticeBlock
-                    config={block.config as FlashcardContactNoticeBlockConfig}
-                  />
-                </main>
-              );
-
-            case 'flashcard_banner':
-              return (
-                <main key={block.id} className="max-w-[760px] mx-auto px-4 py-4">
-                  <FlashcardBannerBlock config={block.config as FlashcardBannerBlockConfig} />
-                </main>
-              );
-
-            default:
-              return null;
-          }
-        })}
+    <div className="pb-12 space-y-6">
+      <UniversalBlockRenderer
+        blocks={blocks}
+        context={{
+          pageType: 'flashcard',
+          product: flashcardProduct,
+          allProducts: products,
+        }}
+        onSelectFlashcardPackage={handleSelectPackage}
+        onRegisterFlashcardGroup={() => {
+          handleRegisterFlashcard(100000, 'Flashcard Nhóm - Đăng ký nhóm học');
+        }}
+      />
     </div>
   );
 };

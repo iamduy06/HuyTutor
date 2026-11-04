@@ -1,17 +1,10 @@
 import React from 'react';
-import {
-  BottomBannerBlock,
-  CategoriesGridBlock,
-  HeroBlock,
-  NoticeTextBlock,
-  SectionGroupsBlock,
-  TopBannerBlock,
-} from '../components/DynamicHomepageBlocks';
+import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
 import { HomepageBlockItem } from '../types';
 
 export const HomePage: React.FC = () => {
-  const { siteConfigs } = useStore();
+  const { siteConfigs, products, categories } = useStore();
 
   let blocks: HomepageBlockItem[] = siteConfigs?.homepage_blocks || [];
 
@@ -91,21 +84,15 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-8 sm:space-y-12 pb-16">
-      {activeBlocks.map((block) => {
-        if (block.type === 'hero') {
-          return <HeroBlock key={block.id} config={block.config} />;
-        }
-
-        return (
-          <div key={block.id} className="max-w-[1120px] mx-auto px-4">
-            {block.type === 'top_banner' && <TopBannerBlock config={block.config} />}
-            {block.type === 'categories_grid' && <CategoriesGridBlock config={block.config} />}
-            {block.type === 'section_groups' && <SectionGroupsBlock config={block.config} />}
-            {block.type === 'notice_text' && <NoticeTextBlock config={block.config} />}
-            {block.type === 'bottom_banner' && <BottomBannerBlock config={block.config} />}
-          </div>
-        );
-      })}
+      <UniversalBlockRenderer
+        blocks={activeBlocks}
+        context={{
+          pageType: 'homepage',
+          allProducts: products,
+          allCategories: categories,
+          siteConfigs,
+        }}
+      />
     </div>
   );
 };

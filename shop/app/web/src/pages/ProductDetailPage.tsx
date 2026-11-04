@@ -1,20 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import {
-  BottomCtaBlock,
-  buildInitialDetailBlocksFromProduct,
-  ProductHeroBlock,
-  ProductIntroBlock,
-  RelatedProductsBlock,
-  SampleGroupsBlock,
-  TopicAccordionBlock,
-  GiftPreviewDownloadBlock,
-  GiftCrossSellBlock,
-} from '../components/DynamicProductDetailBlocks';
-import { GiftDonateCtaBlock } from '../components/DynamicCategoryBlocks';
+import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
+import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
-import { Product, SamplePreviewGroup, UiFormatCode } from '../types';
+import { Product, UiFormatCode } from '../types';
 
 const FRONTEND_SLUG_ALIAS_MAP: Record<string, string> = {
   chotha: '30-de-chot-ha',
@@ -103,20 +93,6 @@ export const ProductDetailPage: React.FC = () => {
     return allBlocks.filter((b) => b.is_active !== false);
   }, [product]);
 
-  const allSampleGroups = useMemo(() => {
-    const list: SamplePreviewGroup[] = [];
-    for (const b of activeBlocks) {
-      if (b.type === 'sample_groups' && Array.isArray(b.config?.groups)) {
-        for (const g of b.config.groups) {
-          if (g && g.is_active !== false) {
-            list.push(g);
-          }
-        }
-      }
-    }
-    return list;
-  }, [activeBlocks]);
-
   if (!product) {
     return (
       <main className="max-w-[820px] mx-auto px-4 py-14 text-center">
@@ -127,92 +103,18 @@ export const ProductDetailPage: React.FC = () => {
 
   return (
     <main className="max-w-[820px] mx-auto px-4 py-8 sm:py-10 space-y-8 sm:space-y-10">
-      {activeBlocks.map((block) => {
-        if (block.type === 'product_hero') {
-          return (
-            <ProductHeroBlock
-              key={block.id}
-              config={block.config}
-              product={product}
-              selectedFormat={selectedFormat}
-              onSelectFormat={setSelectedFormat}
-              onBuyNow={(fmt) => buyNow(product, fmt, 1)}
-              onAddToCart={(fmt) => addToCart(product, fmt, 1)}
-            />
-          );
-        }
-
-        if (block.type === 'product_intro') {
-          return <ProductIntroBlock key={block.id} config={block.config} />;
-        }
-
-        if (block.type === 'topic_accordion') {
-          return (
-            <TopicAccordionBlock
-              key={block.id}
-              config={block.config}
-              sampleGroups={allSampleGroups}
-            />
-          );
-        }
-
-        if (block.type === 'sample_groups') {
-          return <SampleGroupsBlock key={block.id} config={block.config} />;
-        }
-
-        if (block.type === 'bottom_cta') {
-          return (
-            <BottomCtaBlock
-              key={block.id}
-              config={block.config}
-              selectedFormat={selectedFormat}
-              onBuyNow={(fmt) => buyNow(product, fmt, 1)}
-              onAddToCart={(fmt) => addToCart(product, fmt, 1)}
-            />
-          );
-        }
-
-        if (block.type === 'gift_preview_download') {
-          return (
-            <GiftPreviewDownloadBlock
-              key={block.id}
-              config={block.config}
-              product={product}
-            />
-          );
-        }
-
-        if (block.type === 'gift_cross_sell') {
-          return (
-            <GiftCrossSellBlock
-              key={block.id}
-              config={block.config}
-              allProducts={products}
-            />
-          );
-        }
-
-        if (block.type === 'gift_donate_cta') {
-          return (
-            <GiftDonateCtaBlock
-              key={block.id}
-              config={block.config}
-            />
-          );
-        }
-
-        if (block.type === 'related_products') {
-          return (
-            <RelatedProductsBlock
-              key={block.id}
-              config={block.config}
-              autoRelatedProducts={relatedProducts}
-            />
-          );
-        }
-
-        return null;
-      })}
+      <UniversalBlockRenderer
+        blocks={activeBlocks}
+        context={{
+          pageType: 'product_detail',
+          product,
+          allProducts: relatedProducts.length > 0 ? relatedProducts : products,
+        }}
+        selectedFormat={selectedFormat}
+        onSelectFormat={setSelectedFormat}
+        onBuyNow={(fmt) => buyNow(product, fmt, 1)}
+        onAddToCart={(fmt) => addToCart(product, fmt, 1)}
+      />
     </main>
   );
 };
