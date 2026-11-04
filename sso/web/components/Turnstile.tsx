@@ -35,17 +35,14 @@ interface TurnstileProps {
   className?: string;
 }
 
-// Khóa test chính thức từ Cloudflare (luôn tự động vượt qua để phục vụ test local)
-const CLOUDFLARE_DUMMY_PASS_SITEKEY = '1x00000000000000000000AA';
-
 export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
   ({ onSuccess, onError, onExpire, action = 'sso_auth', className = '' }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
     const [scriptLoaded, setScriptLoaded] = useState(false);
 
-    // Lấy Site Key từ env (được Next.js nạp qua next.config.js env)
-    const siteKey = process.env.TURNSTILE_SITE_KEY?.trim() || CLOUDFLARE_DUMMY_PASS_SITEKEY;
+    // Lấy Site Key chuẩn hóa từ biến môi trường (Next.js nạp qua next.config.js env)
+    const siteKey = process.env.TURNSTILE_SITE_KEY?.trim();
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -59,9 +56,9 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
       },
     }));
 
-    // 1. Tải script Cloudflare Turnstile an toàn
+    // 1. Tải script Cloudflare Turnstile an toàn khi có siteKey
     useEffect(() => {
-      if (typeof window === 'undefined') return;
+      if (typeof window === 'undefined' || !siteKey) return;
 
       if (window.turnstile) {
         setScriptLoaded(true);
@@ -90,7 +87,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
 
     // 2. Render Widget khi script và container đã sẵn sàng
     useEffect(() => {
-      if (!scriptLoaded || !containerRef.current || typeof window === 'undefined' || !window.turnstile) {
+      if (!siteKey || !scriptLoaded || !containerRef.current || typeof window === 'undefined' || !window.turnstile) {
         return;
       }
 
@@ -138,6 +135,10 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
         }
       };
     }, [scriptLoaded, siteKey, action, onSuccess, onError, onExpire]);
+
+    if (!siteKey) {
+      return null;
+    }
 
     return (
       <div className={`flex justify-center my-2 min-h-[65px] ${className}`}>
