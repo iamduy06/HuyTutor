@@ -1,21 +1,30 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function secureCompare(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 export async function POST(req: Request) {
   try {
-    // 1. Kiểm tra xác thực qua Secret Key từ Backend API
+    // 1. Kiểm tra xác thực qua Secret Key từ Backend API (Bảo vệ chống Timing Attack)
     const authHeader =
       req.headers.get('x-admin-secret') ||
       req.headers.get('x-admin-key') ||
       req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
     const serverSecret = process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY;
 
-    if (!serverSecret || authHeader !== serverSecret) {
+    if (!serverSecret || !authHeader || !secureCompare(authHeader, serverSecret)) {
       console.warn('[VERCEL_SMTP_AUTH_FAILED] Rejecting request: Invalid or missing admin secret.');
       return NextResponse.json(
         { success: false, error: 'Unauthorized: Invalid admin secret' },
