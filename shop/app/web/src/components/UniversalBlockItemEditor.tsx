@@ -1,4 +1,5 @@
 import React from 'react';
+import { apiClient } from '../api/client';
 import {
   CategoryBannerBlockConfig,
   CategoryHeroBlockConfig,
@@ -707,14 +708,17 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
                 <button
                   type="button"
                   onClick={() => {
+                    if (imgUrl) {
+                      apiClient.deleteR2File(imgUrl).catch(() => {});
+                    }
                     const groups = [...(sampleCfg.groups || [])];
                     if (groups[0]) {
                       groups[0].images = groups[0].images.filter((_, i) => i !== imgIdx);
                       onUpdateConfig({ groups });
                     }
                   }}
-                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-black shadow"
-                  title="Xóa trang này"
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-full flex items-center justify-center text-xs font-black shadow cursor-pointer transition"
+                  title="Xóa vĩnh viễn trang này khỏi Cloudflare R2"
                 >
                   ✕
                 </button>

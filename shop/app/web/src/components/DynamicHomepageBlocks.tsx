@@ -213,7 +213,7 @@ export const CategoriesGridBlock: React.FC<{
       {config.title && (
         <h2 className="text-[#e60049] font-bold text-sm sm:text-base mb-4">{config.title}</h2>
       )}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
         {activeItems.map((cat) => (
           <SmartLink
             key={cat.id}

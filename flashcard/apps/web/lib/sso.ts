@@ -27,7 +27,7 @@ export function getCookieDomain(): string {
   if (cookieDomain) {
     return cookieDomain.trim();
   }
-  return ".huytutor.edu.vn";
+  return "";
 }
 
 export function getCookieDomainList(host?: string | null): string[] {
@@ -39,9 +39,6 @@ export function getCookieDomainList(host?: string | null): string[] {
     domains.add(envDomain.replace(/^\./, ""));
   }
 
-  // Always include master production root domains
-  domains.add(".huytutor.edu.vn");
-  domains.add("huytutor.edu.vn");
 
   if (host) {
     const cleanHost = host.split(":")[0].trim();

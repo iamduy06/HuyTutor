@@ -30,8 +30,12 @@ export const CartDrawer: React.FC = () => {
     new Set(cartItems.map((item) => item.formatCode))
   ) as UiFormatCode[];
 
+  const hasOwnedItemSelected = selectedCartItems.some(
+    (item) => isItemInLibrary && isItemInLibrary(item.slug, item.formatCode)
+  );
+
   const isCheckoutDisabled =
-    selectedCartItems.length === 0 || hasFormatConflict || hasMultipleProductsConflict;
+    selectedCartItems.length === 0 || hasFormatConflict || hasMultipleProductsConflict || hasOwnedItemSelected;
 
   const handleProceedCheckout = () => {
     if (isCheckoutDisabled) return;
@@ -196,6 +200,21 @@ export const CartDrawer: React.FC = () => {
               hàng chỉ được phép thanh toán cho <strong>1 định dạng duy nhất</strong>. Vui lòng bấm
               nút lọc định dạng ở phía trên hoặc bỏ tích các định dạng khác.
             </p>
+          </div>
+        )}
+
+        {/* Cảnh báo tài liệu đã sở hữu trong Tủ sách (Chặn thanh toán) */}
+        {hasOwnedItemSelected && (
+          <div className="mx-5 mb-2 p-3 bg-amber-50 border border-amber-400 rounded-md text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+            <span className="text-base shrink-0 leading-none">⛔</span>
+            <div>
+              <p className="font-extrabold uppercase mb-0.5">
+                Không thể thanh toán tài liệu đã sở hữu:
+              </p>
+              <p>
+                Đơn hàng có tài liệu bạn đã sở hữu trong Tủ sách cá nhân. Vui lòng bỏ tích chọn tài liệu đó để có thể tiếp tục thanh toán.
+              </p>
+            </div>
           </div>
         )}
 

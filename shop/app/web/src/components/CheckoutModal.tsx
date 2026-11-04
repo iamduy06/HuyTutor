@@ -11,7 +11,7 @@ import {
 } from '../types';
 
 export const CheckoutModal: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isItemInLibrary } = useAuth();
   const {
     isCheckoutOpen,
     setIsCheckoutOpen,
@@ -122,6 +122,16 @@ export const CheckoutModal: React.FC = () => {
     if (hasMultipleProductsConflict) {
       setFormError(
         'Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1. Vui lòng điều chỉnh lại giỏ hàng.'
+      );
+      return;
+    }
+
+    const hasOwnedItem = selectedCartItems.some(
+      (it) => isItemInLibrary && isItemInLibrary(it.slug, it.formatCode)
+    );
+    if (hasOwnedItem) {
+      setFormError(
+        'Đơn hàng có tài liệu bạn đã sở hữu trong Tủ sách cá nhân. Không thể thanh toán lại. Vui lòng quay lại giỏ hàng và bỏ chọn tài liệu đó.'
       );
       return;
     }

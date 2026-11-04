@@ -1,3 +1,4 @@
+import { getClientErrorMessage } from '../utils/errorHandler';
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
@@ -60,7 +61,7 @@ export const MyLibraryPage: React.FC = () => {
       setLibraryItems(libRes.items);
       setOrders(ordRes.orders);
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi tải dữ liệu tài khoản.');
+      showToast(getClientErrorMessage(err, 'Lỗi tải dữ liệu tài khoản.'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +104,7 @@ export const MyLibraryPage: React.FC = () => {
       setUserState(res.user);
       showToast(res.message);
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi lưu thông tin hồ sơ.');
+      showToast(getClientErrorMessage(err, 'Lỗi lưu thông tin hồ sơ.'));
     } finally {
       setSavingProfile(false);
     }

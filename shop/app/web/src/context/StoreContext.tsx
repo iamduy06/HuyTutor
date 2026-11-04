@@ -270,8 +270,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const buyNow = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
     if (isItemInLibrary && isItemInLibrary(product.slug, formatCode)) {
       showToast(
-        `⚠️ CẢNH BÁO: Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Bạn có thể vào Tủ sách để tải về mà không cần mua lại.`
+        `⚠️ Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Không thể thanh toán lại. Vui lòng vào Tủ sách để tải tài liệu.`
       );
+      setIsCartOpen(true);
+      return;
     }
 
     const unitPrice = resolveFormatPrice(product, formatCode);

@@ -457,7 +457,7 @@ export const AdminHomepageCms: React.FC = () => {
         quickAddTypes={[
           { type: 'hero', label: 'Hero Đầu Trang' },
           { type: 'top_banner', label: 'Top Banner' },
-          { type: 'categories_grid', label: '6 Ô Danh Mục' },
+          { type: 'categories_grid', label: 'Danh Mục Sản Phẩm' },
           { type: 'section_groups', label: 'Nhóm Tài Liệu' },
           { type: 'notice_text', label: 'Thông Báo CTA' },
           { type: 'bottom_banner', label: 'Bottom Banner' },
