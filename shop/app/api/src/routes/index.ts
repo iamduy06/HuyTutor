@@ -76,6 +76,7 @@ router.post(
   adminAuthMiddleware,
   adminController.resyncOrderToGoogleForm
 );
+router.get('/admin/block-previews/:type', adminAuthMiddleware, adminController.getBlockPreviewImage);
 router.get('/admin/users', adminAuthMiddleware, adminController.getUsers);
 router.put('/admin/users/:id/role', adminAuthMiddleware, adminController.updateUserRoleAndStatus);
 router.delete(

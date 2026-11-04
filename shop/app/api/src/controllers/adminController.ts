@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { dbService } from '../services/dbService';
 import { toPublicUserProfile } from '../services/authService';
 import {
@@ -544,6 +546,46 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi cập nhật cấu hình.',
+      });
+    }
+  },
+
+  /**
+   * GET /api/admin/block-previews/:type
+   * Phuc vu anh minh hoa khoi dong co bao ve phan quyen Admin.
+   * Tuyet doi khong de public: Yeu cau adminAuthMiddleware xac thuc phien role === 'admin'.
+   */
+  async getBlockPreviewImage(req: Request, res: Response): Promise<void> {
+    try {
+      const rawType = String(req.params.type || '').trim();
+      const safeType = path.basename(rawType).replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!safeType) {
+        res.status(400).json({ ok: false, error: 'Loại khối không hợp lệ.' });
+        return;
+      }
+
+      let basePath = path.resolve(__dirname, '..', '..', 'assets', 'block-previews');
+      if (!fs.existsSync(basePath)) {
+        basePath = path.resolve(process.cwd(), 'assets', 'block-previews');
+      }
+      const filePath = path.join(basePath, safeType + '.png');
+
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ ok: false, error: 'Không tìm thấy ảnh minh họa cho khối này.' });
+        return;
+      }
+
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi đọc ảnh minh họa khối.',
       });
     }
   },

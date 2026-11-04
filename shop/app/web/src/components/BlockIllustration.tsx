@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiClient } from '../api/client';
 
 interface BlockIllustrationProps {
   type: string;
@@ -6,31 +7,75 @@ interface BlockIllustrationProps {
   enableZoom?: boolean;
 }
 
+// In-memory cache for authorized blob URLs to prevent redundant network fetches
+const blobCache = new Map<string, string>();
+
 export const BlockIllustration: React.FC<BlockIllustrationProps> = ({
   type,
   className = 'w-full h-28',
   enableZoom = true,
 }) => {
+  const [imageSrc, setImageSrc] = useState<string | null>(blobCache.get(type) || null);
   const [imgError, setImgError] = useState(false);
+  const [isLoading, setIsLoading] = useState(!blobCache.has(type));
   const [isZoomed, setIsZoomed] = useState(false);
 
-  const imageSrc = `/assets/block-previews/${type}.png`;
+  useEffect(() => {
+    let isMounted = true;
 
-  // Render static image preview from plans
-  if (!imgError) {
+    if (blobCache.has(type)) {
+      setImageSrc(blobCache.get(type)!);
+      setIsLoading(false);
+      setImgError(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setImgError(false);
+
+    // Call secure, role-restricted admin endpoint (/api/admin/block-previews/:type)
+    apiClient
+      .getBlockPreviewImageUrl(type)
+      .then((url) => {
+        if (!isMounted) return;
+        blobCache.set(type, url);
+        setImageSrc(url);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setImgError(true);
+        setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [type]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className={`rounded border border-gray-200 bg-gray-50 flex items-center justify-center animate-pulse ${className}`}>
+        <span className="text-[10px] text-gray-400 font-bold">Đang tải ảnh xem trước...</span>
+      </div>
+    );
+  }
+
+  // Render authorized static image preview from backend
+  if (imageSrc && !imgError) {
     return (
       <>
         <div
           className={`relative group cursor-pointer overflow-hidden rounded border border-gray-200 bg-gray-100 flex items-center justify-center ${className}`}
           onClick={() => enableZoom && setIsZoomed(true)}
-          title="Nhấn để phóng to xem ảnh thiết kế từ Plan"
+          title="Nhấn để phóng to xem ảnh thiết kế từ Plan (Chỉ Admin)"
         >
           <img
             src={imageSrc}
             alt={`Ảnh thiết kế khối ${type}`}
             onError={() => setImgError(true)}
             className="w-full h-full object-cover object-top transition duration-200 group-hover:scale-105"
-            loading="lazy"
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition flex items-center justify-center pointer-events-none">
             <span className="opacity-0 group-hover:opacity-100 transition bg-black/75 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow">
@@ -51,7 +96,7 @@ export const BlockIllustration: React.FC<BlockIllustrationProps> = ({
             >
               <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100 px-2">
                 <span className="text-xs font-black text-[#e60049] uppercase">
-                  Ảnh Minh Họa Thiết Kế Từ Plan: Khối #{type}
+                  Ảnh Minh Họa Thiết Kế Từ Plan: Khối #{type} (Quyền Admin)
                 </span>
                 <button
                   type="button"
@@ -76,7 +121,7 @@ export const BlockIllustration: React.FC<BlockIllustrationProps> = ({
   }
 
   // ==========================================
-  // Vector Wireframe Fallback if image fails
+  // Vector Wireframe Fallback if not authorized or missing
   // ==========================================
   switch (type) {
     case 'hero':

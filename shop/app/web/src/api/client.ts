@@ -494,6 +494,25 @@ export const apiClient = {
     });
   },
 
+  /**
+   * Tải ảnh minh họa khối động có bảo mật phân quyền Admin (Authorization Bearer).
+   * Trả về ObjectURL blob an toàn trong bộ nhớ client.
+   */
+  async getBlockPreviewImageUrl(blockType: string): Promise<string> {
+    const res = await fetch(
+      buildApiUrl('/api/admin/block-previews/' + encodeURIComponent(blockType)),
+      {
+        credentials: 'include',
+        headers: buildAuthHeaders(),
+      }
+    );
+    if (!res.ok) {
+      throw new Error('Failed to load preview for ' + blockType + ': ' + res.status);
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
+
   async revokeAdminUserSessions(userId: string): Promise<{
     ok: boolean;
     revokedCount: number;
