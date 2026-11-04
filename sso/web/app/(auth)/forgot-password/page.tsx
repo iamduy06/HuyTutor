@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,11 +21,13 @@ export default function ForgotPasswordPage() {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
         const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
         setErrorMsg(errorText);
         setLoading(false);
@@ -32,6 +37,8 @@ export default function ForgotPasswordPage() {
       setSent(true);
       setLoading(false);
     } catch {
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
       setErrorMsg('Đã có lỗi xảy ra, vui lòng thử lại.');
       setLoading(false);
     }
@@ -100,6 +107,14 @@ export default function ForgotPasswordPage() {
               className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
             />
           </div>
+
+          <Turnstile
+            ref={turnstileRef}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onError={() => setTurnstileToken('')}
+            onExpire={() => setTurnstileToken('')}
+            action="forgot_password"
+          />
 
           <button
             type="submit"

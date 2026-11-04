@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -16,6 +17,8 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   useEffect(() => {
     if (!token) {
@@ -78,11 +81,13 @@ function ResetPasswordContent() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, new_password: password }),
+        body: JSON.stringify({ token, new_password: password, turnstileToken }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
         const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
         setErrorMsg(errorText);
         setLoading(false);
@@ -92,6 +97,8 @@ function ResetPasswordContent() {
       setSuccess(true);
       setLoading(false);
     } catch {
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
       setErrorMsg('Đã có lỗi xảy ra, vui lòng thử lại.');
       setLoading(false);
     }
@@ -200,6 +207,14 @@ function ResetPasswordContent() {
               className="w-full px-3 py-2 text-sm rounded-xs border border-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand placeholder:text-gray-400 text-gray-900 transition-colors"
             />
           </div>
+
+          <Turnstile
+            ref={turnstileRef}
+            onSuccess={(t) => setTurnstileToken(t)}
+            onError={() => setTurnstileToken('')}
+            onExpire={() => setTurnstileToken('')}
+            action="reset_password"
+          />
 
           <button
             type="submit"

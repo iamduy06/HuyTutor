@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink, CheckCircle } from 'lucide-react';
 import { getDeviceId, getDeviceName } from '@/lib/clientDevice';
+import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 
 interface LoginClientProps {
   defaultFlashcardUrl: string;
@@ -26,6 +27,8 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<{ message: string; contactUrl: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   async function handleResendActivation() {
     const targetEmail = unactivatedEmail || email.trim().toLowerCase();
@@ -72,12 +75,16 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
           device_name: getDeviceName(),
           app,
           redirect_url: redirectUrl,
+          turnstileToken,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+
         if (data.error?.code === 'DEVICE_LIMIT_EXCEEDED') {
           setBlocked({
             message: data.error.message || 'Tài khoản đã đạt giới hạn thiết bị.',
@@ -262,6 +269,14 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
             </button>
           </div>
         </div>
+
+        <Turnstile
+          ref={turnstileRef}
+          onSuccess={(token) => setTurnstileToken(token)}
+          onError={() => setTurnstileToken('')}
+          onExpire={() => setTurnstileToken('')}
+          action="login"
+        />
 
         <button
           type="submit"

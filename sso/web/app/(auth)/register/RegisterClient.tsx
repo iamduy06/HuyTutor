@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, Mail, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
+import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 
 interface RegisterClientProps {
   defaultFlashcardUrl: string;
@@ -27,6 +28,8 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
   const [unactivatedEmail, setUnactivatedEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   async function handleResendVerification() {
     if (!registeredEmail || resending) return;
@@ -78,11 +81,15 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
           email: cleanEmail,
           password,
           confirm_password: confirmPassword,
+          turnstileToken,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+
         if (data.error?.code === 'ACCOUNT_EXISTS_UNACTIVATED') {
           setUnactivatedEmail(data.error?.email || cleanEmail);
         }
@@ -308,6 +315,14 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
             </button>
           </div>
         </div>
+
+        <Turnstile
+          ref={turnstileRef}
+          onSuccess={(token) => setTurnstileToken(token)}
+          onError={() => setTurnstileToken('')}
+          onExpire={() => setTurnstileToken('')}
+          action="register"
+        />
 
         <button
           type="submit"

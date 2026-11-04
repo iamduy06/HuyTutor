@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
 
@@ -16,6 +17,8 @@ function VerifyEmailContent() {
   const [resendEmail, setResendEmail] = useState(emailParam);
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   useEffect(() => {
     if (!token) {
@@ -41,7 +44,13 @@ function VerifyEmailContent() {
 
         if (!active) return;
 
-        if (res.ok && data.success) {
+        if (!res.ok || !data.success) {
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+        setResendStatus({ success: false, message: data.error?.message || 'Không thể gửi lại email xác thực.' });
+        return;
+      }
+      if (res.ok && data.success) {
           setSuccess(true);
           if (data.already_verified) {
             setAlreadyVerified(true);
@@ -82,7 +91,7 @@ function VerifyEmailContent() {
       const res = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resendEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email: resendEmail.trim().toLowerCase(), turnstileToken }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -209,6 +218,13 @@ function VerifyEmailContent() {
           )}
           <span>Gửi lại mã kích hoạt</span>
         </button>
+        <Turnstile
+          ref={turnstileRef}
+          onSuccess={(t) => setTurnstileToken(t)}
+          onError={() => setTurnstileToken('')}
+          onExpire={() => setTurnstileToken('')}
+          action="resend_verification"
+        />
       </form>
 
       <div className="pt-3 border-t border-gray-200">
