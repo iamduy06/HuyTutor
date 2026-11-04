@@ -429,48 +429,63 @@ export interface SendEmailOptions {
   type?: 'signup_verification' | 'reset_password' | 'resend_verification' | 'general';
 }
 
-async function sendViaInternalProxy(options: SendEmailOptions): Promise<boolean> {
-  const ssoUrl = getSsoBaseUrl();
-  const proxyUrl = process.env.INTERNAL_EMAIL_URL ? process.env.INTERNAL_EMAIL_URL.trim() : `${ssoUrl}/api-internal/send-email`;
-  const adminSecret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
-
-  if (!adminSecret) {
-    throw new Error('[INTERNAL_EMAIL_ERROR] Missing required environment variable: ADMIN_API_SECRET (or ADMIN_API_KEY)');
+async function sendViaGoogleAppsScript(options: SendEmailOptions): Promise<boolean> {
+  const gasUrl = (process.env.APPS_SCRIPT_EMAIL_URL || process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL)?.trim();
+  if (!gasUrl) {
+    throw new Error('[EMAIL_CONFIG_ERROR] Missing required environment variable: APPS_SCRIPT_EMAIL_URL');
   }
 
-  const res = await fetch(proxyUrl, {
+  const adminSecret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
+  if (!adminSecret) {
+    throw new Error('[EMAIL_CONFIG_ERROR] Missing required environment variable: ADMIN_API_SECRET (or ADMIN_API_KEY)');
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || 'HUY TUTOR';
+
+  const payload = {
+    secret: adminSecret,
+    to: options.to.trim().toLowerCase(),
+    subject: options.subject,
+    html: options.html,
+    text: options.text || '',
+    type: options.type || 'general',
+    fromName,
+  };
+
+  const res = await fetch(gasUrl, {
     method: 'POST',
+    redirect: 'follow',
     headers: {
-      'Content-Type': 'application/json',
-      'x-admin-secret': adminSecret,
+      'Content-Type': 'text/plain;charset=utf-8',
     },
-    body: JSON.stringify({
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text || '',
-      type: options.type || 'general',
-    }),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`[INTERNAL_EMAIL_PROXY_ERROR] ${res.status}: ${errorText}`);
+  const responseText = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    if (res.ok) {
+      console.log(`[GAS_EMAIL_SENT] Email [${options.type || 'general'}] sent to ${options.to}`);
+      return true;
+    }
+    throw new Error(`[GAS_EMAIL_ERROR] Invalid response from Google Apps Script (${res.status}): ${responseText}`);
   }
 
-  const data = (await res.json()) as any;
-  console.log(`[VERCEL_PROXY_EMAIL_SENT] MessageId: ${data?.messageId} [${options.type || 'general'}] to ${options.to}`);
+  if (data && data.success === false) {
+    throw new Error(`[GAS_EMAIL_ERROR] Google Apps Script returned error: ${data.error || 'Unknown error'}`);
+  }
+
+  console.log(`[GAS_EMAIL_SENT] Email [${options.type || 'general'}] sent successfully to ${options.to}`);
   return true;
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
-  // 1. Trong môi trường production hoặc khi có cờ ép buộc: gửi qua Vercel Email Bridge
-  // (tránh lỗi Render Free Tier chặn các cổng socket SMTP 587/465)
-  const isProd = process.env.NODE_ENV === 'production';
-  const forceProxy = process.env.USE_INTERNAL_EMAIL_PROXY === 'true';
-
-  if (isProd || forceProxy) {
-    return await sendViaInternalProxy(options);
+  // 1. Nếu có cấu hình Google Apps Script (Production / Staging): gửi qua GAS Web App
+  const gasUrl = process.env.APPS_SCRIPT_EMAIL_URL || process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL;
+  if (gasUrl) {
+    return await sendViaGoogleAppsScript(options);
   }
 
   // 2. Môi trường phát triển cục bộ (local dev): Gửi trực tiếp qua SMTP Nodemailer
