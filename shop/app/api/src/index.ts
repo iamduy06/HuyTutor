@@ -21,7 +21,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     service: 'huytutor-api',
-    domain: 'api.huytutor.edu.vn',
+    domain: process.env.APP_URL || _req.headers.host || 'huytutor-api',
     databaseMode: isSupabaseConfigured ? 'supabase-postgres-service-role' : 'backend-managed-json-db',
     r2StorageMode: isR2Configured ? 'cloudflare-r2-live' : 'cloudflare-r2-ready',
     timestamp: new Date().toISOString(),
@@ -30,6 +30,15 @@ app.get('/health', (_req, res) => {
 
 // Gắn toàn bộ router nghiệp vụ (/api/auth, /api/user, /api/catalog, /api/orders, /api/admin, /api/webhook)
 app.use('/api', apiRouter);
+
+// Global Error Handler Sanitization Middleware
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[UNHANDLED_ERROR]', err);
+  res.status(err?.status || 500).json({
+    ok: false,
+    error: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.'
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`[Huy Tutor Shop API] Server listening on port ${PORT}`);

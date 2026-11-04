@@ -82,7 +82,7 @@ export const authController = {
 
       // Hủy toàn bộ cookie phiên trên mọi cấp độ domain (.huytutor.edu.vn, huytutor.edu.vn, host-only)
       const isProd = process.env.NODE_ENV === 'production';
-      const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
+      const cookieDomain = process.env.COOKIE_DOMAIN;
 
       const clearOpts = {
         path: '/',
@@ -96,16 +96,18 @@ export const authController = {
       const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
 
       for (const name of cookieNames) {
-        res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
-        if (cookieDomain.startsWith('.')) {
-          res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+        if (cookieDomain) {
+          res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
+          if (cookieDomain.startsWith('.')) {
+            res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+          }
         }
         res.cookie(name, '', clearOpts);
       }
 
       if (req.method === 'GET') {
-        const frontendUrl = process.env.FRONTEND_URL || '/';
-        res.redirect(`${frontendUrl.replace(/\/+$/, '')}/?logout=true`);
+        const frontendUrl = process.env.SHOP_URL || process.env.FRONTEND_URL || '';
+        res.redirect(frontendUrl ? `${frontendUrl.replace(/\/+$/, '')}/?logout=true` : '/?logout=true');
         return;
       }
 
@@ -149,7 +151,7 @@ export const authController = {
       }
 
       const isProd = process.env.NODE_ENV === 'production';
-      const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
+      const cookieDomain = process.env.COOKIE_DOMAIN;
 
       const clearOpts = {
         path: '/',
@@ -163,9 +165,11 @@ export const authController = {
       const cookieNames = ['ht_sso_token', 'ht_session_token', 'session_token'];
 
       for (const name of cookieNames) {
-        res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
-        if (cookieDomain.startsWith('.')) {
-          res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+        if (cookieDomain) {
+          res.cookie(name, '', { ...clearOpts, domain: cookieDomain });
+          if (cookieDomain.startsWith('.')) {
+            res.cookie(name, '', { ...clearOpts, domain: cookieDomain.slice(1) });
+          }
         }
         res.cookie(name, '', clearOpts);
       }

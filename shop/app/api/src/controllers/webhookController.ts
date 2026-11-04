@@ -50,6 +50,16 @@ export const webhookController = {
         return;
       }
 
+      if (order.payment_status === 'paid') {
+        res.status(200).json({
+          ok: true,
+          message: 'Đơn hàng đã được ghi nhận thanh toán trước đó.',
+          orderCode: order.order_code,
+          paymentStatus: 'paid',
+        });
+        return;
+      }
+
       if (transferAmount > 0 && transferAmount < order.total_amount) {
         res.status(400).json({
           ok: false,
@@ -113,6 +123,16 @@ export const webhookController = {
         res.status(404).json({
           ok: false,
           error: `Không tìm thấy đơn hàng ${orderCode}.`,
+        });
+        return;
+      }
+
+      if (order.payment_status === 'paid') {
+        res.status(200).json({
+          ok: true,
+          message: 'Đơn hàng đã được ghi nhận thanh toán trước đó.',
+          orderCode: order.order_code,
+          paymentStatus: 'paid',
         });
         return;
       }

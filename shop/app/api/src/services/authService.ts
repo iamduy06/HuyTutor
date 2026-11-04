@@ -10,7 +10,7 @@ export interface PublicUserProfile {
   email: string;
   fullName: string;
   phone: string;
-  role: 'user' | 'admin' | 'subadmin';
+  role: 'user' | 'admin';
   customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
   schoolOrOrg: string;
   defaultTaxCccd: string;
@@ -27,11 +27,9 @@ export function toPublicUserProfile(user: SeedUser): PublicUserProfile {
     fullName: user.full_name,
     phone: user.phone || '',
     role:
-      String(user.role || '').toLowerCase() === 'admin'
+      String(user.role || '').toUpperCase() === 'ADMIN'
         ? 'admin'
-        : String(user.role || '').toLowerCase() === 'subadmin'
-          ? 'subadmin'
-          : 'user',
+        : 'user',
     customerGroup: user.customer_group || 'Giáo viên',
     schoolOrOrg: user.school_or_org || '',
     defaultTaxCccd: user.default_tax_cccd || '',
@@ -46,6 +44,9 @@ export const authService = {
   /**
    * Đăng ký tài khoản mới (Mặc định role = 'user', mật khẩu băm SHA3-256)
    * và khởi tạo phiên đăng nhập (Session) ngay lập tức.
+   */
+  /**
+   * @deprecated Toàn bộ xác thực đã chuyển về SSO tập trung.
    */
   async register(params: {
     email: string;

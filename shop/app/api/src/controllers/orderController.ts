@@ -101,6 +101,29 @@ export const orderController = {
         }
       }
 
+      // 2.2 Quy tắc chống mua trùng lặp: Nếu khách đã đăng nhập, chặn thanh toán nếu đã sở hữu trong Tủ sách
+      if (req.user && req.user.id) {
+        const userLibrary = await dbService.getUserLibrary(req.user.id);
+        const ownedItem = items.find((rawItem: any) => {
+          const slugOrId = String(rawItem.productId || rawItem.slug || rawItem.code || '').toLowerCase().trim();
+          const itemFmt = String(rawItem.formatCode || rawItem.format_code || selectedFormat).trim();
+          return userLibrary.some(
+            (lib) =>
+              (lib.product_slug.toLowerCase() === slugOrId || lib.id === slugOrId) &&
+              lib.format_code === itemFmt &&
+              lib.is_active
+          );
+        });
+
+        if (ownedItem) {
+          res.status(400).json({
+            ok: false,
+            error: `Bạn đã sở hữu tài liệu "${ownedItem.title || ownedItem.productTitle || selectedFormat}" ở định dạng ${selectedFormat} trong Tủ sách cá nhân. Không thể thanh toán lại.`,
+          });
+          return;
+        }
+      }
+
       // 3. Kiểm tra điều kiện Xuất hóa đơn VAT
       const isInvoiceRequested = Boolean(needInvoice);
       if (isInvoiceRequested) {

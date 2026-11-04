@@ -103,6 +103,7 @@ export interface SeedOrder {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  customer_note?: string;
   customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
   selected_format: UiFormatCode;
   flashcard_quantity: number | null;
@@ -128,7 +129,7 @@ export interface SeedUser {
   password_hash: string; // SHA3-256 hex (64 chars)
   full_name: string;
   phone: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'USER' | 'ADMIN';
   customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
   school_or_org: string;
   default_tax_cccd: string;
@@ -1213,27 +1214,29 @@ export const dbService = {
 
   async createOrder(order: SeedOrder): Promise<SeedOrder> {
     if (isSupabaseConfigured && supabaseAdmin) {
-      const customerNoteParts: string[] = [];
-      if (order.customer_group) customerNoteParts.push(`[Nhóm: ${order.customer_group}]`);
-      if (order.selected_format) customerNoteParts.push(`[Định dạng: ${order.selected_format}]`);
-      if (order.flashcard_quantity) customerNoteParts.push(`[Số lượng FC: ${order.flashcard_quantity}]`);
-
       const insertPayload: Record<string, any> = {
         order_code: order.order_code,
         customer_name: order.customer_name,
         customer_email: order.customer_email,
         customer_phone: order.customer_phone || '',
-        customer_note: customerNoteParts.join(' '),
+        customer_group: order.customer_group || 'Giáo viên',
+        customer_note: order.customer_note || '',
+        selected_format: order.selected_format || '',
+        flashcard_quantity: order.flashcard_quantity || null,
         need_invoice: Boolean(order.need_invoice),
         invoice_company: '',
         invoice_tax_code: order.invoice_tax_or_cccd || '',
         invoice_address: order.invoice_address || '',
-        total_amount: order.subtotal_amount || order.total_amount,
+        subtotal_amount: order.subtotal_amount || order.total_amount,
+        discount_percent: order.discount_percent || 0,
         discount_amount: order.discount_amount || 0,
+        total_amount: order.subtotal_amount || order.total_amount,
         final_amount: order.total_amount,
         status: order.payment_status === 'paid' ? 'completed' : 'pending',
         payment_status: order.payment_status || 'pending',
         payment_method: order.payment_method || 'vietqr',
+        payment_ref_id: order.payment_ref_id || '',
+        google_form_submitted: Boolean(order.google_form_submitted),
       };
       if (order.user_id) {
         insertPayload.user_id = order.user_id;
@@ -1511,7 +1514,7 @@ export const dbService = {
       password_hash: payload.password_hash,
       full_name: payload.full_name.trim(),
       phone: (payload.phone || '').trim(),
-      role: payload.role === 'admin' ? 'admin' : 'user',
+      role: (payload.role && String(payload.role).toUpperCase() === 'ADMIN') ? 'ADMIN' : 'USER',
       customer_group: group,
       school_or_org: (payload.school_or_org || '').trim(),
       default_tax_cccd: '',
@@ -1538,7 +1541,6 @@ export const dbService = {
           school_or_org: newUser.school_or_org,
           default_tax_cccd: newUser.default_tax_cccd,
           default_invoice_address: newUser.default_invoice_address,
-          email_verified: newUser.email_verified,
           is_active: newUser.is_active,
           last_login_at: newUser.last_login_at,
         })
@@ -1862,7 +1864,7 @@ export const dbService = {
           if (order.id && uuidRegex.test(order.id)) {
             insertPayload.order_id = order.id;
           }
-          await supabaseAdmin.from('user_library').insert(insertPayload);
+          await supabaseAdmin.from('user_library').upsert(insertPayload, { onConflict: 'user_id,product_slug,format_code' });
         }
       }
 

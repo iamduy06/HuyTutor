@@ -309,7 +309,7 @@ export async function logout(req: AuthenticatedRequest, res: Response): Promise<
     }
 
     const isProd = process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN || '.huytutor.edu.vn';
+    const cookieDomain = process.env.COOKIE_DOMAIN;
 
     const clearOpts = {
       path: '/',
@@ -320,10 +320,12 @@ export async function logout(req: AuthenticatedRequest, res: Response): Promise<
       expires: new Date(0),
     };
 
-    // 1. Clear on root domain (.huytutor.edu.vn and huytutor.edu.vn)
-    res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain });
-    if (cookieDomain.startsWith('.')) {
-      res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain.slice(1) });
+    // 1. Clear on root domain if configured
+    if (cookieDomain) {
+      res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain });
+      if (cookieDomain.startsWith('.')) {
+        res.cookie('ht_sso_token', '', { ...clearOpts, domain: cookieDomain.slice(1) });
+      }
     }
 
     // 2. Clear host-only (no domain specified)
