@@ -41,6 +41,16 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
     const widgetIdRef = useRef<string | null>(null);
     const [scriptLoaded, setScriptLoaded] = useState(false);
 
+    // Lưu các callback vào ref để tránh re-render / re-mount vô tận widget khi state cha thay đổi
+    const onSuccessRef = useRef(onSuccess);
+    onSuccessRef.current = onSuccess;
+
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
+
+    const onExpireRef = useRef(onExpire);
+    onExpireRef.current = onExpire;
+
     // Lấy Site Key chuẩn hóa từ biến môi trường (Next.js nạp qua next.config.js env)
     const siteKey = process.env.TURNSTILE_SITE_KEY?.trim();
 
@@ -77,15 +87,15 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
         script.onload = () => setScriptLoaded(true);
         script.onerror = (e) => {
           console.error('[TURNSTILE_SCRIPT_ERROR] Failed loading Cloudflare Turnstile script', e);
-          onError?.(e);
+          onErrorRef.current?.(e);
         };
         document.head.appendChild(script);
       } else {
         script.addEventListener('load', () => setScriptLoaded(true));
       }
-    }, [onError]);
+    }, [siteKey]);
 
-    // 2. Render Widget khi script và container đã sẵn sàng
+    // 2. Render Widget khi script và container đã sẵn sàng (chỉ render 1 lần, không re-mount khi gõ phím hoặc có token)
     useEffect(() => {
       if (!siteKey || !scriptLoaded || !containerRef.current || typeof window === 'undefined' || !window.turnstile) {
         return;
@@ -108,15 +118,15 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           size: 'normal',
           action,
           callback: (token: string) => {
-            onSuccess(token);
+            onSuccessRef.current?.(token);
           },
           'error-callback': (err?: any) => {
             console.warn('[TURNSTILE_ERROR]', err);
-            onError?.(err);
+            onErrorRef.current?.(err);
           },
           'expired-callback': () => {
             console.log('[TURNSTILE_EXPIRED]');
-            onExpire?.();
+            onExpireRef.current?.();
           },
         });
         widgetIdRef.current = id;
@@ -134,7 +144,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           widgetIdRef.current = null;
         }
       };
-    }, [scriptLoaded, siteKey, action, onSuccess, onError, onExpire]);
+    }, [scriptLoaded, siteKey, action]);
 
     if (!siteKey) {
       return null;
