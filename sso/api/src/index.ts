@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { corsMiddleware } from './middlewares/cors.js';
 import { requireAuth } from './middlewares/auth.js';
+import { turnstileGuard } from './middlewares/turnstileGuard.js';
 import {
   validate,
   ssoLoginSchema,
@@ -56,17 +57,17 @@ app.get('/health', (_req: Request, res: Response) => {
 // 2. Authentication routes
 const authRouter = express.Router();
 
-authRouter.post('/login', validate({ body: ssoLoginSchema }), login);
-authRouter.post('/register', validate({ body: ssoRegisterSchema }), register);
+authRouter.post('/login', turnstileGuard, validate({ body: ssoLoginSchema }), login);
+authRouter.post('/register', turnstileGuard, validate({ body: ssoRegisterSchema }), register);
 authRouter.post('/logout', logout);
 authRouter.get('/logout', logout);
-authRouter.post('/forgot-password', validate({ body: ssoForgotPasswordSchema }), forgotPassword);
-authRouter.post('/resend-verification', validate({ body: ssoResendVerificationSchema }), resendVerification);
+authRouter.post('/forgot-password', turnstileGuard, validate({ body: ssoForgotPasswordSchema }), forgotPassword);
+authRouter.post('/resend-verification', turnstileGuard, validate({ body: ssoResendVerificationSchema }), resendVerification);
 authRouter.get('/verify-token', verifyToken);
 authRouter.post('/verify-token', verifyToken);
 authRouter.get('/verify-otp', verifyOtp);
 authRouter.post('/verify-otp', validate({ body: ssoVerifyOtpSchema }), verifyOtp);
-authRouter.post('/reset-password', validate({ body: ssoResetPasswordSchema }), resetPassword);
+authRouter.post('/reset-password', turnstileGuard, validate({ body: ssoResetPasswordSchema }), resetPassword);
 authRouter.post('/change-password', requireAuth, validate({ body: ssoChangePasswordSchema }), changePassword);
 authRouter.post('/update-password', requireAuth, validate({ body: ssoChangePasswordSchema }), changePassword);
 authRouter.get('/me', requireAuth, getMe);
