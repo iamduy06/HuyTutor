@@ -21,12 +21,23 @@ export async function GET() {
   const secret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
+
+  // Trả về danh sách tên biến môi trường (chỉ trả về KEY, KHÔNG bao giờ trả về VALUE bí mật)
+  const safeEnvKeys = Object.keys(process.env).filter(
+    (k) => !k.includes('KEY') && !k.includes('SECRET') && !k.includes('PASS')
+  );
+
   return NextResponse.json({
     status: 'ok',
     hasSecret: Boolean(secret),
     secretLen: secret?.length || 0,
     hasHost: Boolean(host),
     hasUser: Boolean(user),
+    vercelEnv: process.env.VERCEL_ENV || null,
+    gitBranch: process.env.VERCEL_GIT_COMMIT_REF || null,
+    gitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    envKeysCount: Object.keys(process.env).length,
+    safeEnvKeys,
     timestamp: new Date().toISOString(),
   });
 }
