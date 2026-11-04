@@ -924,3 +924,43 @@ export interface UserLibraryItem {
 export interface AdminUserRecord extends UserProfile {
   activeSessions: number;
 }
+
+/**
+ * ============================================================================
+ * UNIVERSAL BLOCK BUILDER (CROSS-PAGE BLOCK SHARING SYSTEM)
+ * ============================================================================
+ */
+export type UniversalBlockCategory =
+  | 'hero_banner'
+  | 'products'
+  | 'content'
+  | 'pricing'
+  | 'cta';
+
+export interface UniversalBlockMeta {
+  type: string;
+  category: UniversalBlockCategory;
+  categoryLabel: string;
+  label: string;
+  badgeColor: string;
+  desc: string;
+  originPage: string;
+}
+
+export interface UniversalBlockItem {
+  id: string;
+  type: string;
+  title_label?: string;
+  is_active: boolean;
+  sort_order: number;
+  config: Record<string, any>;
+}
+
+export interface UniversalPageContext {
+  pageType: 'homepage' | 'category' | 'product_detail' | 'combo' | 'flashcard' | 'utility' | 'gift';
+  product?: Product;
+  category?: CategoryItem;
+  allProducts?: Product[];
+  allCategories?: CategoryItem[];
+  siteConfigs?: any;
+}
