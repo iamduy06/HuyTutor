@@ -17,6 +17,20 @@ function secureCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+export async function GET() {
+  const secret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  return NextResponse.json({
+    status: 'ok',
+    hasSecret: Boolean(secret),
+    secretLen: secret?.length || 0,
+    hasHost: Boolean(host),
+    hasUser: Boolean(user),
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Kiểm tra xác thực qua Secret Key từ Backend API (Bảo vệ chống Timing Attack)
