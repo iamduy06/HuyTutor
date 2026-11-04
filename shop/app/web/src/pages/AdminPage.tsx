@@ -41,6 +41,20 @@ const DEFAULT_FORMATS: ProductFormat[] = [
   { format_code: 'Thiết kế', price: 180000, is_active: false },
 ];
 
+export type AdminTab =
+  | 'products'
+  | 'configs'
+  | 'homepage_cms'
+  | 'category_cms'
+  | 'product_detail_cms'
+  | 'combo_cms'
+  | 'flashcard_cms'
+  | 'utility_cms'
+  | 'campaign_cms'
+  | 'orders'
+  | 'mapping'
+  | 'users';
+
 export const AdminPage: React.FC = () => {
   const {
     menus: storeMenus,
@@ -50,9 +64,42 @@ export const AdminPage: React.FC = () => {
     showToast,
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<
-    'homepage_cms' | 'category_cms' | 'combo_cms' | 'flashcard_cms' | 'utility_cms' | 'campaign_cms' | 'products' | 'orders' | 'mapping' | 'users' | 'configs'
-  >('homepage_cms');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab') as AdminTab;
+      if (
+        tabParam &&
+        [
+          'products',
+          'configs',
+          'homepage_cms',
+          'category_cms',
+          'product_detail_cms',
+          'combo_cms',
+          'flashcard_cms',
+          'utility_cms',
+          'campaign_cms',
+          'orders',
+          'mapping',
+          'users',
+        ].includes(tabParam)
+      ) {
+        return tabParam;
+      }
+    }
+    return 'products';
+  });
+
+  const switchTab = (tab: AdminTab) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +122,51 @@ export const AdminPage: React.FC = () => {
   const [userPage, setUserPage] = useState(1);
   const USERS_PER_PAGE = 20;
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
+
+  // State cho Tab 5: Cấu hình Trang cấp 2 (Chi tiết tài liệu)
+  const [selectedDetailProductSlug, setSelectedDetailProductSlug] = useState<string>('');
+  const [currentDetailProduct, setCurrentDetailProduct] = useState<Partial<Product> | null>(null);
+  const [savingDetailBlocks, setSavingDetailBlocks] = useState(false);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      const slugToFind = selectedDetailProductSlug || products[0].slug;
+      const found = products.find((p) => p.slug === slugToFind) || products[0];
+      if (found) {
+        if (!selectedDetailProductSlug) {
+          setSelectedDetailProductSlug(found.slug);
+        }
+        const initialBlocks =
+          Array.isArray(found.detail_blocks) && found.detail_blocks.length > 0
+            ? found.detail_blocks
+            : buildInitialDetailBlocksFromProduct(found);
+        setCurrentDetailProduct({
+          ...found,
+          detail_blocks: initialBlocks,
+        });
+      }
+    } else {
+      setCurrentDetailProduct(null);
+    }
+  }, [selectedDetailProductSlug, products]);
+
+  const handleSaveDetailBlocks = async () => {
+    if (!currentDetailProduct || !currentDetailProduct.slug) return;
+    setSavingDetailBlocks(true);
+    try {
+      await apiClient.upsertProduct(currentDetailProduct);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.slug === currentDetailProduct.slug ? { ...p, ...currentDetailProduct } : p
+        )
+      );
+      showToast(`Đã lưu cấu hình Trang cấp 2 cho "${currentDetailProduct.title}" thành công!`);
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi lưu cấu hình Trang cấp 2.');
+    } finally {
+      setSavingDetailBlocks(false);
+    }
+  };
 
   // State cho Tab 5: Cấu hình Menu Header & Footer
   const [adminMenus, setAdminMenus] = useState<MenuItem[]>([]);
@@ -550,16 +642,57 @@ export const AdminPage: React.FC = () => {
             </div>
 
             <nav className="space-y-1">
+              {/* 1. QUẢN LÝ SẢN PHẨM & 5 ĐỊNH DẠNG */}
               <button
                 type="button"
-                onClick={() => setActiveTab('homepage_cms')}
+                onClick={() => switchTab('products')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'products'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>1. Quản lý Sản phẩm</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'products' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {products.length}
+                </span>
+              </button>
+
+              {/* 2. MENU HEADER & FOOTER */}
+              <button
+                type="button"
+                onClick={() => switchTab('configs')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'configs'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>2. Menu Header &amp; Footer</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'configs' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {adminMenus.length}
+                </span>
+              </button>
+
+              {/* 3. CẤU HÌNH TRANG CHỦ */}
+              <button
+                type="button"
+                onClick={() => switchTab('homepage_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'homepage_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>1. Cấu hình Trang chủ</span>
+                <span>3. Cấu hình Trang chủ</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'homepage_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -569,16 +702,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 4. CẤU HÌNH TRANG CẤP 1 (DANH MỤC) */}
               <button
                 type="button"
-                onClick={() => setActiveTab('category_cms')}
+                onClick={() => switchTab('category_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'category_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>2. Cấu hình Trang Cấp 1</span>
+                <span>4. Cấu hình Trang Cấp 1</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'category_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -588,16 +722,37 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 5. CẤU HÌNH TRANG CẤP 2 (CHI TIẾT SẢN PHẨM) */}
               <button
                 type="button"
-                onClick={() => setActiveTab('combo_cms')}
+                onClick={() => switchTab('product_detail_cms')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'product_detail_cms'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>5. Cấu hình Trang Cấp 2</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'product_detail_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {products.length} trang
+                </span>
+              </button>
+
+              {/* 6. CẤU HÌNH TRANG COMBO THPT */}
+              <button
+                type="button"
+                onClick={() => switchTab('combo_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'combo_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>3. Cấu hình Trang Combo THPT</span>
+                <span>6. Cấu hình Trang Combo THPT</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'combo_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -607,16 +762,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 7. CẤU HÌNH TRANG FLASHCARD */}
               <button
                 type="button"
-                onClick={() => setActiveTab('flashcard_cms')}
+                onClick={() => switchTab('flashcard_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'flashcard_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>4. Cấu hình Trang Flashcard</span>
+                <span>7. Cấu hình Trang Flashcard</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'flashcard_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -626,16 +782,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 8. CẤU HÌNH TRANG TIỆN ÍCH */}
               <button
                 type="button"
-                onClick={() => setActiveTab('utility_cms')}
+                onClick={() => switchTab('utility_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'utility_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>5. Cấu hình Trang Tiện ích</span>
+                <span>8. Cấu hình Trang Tiện ích</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'utility_cms' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -645,16 +802,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 9. KHUNG ẢNH & CHIẾN DỊCH */}
               <button
                 type="button"
-                onClick={() => setActiveTab('campaign_cms')}
+                onClick={() => switchTab('campaign_cms')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'campaign_cms'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>6. Khung Ảnh & Chiến Dịch</span>
+                <span>9. Khung Ảnh &amp; Chiến Dịch</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'campaign_cms'
@@ -668,35 +826,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 10. QUẢN LÝ ĐƠN HÀNG */}
               <button
                 type="button"
-                onClick={() => setActiveTab('products')}
-                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
-                  activeTab === 'products'
-                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 font-medium'
-                }`}
-              >
-                <span>6. Quản lý Sản phẩm</span>
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
-                    activeTab === 'products' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {products.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('orders')}
+                onClick={() => switchTab('orders')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'orders'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>7. Quản lý Đơn hàng</span>
+                <span>10. Quản lý Đơn hàng</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'orders' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -706,16 +846,17 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 11. ĐỐI SOÁT & TỰ ĐỘNG */}
               <button
                 type="button"
-                onClick={() => setActiveTab('mapping')}
+                onClick={() => switchTab('mapping')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'mapping'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>8. Đối soát &amp; Tự động</span>
+                <span>11. Đối soát &amp; Tự động</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'mapping' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
@@ -725,41 +866,23 @@ export const AdminPage: React.FC = () => {
                 </span>
               </button>
 
+              {/* 12. THÀNH VIÊN & PHÂN QUYỀN */}
               <button
                 type="button"
-                onClick={() => setActiveTab('users')}
+                onClick={() => switchTab('users')}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
                   activeTab === 'users'
                     ? 'bg-[#e60049] text-white font-bold shadow-sm'
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>9. Thành viên &amp; Phân quyền</span>
+                <span>12. Thành viên &amp; Phân quyền</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'users' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
                   }`}
                 >
                   {adminUsers.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('configs')}
-                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
-                  activeTab === 'configs'
-                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 font-medium'
-                }`}
-              >
-                <span>10. Menu Header &amp; Footer</span>
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
-                    activeTab === 'configs' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {adminMenus.length}
                 </span>
               </button>
             </nav>
@@ -812,6 +935,113 @@ export const AdminPage: React.FC = () => {
 
             {/* TAB CATEGORY CMS */}
             {activeTab === 'category_cms' && <AdminCategoryCms />}
+
+            {/* TAB TRANG CẤP 2 (CHI TIẾT TÀI LIỆU) CMS */}
+            {activeTab === 'product_detail_cms' && (
+              <div className="space-y-6">
+                {/* Header chuẩn hóa theo phong cách Combo CMS */}
+                <div className="bg-white border border-gray-200 rounded-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-extrabold text-gray-900 uppercase tracking-tight">
+                        CẤU HÌNH TRANG CẤP 2 - BỐ CỤC ĐỘNG CHI TIẾT SẢN PHẨM (/TAI-LIEU/:SLUG)
+                      </h2>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-pink-50 text-[#e60049] border border-pink-200">
+                        {products.length} TÀI LIỆU
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tùy biến 6 phần chuẩn huytutor.io.vn (Mục lục, Đọc thử PDF/ảnh R2, Nhóm mẫu, Bảng giá, Accordion...) và gắn thêm bất kỳ khối Vạn năng nào.
+                    </p>
+                  </div>
+
+                  {currentDetailProduct && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`/tai-lieu/${currentDetailProduct.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3.5 py-2 rounded-sm transition"
+                      >
+                        👁️ Xem Trang Chi Tiết
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetailBlocks}
+                        disabled={savingDetailBlocks}
+                        className="bg-[#e60049] hover:bg-[#cc0041] disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-sm transition shadow-sm"
+                      >
+                        {savingDetailBlocks ? 'Đang lưu...' : '💾 Lưu Cấu Hình Trang Chi Tiết'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {products.length === 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-sm p-8 text-center shadow-xs">
+                    <div className="text-3xl mb-2">📚</div>
+                    <h3 className="text-sm font-bold text-gray-800 uppercase tracking-tight">
+                      Kho tài liệu hiện chưa có sản phẩm nào
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                      Trang cấp 2 là trang chi tiết cho từng tài liệu. Vui lòng tạo sản phẩm đầu tiên tại mục 1. Quản lý Sản phẩm trước khi thiết kế bố cục.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => switchTab('products')}
+                      className="mt-4 px-4 py-2 bg-[#e60049] text-white text-xs font-bold rounded-sm hover:bg-[#cc0041] transition"
+                    >
+                      ➕ Đến mục 1. Quản lý Sản phẩm &amp; Tạo tài liệu
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-white border border-gray-200 rounded-sm p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <label className="text-xs font-bold text-gray-700 whitespace-nowrap">
+                          Chọn tài liệu để thiết kế bố cục:
+                        </label>
+                        <select
+                          value={selectedDetailProductSlug || products[0]?.slug}
+                          onChange={(e) => setSelectedDetailProductSlug(e.target.value)}
+                          className="border border-gray-300 rounded-sm px-3 py-1.5 text-xs font-bold text-gray-800 bg-white flex-1 min-w-0 max-w-xl focus:border-[#e60049] focus:outline-none"
+                        >
+                          {products.map((p) => (
+                            <option key={p.id || p.slug} value={p.slug}>
+                              {p.code ? `[${p.code}] ` : ''}{p.title} ({p.category_name || p.category_slug})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (currentDetailProduct) {
+                            handleSelectProductToEdit(currentDetailProduct as Product);
+                            switchTab('products');
+                          }
+                        }}
+                        className="text-xs font-semibold text-gray-600 hover:text-[#e60049] underline"
+                      >
+                        Chỉnh sửa thông tin cơ bản &amp; giá ↗
+                      </button>
+                    </div>
+
+                    {currentDetailProduct && (
+                      <AdminProductDetailBuilder
+                        product={currentDetailProduct}
+                        allProducts={products}
+                        onChangeBlocks={(nextBlocks) => {
+                          setCurrentDetailProduct((prev) => (prev ? { ...prev, detail_blocks: nextBlocks } : null));
+                        }}
+                        showToast={showToast}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* TAB COMBO CMS */}
             {activeTab === 'combo_cms' && <AdminComboCms />}
@@ -898,12 +1128,16 @@ export const AdminPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center justify-end gap-2 mt-2.5 pt-2 border-t border-gray-100">
-                        <Link
-                          to={`/${prod.category_slug}/${prod.slug}`}
-                          className="text-[11px] text-gray-600 hover:text-[#e60049] font-semibold"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDetailProductSlug(prod.slug);
+                            switchTab('product_detail_cms');
+                          }}
+                          className="px-2.5 py-1 bg-pink-50 hover:bg-pink-100 text-[#e60049] border border-pink-200 text-[10px] font-bold rounded-sm transition"
                         >
-                          Xem trang
-                        </Link>
+                          Bố cục Cấp 2 ↗
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleSelectProductToEdit(prod)}
