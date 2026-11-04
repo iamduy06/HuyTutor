@@ -31,7 +31,7 @@ export async function turnstileGuard(
       success: false,
       error: {
         code: 'TURNSTILE_VERIFICATION_FAILED',
-        message: result.error || 'Xác thực bảo mật chống spam không thành công. Vui lòng tải lại trang và thử lại.',
+        message: result.error || 'Xác thực không thành công, vui lòng thử lại.',
       },
     });
     return;

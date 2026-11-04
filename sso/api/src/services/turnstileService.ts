@@ -28,7 +28,7 @@ export async function verifyTurnstileToken(
   if (!token || typeof token !== 'string' || token.trim().length === 0) {
     return {
       success: false,
-      error: 'Thiếu mã xác thực bảo mật Turnstile. Vui lòng thử lại.',
+      error: 'Xác thực không thành công, vui lòng thử lại.',
     };
   }
 
@@ -52,7 +52,7 @@ export async function verifyTurnstileToken(
       console.error(`[TURNSTILE_HTTP_ERROR] Cloudflare siteverify trả về HTTP status ${res.status}`);
       return {
         success: false,
-        error: 'Lỗi kết nối tới máy chủ kiểm tra bảo mật Cloudflare. Vui lòng thử lại sau.',
+        error: 'Xác thực không thành công, vui lòng thử lại.',
       };
     }
 
@@ -66,7 +66,7 @@ export async function verifyTurnstileToken(
       console.warn('[TURNSTILE_VERIFY_FAILED] Cloudflare từ chối token:', data['error-codes']);
       return {
         success: false,
-        error: 'Xác thực bảo mật chống spam không thành công hoặc phiên đã hết hạn. Vui lòng thử lại.',
+        error: 'Xác thực không thành công, vui lòng thử lại.',
         errorCodes: data['error-codes'],
       };
     }
@@ -79,7 +79,7 @@ export async function verifyTurnstileToken(
     console.error('[TURNSTILE_EXCEPTION]', err);
     return {
       success: false,
-      error: 'Không thể kết nối tới dịch vụ bảo mật Cloudflare. Vui lòng thử lại sau.',
+      error: 'Xác thực không thành công, vui lòng thử lại.',
     };
   }
 }
