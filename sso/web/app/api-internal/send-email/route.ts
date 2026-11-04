@@ -34,6 +34,8 @@ export async function GET() {
     hasHost: Boolean(host),
     hasUser: Boolean(user),
     vercelEnv: process.env.VERCEL_ENV || null,
+    projectName: process.env.VERCEL_PROJECT_NAME || null,
+    projectProductionUrl: process.env.VERCEL_PROJECT_PRODUCTION_URL || null,
     gitBranch: process.env.VERCEL_GIT_COMMIT_REF || null,
     gitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     envKeysCount: Object.keys(process.env).length,
