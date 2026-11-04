@@ -24,6 +24,10 @@ import {
   ComboPackagesBlock,
   ComboSectionsBlock,
 } from './DynamicComboBlocks';
+import { UniversalBlockPickerModal } from './UniversalBlockPickerModal';
+import { UniversalBlockRenderer } from './UniversalBlockRenderer';
+import { UniversalBlockItemEditor } from './UniversalBlockItemEditor';
+import { UNIVERSAL_BLOCK_CATALOG } from './universalCatalog';
 
 const COMBO_BLOCK_META: Record<
   ComboBlockType,
@@ -72,6 +76,7 @@ export const AdminComboCms: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showUniversalPicker, setShowUniversalPicker] = useState(false);
 
   useEffect(() => {
     if (Array.isArray(siteConfigs?.combo_page_blocks) && siteConfigs.combo_page_blocks.length > 0) {
@@ -249,55 +254,14 @@ export const AdminComboCms: React.FC = () => {
             <span className="text-[10px] text-gray-500 font-normal">Cập nhật tức thời theo cấu hình bên dưới</span>
           </div>
           <div className="bg-white rounded border border-gray-200 p-4 max-h-[600px] overflow-y-auto">
-            {blocks
-              .filter((b) => b.is_active !== false)
-              .map((block) => {
-                switch (block.type) {
-                  case 'combo_hero':
-                    return <ComboHeroBlock key={block.id} config={block.config as ComboHeroBlockConfig} />;
-                  case 'combo_packages':
-                    return (
-                      <div key={block.id} className="max-w-[920px] mx-auto py-4">
-                        <ComboPackagesBlock
-                          config={block.config as ComboPackagesBlockConfig}
-                          allProducts={products}
-                          onSelectPackage={() => {}}
-                        />
-                      </div>
-                    );
-                  case 'combo_sections':
-                    return (
-                      <div key={block.id} className="max-w-[920px] mx-auto py-4">
-                        <ComboSectionsBlock
-                          config={block.config as ComboSectionsBlockConfig}
-                          allProducts={products}
-                        />
-                      </div>
-                    );
-                  case 'combo_bottom_cta':
-                    return (
-                      <ComboBottomCtaBlock
-                        key={block.id}
-                        config={block.config as ComboBottomCtaBlockConfig}
-                        onActionClick={() => {}}
-                      />
-                    );
-                  case 'combo_banner':
-                    return (
-                      <div key={block.id} className="max-w-[920px] mx-auto py-2">
-                        <ComboBannerBlock config={block.config as ComboBannerBlockConfig} />
-                      </div>
-                    );
-                  case 'combo_notice':
-                    return (
-                      <div key={block.id} className="max-w-[920px] mx-auto py-2">
-                        <ComboNoticeBlock config={block.config as ComboNoticeBlockConfig} />
-                      </div>
-                    );
-                  default:
-                    return null;
-                }
-              })}
+            <UniversalBlockRenderer
+              blocks={blocks}
+              context={{
+                pageType: 'combo',
+                allProducts: products,
+                siteConfigs,
+              }}
+            />
           </div>
         </div>
       )}
@@ -305,11 +269,13 @@ export const AdminComboCms: React.FC = () => {
       {/* Danh sách Khối Động (Block Repeater) */}
       <div className="space-y-4">
         {blocks.map((block, index) => {
-          const meta = COMBO_BLOCK_META[block.type] || {
-            label: block.title_label || block.type,
-            badgeColor: 'bg-gray-600 text-white',
-            desc: '',
-          };
+          const meta =
+            COMBO_BLOCK_META[block.type] ||
+            UNIVERSAL_BLOCK_CATALOG.find((m) => m.type === block.type) || {
+              label: block.title_label || block.type,
+              badgeColor: 'bg-gray-600 text-white',
+              desc: '',
+            };
           const isEditing = editingBlockId === block.id;
 
           return (
@@ -440,6 +406,20 @@ export const AdminComboCms: React.FC = () => {
                       onUpdate={(cfg) => handleUpdateBlockConfig(block.id, cfg)}
                     />
                   )}
+
+                  {/* EDIT KHỐI VẠN NĂNG TỪ CÁC TRANG KHÁC */}
+                  {!['combo_hero', 'combo_packages', 'combo_sections', 'combo_bottom_cta', 'combo_banner', 'combo_notice'].includes(block.type) && (
+                    <UniversalBlockItemEditor
+                      block={block as any}
+                      onUpdateConfig={(cfg) => handleUpdateBlockConfig(block.id, cfg)}
+                      allProducts={products}
+                      context={{
+                        pageType: 'combo',
+                        allProducts: products,
+                        siteConfigs,
+                      }}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -461,8 +441,31 @@ export const AdminComboCms: React.FC = () => {
               + {COMBO_BLOCK_META[type].label.split(':')[0]}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowUniversalPicker(true)}
+            className="bg-[#e60049] hover:bg-[#cc0041] text-white font-extrabold text-xs px-4 py-1.5 rounded-sm transition shadow-2xs flex items-center gap-1.5"
+          >
+            <span>✨ THƯ VIỆN KHỐI VẠN NĂNG (25+ KHỐI TOÀN TRANG)</span>
+          </button>
         </div>
       </div>
+
+      <UniversalBlockPickerModal
+        isOpen={showUniversalPicker}
+        onClose={() => setShowUniversalPicker(false)}
+        onSelectBlock={(newBlock) => {
+          setBlocks((prev) => [...prev, newBlock as any]);
+          setEditingBlockId(newBlock.id);
+          showToast(`Đã thêm mới: ${newBlock.title_label || newBlock.type}`);
+        }}
+        currentBlocksCount={blocks.length}
+        context={{
+          pageType: 'combo',
+          allProducts: products,
+          siteConfigs,
+        }}
+      />
     </div>
   );
 };
@@ -471,7 +474,7 @@ export const AdminComboCms: React.FC = () => {
 // SUB-EDITORS FOR EACH BLOCK TYPE
 // ============================================================================
 
-const EditComboHeroConfig: React.FC<{
+export const EditComboHeroConfig: React.FC<{
   config: ComboHeroBlockConfig;
   onUpdate: (cfg: Partial<ComboHeroBlockConfig>) => void;
   onUploadR2: (file: File) => Promise<string>;
@@ -597,7 +600,7 @@ const EditComboHeroConfig: React.FC<{
   );
 };
 
-const EditComboPackagesConfig: React.FC<{
+export const EditComboPackagesConfig: React.FC<{
   config: ComboPackagesBlockConfig;
   allProducts: Product[];
   onUpdate: (cfg: Partial<ComboPackagesBlockConfig>) => void;
@@ -748,7 +751,7 @@ const EditComboPackagesConfig: React.FC<{
   );
 };
 
-const EditComboSectionsConfig: React.FC<{
+export const EditComboSectionsConfig: React.FC<{
   config: ComboSectionsBlockConfig;
   allProducts: Product[];
   onUpdate: (cfg: Partial<ComboSectionsBlockConfig>) => void;
@@ -860,7 +863,7 @@ const EditComboSectionsConfig: React.FC<{
   );
 };
 
-const EditComboBottomCtaConfig: React.FC<{
+export const EditComboBottomCtaConfig: React.FC<{
   config: ComboBottomCtaBlockConfig;
   onUpdate: (cfg: Partial<ComboBottomCtaBlockConfig>) => void;
 }> = ({ config, onUpdate }) => {
@@ -900,7 +903,7 @@ const EditComboBottomCtaConfig: React.FC<{
   );
 };
 
-const EditComboBannerConfig: React.FC<{
+export const EditComboBannerConfig: React.FC<{
   config: ComboBannerBlockConfig;
   onUpdate: (cfg: Partial<ComboBannerBlockConfig>) => void;
   onUploadR2: (file: File) => Promise<string>;
@@ -949,7 +952,7 @@ const EditComboBannerConfig: React.FC<{
   );
 };
 
-const EditComboNoticeConfig: React.FC<{
+export const EditComboNoticeConfig: React.FC<{
   config: ComboNoticeBlockConfig;
   onUpdate: (cfg: Partial<ComboNoticeBlockConfig>) => void;
 }> = ({ config, onUpdate }) => {

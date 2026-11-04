@@ -21,6 +21,8 @@ import {
 } from '../types';
 
 import { R2ImageUploader } from './R2ImageUploader';
+import { UniversalBlockCardRepeater } from './UniversalBlockCardRepeater';
+import { UniversalBlockRenderer } from './UniversalBlockRenderer';
 
 const FLASHCARD_BLOCK_META: Record<
   FlashcardBlockType,
@@ -71,6 +73,7 @@ export const AdminFlashcardCms: React.FC = () => {
   });
 
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -313,361 +316,152 @@ export const AdminFlashcardCms: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* HEADER CMS */}
-      <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Top Header Controls */}
+      <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#e60049] animate-pulse"></span>
-            <h2 className="text-sm font-extrabold text-[#e60049] uppercase tracking-wide">
-              Trình Quản Trị Trang Flashcard (Flashcard CMS Builder)
-            </h2>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Quản lý và tùy biến tất cả các khối trên trang{' '}
-            <code className="text-[#e60049] font-mono text-[11px]">/flashcard</code>: Video YouTube, tính năng, gói học và ma trận giá nhóm.
+          <h2 className="text-base font-extrabold text-[#e60049] uppercase flex items-center gap-2">
+            <span>Quản lý Khối Động Trang Flashcard (/flashcard)</span>
+            <span className="text-[10px] bg-pink-100 text-[#e60049] font-black px-2 py-0.5 rounded">
+              {blocks.length} KHỐI
+            </span>
+          </h2>
+          <p className="text-xs text-gray-600 mt-1">
+            Tự do thêm bớt, đổi thứ tự, cấu hình các gói tài khoản, video giới thiệu và bảng giá nhóm mà không cần sửa code.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleResetToDefault}
-            className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-sm transition"
+            className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2 rounded-sm transition"
           >
             Khôi phục mặc định
           </button>
           <button
             type="button"
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-sm transition flex items-center gap-1.5"
+            onClick={() => setShowPreview(!showPreview)}
+            className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3.5 py-2 rounded-sm transition"
           >
-            <span>+</span> Thêm khối mới
+            {showPreview ? 'Ẩn Xem trước' : '👁️ Xem trước Trang Flashcard'}
           </button>
           <button
             type="button"
             onClick={handleSaveBlocks}
             disabled={saving}
-            className="px-4 py-1.5 bg-[#e60049] hover:bg-[#cc0041] disabled:opacity-50 text-white text-xs font-bold rounded-sm transition flex items-center gap-2 shadow-sm"
+            className="bg-[#e60049] hover:bg-[#cc0041] disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-sm transition shadow-sm"
           >
-            {saving ? 'Đang lưu...' : 'Lưu Trang Flashcard'}
+            {saving ? 'Đang lưu...' : '💾 Lưu Cấu Hình Khối'}
           </button>
         </div>
       </div>
 
-      {/* DANH SÁCH KHỐI & BẢNG ĐIỀU KHIỂN */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* CỘT TRÁI: DANH SÁCH KHỐI DẠNG DANH SÁCH THỨ TỰ (5 CỘT) */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold text-gray-700">
-              Cấu trúc trang ({blocks.length} khối)
-            </span>
-            <span className="text-[11px] text-gray-500">
-              Nhấn vào khối để tùy chỉnh chi tiết
-            </span>
+      {/* Xem trước Live Preview */}
+      {showPreview && (
+        <div className="bg-gray-100 border-2 border-dashed border-pink-300 rounded-md p-4">
+          <div className="text-xs font-bold text-[#e60049] uppercase mb-3 flex items-center justify-between">
+            <span>Live Preview: Giao diện Trang Flashcard thực tế</span>
+            <span className="text-[10px] text-gray-500 font-normal">Cập nhật tức thời theo cấu hình bên dưới</span>
           </div>
-
-          <div className="space-y-2">
-            {blocks.map((block, idx) => {
-              const isSelected = activeBlockId === block.id;
-
-              return (
-                <div
-                  key={block.id}
-                  onClick={() => setActiveBlockId(block.id)}
-                  className={`p-3 rounded-md border transition cursor-pointer select-none ${
-                    isSelected
-                      ? 'border-[#e60049] bg-pink-50/40 shadow-sm'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 font-bold text-[10px]">
-                        {idx + 1}
-                      </span>
-                      <div className="truncate">
-                        <div className="text-xs font-bold text-gray-800 truncate">
-                          {block.title_label || block.type}
-                        </div>
-                        <div className="text-[10px] text-gray-400 font-mono">
-                          {block.type}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* HÀNH ĐỘNG KHỐI */}
-                    <div
-                      className="flex items-center gap-1 flex-shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleMoveBlock(idx, 'up')}
-                        disabled={idx === 0}
-                        title="Di chuyển lên"
-                        className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs rounded"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveBlock(idx, 'down')}
-                        disabled={idx === blocks.length - 1}
-                        title="Di chuyển xuống"
-                        className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs rounded"
-                      >
-                        ▼
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleActive(block.id)}
-                        title={block.is_active ? 'Đang bật - Nhấn để ẩn' : 'Đang ẩn - Nhấn để bật'}
-                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded-sm ${
-                          block.is_active
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}
-                      >
-                        {block.is_active ? 'Bật' : 'Ẩn'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteBlock(block.id)}
-                        title="Xóa khối"
-                        className="p-1 text-gray-400 hover:text-red-600 text-xs rounded"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* CỘT PHẢI: TRÌNH BIÊN TẬP CHI TIẾT KHỐI ĐƯỢC CHỌN (7 CỘT) */}
-        <div className="lg:col-span-7 bg-white border border-gray-200 rounded-md p-5 shadow-sm">
-          {activeBlockId ? (
-            (() => {
-              const currentBlock = blocks.find((b) => b.id === activeBlockId);
-              if (!currentBlock) {
-                return (
-                  <div className="text-xs text-gray-400 py-12 text-center">
-                    Vui lòng chọn một khối từ danh sách bên trái để chỉnh sửa.
-                  </div>
-                );
-              }
-
-              return (
-                <div className="space-y-5">
-                  {/* Header chuẩn: Title khối - Mô tả của khối đó */}
-                  <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
-                          {currentBlock.type}
-                        </span>
-                        <h3 className="text-sm font-black text-gray-900">
-                          {currentBlock.title_label || FLASHCARD_BLOCK_META[currentBlock.type]?.label}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {FLASHCARD_BLOCK_META[currentBlock.type]?.desc}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={currentBlock.title_label}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setBlocks((prev) =>
-                            prev.map((b) =>
-                              b.id === currentBlock.id ? { ...b, title_label: val } : b
-                            )
-                          );
-                        }}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:border-[#e60049] outline-none"
-                        placeholder="Tên gợi nhớ"
-                      />
-                    </div>
-                  </div>
-
-                  {/* RENDER CHI TIẾT THEO LOẠI KHỐI */}
-                  {currentBlock.type === 'flashcard_hero' && (
-                    <HeroBlockEditor
-                      config={currentBlock.config as FlashcardHeroBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_features' && (
-                    <FeaturesBlockEditor
-                      config={currentBlock.config as FlashcardFeaturesBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_free_tier' && (
-                    <FreeTierBlockEditor
-                      config={currentBlock.config as FlashcardFreeTierBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_pricing_packages' && (
-                    <PricingBlockEditor
-                      config={currentBlock.config as FlashcardPricingBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_group_pricing' && (
-                    <GroupPricingBlockEditor
-                      config={currentBlock.config as FlashcardGroupPricingBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_contact_notice' && (
-                    <ContactNoticeBlockEditor
-                      config={currentBlock.config as FlashcardContactNoticeBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                    />
-                  )}
-
-                  {currentBlock.type === 'flashcard_banner' && (
-                    <BannerBlockEditor
-                      config={currentBlock.config as FlashcardBannerBlockConfig}
-                      onUpdate={(cfg) => handleUpdateBlockConfig(currentBlock.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
-                    />
-                  )}
-                </div>
-              );
-            })()
-          ) : (
-            <div className="text-center py-16 text-gray-400">
-              <div className="text-2xl mb-2">👈</div>
-              <div className="text-xs font-bold text-gray-600">
-                Chọn một khối bên trái để bắt đầu chỉnh sửa
-              </div>
-              <p className="text-[11px] text-gray-400 mt-1 max-w-sm mx-auto">
-                Bạn có thể sửa chữ, đổi video YouTube, thêm/xóa tính năng hoặc tùy chỉnh bảng giá nhóm.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* MODAL THÊM KHỐI MỚI */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md shadow-xl max-w-md w-full p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold text-gray-900 uppercase">
-                Thêm khối mới vào Trang Flashcard
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-700 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_hero')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">1. Hero &amp; Video Giới thiệu</div>
-                <div className="text-[10px] text-gray-500">
-                  Tiêu đề lớn, slogan và khung nhúng YouTube / Video R2.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_features')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">2. Banner Tính năng Nổi bật</div>
-                <div className="text-[10px] text-gray-500">
-                  Dải màu đỏ giới thiệu thẻ từ vựng mẫu và 9+ tính năng học.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_free_tier')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">3. Chính sách Gói Miễn phí</div>
-                <div className="text-[10px] text-gray-500">
-                  Điều khoản tặng tài khoản cho học sinh và người mua file Word.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_pricing_packages')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">4. Gói Trả phí Cá nhân</div>
-                <div className="text-[10px] text-gray-500">
-                  Lưới 4 card gói 6 tháng / 1 năm / 2 năm / 3 năm.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_group_pricing')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">5. Bảng giá Quy mô Nhóm &amp; CTA</div>
-                <div className="text-[10px] text-gray-500">
-                  Bảng ma trận giá cho các nhóm 2-10, 11-50, 51-100... và nút mua.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_contact_notice')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">6. Hướng dẫn &amp; Kênh Hỗ trợ</div>
-                <div className="text-[10px] text-gray-500">
-                  Thông báo cho thầy cô đăng ký số lượng lớn, kiểm tra thư mục spam.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddBlock('flashcard_banner')}
-                className="p-3 text-left border border-gray-200 hover:border-[#e60049] hover:bg-pink-50/30 rounded-md transition"
-              >
-                <div className="text-xs font-bold text-gray-800">7. Banner Hình ảnh</div>
-                <div className="text-[10px] text-gray-500">
-                  Thêm banner quảng cáo, chương trình khuyến mãi riêng.
-                </div>
-              </button>
-            </div>
+          <div className="bg-white rounded border border-gray-200 p-4 max-h-[600px] overflow-y-auto">
+            <UniversalBlockRenderer
+              blocks={blocks}
+              context={{
+                pageType: 'flashcard',
+                siteConfigs,
+              }}
+            />
           </div>
         </div>
       )}
+
+      {/* Block Repeater & Universal Picker */}
+      <UniversalBlockCardRepeater
+        pageTitle="Trang Flashcard"
+        pageRouteLabel="/flashcard"
+        blocks={blocks}
+        onBlocksChange={(newBlocks) => setBlocks(newBlocks)}
+        context={{
+          pageType: 'flashcard',
+          siteConfigs,
+        }}
+        quickAddTypes={[
+          { type: 'flashcard_hero', label: 'Video Hero' },
+          { type: 'flashcard_features', label: 'Tính Năng' },
+          { type: 'flashcard_free_tier', label: 'Gói Miễn Phí' },
+          { type: 'flashcard_pricing_packages', label: 'Gói Cá Nhân' },
+          { type: 'flashcard_group_pricing', label: 'Bảng Giá Nhóm' },
+          { type: 'flashcard_contact_notice', label: 'Kênh Hỗ Trợ' },
+          { type: 'flashcard_banner', label: 'Banner' },
+        ]}
+        renderCustomEditor={(block, onUpdate) => {
+          if (block.type === 'flashcard_hero') {
+            return (
+              <HeroBlockEditor
+                config={block.config as FlashcardHeroBlockConfig}
+                onUpdate={onUpdate}
+                onUploadR2={handleUploadR2}
+                uploading={uploadingImage}
+              />
+            );
+          }
+          if (block.type === 'flashcard_features') {
+            return (
+              <FeaturesBlockEditor
+                config={block.config as FlashcardFeaturesBlockConfig}
+                onUpdate={onUpdate}
+                onUploadR2={handleUploadR2}
+                uploading={uploadingImage}
+              />
+            );
+          }
+          if (block.type === 'flashcard_free_tier') {
+            return (
+              <FreeTierBlockEditor
+                config={block.config as FlashcardFreeTierBlockConfig}
+                onUpdate={onUpdate}
+              />
+            );
+          }
+          if (block.type === 'flashcard_pricing_packages') {
+            return (
+              <PricingBlockEditor
+                config={block.config as FlashcardPricingBlockConfig}
+                onUpdate={onUpdate}
+                onUploadR2={handleUploadR2}
+                uploading={uploadingImage}
+              />
+            );
+          }
+          if (block.type === 'flashcard_group_pricing') {
+            return (
+              <GroupPricingBlockEditor
+                config={block.config as FlashcardGroupPricingBlockConfig}
+                onUpdate={onUpdate}
+              />
+            );
+          }
+          if (block.type === 'flashcard_contact_notice') {
+            return (
+              <ContactNoticeBlockEditor
+                config={block.config as FlashcardContactNoticeBlockConfig}
+                onUpdate={onUpdate}
+              />
+            );
+          }
+          if (block.type === 'flashcard_banner') {
+            return (
+              <BannerBlockEditor
+                config={block.config as FlashcardBannerBlockConfig}
+                onUpdate={onUpdate}
+                onUploadR2={handleUploadR2}
+                uploading={uploadingImage}
+              />
+            );
+          }
+          return null;
+        }}
+      />
     </div>
   );
 };
