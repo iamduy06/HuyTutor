@@ -9,8 +9,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function secureCompare(a: string, b: string): boolean {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
+  const cleanA = a.trim();
+  const cleanB = b.trim();
+  const bufA = Buffer.from(cleanA);
+  const bufB = Buffer.from(cleanB);
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
 }
@@ -18,11 +20,12 @@ function secureCompare(a: string, b: string): boolean {
 export async function POST(req: Request) {
   try {
     // 1. Kiểm tra xác thực qua Secret Key từ Backend API (Bảo vệ chống Timing Attack)
-    const authHeader =
+    const rawAuthHeader =
       req.headers.get('x-admin-secret') ||
       req.headers.get('x-admin-key') ||
       req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-    const serverSecret = process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY;
+    const authHeader = rawAuthHeader?.trim();
+    const serverSecret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
 
     if (!serverSecret || !authHeader || !secureCompare(authHeader, serverSecret)) {
       console.warn('[VERCEL_SMTP_AUTH_FAILED] Rejecting request: Invalid or missing admin secret.');
@@ -118,8 +121,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const port = parseInt(portStr, 10);
-    const secure = secureStr === 'true';
+    const port = parseInt(portStr.trim(), 10);
+    const secure = secureStr?.trim() === 'true' || port === 465;
 
     // 4. Khởi tạo Transporter với timeout bảo vệ
     const transporter = nodemailer.createTransport({
