@@ -64,6 +64,17 @@ export function getSsoBaseUrl(): string {
   return ssoUrl.trim().replace(/\/+$/, '');
 }
 
+/**
+ * Strict SHOP URL loader: NO fallback data, strictly reads from env variables.
+ */
+export function getShopBaseUrl(): string {
+  const shopUrl = process.env.SHOP_URL;
+  if (!shopUrl) {
+    throw new Error('[ENV_ERROR] Missing required environment variable: SHOP_URL');
+  }
+  return shopUrl.trim().replace(/\/+$/, '');
+}
+
 let cachedTransporter: Transporter | null = null;
 
 function getTransporter(): Transporter {
@@ -78,6 +89,9 @@ function getTransporter(): Transporter {
         user: config.user,
         pass: config.pass,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 
@@ -86,6 +100,7 @@ function getTransporter(): Transporter {
 
 export function renderConfirmSignupTemplate(token: string, email?: string): string {
   const ssoUrl = getSsoBaseUrl();
+  const shopUrl = getShopBaseUrl();
   const confirmUrl = email
     ? `${ssoUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`
     : `${ssoUrl}/verify-email?token=${token}`;
@@ -230,7 +245,7 @@ export function renderConfirmSignupTemplate(token: string, email?: string): stri
         <div class="footer-text">
           © <strong>Huy Tutor</strong> &nbsp;|&nbsp; Standard & Detailed<br>
           <div class="footer-links" style="margin-top: 8px;">
-            <a href="https://www.huytutor.edu.vn">Website</a> &nbsp;•&nbsp; 
+            <a href="${shopUrl}">Website</a> &nbsp;•&nbsp; 
             <a href="https://www.facebook.com/huytutor">Fanpage</a>
           </div>
         </div>
@@ -244,6 +259,7 @@ export function renderConfirmSignupTemplate(token: string, email?: string): stri
 
 export function renderResetPasswordTemplate(token: string): string {
   const ssoUrl = getSsoBaseUrl();
+  const shopUrl = getShopBaseUrl();
   const resetUrl = `${ssoUrl}/reset-password?token=${token}`;
 
   const tokenHtml = `
@@ -393,7 +409,7 @@ export function renderResetPasswordTemplate(token: string): string {
         <div class="footer-text">
           © <strong>Huy Tutor</strong> &nbsp;|&nbsp; Standard & Detailed<br>
           <div class="footer-links" style="margin-top: 8px;">
-            <a href="https://www.huytutor.edu.vn">Website</a> &nbsp;•&nbsp; 
+            <a href="${shopUrl}">Website</a> &nbsp;•&nbsp; 
             <a href="https://www.facebook.com/huytutor">Fanpage</a>
           </div>
         </div>
@@ -405,12 +421,59 @@ export function renderResetPasswordTemplate(token: string): string {
 </html>`;
 }
 
-export async function sendEmail(options: {
+export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
-}): Promise<boolean> {
+  type?: 'signup_verification' | 'reset_password' | 'resend_verification' | 'general';
+}
+
+async function sendViaInternalProxy(options: SendEmailOptions): Promise<boolean> {
+  const ssoUrl = getSsoBaseUrl();
+  const proxyUrl = process.env.INTERNAL_EMAIL_URL ? process.env.INTERNAL_EMAIL_URL.trim() : `${ssoUrl}/api-internal/send-email`;
+  const adminSecret = process.env.ADMIN_API_SECRET;
+
+  if (!adminSecret) {
+    throw new Error('[INTERNAL_EMAIL_ERROR] Missing required environment variable: ADMIN_API_SECRET');
+  }
+
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-secret': adminSecret,
+    },
+    body: JSON.stringify({
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || '',
+      type: options.type || 'general',
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`[INTERNAL_EMAIL_PROXY_ERROR] ${res.status}: ${errorText}`);
+  }
+
+  const data = (await res.json()) as any;
+  console.log(`[VERCEL_PROXY_EMAIL_SENT] MessageId: ${data?.messageId} [${options.type || 'general'}] to ${options.to}`);
+  return true;
+}
+
+export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
+  // 1. Trong môi trường production hoặc khi có cờ ép buộc: gửi qua Vercel Email Bridge
+  // (tránh lỗi Render Free Tier chặn các cổng socket SMTP 587/465)
+  const isProd = process.env.NODE_ENV === 'production';
+  const forceProxy = process.env.USE_INTERNAL_EMAIL_PROXY === 'true';
+
+  if (isProd || forceProxy) {
+    return await sendViaInternalProxy(options);
+  }
+
+  // 2. Môi trường phát triển cục bộ (local dev): Gửi trực tiếp qua SMTP Nodemailer
   const transporter = getTransporter();
   const config = getSmtpConfig();
 
@@ -440,6 +503,7 @@ export async function sendSignupVerificationOtp(email: string, token: string): P
     subject: 'Xác thực tài khoản Huy Tutor của bạn',
     text: `Vui lòng xác thực tài khoản của bạn bằng cách truy cập liên kết: ${confirmUrl}`,
     html,
+    type: 'signup_verification',
   });
 }
 
@@ -451,5 +515,6 @@ export async function sendPasswordResetOtp(email: string, token: string): Promis
     subject: 'Khôi phục mật khẩu tài khoản Huy Tutor',
     text: `Vui lòng sử dụng liên kết sau để đặt lại mật khẩu mới: ${ssoUrl}/reset-password?token=${token}`,
     html,
+    type: 'reset_password',
   });
 }
