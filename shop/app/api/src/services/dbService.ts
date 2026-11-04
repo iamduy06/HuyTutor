@@ -237,273 +237,7 @@ const SECTION_LABEL_MAP: Record<string, string> = {
 };
 
 function buildAdditionalProductsForAll39Pages(): SeedProduct[] {
-  const defaultWatermark = 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN';
-  return [
-    {
-      id: 'chuyen-de-dien-tu',
-      category_id: 'high-school',
-      category_slug: 'high-school',
-      category_name: 'Danh mục tài liệu Chuẩn mực & Chi tiết cấp THPT',
-      sub_section: 'Bổ trợ',
-      code: 'ĐIỀN TỪ QC',
-      title: 'Chuyên đề điền từ quảng cáo - tờ rơi - thông báo',
-      slug: 'chuyen-de-dien-tu-quang-cao-to-roi-thong-bao',
-      google_form_product_name: 'Chuyên đề điền từ quảng cáo - tờ rơi - thông báo',
-      badge_text: 'Chính thức',
-      short_desc:
-        'Tài liệu chuyên sâu luyện dạng bài đọc điền thông báo (Announcement) và tờ rơi quảng cáo (Advertisement/Leaflet) theo đúng cấu trúc đề thi THPT từ 2025.',
-      cover_tag: 'Dành cho\ncấp THPT',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [
-        { label: 'Số lượng', val: '100 bài đọc điền Quảng cáo - Tờ rơi - Thông báo' },
-        { label: 'Cấp độ', val: 'B1 - C1 bám sát form đề mới' },
-        { label: 'Giải thích', val: 'Giải thích chi tiết từng câu kèm bảng từ vựng' },
-      ],
-      topics: [
-        'Quảng cáo sự kiện, khóa học, dịch vụ, du lịch, môi trường, công nghệ.',
-        'Thông báo trường học, câu lạc bộ, tuyển dụng và hướng dẫn cộng đồng.',
-      ],
-      features: [
-        'Bám sát 100% dạng câu hỏi đọc điền mới trong đề minh họa của Bộ GD&ĐT.',
-        'Hỗ trợ cả bản Word chỉnh sửa trực tiếp và bản PDF in ấn sắc nét.',
-      ],
-      is_featured: true,
-      is_combo_eligible: true,
-      is_active: true,
-      formats: [
-        { format_code: 'Word', price: 159000, is_active: true },
-        { format_code: 'PDF', price: 109000, is_active: true },
-        { format_code: 'Flashcard', price: 60000, is_active: true },
-        { format_code: 'Trang tính', price: 100000, is_active: false },
-        { format_code: 'Thiết kế', price: 150000, is_active: false },
-      ],
-    },
-    {
-      id: 'reading-g7',
-      category_id: 'secondary-school',
-      category_slug: 'secondary-school',
-      category_name: 'Danh mục tài liệu Chuẩn mực & Chi tiết cấp THCS',
-      sub_section: 'Cấp THCS',
-      code: 'ĐỌC HIỂU 7',
-      title: 'Bài tập đọc điền - đọc hiểu tiếng Anh 7 từ cơ bản đến nâng cao',
-      slug: 'reading-g7',
-      google_form_product_name:
-        'Bài tập đọc điền - đọc hiểu tiếng Anh 7 từ cơ bản đến nâng cao',
-      badge_text: 'Chính thức',
-      short_desc:
-        'Hệ thống bài tập đọc điền và đọc hiểu Tiếng Anh lớp 7 theo các chủ đề SGK chương trình mới, có giải thích chi tiết và bảng từ vựng mở rộng.',
-      cover_tag: 'Tiếng Anh 7\nCơ bản đến\nnâng cao',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [
-        { label: 'Khối lớp', val: 'Lớp 7 THCS (CT GDPT 2018)' },
-        { label: 'Nội dung', val: 'Đọc điền & Đọc hiểu phân hóa từ cơ bản đến nâng cao' },
-      ],
-      topics: ['Hobbies, Healthy Living, Community Service, Music and Arts, Food and Drink, Education, Energy Sources.'],
-      features: ['Đáp án kèm giải thích chi tiết từng câu và dịch nghĩa ngữ cảnh đầy đủ.'],
-      is_featured: true,
-      is_combo_eligible: true,
-      is_active: true,
-      formats: [
-        { format_code: 'Word', price: 149000, is_active: true },
-        { format_code: 'PDF', price: 99000, is_active: true },
-        { format_code: 'Flashcard', price: 60000, is_active: false },
-        { format_code: 'Trang tính', price: 99000, is_active: false },
-        { format_code: 'Thiết kế', price: 120000, is_active: false },
-      ],
-    },
-    {
-      id: 'reading-g6',
-      category_id: 'secondary-school',
-      category_slug: 'secondary-school',
-      category_name: 'Danh mục tài liệu Chuẩn mực & Chi tiết cấp THCS',
-      sub_section: 'Cấp THCS',
-      code: 'ĐỌC HIỂU 6',
-      title: 'Bài tập đọc điền - đọc hiểu tiếng Anh 6 từ cơ bản đến nâng cao',
-      slug: 'reading-g6',
-      google_form_product_name:
-        'Bài tập đọc điền - đọc hiểu tiếng Anh 6 từ cơ bản đến nâng cao',
-      badge_text: 'Chính thức',
-      short_desc:
-        'Tài liệu luyện kỹ năng đọc điền và đọc hiểu Tiếng Anh lớp 6 bám sát chương trình mới, xây dựng nền tảng từ vựng và ngữ pháp vững chắc.',
-      cover_tag: 'Tiếng Anh 6\nCơ bản đến\nnâng cao',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [
-        { label: 'Khối lớp', val: 'Lớp 6 THCS (CT GDPT 2018)' },
-        { label: 'Nội dung', val: 'Bài tập đọc điền & đọc hiểu theo từng Unit' },
-      ],
-      topics: ['My New School, My House, My Friends, My Neighbourhood, Natural Wonders, Tet Holiday, Television, Cities of the World.'],
-      features: ['Phù hợp cho cả giáo viên làm ngữ liệu giảng dạy và học sinh tự luyện tại nhà.'],
-      is_featured: true,
-      is_combo_eligible: true,
-      is_active: true,
-      formats: [
-        { format_code: 'Word', price: 149000, is_active: true },
-        { format_code: 'PDF', price: 99000, is_active: true },
-        { format_code: 'Flashcard', price: 60000, is_active: false },
-        { format_code: 'Trang tính', price: 99000, is_active: false },
-        { format_code: 'Thiết kế', price: 120000, is_active: false },
-      ],
-    },
-    // 5 TÀI LIỆU QUÀ TẶNG MIỄN PHÍ (/gifts/*)
-    {
-      id: 'gift-100-idioms',
-      category_id: 'gifts',
-      category_slug: 'gifts',
-      category_name: 'Tài liệu miễn phí & Quà tặng tri ân',
-      sub_section: 'Quà tặng miễn phí',
-      code: '100 IDIOMS',
-      title: '100 câu trắc nghiệm Thành ngữ (Idioms) trọng tâm thi THPT',
-      slug: '100-cau-thanh-ngu',
-      google_form_product_name: '100 câu trắc nghiệm Thành ngữ (Idioms)',
-      badge_text: 'Miễn phí',
-      short_desc: 'Tài liệu quà tặng miễn phí gồm 100 câu thành ngữ tiếng Anh thường gặp kèm giải thích chi tiết.',
-      cover_tag: 'Tài liệu\nQuà tặng\nMiễn phí',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [{ label: 'Hình thức', val: 'Tài liệu Quà tặng Miễn phí (PDF)' }],
-      topics: ['100 thành ngữ thông dụng trong đề thi THPTQG và HSG.'],
-      features: ['Có đáp án và giải thích nghĩa từng thành ngữ.'],
-      is_featured: false,
-      is_combo_eligible: false,
-      is_active: true,
-      formats: [{ format_code: 'PDF', price: 0, is_active: true }],
-    },
-    {
-      id: 'gift-200-collocations',
-      category_id: 'gifts',
-      category_slug: 'gifts',
-      category_name: 'Tài liệu miễn phí & Quà tặng tri ân',
-      sub_section: 'Quà tặng miễn phí',
-      code: '200 COLLOC',
-      title: '200 câu trắc nghiệm Cụm từ cố định (Collocations) thông dụng',
-      slug: '200caucollocations',
-      google_form_product_name: '200 câu trắc nghiệm Cụm từ cố định (Collocations)',
-      badge_text: 'Miễn phí',
-      short_desc: 'Bộ 200 câu trắc nghiệm Collocations chọn lọc giúp học sinh bứt phá điểm 8+ - 9+.',
-      cover_tag: 'Tài liệu\nQuà tặng\nMiễn phí',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [{ label: 'Hình thức', val: 'Tài liệu Quà tặng Miễn phí (PDF)' }],
-      topics: ['Cụm động từ và Collocations đi với Make, Do, Take, Have, Break, Catch, Pay.'],
-      features: ['Giải thích chi tiết từng cụm từ cố định.'],
-      is_featured: false,
-      is_combo_eligible: false,
-      is_active: true,
-      formats: [{ format_code: 'PDF', price: 0, is_active: true }],
-    },
-    {
-      id: 'gift-296-collocations',
-      category_id: 'gifts',
-      category_slug: 'gifts',
-      category_name: 'Tài liệu miễn phí & Quà tặng tri ân',
-      sub_section: 'Quà tặng miễn phí',
-      code: '296 COLLOC',
-      title: '296 Cụm từ cố định (Collocations) trích từ đề thi thử các trường & sở',
-      slug: '296-collocations',
-      google_form_product_name: '296 Cụm từ cố định (Collocations)',
-      badge_text: 'Miễn phí',
-      short_desc: 'Tổng hợp 296 Collocations thực chiến xuất hiện nhiều nhất trong đề thi thử các Sở GD&ĐT.',
-      cover_tag: 'Tài liệu\nQuà tặng\nMiễn phí',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [{ label: 'Hình thức', val: 'Tài liệu Quà tặng Miễn phí (PDF)' }],
-      topics: ['296 Collocations thực chiến sát đề thi thật.'],
-      features: ['Bảng tổng hợp khoa học, dễ tra cứu và ôn tập.'],
-      is_featured: false,
-      is_combo_eligible: false,
-      is_active: true,
-      formats: [{ format_code: 'PDF', price: 0, is_active: true }],
-    },
-    {
-      id: 'gift-de-thi-chinh-thuc',
-      category_id: 'gifts',
-      category_slug: 'gifts',
-      category_name: 'Tài liệu miễn phí & Quà tặng tri ân',
-      sub_section: 'Quà tặng miễn phí',
-      code: 'ĐỀ BỘ GD',
-      title: 'Tuyển tập Đề thi chính thức & Đề tham khảo môn Tiếng Anh Bộ GD&ĐT',
-      slug: 'de-thi-chinh-thuc',
-      google_form_product_name: 'Tuyển tập Đề thi chính thức Bộ GD&ĐT',
-      badge_text: 'Miễn phí',
-      short_desc: 'Tổng hợp các mã đề thi chính thức và đề tham khảo của Bộ GD&ĐT kèm lời giải chi tiết.',
-      cover_tag: 'Đề chính thức\nBộ GD&ĐT\nMiễn phí',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [{ label: 'Hình thức', val: 'Tài liệu Quà tặng Miễn phí (PDF)' }],
-      topics: ['Đề thi chính thức và đề minh họa qua các năm.'],
-      features: ['Phân tích ma trận và giải thích chi tiết.'],
-      is_featured: false,
-      is_combo_eligible: false,
-      is_active: true,
-      formats: [{ format_code: 'PDF', price: 0, is_active: true }],
-    },
-    {
-      id: 'gift-de-truong-so',
-      category_id: 'gifts',
-      category_slug: 'gifts',
-      category_name: 'Tài liệu miễn phí & Quà tặng tri ân',
-      sub_section: 'Quà tặng miễn phí',
-      code: 'ĐỀ TRƯỜNG SỞ',
-      title: 'Tổng hợp Đề thi thử THPT môn Tiếng Anh các Trường & Sở GD&ĐT trên cả nước',
-      slug: 'detruongso',
-      google_form_product_name: 'Tổng hợp Đề thi thử các Trường & Sở GD&ĐT',
-      badge_text: 'Miễn phí',
-      short_desc: 'Kho đề thi thử chọn lọc từ các trường chuyên và Sở GD&ĐT trên toàn quốc.',
-      cover_tag: 'Đề thi thử\nCác Trường & Sở\nMiễn phí',
-      thumbnail_url: '',
-      preview_type: 'images',
-      sample_pdf_source: 'r2',
-      sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: defaultWatermark,
-      preview_images: [],
-      specs: [{ label: 'Hình thức', val: 'Tài liệu Quà tặng Miễn phí (PDF)' }],
-      topics: ['Đề thi thử các Sở Hà Nội, TP.HCM, Nghệ An, Hà Tĩnh, Nam Định, Bắc Ninh...'],
-      features: ['Cập nhật liên tục phục vụ thầy cô và học sinh luyện đề.'],
-      is_featured: false,
-      is_combo_eligible: false,
-      is_active: true,
-      formats: [{ format_code: 'PDF', price: 0, is_active: true }],
-    },
-  ];
+  return [];
 }
 
 function buildNormalizedSeedState(): DbState {
@@ -1590,7 +1324,7 @@ export const dbService = {
         .from('orders')
         .select('*, order_items(*)')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((row: any) => ({
           id: row.id,
           user_id: row.user_id || null,
@@ -1872,7 +1606,7 @@ export const dbService = {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) handleSupabaseAuthError(error);
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data as SeedUser[];
       }
     }
@@ -2065,7 +1799,7 @@ export const dbService = {
         .eq('is_revoked', false)
         .order('last_active_at', { ascending: false });
       if (error) handleSupabaseAuthError(error);
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return (data as SeedUserSession[]).filter((s) => new Date(s.expires_at) > now);
       }
     }
@@ -2189,7 +1923,7 @@ export const dbService = {
         .eq('is_active', true)
         .order('granted_at', { ascending: false });
       if (error) handleSupabaseAuthError(error);
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data as SeedUserLibraryItem[];
       }
     }
