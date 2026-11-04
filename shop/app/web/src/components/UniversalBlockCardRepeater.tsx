@@ -8,7 +8,6 @@ import {
 import { UNIVERSAL_BLOCK_CATALOG, createDefaultUniversalBlock } from './universalCatalog';
 import { UniversalBlockItemEditor } from './UniversalBlockItemEditor';
 import { UniversalBlockPickerModal } from './UniversalBlockPickerModal';
-import { BlockIllustration } from './BlockIllustration';
 
 export interface UniversalBlockCardRepeaterProps {
   pageTitle: string;
@@ -177,19 +176,6 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
               {/* Block Config Editor Area */}
               {isEditing && (
                 <div className="p-5 bg-white border-t border-gray-100 space-y-5 text-xs">
-                  {/* Sơ đồ cấu trúc trực quan của khối */}
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-black text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
-                        <span className="text-pink-600">📐</span> Sơ đồ bố cục trực quan của khối:
-                      </span>
-                      <span className="text-[9px] font-bold text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">
-                        Gốc: {meta.originPage}
-                      </span>
-                    </div>
-                    <BlockIllustration type={block.type} className="w-full h-28 shadow-2xs" />
-                  </div>
-
                   {renderCustomEditor && renderCustomEditor(block, (cfg) => handleUpdateBlockConfig(block.id, cfg)) ? (
                     renderCustomEditor(block, (cfg) => handleUpdateBlockConfig(block.id, cfg))
                   ) : (
