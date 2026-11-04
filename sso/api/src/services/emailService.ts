@@ -432,10 +432,10 @@ export interface SendEmailOptions {
 async function sendViaInternalProxy(options: SendEmailOptions): Promise<boolean> {
   const ssoUrl = getSsoBaseUrl();
   const proxyUrl = process.env.INTERNAL_EMAIL_URL ? process.env.INTERNAL_EMAIL_URL.trim() : `${ssoUrl}/api-internal/send-email`;
-  const adminSecret = process.env.ADMIN_API_SECRET;
+  const adminSecret = (process.env.ADMIN_API_SECRET || process.env.ADMIN_API_KEY)?.trim();
 
   if (!adminSecret) {
-    throw new Error('[INTERNAL_EMAIL_ERROR] Missing required environment variable: ADMIN_API_SECRET');
+    throw new Error('[INTERNAL_EMAIL_ERROR] Missing required environment variable: ADMIN_API_SECRET (or ADMIN_API_KEY)');
   }
 
   const res = await fetch(proxyUrl, {
