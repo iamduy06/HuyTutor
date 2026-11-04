@@ -5,6 +5,7 @@ import {
   UNIVERSAL_CATEGORY_TABS,
   createDefaultUniversalBlock,
 } from './universalCatalog';
+import { BlockIllustration } from './BlockIllustration';
 
 interface UniversalBlockPickerModalProps {
   isOpen: boolean;
@@ -137,6 +138,11 @@ export const UniversalBlockPickerModal: React.FC<UniversalBlockPickerModalProps>
                       </span>
                     </div>
 
+                    {/* Sơ đồ minh họa trực quan từ thiết kế */}
+                    <div className="pt-1">
+                      <BlockIllustration type={item.type} className="w-full h-24 shadow-2xs" />
+                    </div>
+
                     <h3 className="text-xs font-black text-gray-900 group-hover:text-[#e60049] transition">
                       {item.label}
                     </h3>
@@ -181,3 +187,4 @@ export const UniversalBlockPickerModal: React.FC<UniversalBlockPickerModalProps>
     </div>
   );
 };
+
