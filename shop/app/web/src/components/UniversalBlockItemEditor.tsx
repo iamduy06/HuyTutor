@@ -784,6 +784,188 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
     );
   }
 
+  // ==========================================
+  // KHỐI KHUNG ẢNH & CHIẾN DỊCH (CAMPAIGN FRAME)
+  // ==========================================
+  if (block.type === 'campaign_frame') {
+    const frameType = cfg.frame_type || 'preset';
+    const presetName = cfg.preset_name || 'sale';
+    const scope = cfg.scope || 'global';
+    const appliedIds: string[] = Array.isArray(cfg.applied_product_ids) ? cfg.applied_product_ids : [];
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Tiêu đề chiến dịch</label>
+            <input
+              type="text"
+              value={cfg.title || ''}
+              onChange={(e) => onUpdateConfig({ title: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+              placeholder="CHIẾN DỊCH KHUYẾN MÃI ĐẶC BIỆT"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Mô tả phụ</label>
+            <input
+              type="text"
+              value={cfg.subtitle || ''}
+              onChange={(e) => onUpdateConfig({ subtitle: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+              placeholder="Khung ảnh ưu đãi giới hạn áp dụng độc quyền"
+            />
+          </div>
+        </div>
+
+        {/* Chế độ Khung Đè: Preset vs Custom R2 */}
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-md space-y-3">
+          <label className="block font-black text-xs text-gray-800 uppercase">
+            Loại Khung Đè Chiến Dịch:
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onUpdateConfig({ frame_type: 'preset' })}
+              className={`flex-1 py-1.5 px-3 rounded text-xs font-bold transition border ${
+                frameType === 'preset'
+                  ? 'bg-[#e60049] text-white border-[#e60049]'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Preset Có Sẵn (Vector Hi-Res)
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateConfig({ frame_type: 'custom' })}
+              className={`flex-1 py-1.5 px-3 rounded text-xs font-bold transition border ${
+                frameType === 'custom'
+                  ? 'bg-[#e60049] text-white border-[#e60049]'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Tải PNG Trong Suốt Lên R2
+            </button>
+          </div>
+
+          {frameType === 'preset' ? (
+            <div>
+              <label className="block font-bold text-gray-700 mb-1.5">Chọn mẫu Preset:</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { key: 'tet', label: 'Tết Mừng Xuân' },
+                  { key: 'sale', label: 'Siêu Sale Giảm Sốc' },
+                  { key: 'exam', label: 'Mùa Thi Quyết Thắng' },
+                  { key: 'christmas', label: 'Giáng Sinh Rực Rỡ' },
+                ].map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => onUpdateConfig({ preset_name: p.key })}
+                    className={`py-1.5 px-2 rounded text-xs font-bold border transition ${
+                      presetName === p.key
+                        ? 'border-[#e60049] bg-pink-50 text-[#e60049]'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <R2ImageUploader
+              label="Tải lên khung đè PNG trong suốt (Cloudflare R2)"
+              imageUrl={cfg.custom_frame_url}
+              onUrlChange={(url: string) => onUpdateConfig({ custom_frame_url: url })}
+              folder="campaign"
+            />
+          )}
+        </div>
+
+        {/* Phạm vi áp dụng & Tùy chọn */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Phạm vi áp dụng khung</label>
+            <select
+              value={scope}
+              onChange={(e) => onUpdateConfig({ scope: e.target.value as 'global' | 'specific' })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
+            >
+              <option value="global">Toàn bộ sản phẩm trên trang (Global)</option>
+              <option value="specific">Chỉ áp dụng cho các sản phẩm được tick chọn</option>
+            </select>
+          </div>
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Tỷ lệ khung ảnh (Aspect Ratio)</label>
+            <select
+              value={cfg.aspect_ratio || '3:4'}
+              onChange={(e) => onUpdateConfig({ aspect_ratio: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
+            >
+              <option value="3:4">3:4 (Chuẩn dọc bìa sách)</option>
+              <option value="1:1">1:1 (Vuông)</option>
+              <option value="4:3">4:3 (Ngang tiêu chuẩn)</option>
+              <option value="16:9">16:9 (Rộng)</option>
+              <option value="A4">A4 (Tài liệu học tập)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Nếu chọn specific: Danh sách sản phẩm */}
+        {scope === 'specific' && (
+          <div className="border border-gray-200 rounded-md p-3 bg-gray-50 max-h-48 overflow-y-auto space-y-1.5">
+            <span className="block font-bold text-xs text-gray-700 mb-2">
+              Chọn các sản phẩm áp dụng khung chiến dịch:
+            </span>
+            {allProducts.map((p) => {
+              const isChecked = appliedIds.includes(p.id);
+              return (
+                <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onUpdateConfig({ applied_product_ids: [...appliedIds, p.id] });
+                      } else {
+                        onUpdateConfig({ applied_product_ids: appliedIds.filter((id) => id !== p.id) });
+                      }
+                    }}
+                    className="accent-[#e60049]"
+                  />
+                  <span className="text-xs text-gray-800">{p.title}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Nút bấm chuyển đổi (CTA)</label>
+            <input
+              type="text"
+              value={cfg.cta_label || 'Khám phá ngay'}
+              onChange={(e) => onUpdateConfig({ cta_label: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Đường dẫn liên kết (CTA URL)</label>
+            <input
+              type="text"
+              value={cfg.cta_url || ''}
+              onChange={(e) => onUpdateConfig({ cta_url: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+              placeholder="/combo-thpt hoặc /catalog"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Fallback editor cho các block khác
   return (
     <div className="space-y-3">

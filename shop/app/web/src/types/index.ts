@@ -197,6 +197,22 @@ export interface ImageFrameConfig {
 
 export type CampaignFramePreset = 'tet' | 'sale' | 'exam' | 'christmas';
 
+export interface CampaignFrameBlockConfig {
+  title?: string;
+  subtitle?: string;
+  is_active?: boolean;
+  frame_type: 'preset' | 'custom';
+  preset_name?: CampaignFramePreset;
+  custom_frame_url?: string;
+  scope: 'global' | 'specific';
+  applied_product_ids?: string[];
+  banner_text?: string;
+  cta_label?: string;
+  cta_url?: string;
+  show_sample_products?: boolean;
+  aspect_ratio?: PresetAspectRatio;
+}
+
 export interface CampaignFrameConfig {
   is_enabled: boolean;
   frame_type: 'preset' | 'custom';

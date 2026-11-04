@@ -46,6 +46,15 @@ export const UNIVERSAL_CATEGORY_TABS: { key: 'all' | UniversalBlockCategory; lab
 export const UNIVERSAL_BLOCK_CATALOG: UniversalBlockMeta[] = [
   // --- NHÓM 1: HERO & BANNER ---
   {
+    type: 'campaign_frame',
+    category: 'hero_banner',
+    categoryLabel: 'Hero & Banner',
+    label: 'KHỐI: Khung Ảnh & Chiến Dịch (Campaign Frame Overlay)',
+    badgeColor: 'bg-gradient-to-r from-red-600 to-amber-500 text-white',
+    desc: 'Khung ảnh chiến dịch lễ Tết, Siêu Sale, Mùa Thi, Giáng Sinh hoặc tải PNG trong suốt từ R2 áp dụng cho sản phẩm và banner chuyển đổi.',
+    originPage: 'Toàn trang',
+  },
+  {
     type: 'hero',
     category: 'hero_banner',
     categoryLabel: 'Hero & Banner',
@@ -719,6 +728,24 @@ export function createDefaultUniversalBlock(
         download_url: '',
         preview_images: [],
         watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+        is_active: true,
+      };
+      break;
+
+    case 'campaign_frame':
+      config = {
+        title: 'CHIẾN DỊCH KHUYẾN MÃI ĐẶC BIỆT',
+        subtitle: 'Khung ảnh ưu đãi giới hạn áp dụng độc quyền',
+        frame_type: 'preset',
+        preset_name: 'sale',
+        custom_frame_url: '',
+        scope: 'global',
+        applied_product_ids: [],
+        banner_text: 'Săn tài liệu ôn thi trọng tâm - Chiết khấu đặc biệt tới 35%',
+        cta_label: 'Khám phá ngay',
+        cta_url: '#',
+        show_sample_products: true,
+        aspect_ratio: '3:4',
         is_active: true,
       };
       break;

@@ -80,6 +80,8 @@ import {
   FlashcardHeroBlock,
   FlashcardPricingBlock,
 } from './DynamicFlashcardBlocks';
+import { ProductImageFrame } from './ProductImageFrame';
+import { SmartLink } from './SmartLink';
 
 export interface UniversalBlockRendererProps {
   blocks: (UniversalBlockItem | any)[];
@@ -213,6 +215,77 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
                 <FlashcardBannerBlock config={cfg as FlashcardBannerBlockConfig} />
               </div>
             );
+
+          case 'campaign_frame': {
+            const frameType = cfg.frame_type || 'preset';
+            const presetName = cfg.preset_name || 'sale';
+            const customFrameUrl = cfg.custom_frame_url;
+            const appliedIds: string[] = Array.isArray(cfg.applied_product_ids) ? cfg.applied_product_ids : [];
+            const scope = cfg.scope || 'global';
+            const sampleProds = (context?.allProducts || []).filter((p) => {
+              if (scope === 'specific') {
+                return appliedIds.includes(p.id) || appliedIds.includes(p.slug);
+              }
+              return true;
+            }).slice(0, 3);
+
+            return (
+              <div key={key} className="max-w-[920px] mx-auto py-4">
+                <section className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 rounded-lg p-5 text-white shadow-md relative overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
+                    <div className="space-y-1 max-w-[70%]">
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded">
+                        CHIẾN DỊCH KHUYẾN MÃI
+                      </span>
+                      <h2 className="text-base sm:text-lg font-black leading-tight drop-shadow-xs">
+                        {cfg.title || 'ƯU ĐÃI ĐẶC BIỆT THEO MÙA'}
+                      </h2>
+                      {cfg.subtitle && (
+                        <p className="text-xs text-rose-100">{cfg.subtitle}</p>
+                      )}
+                      {cfg.banner_text && (
+                        <p className="text-xs font-bold text-amber-200 mt-1">{cfg.banner_text}</p>
+                      )}
+                    </div>
+                    {cfg.cta_label && (
+                      <SmartLink
+                        to={cfg.cta_url || '#'}
+                        className="bg-white hover:bg-amber-100 text-[#e60049] font-black text-xs px-4 py-2 rounded shadow transition"
+                      >
+                        {cfg.cta_label} →
+                      </SmartLink>
+                    )}
+                  </div>
+
+                  {sampleProds.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-5 pt-4 border-t border-white/20 relative z-10">
+                      {sampleProds.map((prod) => (
+                        <div key={prod.id} className="bg-white rounded-md p-2 text-gray-900 shadow flex flex-col justify-between">
+                          <ProductImageFrame
+                            src={prod.thumbnail_url || (prod.preview_images && prod.preview_images[0]) || ''}
+                            alt={prod.title}
+                            presetRatio={cfg.aspect_ratio || '3:4'}
+                            forcePresetOverlay={frameType === 'preset' ? presetName : undefined}
+                            customCampaignFrameUrl={frameType === 'custom' ? customFrameUrl : undefined}
+                            className="w-full"
+                          />
+                          <div className="pt-2 text-center">
+                            <h4 className="text-xs font-bold text-gray-900 line-clamp-1">{prod.title}</h4>
+                            <SmartLink
+                              to={`/catalog/${prod.category_slug || 'high-school'}/${prod.slug}`}
+                              className="mt-1.5 inline-block w-full bg-[#e60049] hover:bg-[#cc0041] text-white text-[10px] font-bold py-1 rounded"
+                            >
+                              Xem tài liệu
+                            </SmartLink>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            );
+          }
 
           // ==========================================
           // 2. SẢN PHẨM & BÁN HÀNG

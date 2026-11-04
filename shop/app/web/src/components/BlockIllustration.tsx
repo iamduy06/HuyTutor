@@ -179,6 +179,21 @@ export const BlockIllustration: React.FC<BlockIllustrationProps> = ({
         </div>
       );
 
+    case 'campaign_frame':
+      return (
+        <div className={`bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 rounded border border-red-700 p-2 flex items-center justify-between text-white overflow-hidden relative ${className}`}>
+          <div className="space-y-1 z-10">
+            <span className="text-[6px] bg-white/20 px-1 py-0.2 rounded font-black uppercase">KHUNG CHIẾN DỊCH</span>
+            <div className="text-[8px] font-black">KHUNG ĐÈ SẢN PHẨM & LỄ TẾT</div>
+            <div className="w-24 h-1 bg-white/40 rounded-full"></div>
+          </div>
+          <div className="w-10 h-14 bg-white/30 border border-white rounded-xs flex items-center justify-center text-[5px] font-black relative">
+            <div className="absolute top-0 right-0 bg-amber-400 text-red-950 px-0.5 text-[4px] font-black">TẾT</div>
+            ẢNH SP
+          </div>
+        </div>
+      );
+
     default:
       return (
         <div className={`bg-gray-100 rounded border border-dashed border-gray-300 p-2 flex items-center justify-center text-gray-500 text-xs ${className}`}>
