@@ -6,16 +6,6 @@
 -- ── 0. TIỆN ÍCH MỞ RỘNG ──────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Helper function cho phép backend chạy migration tự động nếu cần
-CREATE OR REPLACE FUNCTION public.exec_sql(query text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  EXECUTE query;
-END;
-$$;
 
 
 -- ── 1. BẢNG USERS TỰ CHỦ (MASTER IDENTITY - KHÔNG DÙNG AUTH.USERS)
