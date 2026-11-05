@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { buildProductUrl } from '../utils/urlHelper';
 import { formatVnd } from '../types';
 
 export const SearchModal: React.FC = () => {
@@ -55,7 +56,7 @@ export const SearchModal: React.FC = () => {
               return (
                 <Link
                   key={item.id}
-                  to={`/${item.category_slug || 'high-school'}/${item.slug}`}
+                  to={buildProductUrl(item.category_slug, item.slug)}
                   onClick={() => setIsSearchOpen(false)}
                   className="p-3.5 flex items-center justify-between hover:bg-[#fff5f7] transition"
                 >

@@ -1,3 +1,4 @@
+import { buildProductUrl } from '../utils/urlHelper';
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
@@ -944,7 +945,7 @@ export const AdminPage: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-extrabold text-gray-900 uppercase tracking-tight">
-                        CẤU HÌNH TRANG CẤP 2 - BỐ CỤC ĐỘNG CHI TIẾT SẢN PHẨM (/TAI-LIEU/:SLUG)
+                        CẤU HÌNH TRANG CẤP 2 - BỐ CỤC ĐỘNG CHI TIẾT SẢN PHẨM (/:CATEGORY/:SLUG)
                       </h2>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-pink-50 text-[#e60049] border border-pink-200">
                         {products.length} TÀI LIỆU
@@ -958,7 +959,7 @@ export const AdminPage: React.FC = () => {
                   {currentDetailProduct && (
                     <div className="flex flex-wrap items-center gap-2">
                       <a
-                        href={`/tai-lieu/${currentDetailProduct.slug}`}
+                        href={buildProductUrl(currentDetailProduct.category_slug, currentDetailProduct.slug)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3.5 py-2 rounded-sm transition"

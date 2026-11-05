@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { fixMalformedSlugUrl } from '../utils/urlHelper';
 
 /**
  * Kiểm tra xem một URL có phải là liên kết ra bên ngoài hay không
@@ -35,8 +36,8 @@ export function normalizeTargetUrl(raw?: string | null): string {
     return trimmed;
   }
 
-  // Đường dẫn nội bộ: Đảm bảo luôn luôn xuất phát từ root '/'
-  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  // Đường dẫn nội bộ: Tự động sửa lỗi dính liền slug và đảm bảo luôn luôn xuất phát từ root '/'
+  return fixMalformedSlugUrl(trimmed);
 }
 
 export interface SmartLinkProps

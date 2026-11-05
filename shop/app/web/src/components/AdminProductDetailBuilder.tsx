@@ -16,6 +16,7 @@ import {
   UiFormatCode,
 } from '../types';
 import { normalizeTargetUrl } from './SmartLink';
+import { buildProductUrl } from '../utils/urlHelper';
 import {
   BottomCtaBlock,
   buildInitialDetailBlocksFromProduct,
@@ -479,7 +480,7 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
       <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-extrabold text-[#e60049] uppercase flex items-center gap-2">
-            <span>Quản lý Khối Động Trang Chi Tiết (/san-pham/${product.slug || 'chi-tiet'})</span>
+            <span>Quản lý Khối Động Trang Chi Tiết (${buildProductUrl(product.category_slug, product.slug)})</span>
             <span className="text-[10px] bg-pink-100 text-[#e60049] font-black px-2 py-0.5 rounded">
               {blocks.length} KHỐI
             </span>
@@ -534,7 +535,7 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
       {/* Block Repeater & Universal Picker */}
       <UniversalBlockCardRepeater
         pageTitle={`Trang Chi Tiết (${product.title || 'Sản phẩm'})`}
-        pageRouteLabel={`/san-pham/${product.slug || 'chi-tiet'}`}
+        pageRouteLabel={buildProductUrl(product.category_slug, product.slug)}
         blocks={blocks}
         onBlocksChange={(newBlocks) => onChangeBlocks(newBlocks)}
         allProducts={allProducts}

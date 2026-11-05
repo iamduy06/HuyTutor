@@ -15,6 +15,7 @@ import {
   UiFormatCode,
 } from '../types';
 import { SmartLink } from './SmartLink';
+import { buildProductUrl } from '../utils/urlHelper';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -819,7 +820,7 @@ export const RelatedProductsBlock: React.FC<{
       badge_text: rel.badge_text || '',
       tag_text: rel.cover_tag || '',
       button_text: 'Đọc thử',
-      target_url: `/${rel.category_slug || 'high-school'}/${rel.slug}`,
+      target_url: buildProductUrl(rel.category_slug, rel.slug),
       is_active: true,
     }));
   }
@@ -1025,7 +1026,7 @@ export const GiftCrossSellBlock: React.FC<{
             </div>
 
             <SmartLink
-              to={'/' + p.category_slug + '/' + p.slug}
+              to={buildProductUrl(p.category_slug, p.slug)}
               className="block w-full py-1.5 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-2xs"
             >
               Xem chi tiết

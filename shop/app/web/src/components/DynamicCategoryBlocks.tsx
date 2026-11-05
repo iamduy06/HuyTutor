@@ -16,6 +16,7 @@ import {
 } from '../types';
 import { Link } from 'react-router-dom';
 import { SmartLink } from './SmartLink';
+import { buildProductUrl, fixMalformedSlugUrl } from '../utils/urlHelper';
 
 /**
  * Khởi tạo danh sách các khối động (category_blocks) từ dữ liệu thực tế của danh mục
@@ -104,7 +105,7 @@ export function buildInitialCategoryBlocks(
       badge_text: p.badge_text || '',
       tag_text: p.cover_tag || '',
       button_text: 'Đọc thử',
-      target_url: `/${p.category_slug || category.slug}/${p.slug}`,
+      target_url: buildProductUrl(p.category_slug || category.slug, p.slug),
       is_active: p.is_active !== false,
     }));
 
@@ -274,12 +275,29 @@ export const CategorySectionBlock: React.FC<{
         badge_text: p.badge_text || '',
         tag_text: p.cover_tag || '',
         button_text: 'Đọc thử',
-        target_url: `/${p.category_slug || 'high-school'}/${p.slug}`,
+        target_url: buildProductUrl(p.category_slug, p.slug),
         is_active: p.is_active !== false,
       }));
   } else {
     cards = (config.items || []).filter((it) => it.is_active !== false);
   }
+
+  // Tự động chuẩn hóa và giải quyết target_url cho tất cả các thẻ sách trong section
+  cards = cards.map((it) => {
+    let target = it.target_url;
+    if (!target) {
+      const matchedProd = allCategoryProducts.find(
+        (p) => p.id === (it as any).product_id || p.id === it.id || p.slug === it.id
+      );
+      if (matchedProd) {
+        target = buildProductUrl(matchedProd.category_slug, matchedProd.slug);
+      }
+    }
+    return {
+      ...it,
+      target_url: target ? fixMalformedSlugUrl(target) : target,
+    };
+  });
 
   if (cards.length === 0) return null;
 

@@ -1,10 +1,11 @@
 import React from 'react';
 import { Product } from '../types';
 import { SmartLink } from './SmartLink';
+import { buildProductUrl } from '../utils/urlHelper';
 import { ProductImageFrame } from './ProductImageFrame';
 
 export const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
-  const detailUrl = `/${product.category_slug || 'high-school'}/${product.slug}`;
+  const detailUrl = buildProductUrl(product.category_slug, product.slug);
   const coverLines = product.cover_tag
     ? product.cover_tag.split('\n').map((l) => l.trim()).filter(Boolean)
     : [];

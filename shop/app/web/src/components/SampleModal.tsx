@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { buildProductUrl } from '../utils/urlHelper';
 import { WatermarkViewer } from './WatermarkViewer';
 
 export const SampleModal: React.FC = () => {
@@ -19,7 +20,7 @@ export const SampleModal: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/${sampleModalProduct.category_slug || 'high-school'}/${sampleModalProduct.slug}`}
+              to={buildProductUrl(sampleModalProduct.category_slug, sampleModalProduct.slug)}
               onClick={() => setSampleModalProduct(null)}
               className="px-2.5 py-1 bg-white text-[#e60049] font-bold text-xs rounded-sm hover:bg-gray-100"
             >

@@ -18,6 +18,7 @@ import { HeaderFooterDemoPage } from './pages/HeaderFooterDemoPage';
 import { HomePage } from './pages/HomePage';
 import { MyLibraryPage } from './pages/MyLibraryPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
+import { SingleSegmentRedirectHandler } from './components/SingleSegmentRedirectHandler';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import {
   DonatePage,
@@ -123,6 +124,12 @@ export const App: React.FC = () => {
                 <Route
                   path="/:categorySlug/:productSlug"
                   element={<ProductDetailPage />}
+                />
+
+                {/* 6. Tự động sửa lỗi và điều hướng an toàn cho đường dẫn 1 cấp bị dính liền slug */}
+                <Route
+                  path="/:singleSegment"
+                  element={<SingleSegmentRedirectHandler />}
                 />
               </Routes>
             </div>

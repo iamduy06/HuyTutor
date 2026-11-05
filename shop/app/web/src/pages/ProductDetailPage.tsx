@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { buildProductUrl } from '../utils/urlHelper';
 import { apiClient } from '../api/client';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
@@ -26,12 +27,20 @@ const FRONTEND_SLUG_ALIAS_MAP: Record<string, string> = {
 };
 
 export const ProductDetailPage: React.FC = () => {
-  const { productSlug = '' } = useParams<{
+  const { categorySlug = '', productSlug = '' } = useParams<{
     categorySlug: string;
     productSlug: string;
   }>();
+  const navigate = useNavigate();
 
   const { products, addToCart, buyNow } = useStore();
+
+  // Tự động chuẩn hóa nếu người dùng truy cập qua tiền tố cũ (tai-lieu, san-pham, catalog)
+  useEffect(() => {
+    if (categorySlug === 'tai-lieu' || categorySlug === 'san-pham' || categorySlug === 'catalog') {
+      navigate(buildProductUrl('high-school', productSlug), { replace: true });
+    }
+  }, [categorySlug, productSlug, navigate]);
   const [remoteProduct, setRemoteProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<UiFormatCode>('Word');

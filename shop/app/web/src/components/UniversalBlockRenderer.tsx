@@ -82,6 +82,7 @@ import {
 } from './DynamicFlashcardBlocks';
 import { ProductImageFrame } from './ProductImageFrame';
 import { SmartLink } from './SmartLink';
+import { buildProductUrl } from '../utils/urlHelper';
 
 export interface UniversalBlockRendererProps {
   blocks: (UniversalBlockItem | any)[];
@@ -272,7 +273,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
                           <div className="pt-2 text-center">
                             <h4 className="text-xs font-bold text-gray-900 line-clamp-1">{prod.title}</h4>
                             <SmartLink
-                              to={`/catalog/${prod.category_slug || 'high-school'}/${prod.slug}`}
+                              to={buildProductUrl(prod.category_slug, prod.slug)}
                               className="mt-1.5 inline-block w-full bg-[#e60049] hover:bg-[#cc0041] text-white text-[10px] font-bold py-1 rounded"
                             >
                               Xem tài liệu

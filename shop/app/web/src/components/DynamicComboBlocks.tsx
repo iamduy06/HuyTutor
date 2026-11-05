@@ -15,6 +15,7 @@ import {
   UiFormatCode,
 } from '../types';
 import { SmartLink } from './SmartLink';
+import { buildProductUrl } from '../utils/urlHelper';
 
 /**
  * Khởi tạo danh sách các khối động cho Trang Combo THPT (Zero-Breaking: tự động map dữ liệu hiện có)
@@ -431,7 +432,7 @@ export const ComboSectionsBlock: React.FC<{
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
               {groupProducts.map((prod) => {
-                const targetUrl = `/${prod.category_slug || 'high-school'}/${prod.slug}`;
+                const targetUrl = buildProductUrl(prod.category_slug, prod.slug);
 
                 return (
                   <div

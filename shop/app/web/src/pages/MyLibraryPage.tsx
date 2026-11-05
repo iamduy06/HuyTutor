@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
+import { buildProductUrl } from '../utils/urlHelper';
 import {
   formatVnd,
   OrderRecord,
@@ -296,7 +297,7 @@ export const MyLibraryPage: React.FC = () => {
 
                           {matchedProd && (
                             <Link
-                              to={`/${matchedProd.category_slug}/${matchedProd.slug}`}
+                              to={buildProductUrl(matchedProd.category_slug, matchedProd.slug)}
                               className="border border-gray-300 text-gray-700 hover:border-[#e60049] hover:text-[#e60049] font-bold text-xs px-3 py-1.5 rounded-sm transition"
                             >
                               Chi tiết tài liệu

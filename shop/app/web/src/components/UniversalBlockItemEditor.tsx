@@ -1,3 +1,4 @@
+import { buildProductUrl } from '../utils/urlHelper';
 import React from 'react';
 import { apiClient } from '../api/client';
 import {
@@ -485,6 +486,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
                           title: found?.title || 'Tài liệu',
                           image_url: found?.thumbnail_url || '',
                           badge_tag: found?.cover_tag || 'MỚI',
+                          target_url: buildProductUrl(found?.category_slug, found?.slug),
                         };
                       });
                       onUpdateConfig({ items: newItems, product_ids: nextIds });
