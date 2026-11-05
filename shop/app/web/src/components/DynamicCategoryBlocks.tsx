@@ -379,6 +379,7 @@ export const CategorySectionBlock: React.FC<{
                     alt={item.display_title || ''}
                     ratioMode="preset"
                     presetRatio="3:4"
+                    objectFit="contain"
                     rounded="2xl"
                     showBorder={true}
                     showShadow={true}
@@ -438,7 +439,7 @@ export const CategoryBannerBlock: React.FC<{
         <img
           src={config.image_url}
           alt={config.header_label || 'Banner'}
-          className="w-full h-auto object-cover rounded-2xl block"
+          className="w-full h-auto object-contain rounded-2xl block"
         />
       </SmartLink>
     </section>

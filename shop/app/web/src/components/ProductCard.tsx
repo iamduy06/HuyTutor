@@ -27,7 +27,7 @@ export const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
             customRatioW={cfg?.custom_ratio_w}
             customRatioH={cfg?.custom_ratio_h}
             maxWidthPx={cfg?.max_width_px}
-            objectFit={cfg?.object_fit || 'cover'}
+            objectFit={cfg?.object_fit || 'contain'}
             rounded={cfg?.border_rounded || '2xl'}
             showBorder={cfg?.show_border !== false}
             showShadow={cfg?.show_shadow !== false}
@@ -54,7 +54,7 @@ export const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
                 alt={product.title}
                 ratioMode="preset"
                 presetRatio="3:4"
-                objectFit="cover"
+                objectFit="contain"
                 rounded="xl"
                 showBorder={true}
                 showShadow={false}

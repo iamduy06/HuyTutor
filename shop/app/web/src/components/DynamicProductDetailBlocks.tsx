@@ -316,12 +316,12 @@ export const ProductHeroBlock: React.FC<{
                 <ProductImageFrame
                   src={displayImage}
                   alt={displayTitle}
-                  ratioMode={config.ratio_mode || product.image_frame_config?.ratio_mode || 'preset'}
-                  presetRatio={config.preset_ratio || product.image_frame_config?.preset_ratio || '3:4'}
+                  ratioMode={config.ratio_mode || product.image_frame_config?.ratio_mode || 'auto'}
+                  presetRatio={config.preset_ratio || product.image_frame_config?.preset_ratio}
                   customRatioW={config.custom_ratio_w || product.image_frame_config?.custom_ratio_w}
                   customRatioH={config.custom_ratio_h || product.image_frame_config?.custom_ratio_h}
-                  maxWidthPx={config.max_width_px || product.image_frame_config?.max_width_px || 360}
-                  objectFit={config.object_fit || product.image_frame_config?.object_fit || 'cover'}
+                  maxWidthPx={config.max_width_px || product.image_frame_config?.max_width_px || 440}
+                  objectFit={config.object_fit || product.image_frame_config?.object_fit || 'contain'}
                   rounded={product.image_frame_config?.border_rounded || '2xl'}
                   showBorder={product.image_frame_config?.show_border !== false}
                   showShadow={product.image_frame_config?.show_shadow !== false}
@@ -1010,6 +1010,7 @@ export const GiftCrossSellBlock: React.FC<{
                 alt={p.title}
                 ratioMode="preset"
                 presetRatio="3:4"
+                objectFit="contain"
                 rounded="xl"
                 maxWidthPx={120}
                 showBorder={true}

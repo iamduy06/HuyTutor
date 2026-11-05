@@ -231,7 +231,7 @@ export const ComboHeroBlock: React.FC<{
           <img
             src={config.banner_image_url}
             alt={config.headline || 'Combo THPT'}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-contain"
           />
         </div>
       ) : (
@@ -247,7 +247,7 @@ export const ComboHeroBlock: React.FC<{
                       idx === 1 ? 'w-24 h-34 scale-105 z-10' : 'w-24 h-32 opacity-95'
                     }`}
                   >
-                    <img src={url} alt="Bìa sách" className="w-full h-full object-cover" />
+                    <img src={url} alt="Bìa sách" className="w-full h-full object-contain bg-white" />
                   </div>
                 ))
               ) : (
@@ -373,7 +373,7 @@ export const ComboPackagesBlock: React.FC<{
                       key={i}
                       src={img}
                       alt="Bìa"
-                      className="w-8 h-11 object-cover rounded-sm shadow border border-white"
+                      className="w-8 h-11 object-contain bg-white rounded-sm shadow border border-white"
                     />
                   ))
                 ) : (
@@ -446,6 +446,7 @@ export const ComboSectionsBlock: React.FC<{
                         alt={prod.title}
                         ratioMode="preset"
                         presetRatio="3:4"
+                        objectFit="contain"
                         rounded="2xl"
                         showBorder={true}
                         showShadow={true}
@@ -541,7 +542,7 @@ export const ComboBannerBlock: React.FC<{
       <img
         src={config.banner_url}
         alt={config.alt_text || 'Banner Combo'}
-        className="w-full h-auto object-cover"
+        className="w-full h-auto object-contain"
       />
     </div>
   );

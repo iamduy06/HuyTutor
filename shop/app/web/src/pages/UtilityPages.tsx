@@ -782,7 +782,7 @@ export const CustomPageRenderer: React.FC<{ page: CustomPageItem }> = ({ page })
                         <img
                           src={block.image_url}
                           alt={block.title || 'Banner'}
-                          className="w-full max-h-72 object-cover rounded-xs border border-white/20"
+                          className="w-full max-h-72 object-contain rounded-xs border border-white/20"
                         />
                       </div>
                     )}

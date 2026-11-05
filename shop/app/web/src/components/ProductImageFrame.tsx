@@ -323,7 +323,7 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
   customRatioW,
   customRatioH,
   maxWidthPx,
-  objectFit = 'cover',
+  objectFit = 'contain',
   rounded = '2xl',
   showBorder = true,
   borderColor = 'border-gray-200',
@@ -426,7 +426,7 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
         <img
           src={customOverlayUrl}
           alt="Campaign Overlay Frame"
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10 select-none block"
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10 select-none block"
           loading="lazy"
         />
       );
@@ -470,8 +470,8 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
         <img
           src={src}
           alt={alt}
-          className={`w-full h-full block ${
-            objectFit === 'contain' ? 'object-contain' : 'object-cover'
+          className={`w-full ${ratioMode === 'auto' ? 'h-auto' : 'h-full'} block ${
+            objectFit === 'cover' ? 'object-cover' : 'object-contain'
           } ${imageClassName}`}
           loading="lazy"
         />

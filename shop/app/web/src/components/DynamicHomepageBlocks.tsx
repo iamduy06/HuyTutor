@@ -33,7 +33,7 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
         <img
           src={img}
           alt={config.title || ''}
-          className="w-full h-auto object-cover block"
+          className="w-full h-auto object-contain block"
         />
       </section>
     );
@@ -124,7 +124,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
           <img
             src={imageUrl}
             alt={config.header_label || config.title || 'Banner'}
-            className="w-full h-auto object-cover rounded-2xl block"
+            className="w-full h-auto object-contain rounded-2xl block"
           />
         </SmartLink>
       </section>
@@ -395,7 +395,7 @@ export const BottomBannerBlock: React.FC<{
           <img
             src={imageUrl}
             alt={config.title || 'Bottom Banner'}
-            className="w-full h-auto object-cover rounded-2xl block"
+            className="w-full h-auto object-contain rounded-2xl block"
           />
         </SmartLink>
       </section>

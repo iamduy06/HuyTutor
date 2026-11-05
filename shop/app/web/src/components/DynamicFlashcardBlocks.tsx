@@ -218,7 +218,7 @@ export const FlashcardHeroBlock: React.FC<{
             <img
               src={config.cover_image_url}
               alt={config.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-black/5"
             />
             <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition flex items-center justify-center">
               <div className="w-14 h-10 bg-[#ff0000] rounded-md flex items-center justify-center text-white text-lg font-bold shadow-lg group-hover:scale-110 transition">
@@ -286,7 +286,7 @@ export const FlashcardFeaturesBlock: React.FC<{
               <img
                 src={demo_card.image_url}
                 alt="Flashcard demo"
-                className="w-full h-auto object-cover"
+                className="w-full h-auto object-contain"
               />
             </div>
           ) : (
@@ -532,7 +532,7 @@ export const FlashcardBannerBlock: React.FC<{
       <img
         src={config.banner_url}
         alt={config.alt_text || 'Flashcard Banner'}
-        className="w-full h-auto object-cover"
+        className="w-full h-auto object-contain"
       />
     </div>
   );
