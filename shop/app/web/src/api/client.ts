@@ -290,13 +290,14 @@ export const apiClient = {
     });
   },
 
-  async getOrderStatus(orderCode: string): Promise<{
+  async getOrderStatus(orderCode: string, token?: string): Promise<{
     ok: boolean;
     order: OrderRecord;
     mappedGoogleFormNote: string;
     paymentInstruction: PaymentInstruction;
   }> {
-    return requestJson(`/api/orders/${encodeURIComponent(orderCode)}`);
+    const q = token ? `?token=${encodeURIComponent(token)}` : '';
+    return requestJson(`/api/orders/${encodeURIComponent(orderCode)}${q}`);
   },
 
   async simulatePaymentSuccess(orderCode: string): Promise<{

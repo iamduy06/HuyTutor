@@ -76,7 +76,7 @@ export const CheckoutModal: React.FC = () => {
 
     const interval = setInterval(async () => {
       try {
-        const res = await apiClient.getOrderStatus(createdOrder.order_code);
+        const res = await apiClient.getOrderStatus(createdOrder.order_code, createdOrder.view_token);
         if (res.order.payment_status === 'paid') {
           setCreatedOrder(res.order);
           clearSelectedCartItems();
@@ -187,7 +187,7 @@ export const CheckoutModal: React.FC = () => {
     setVerifyingPayment(true);
     setFormError(null);
     try {
-      const res = await apiClient.getOrderStatus(createdOrder.order_code);
+      const res = await apiClient.getOrderStatus(createdOrder.order_code, createdOrder.view_token);
       if (res.order.payment_status === 'paid') {
         setCreatedOrder(res.order);
         clearSelectedCartItems();

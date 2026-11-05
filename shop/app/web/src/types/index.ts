@@ -924,6 +924,7 @@ export interface OrderRecord {
   payment_status: 'pending' | 'paid' | 'failed';
   payment_ref_id?: string;
   paid_at?: string;
+  view_token?: string;
   google_form_submitted: boolean;
   created_at: string;
   items: OrderItemRecord[];
