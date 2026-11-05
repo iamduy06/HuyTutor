@@ -25,6 +25,11 @@ import {
   HcRewardsPage,
   SoanTaiLieuPage,
   TermsPage,
+  PrivacyPolicyPage,
+  PaymentDeliveryPolicyPage,
+  RefundPolicyPage,
+  CopyrightPolicyPage,
+  CustomDynamicPageView,
 } from './pages/UtilityPages';
 
 export const App: React.FC = () => {
@@ -80,9 +85,20 @@ export const App: React.FC = () => {
                 <Route path="/soan-tai-lieu" element={<SoanTaiLieuPage />} />
                 <Route path="/faq" element={<FaqPage />} />
                 <Route path="/terms-of-service" element={<TermsPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicyPage />} />
+                <Route path="/payment-delivery-policy" element={<PaymentDeliveryPolicyPage />} />
+                <Route path="/chinh-sach-thanh-toan-giao-hang" element={<PaymentDeliveryPolicyPage />} />
+                <Route path="/refund-policy" element={<RefundPolicyPage />} />
+                <Route path="/chinh-sach-hoan-tien" element={<RefundPolicyPage />} />
+                <Route path="/copyright-policy" element={<CopyrightPolicyPage />} />
+                <Route path="/chinh-sach-ban-quyen" element={<CopyrightPolicyPage />} />
                 <Route path="/hc-rewards" element={<HcRewardsPage />} />
                 <Route path="/donate" element={<DonatePage />} />
                 <Route path="/header-footer" element={<HeaderFooterDemoPage />} />
+
+                {/* 3.1. Tuyến đường trang tuỳ biến theo khối */}
+                <Route path="/p/:slug" element={<CustomDynamicPageView />} />
 
                 {/* 4. Trang Tủ sách cá nhân, Đặt lại mật khẩu & Quản trị Admin */}
                 <Route

@@ -7,9 +7,12 @@ export const Footer: React.FC = () => {
 
   const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [
     { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
-    { id: 'privacy', label: 'Chính sách bảo mật', url: '/terms-of-service', order_index: 2, is_active: true },
-    { id: 'faq', label: 'Chính sách thanh toán & FAQ', url: '/faq', order_index: 3, is_active: true },
-    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 4, is_active: true },
+    { id: 'privacy', label: 'Chính sách bảo mật', url: '/privacy-policy', order_index: 2, is_active: true },
+    { id: 'payment', label: 'Chính sách thanh toán & giao hàng', url: '/payment-delivery-policy', order_index: 3, is_active: true },
+    { id: 'refund', label: 'Chính sách hoàn tiền', url: '/refund-policy', order_index: 4, is_active: true },
+    { id: 'copyright', label: 'Chính sách bản quyền', url: '/copyright-policy', order_index: 5, is_active: true },
+    { id: 'faq', label: 'Câu hỏi thường gặp (FAQ)', url: '/faq', order_index: 6, is_active: true },
+    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 7, is_active: true },
   ];
 
   const socialLinks = siteConfigs?.footer_social_links?.filter((s) => s.is_active) || [

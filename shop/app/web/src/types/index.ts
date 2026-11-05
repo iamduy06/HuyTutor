@@ -236,6 +236,11 @@ export interface SiteConfigs {
   flashcard_page_blocks?: FlashcardPageBlockItem[];
   gift_page_blocks?: CategoryBlockItem[];
   terms_page_config?: TermsPageConfig;
+  privacy_policy_config?: PolicyPageConfig;
+  payment_delivery_policy_config?: PolicyPageConfig;
+  refund_policy_config?: PolicyPageConfig;
+  copyright_policy_config?: PolicyPageConfig;
+  custom_pages_config?: CustomPagesConfig;
   faq_page_config?: FaqPageConfig;
   hc_rewards_page_config?: HcRewardsPageConfig;
   soan_tai_lieu_page_config?: SoanTaiLieuPageConfig;
@@ -722,6 +727,19 @@ export interface GiftCrossSellConfig {
  * ============================================================================
  */
 
+export interface PolicySectionItem {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface PolicyPageConfig {
+  title: string;
+  description: string;
+  last_updated?: string;
+  sections: PolicySectionItem[];
+}
+
 export interface TermsSectionItem {
   id: string;
   title: string;
@@ -732,6 +750,50 @@ export interface TermsPageConfig {
   title: string;
   description: string;
   sections: TermsSectionItem[];
+}
+
+export type CustomBlockType =
+  | 'rich_text'
+  | 'banner_hero'
+  | 'accordion_faq'
+  | 'cards_grid'
+  | 'cta_box'
+  | 'image_only';
+
+export interface CustomPageBlockItem {
+  id: string;
+  title: string;
+  desc?: string;
+  icon?: string;
+  link?: string;
+}
+
+export interface CustomPageBlock {
+  id: string;
+  type: CustomBlockType;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  image_url?: string;
+  link_url?: string;
+  caption?: string;
+  items?: CustomPageBlockItem[];
+  is_active?: boolean;
+}
+
+export interface CustomPageItem {
+  id: string;
+  title: string;
+  slug: string;
+  meta_description?: string;
+  is_active: boolean;
+  blocks: CustomPageBlock[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomPagesConfig {
+  pages: CustomPageItem[];
 }
 
 export interface FaqItem {
