@@ -730,13 +730,18 @@ export const dbService = {
   async updateSiteConfig(key: string, value: any): Promise<any> {
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        await supabaseAdmin.from('site_configs').upsert({
+        const { error } = await supabaseAdmin.from('site_configs').upsert({
           key,
           value,
           updated_at: new Date().toISOString(),
         });
+        if (error) {
+          console.error('[dbService] Error updating site_configs in Supabase:', error);
+          throw error;
+        }
       } catch (err) {
         console.error('[dbService] Error updating site_configs in Supabase:', err);
+        throw err;
       }
     }
     const db = loadLocalDb();
@@ -803,21 +808,21 @@ export const dbService = {
   async getComboRules(): Promise<SeedComboRule[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const { data, error } = await supabaseAdmin
-          .from('combo_rules')
-          .select('*')
-          .eq('is_active', true)
-          .order('min_quantity', { ascending: true });
-        if (!error && data) {
-          return data as SeedComboRule[];
+        const { data: configRow, error: cfgErr } = await supabaseAdmin
+          .from('site_configs')
+          .select('value')
+          .eq('key', 'combo_rules')
+          .maybeSingle();
+
+        if (!cfgErr && configRow && Array.isArray(configRow.value)) {
+          return configRow.value.filter((r: any) => r.is_active);
         }
       } catch (err) {
         console.error('[dbService] Supabase getComboRules error:', err);
       }
-      return [];
     }
     const db = loadLocalDb();
-    return db.combo_rules
+    return (db.combo_rules || [])
       .filter((r) => r.is_active)
       .sort((a, b) => a.min_quantity - b.min_quantity);
   },
@@ -956,11 +961,19 @@ export const dbService = {
 
   async upsertProduct(payload: Partial<SeedProduct>): Promise<SeedProduct> {
     const db = loadLocalDb();
-    const categories = db.categories;
+    const categories = await this.getCategories({ includeInactive: true });
+    const fallbackCat = {
+      id: 'c3b9b4f7-0000-0000-0000-000000000001',
+      name: 'Tài liệu THPT',
+      slug: 'high-school',
+      description: '',
+      sort_order: 1,
+      is_active: true,
+    };
     const matchedCat =
       categories.find(
         (c) => c.slug === payload.category_slug || c.id === payload.category_id
-      ) || categories[0];
+      ) || categories[0] || fallbackCat;
 
     const existingIdx = db.products.findIndex(
       (p) =>
@@ -1091,7 +1104,7 @@ export const dbService = {
           {
             key: `product_detail_blocks:${productRecord.slug}`,
             value: productRecord.detail_blocks,
-            description: `Cấu hình các khối động Trang cấp 2 cho tài liệu ${productRecord.slug}`,
+            updated_at: new Date().toISOString(),
           },
           { onConflict: 'key' }
         );
@@ -1099,16 +1112,19 @@ export const dbService = {
 
       if (!prodErr && upsertedProd) {
         productRecord.id = upsertedProd.id;
-        for (const fmt of productRecord.formats) {
-          await supabaseAdmin.from('product_formats').upsert(
-            {
-              product_id: upsertedProd.id,
-              format_code: fmt.format_code,
-              price: fmt.price,
-              is_active: fmt.is_active,
-            },
-            { onConflict: 'product_id,format_code' }
-          );
+        // Xóa formats cũ và insert formats mới (tránh lỗi 42P10 thiếu constraint unique trên product_formats)
+        await supabaseAdmin.from('product_formats').delete().eq('product_id', upsertedProd.id);
+        if (Array.isArray(productRecord.formats) && productRecord.formats.length > 0) {
+          const formatRows = productRecord.formats.map((fmt) => ({
+            product_id: upsertedProd.id,
+            format_code: fmt.format_code,
+            price: Number(fmt.price) || 0,
+            is_active: fmt.is_active !== false,
+          }));
+          const { error: fmtErr } = await supabaseAdmin.from('product_formats').insert(formatRows);
+          if (fmtErr) {
+            console.error('[dbService] Error inserting product_formats in Supabase:', fmtErr);
+          }
         }
       }
     }
@@ -1123,11 +1139,18 @@ export const dbService = {
   },
 
   async deleteProduct(slugOrId: string): Promise<boolean> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slugOrId);
     if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin
-        .from('products')
-        .delete()
-        .or(`slug.eq.${slugOrId},id.eq.${slugOrId}`);
+      let query = supabaseAdmin.from('products').delete();
+      if (isUuid) {
+        query = query.or(`slug.eq.${slugOrId},id.eq.${slugOrId}`);
+      } else {
+        query = query.eq('slug', slugOrId);
+      }
+      const { error: delErr } = await query;
+      if (delErr) {
+        console.error('[dbService] Error deleting product from Supabase:', delErr);
+      }
       await supabaseAdmin
         .from('site_configs')
         .delete()
@@ -1202,7 +1225,7 @@ export const dbService = {
           {
             key: `category_blocks:${categoryRecord.slug}`,
             value: categoryRecord.blocks,
-            description: `Cấu hình các khối động Trang cấp 1 cho danh mục ${categoryRecord.slug}`,
+            updated_at: new Date().toISOString(),
           },
           { onConflict: 'key' }
         );
@@ -1222,17 +1245,27 @@ export const dbService = {
     return categoryRecord;
   },
 
-  async deleteCategory(slug: string): Promise<boolean> {
+  async deleteCategory(slugOrId: string): Promise<boolean> {
     const db = loadLocalDb();
-    const idx = db.categories.findIndex((c) => c.slug === slug || c.id === slug);
+    const idx = db.categories.findIndex((c) => c.slug === slugOrId || c.id === slugOrId);
     if (idx >= 0) {
       db.categories.splice(idx, 1);
       saveLocalDb(db);
     }
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      await supabaseAdmin.from('categories').delete().eq('slug', slug);
-      await supabaseAdmin.from('site_configs').delete().eq('key', `category_blocks:${slug}`);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slugOrId);
+      let query = supabaseAdmin.from('categories').delete();
+      if (isUuid) {
+        query = query.or(`slug.eq.${slugOrId},id.eq.${slugOrId}`);
+      } else {
+        query = query.eq('slug', slugOrId);
+      }
+      const { error: delErr } = await query;
+      if (delErr) {
+        console.error('[dbService] Error deleting category from Supabase:', delErr);
+      }
+      await supabaseAdmin.from('site_configs').delete().eq('key', `category_blocks:${slugOrId}`);
     }
     return true;
   },
@@ -1276,9 +1309,11 @@ export const dbService = {
 
       if (!error && insertedOrder) {
         order.id = insertedOrder.id;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         for (const item of order.items) {
           await supabaseAdmin.from('order_items').insert({
             order_id: insertedOrder.id,
+            ...(item.product_id && uuidRegex.test(item.product_id) ? { product_id: item.product_id } : {}),
             product_title: item.product_title,
             google_form_product_name: item.google_form_product_name || '',
             format_code: item.format_code,
@@ -1450,15 +1485,25 @@ export const dbService = {
     is_success: boolean;
     error_message?: string;
   }): Promise<void> {
+    if (log.order_code && log.is_success) {
+      await this.updateOrderStatus(log.order_code, { google_form_submitted: true });
+    }
     if (isSupabaseConfigured && supabaseAdmin && log.order_id) {
-      await supabaseAdmin.from('google_form_logs').insert({
-        order_id: log.order_id,
-        product_name: log.product_name,
-        payload: log.payload,
-        http_status: log.http_status,
-        is_success: log.is_success,
-        error_message: log.error_message || null,
-      });
+      try {
+        const { error } = await supabaseAdmin.from('google_form_logs').insert({
+          order_id: log.order_id,
+          product_name: log.product_name,
+          payload: log.payload,
+          http_status: log.http_status,
+          is_success: log.is_success,
+          error_message: log.error_message || null,
+        });
+        if (error && error.code !== 'PGRST205') {
+          console.error('[dbService] Error logging google form submission to Supabase:', error);
+        }
+      } catch (err) {
+        // Safe catch if table is not in schema
+      }
     }
   },
 
