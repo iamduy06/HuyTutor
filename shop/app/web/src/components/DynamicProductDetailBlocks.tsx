@@ -276,36 +276,35 @@ export const ProductHeroBlock: React.FC<{
         {/* Cột Trái: Hình ảnh tài liệu (Đứng độc lập hoặc Card Box bìa sách 3D) */}
         <div className="md:col-span-5 flex justify-center items-center">
           {config.image_mode === 'card_box' ? (
-            <div className="w-full bg-white border border-gray-200 rounded-xl p-5 min-h-[190px] flex items-center justify-center gap-4 shadow-2xs relative">
+            <div className="w-full bg-white border border-gray-200 rounded-xl p-5 min-h-[220px] flex flex-col sm:flex-row items-center justify-center gap-5 shadow-2xs relative">
               {displayBadge && (
-                <span className="absolute top-3 right-3 bg-[#e60049] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-xs">
+                <span className="absolute top-3 right-3 bg-[#e60049] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-xs z-10">
                   {displayBadge}
                 </span>
               )}
-              <div className="shrink-0 flex justify-center">
+              <div className="flex-1 shrink-0 flex justify-center max-w-full">
                 {displayImage ? (
                   <img
                     src={displayImage}
                     alt={displayTitle}
-                    className="max-h-[155px] w-auto max-w-full object-contain drop-shadow-md block"
+                    className="max-h-[240px] sm:max-h-[280px] w-auto max-w-full object-contain drop-shadow-md block"
                   />
                 ) : null}
               </div>
               {coverLines.length > 0 && (
-                <div className="flex-1 min-w-0 pl-1">
-                  <p className="text-xs sm:text-[13px] text-gray-700 leading-snug">
+                <div className="flex-1 min-w-0 w-full sm:w-auto text-left">
+                  <p className="text-xs sm:text-[13px] text-gray-700 leading-snug break-words">
                     {coverLines.map((line, i) => (
                       <React.Fragment key={i}>
                         {i === coverLines.length - 1 ? (
-                          <strong className="text-gray-900 font-bold">{line}</strong>
+                          <strong className="text-gray-900 font-bold block mt-1">{line}</strong>
                         ) : (
-                          line
+                          <span className="block">{line}</span>
                         )}
-                        {i < coverLines.length - 1 && <br />}
                       </React.Fragment>
                     ))}
                   </p>
-                  <div className="h-[2px] w-16 bg-[#e60049] mt-2" />
+                  <div className="h-[2px] w-16 bg-[#e60049] mt-2.5" />
                 </div>
               )}
             </div>
