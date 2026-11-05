@@ -34,8 +34,8 @@ export const FORM_ENTRIES = {
   documentNote:       'entry.906534887',  // 8. Ghi chú (Word dài | PDF dài | Flashcard | Trang tính | Thiết kế)
   customerEmail:      'entry.1610762805', // 9. Email nhận tài liệu (Đã xác thực 2 lớp)
   customerGroup:      'entry.1680953650', // 10. Nhóm khách
-  discountPointsUsed: 'entry.112780521',  // 11. Điểm KM đã sử dụng (Mặc định để trống "")
-  quantity:           'entry.242891304',  // 12. Số lượng (Chỉ điền khi mua Flashcard, còn lại để trống "")
+  quantity:           'entry.112780521',  // 11. Số lượng (Chỉ điền khi mua Flashcard, còn lại để trống "")
+  discountPointsUsed: 'entry.242891304',  // 12. Điểm KM đã sử dụng (Mặc định để trống "")
   otherUnit:          'entry.317416358',  // 13. Đơn vị khác (Mặc định để trống "")
   sellerName:         'entry.118891792',  // 14. Người bán (Mặc định: 'Website')
 } as const;
