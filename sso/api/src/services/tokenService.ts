@@ -85,6 +85,14 @@ export async function recordTokenView(token: string): Promise<{
       message: 'Mã xác thực không được để trống.',
     };
   }
+  // SEC-11: Validate token format strictly (only hex characters) to prevent PostgREST LIKE injection
+  if (!/^[0-9a-fA-F]{32,64}$/.test(cleanToken)) {
+    return {
+      valid: false,
+      reason: 'INVALID_TOKEN_FORMAT',
+      message: 'Mã xác thực không đúng định dạng.',
+    };
+  }
 
   // 1. Look up in memory store
   let record = memoryTokenStore.get(cleanToken);
@@ -180,6 +188,10 @@ export async function consumeTokenFinal(token: string): Promise<{
   const cleanToken = token.trim();
   if (!cleanToken) {
     return { valid: false, message: 'Thiếu mã token xác thực.' };
+  }
+  // SEC-11: Validate token format strictly (only hex characters)
+  if (!/^[0-9a-fA-F]{32,64}$/.test(cleanToken)) {
+    return { valid: false, message: 'Mã xác thực không đúng định dạng.' };
   }
 
   let record = memoryTokenStore.get(cleanToken);

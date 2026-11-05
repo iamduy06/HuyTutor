@@ -556,28 +556,16 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
     }
 
     const users = (await userRes.json()) as any[];
-    if (!users || users.length === 0) {
-      res.status(404).json({
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'Tài khoản với email này không tồn tại trên hệ thống. Vui lòng kiểm tra lại email hoặc đăng ký tài khoản mới.',
-        },
+    // SEC-10: Chống dò quét danh sách email (User Enumeration) - Trả về thông báo thành công chung
+    if (!users || users.length === 0 || users[0].is_active === false) {
+      res.json({
+        success: true,
+        message: 'Nếu email này đã được đăng ký trên hệ thống, mã xác nhận khôi phục mật khẩu đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư đến.',
       });
       return;
     }
 
     const user = users[0];
-    if (user.is_active === false) {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: 'ACCOUNT_NOT_ACTIVATED',
-          message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để kích hoạt tài khoản.',
-        },
-      });
-      return;
-    }
 
     const token = await createVerificationToken({
       userId: user.id,
