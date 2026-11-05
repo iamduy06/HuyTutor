@@ -325,6 +325,7 @@ router.post('/auth/logout', requireAuth, async (req: Request, res: Response) => 
     memoryCache.invalidateUserTokens(req.user.id);
   }
   if (req.token) {
+    memoryCache.delete(`user_token_${req.token}`);
     try {
       const admin = getAdminClient();
       await admin.from('user_sessions').update({ is_revoked: true }).eq('session_token', req.token);

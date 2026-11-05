@@ -178,7 +178,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     };
 
     // Cache in RAM for 5 minutes
-    memoryCache.set(cacheKey, authUser, 300);
+    memoryCache.set(cacheKey, authUser, 20);
   }
 
   // 4. SEC-007: Device Binding & Flashcard Quota Verification
@@ -343,7 +343,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       device_id: ssoDeviceId,
     };
 
-    memoryCache.set(cacheKey, authUser, 300);
+    memoryCache.set(cacheKey, authUser, 20);
     req.user = authUser;
   }
 
