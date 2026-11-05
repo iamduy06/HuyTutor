@@ -222,6 +222,10 @@ export const apiClient = {
     return requestJson(`/api/catalog/init${query}`);
   },
 
+  async getAdminMenus(): Promise<{ ok: boolean; menus: MenuItem[] }> {
+    return requestJson('/api/admin/menus');
+  },
+
   async updateMenus(menus: MenuItem[]): Promise<{ ok: boolean; menus: MenuItem[] }> {
     return requestJson('/api/admin/menus', {
       method: 'PUT',

@@ -173,10 +173,11 @@ export const AdminPage: React.FC = () => {
   const [adminMenus, setAdminMenus] = useState<MenuItem[]>([]);
   const [adminSocials, setAdminSocials] = useState<FooterSocialLink[]>([]);
   const [adminPolicies, setAdminPolicies] = useState<FooterPolicyLink[]>([]);
+  const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
-    if (storeMenus && storeMenus.length > 0) {
+    if (adminMenus.length === 0 && storeMenus && storeMenus.length > 0) {
       setAdminMenus(storeMenus);
     }
   }, [storeMenus]);
@@ -193,7 +194,10 @@ export const AdminPage: React.FC = () => {
   const handleSaveMenus = async () => {
     setSavingConfig(true);
     try {
-      await apiClient.updateMenus(adminMenus);
+      const res = await apiClient.updateMenus(adminMenus);
+      if (res?.menus && Array.isArray(res.menus)) {
+        setAdminMenus(res.menus);
+      }
       await refreshCatalog();
       showToast('Đã lưu cấu hình danh sách Menu Header thành công!');
     } catch (err: any) {
@@ -269,6 +273,9 @@ export const AdminPage: React.FC = () => {
       setCategories(data.categories);
       setOrders(data.orders);
       setAdminUsers(usersRes.users || []);
+      if (Array.isArray(data.menus)) {
+        setAdminMenus(data.menus);
+      }
     } catch (err: any) {
       showToast(err?.message || 'Lỗi tải dữ liệu Admin từ Backend.');
     } finally {
@@ -2230,78 +2237,257 @@ export const AdminPage: React.FC = () => {
                   </thead>
                   <tbody>
                     {adminMenus.map((item, idx) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="border border-gray-200 p-2 text-center">
-                          <input
-                            type="number"
-                            value={item.sort_order}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setAdminMenus((prev) =>
-                                prev.map((m, i) => (i === idx ? { ...m, sort_order: val } : m))
-                              );
-                            }}
-                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2">
-                          <input
-                            type="text"
-                            value={item.title}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminMenus((prev) =>
-                                prev.map((m, i) => (i === idx ? { ...m, title: val } : m))
-                              );
-                            }}
-                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-semibold"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2">
-                          <input
-                            type="text"
-                            value={item.slug}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminMenus((prev) =>
-                                prev.map((m, i) => (i === idx ? { ...m, slug: val } : m))
-                              );
-                            }}
-                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs text-gray-700 font-mono"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2">
-                          <span className="text-[11px] text-gray-600 font-medium">
-                            {item.children && item.children.length > 0
-                              ? `${item.children.length} mục con (${item.children.map((c) => c.label).slice(0, 2).join(', ')}${item.children.length > 2 ? '...' : ''})`
-                              : 'Không có'}
-                          </span>
-                        </td>
-                        <td className="border border-gray-200 p-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={item.is_active}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setAdminMenus((prev) =>
-                                prev.map((m, i) => (i === idx ? { ...m, is_active: checked } : m))
-                              );
-                            }}
-                            className="w-4 h-4 text-[#e60049] rounded"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdminMenus((prev) => prev.filter((_, i) => i !== idx));
-                            }}
-                            className="text-red-600 hover:text-red-800 text-[11px] font-bold"
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
+                      <React.Fragment key={item.id}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="border border-gray-200 p-2 text-center">
+                            <input
+                              type="number"
+                              value={item.sort_order}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setAdminMenus((prev) =>
+                                  prev.map((m, i) => (i === idx ? { ...m, sort_order: val } : m))
+                                );
+                              }}
+                              className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <input
+                              type="text"
+                              value={item.title}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminMenus((prev) =>
+                                  prev.map((m, i) => (i === idx ? { ...m, title: val } : m))
+                                );
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-semibold"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <input
+                              type="text"
+                              value={item.slug}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminMenus((prev) =>
+                                  prev.map((m, i) => (i === idx ? { ...m, slug: val } : m))
+                                );
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs text-gray-700 font-mono"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-[11px] text-gray-600 font-medium">
+                                {item.children && item.children.length > 0
+                                  ? `${item.children.length} mục con`
+                                  : 'Không có'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedMenuId(expandedMenuId === item.id ? null : item.id)
+                                }
+                                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer shrink-0"
+                              >
+                                {expandedMenuId === item.id ? 'Thu gọn ▲' : 'Quản lý (▼)'}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="border border-gray-200 p-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={item.is_active}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setAdminMenus((prev) =>
+                                  prev.map((m, i) => (i === idx ? { ...m, is_active: checked } : m))
+                                );
+                              }}
+                              className="w-4 h-4 text-[#e60049] rounded"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAdminMenus((prev) => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+
+                        {expandedMenuId === item.id && (
+                          <tr className="bg-gray-50/80">
+                            <td colSpan={6} className="border border-gray-200 p-3 pl-8">
+                              <div className="bg-white border border-gray-200 rounded p-3 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-bold text-gray-800">
+                                    Danh sách Menu con cho:{' '}
+                                    <span className="text-[#e60049]">{item.title}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentChildren = Array.isArray(item.children)
+                                        ? [...item.children]
+                                        : [];
+                                      const newSub = {
+                                        id: `sub_${Date.now()}`,
+                                        label: 'Mục con mới',
+                                        url: `${item.slug}/sub-link`,
+                                        order_index: currentChildren.length + 1,
+                                        is_highlight: false,
+                                      };
+                                      setAdminMenus((prev) =>
+                                        prev.map((m) =>
+                                          m.id === item.id
+                                            ? { ...m, children: [...currentChildren, newSub] }
+                                            : m
+                                        )
+                                      );
+                                    }}
+                                    className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2.5 py-1 rounded border border-gray-300"
+                                  >
+                                    + Thêm menu con
+                                  </button>
+                                </div>
+
+                                {!item.children || item.children.length === 0 ? (
+                                  <p className="text-xs text-gray-400 italic">
+                                    Chưa có menu con nào. Bấm "+ Thêm menu con" để tạo.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {item.children.map((sub, sIdx) => (
+                                      <div
+                                        key={sub.id || sIdx}
+                                        className="flex items-center gap-2 text-xs"
+                                      >
+                                        <input
+                                          type="number"
+                                          value={sub.order_index ?? sIdx + 1}
+                                          onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            setAdminMenus((prev) =>
+                                              prev.map((m) =>
+                                                m.id === item.id
+                                                  ? {
+                                                      ...m,
+                                                      children: m.children?.map((c, ci) =>
+                                                        ci === sIdx ? { ...c, order_index: val } : c
+                                                      ),
+                                                    }
+                                                  : m
+                                              )
+                                            );
+                                          }}
+                                          className="w-12 border border-gray-300 rounded px-1 py-1 text-center font-mono"
+                                          placeholder="STT"
+                                          title="Thứ tự hiển thị"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={sub.label}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setAdminMenus((prev) =>
+                                              prev.map((m) =>
+                                                m.id === item.id
+                                                  ? {
+                                                      ...m,
+                                                      children: m.children?.map((c, ci) =>
+                                                        ci === sIdx ? { ...c, label: val } : c
+                                                      ),
+                                                    }
+                                                  : m
+                                              )
+                                            );
+                                          }}
+                                          className="flex-1 border border-gray-300 rounded px-2 py-1 font-medium"
+                                          placeholder="Tên nhãn menu con (VD: Tài liệu THPT)"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={sub.url}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setAdminMenus((prev) =>
+                                              prev.map((m) =>
+                                                m.id === item.id
+                                                  ? {
+                                                      ...m,
+                                                      children: m.children?.map((c, ci) =>
+                                                        ci === sIdx ? { ...c, url: val } : c
+                                                      ),
+                                                    }
+                                                  : m
+                                              )
+                                            );
+                                          }}
+                                          className="flex-1 border border-gray-300 rounded px-2 py-1 font-mono text-gray-700"
+                                          placeholder="Đường dẫn (VD: /tailieu/high-school)"
+                                        />
+                                        <label className="flex items-center gap-1 text-[11px] text-gray-600 font-bold shrink-0 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(sub.is_highlight)}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              setAdminMenus((prev) =>
+                                                prev.map((m) =>
+                                                  m.id === item.id
+                                                    ? {
+                                                        ...m,
+                                                        children: m.children?.map((c, ci) =>
+                                                          ci === sIdx
+                                                            ? { ...c, is_highlight: checked }
+                                                            : c
+                                                        ),
+                                                      }
+                                                    : m
+                                                )
+                                              );
+                                            }}
+                                            className="w-3.5 h-3.5 text-[#e60049] rounded"
+                                          />
+                                          Nổi bật
+                                        </label>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setAdminMenus((prev) =>
+                                              prev.map((m) =>
+                                                m.id === item.id
+                                                  ? {
+                                                      ...m,
+                                                      children: m.children?.filter(
+                                                        (_, ci) => ci !== sIdx
+                                                      ),
+                                                    }
+                                                  : m
+                                              )
+                                            );
+                                          }}
+                                          className="text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1"
+                                          title="Xóa menu con"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
