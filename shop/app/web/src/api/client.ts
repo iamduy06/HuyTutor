@@ -1,5 +1,4 @@
-import {
-  AdminUserRecord,
+import { AdminUserRecord,
   CategoryItem,
   ComboRule,
   MenuItem,
@@ -10,8 +9,7 @@ import {
   UiFormatCode,
   UserLibraryItem,
   UserProfile,
-  UserSessionItem,
-} from '../types';
+  UserSessionItem, ClientRegion } from '../types';
 
 const rawApiBase = import.meta.env.API_BASE_URL;
 const API_BASE_URL = rawApiBase ? (rawApiBase as string).replace(/\/$/, '') : '';
@@ -34,6 +32,14 @@ function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
     typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null;
   if (savedToken) {
     headers['Authorization'] = `Bearer ${savedToken}`;
+  }
+  if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) headers['x-client-timezone'] = tz;
+    } catch {
+      // ignore timezone error
+    }
   }
   if (extra) {
     const entries =
@@ -212,10 +218,7 @@ export const apiClient = {
     comboRules: ComboRule[];
     products: Product[];
     siteConfigs?: SiteConfigs;
-    clientRegion: {
-      country: string;
-      recommendedGateway: 'sepay' | 'paypal';
-    };
+    clientRegion: ClientRegion;
     mediaDomain: string;
   }> {
     const query = countryOverride ? `?country=${countryOverride}` : '';

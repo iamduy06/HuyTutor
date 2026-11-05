@@ -9,6 +9,7 @@ import {
   Product,
   SiteConfigs,
   UiFormatCode,
+  ClientRegion,
 } from '../types';
 
 interface StoreContextValue {
@@ -20,10 +21,7 @@ interface StoreContextValue {
   products: Product[];
   siteConfigs: SiteConfigs;
   updateSiteConfig: (key: string, value: any) => Promise<void>;
-  clientRegion: {
-    country: string;
-    recommendedGateway: 'sepay' | 'paypal';
-  };
+  clientRegion: ClientRegion;
   setRegionOverride: (country: 'VN' | 'INTL') => void;
   refreshCatalog: () => Promise<void>;
 
@@ -76,12 +74,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [comboRules, setComboRules] = useState<ComboRule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [siteConfigs, setSiteConfigs] = useState<SiteConfigs>(DEFAULT_SITE_CONFIGS);
-  const [clientRegion, setClientRegion] = useState<{
-    country: string;
-    recommendedGateway: 'sepay' | 'paypal';
-  }>({
+  const [clientRegion, setClientRegion] = useState<ClientRegion>({
     country: 'VN',
-    recommendedGateway: 'sepay',
+    isVietnam: true,
+    allowedGateways: ['sepay'],
+    defaultGateway: 'sepay',
+    usdExchangeRate: 27000,
   });
 
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -174,10 +172,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const setRegionOverride = (country: 'VN' | 'INTL') => {
-    setClientRegion({
+    const isVN = country === 'VN';
+    setClientRegion((prev: ClientRegion) => ({
+      ...prev,
       country,
-      recommendedGateway: country === 'VN' ? 'sepay' : 'paypal',
-    });
+      isVietnam: isVN,
+      allowedGateways: isVN ? ['sepay'] : ['sepay', 'paypal'],
+    }));
   };
 
   const refreshCatalog = async () => {

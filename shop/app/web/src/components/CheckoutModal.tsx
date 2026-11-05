@@ -40,9 +40,8 @@ export const CheckoutModal: React.FC = () => {
   const [invoiceTaxOrCccd, setInvoiceTaxOrCccd] = useState('');
   const [invoiceAddress, setInvoiceAddress] = useState('');
   const [flashcardQuantity, setFlashcardQuantity] = useState<number>(1);
-  const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>(
-    clientRegion.recommendedGateway || 'sepay'
-  );
+  const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>('sepay');
+  const isVietnamUser = clientRegion.isVietnam !== false && clientRegion.country === 'VN';
 
   // Tự động điền thông tin từ tài khoản đang đăng nhập
   useEffect(() => {
@@ -162,7 +161,7 @@ export const CheckoutModal: React.FC = () => {
         invoiceTaxOrCccd: needInvoice ? invoiceTaxOrCccd.trim() : '',
         invoiceAddress: needInvoice ? invoiceAddress.trim() : '',
         flashcardQuantity: activeFormat === 'Flashcard' ? flashcardQuantity : null,
-        paymentMethod: selectedGateway,
+        paymentMethod: isVietnamUser ? 'sepay' : selectedGateway,
         items: selectedCartItems.map((it) => ({
           productId: it.slug,
           productTitle: it.title,
@@ -228,55 +227,83 @@ export const CheckoutModal: React.FC = () => {
         <div className="p-6 max-h-[82vh] overflow-y-auto">
           {!createdOrder ? (
             <form onSubmit={handleCreateOrder} className="space-y-4">
-              {/* Lựa chọn phương thức thanh toán */}
-              <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-3.5 space-y-2">
-                <div className="text-xs font-bold text-gray-800">
-                  Phương thức thanh toán:
+              {/* Lựa chọn phương thức thanh toán (Tự động tracking Việt Nam vs Nước ngoài) */}
+              {isVietnamUser ? (
+                /* Khách hàng ở Việt Nam: Bắt buộc 100% VietQR, không có PayPal, không huy hiệu */
+                <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-3.5 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider">
+                      Phương thức thanh toán
+                    </div>
+                    <div className="text-xs font-bold text-[#e60049] flex items-center gap-1.5 mt-0.5">
+                      <span>Chuyển khoản Ngân hàng (VietQR)</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-sm">
+                    Tự động kích hoạt
+                  </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <label
-                    className={`flex items-center gap-2 p-2.5 rounded-sm border cursor-pointer transition ${
-                      selectedGateway === 'sepay'
-                        ? 'bg-white border-[#e60049] text-[#e60049] font-bold shadow-sm'
-                        : 'bg-white/60 border-gray-200 text-gray-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment_gateway"
-                      value="sepay"
-                      checked={selectedGateway === 'sepay'}
-                      onChange={() => {
-                        setSelectedGateway('sepay');
-                        setRegionOverride('VN');
-                      }}
-                      className="accent-[#e60049]"
-                    />
-                    <span className="text-xs">Chuyển khoản Ngân hàng (VietQR)</span>
-                  </label>
-
-                  <label
-                    className={`flex items-center gap-2 p-2.5 rounded-sm border cursor-pointer transition ${
-                      selectedGateway === 'paypal'
-                        ? 'bg-white border-[#e60049] text-[#e60049] font-bold shadow-sm'
-                        : 'bg-white/60 border-gray-200 text-gray-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment_gateway"
-                      value="paypal"
-                      checked={selectedGateway === 'paypal'}
-                      onChange={() => {
-                        setSelectedGateway('paypal');
-                        setRegionOverride('INTL');
-                      }}
-                      className="accent-[#e60049]"
-                    />
-                    <span className="text-xs">Thanh toán Quốc tế (PayPal / Thẻ)</span>
-                  </label>
-                </div>
-              </div>
+              ) : (
+                /* Khách hàng ở Nước ngoài: Mặc định là VietQR, nếu không có tài khoản VN thì bấm chọn PayPal */
+                selectedGateway === 'sepay' ? (
+                  <div className="bg-[#fff5f7] border border-pink-200 rounded-md p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider">
+                          Phương thức thanh toán
+                        </div>
+                        <div className="text-xs font-bold text-[#e60049] flex items-center gap-1.5 mt-0.5">
+                          <span>Chuyển khoản Ngân hàng (VietQR)</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-sm">
+                        Mặc định
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-pink-100 flex flex-wrap items-center justify-between text-xs gap-1">
+                      <span className="text-gray-600">Bạn không có tài khoản ngân hàng Việt Nam?</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGateway('paypal')}
+                        className="text-[#e60049] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        Thanh toán bằng PayPal ↗
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-blue-50/70 border border-blue-200 rounded-md p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[11px] text-blue-700 font-semibold uppercase tracking-wider">
+                          Phương thức thanh toán
+                        </div>
+                        <div className="text-xs font-bold text-blue-900 mt-0.5">
+                          Thanh toán Quốc tế (PayPal / Thẻ Visa, MasterCard)
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGateway('sepay')}
+                        className="text-xs text-[#e60049] hover:underline font-bold cursor-pointer"
+                      >
+                        ← Đổi sang VietQR
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-gray-600 bg-white/80 p-2 rounded border border-blue-100 flex flex-wrap items-center justify-between gap-1">
+                      <span>
+                        Số tiền quy đổi:{' '}
+                        <strong>
+                          ~${(totalAmount / (clientRegion.usdExchangeRate || 27000)).toFixed(2)} USD
+                        </strong>
+                      </span>
+                      <span className="text-gray-500 text-[10px]">
+                        Tỷ giá: 1 USD ≈ {(clientRegion.usdExchangeRate || 27000).toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  </div>
+                )
+              )}
 
               {formError && (
                 <div className="p-3 bg-red-50 border border-[#e60049] text-[#e60049] text-xs font-bold rounded-sm">

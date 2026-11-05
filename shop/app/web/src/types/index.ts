@@ -1046,3 +1046,12 @@ export interface UniversalPageContext {
   allCategories?: CategoryItem[];
   siteConfigs?: any;
 }
+
+export interface ClientRegion {
+  country: string;
+  isVietnam: boolean;
+  allowedGateways: ('sepay' | 'paypal')[];
+  defaultGateway: 'sepay';
+  usdExchangeRate: number;
+  usdLiveRate?: number;
+}
