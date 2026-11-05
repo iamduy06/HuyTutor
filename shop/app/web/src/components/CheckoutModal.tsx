@@ -294,11 +294,11 @@ export const CheckoutModal: React.FC = () => {
                       <span>
                         Số tiền quy đổi:{' '}
                         <strong>
-                          ~${(totalAmount / (clientRegion.usdExchangeRate || 27000)).toFixed(2)} USD
+                          ~${(totalAmount / (clientRegion.usdExchangeRate || 26000)).toFixed(2)} USD
                         </strong>
                       </span>
                       <span className="text-gray-500 text-[10px]">
-                        Tỷ giá: 1 USD ≈ {(clientRegion.usdExchangeRate || 27000).toLocaleString('vi-VN')} đ
+                        Tỷ giá: 1 USD ≈ {(clientRegion.usdExchangeRate || 26000).toLocaleString('vi-VN')} đ
                       </span>
                     </div>
                   </div>

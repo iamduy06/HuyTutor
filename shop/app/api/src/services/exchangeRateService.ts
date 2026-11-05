@@ -66,11 +66,11 @@ async function fetchLiveRate(): Promise<CachedExchangeRate> {
     }
 
     const liveRate = fallbackBase;
-    const effectiveRate = liveRate + RATE_BUFFER_VND;
+    const effectiveRate = fallbackBase; // Khi không lấy được tỷ giá động, fallback đúng 26.000 VNĐ, không cộng thêm phí bù
     const fallbackResult: CachedExchangeRate = {
       liveRate,
       effectiveRate,
-      bufferVnd: RATE_BUFFER_VND,
+      bufferVnd: 0,
       lastFetchedAt: Date.now(),
       source: 'fallback_env',
     };
@@ -81,7 +81,7 @@ async function fetchLiveRate(): Promise<CachedExchangeRate> {
 
 export const exchangeRateService = {
   /**
-   * Lấy thông tin tỷ giá USD/VND hiện hành (đã cộng 1.000 VNĐ buffer bù phí PayPal)
+   * Lấy thông tin tỷ giá USD/VND hiện hành (đã cộng 1.000 VNĐ buffer bù phí PayPal khi lấy được từ API)
    */
   async getExchangeRateInfo(): Promise<CachedExchangeRate> {
     const now = Date.now();
@@ -99,7 +99,7 @@ export const exchangeRateService = {
   },
 
   /**
-   * Lấy tỷ giá hiệu lực (effectiveRate = liveRate + 1000) để quy đổi VND -> USD
+   * Lấy tỷ giá hiệu lực (effectiveRate = liveRate + 1000 khi có mạng, hoặc fallback 26000 cố định)
    */
   async getEffectiveRate(): Promise<number> {
     const info = await this.getExchangeRateInfo();
@@ -107,11 +107,11 @@ export const exchangeRateService = {
   },
 
   /**
-   * Lấy nhanh tỷ giá hiệu lực từ cache đồng bộ (0ms), fallback nếu chưa nạp
+   * Lấy nhanh tỷ giá hiệu lực từ cache đồng bộ (0ms), fallback nếu chưa nạp (đúng 26.000 VNĐ)
    */
   getEffectiveRateSync(): number {
     if (cache) return cache.effectiveRate;
     const fallbackBase = Number(process.env.USD_EXCHANGE_RATE) || DEFAULT_FALLBACK_BASE_RATE;
-    return fallbackBase + RATE_BUFFER_VND;
+    return fallbackBase;
   },
 };

@@ -79,7 +79,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isVietnam: true,
     allowedGateways: ['sepay'],
     defaultGateway: 'sepay',
-    usdExchangeRate: 27000,
+    usdExchangeRate: 26000,
   });
 
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
