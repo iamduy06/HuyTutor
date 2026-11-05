@@ -122,6 +122,8 @@ export const webhookController = {
       const orderCode = String(
         req.body.orderCode ||
           req.body.resource?.purchase_units?.[0]?.custom_id ||
+          req.body.resource?.purchase_units?.[0]?.invoice_id ||
+          req.body.resource?.purchase_units?.[0]?.invoice_number ||
           req.body.resource?.custom_id ||
           ''
       )

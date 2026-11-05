@@ -207,8 +207,9 @@ export const orderController = {
       const totalAmount = Math.max(0, subtotalAmount - discountAmount);
 
       const randomDigits = Math.floor(10000 + Math.random() * 90000);
-      const prefix = process.env.ORDER_CODE_PREFIX;
+      const prefix = process.env.ORDER_CODE_PREFIX || 'DH';
       const orderCode = `${prefix}${randomDigits}`;
+      const viewToken = crypto.randomBytes(16).toString('hex');
 
       const chosenGateway: 'sepay' | 'paypal' =
         paymentMethod === 'paypal' || req.recommendedGateway === 'paypal' ? 'paypal' : 'sepay';
@@ -238,6 +239,7 @@ export const orderController = {
         total_amount: totalAmount,
         payment_method: chosenGateway,
         payment_status: 'pending',
+        view_token: viewToken,
         google_form_submitted: false,
         created_at: new Date().toISOString(),
         items: resolvedItems,

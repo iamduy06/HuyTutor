@@ -1,11 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
-import dotenv from 'dotenv';
 import apiRouter from './routes';
 import { corsGuardMiddleware } from './middlewares/corsGuard';
 import { isSupabaseConfigured } from './config/supabase';
 import { isR2Configured } from './services/r2Service';
-
-dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT);

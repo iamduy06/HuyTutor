@@ -1297,7 +1297,8 @@ export const dbService = {
         view_token: order.view_token || '',
         google_form_submitted: Boolean(order.google_form_submitted),
       };
-      if (order.user_id) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (order.user_id && uuidRegex.test(order.user_id)) {
         insertPayload.user_id = order.user_id;
       }
 
@@ -1307,11 +1308,15 @@ export const dbService = {
         .select('*')
         .single();
 
-      if (!error && insertedOrder) {
+      if (error) {
+        console.error('[dbService] Error inserting order into Supabase:', error);
+        throw error;
+      }
+
+      if (insertedOrder) {
         order.id = insertedOrder.id;
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         for (const item of order.items) {
-          await supabaseAdmin.from('order_items').insert({
+          const { error: itemErr } = await supabaseAdmin.from('order_items').insert({
             order_id: insertedOrder.id,
             ...(item.product_id && uuidRegex.test(item.product_id) ? { product_id: item.product_id } : {}),
             product_title: item.product_title,
@@ -1321,6 +1326,9 @@ export const dbService = {
             quantity: item.quantity,
             subtotal: item.subtotal,
           });
+          if (itemErr) {
+            console.error('[dbService] Error inserting order_item to Supabase:', itemErr);
+          }
         }
       }
     }
@@ -1353,14 +1361,15 @@ export const dbService = {
           need_invoice: Boolean(data.need_invoice),
           invoice_tax_or_cccd: data.invoice_tax_or_cccd || '',
           invoice_address: data.invoice_address || '',
-          subtotal_amount: Number(data.subtotal_amount),
-          discount_percent: Number(data.discount_percent),
-          discount_amount: Number(data.discount_amount),
-          total_amount: Number(data.total_amount),
+          subtotal_amount: Number(data.subtotal_amount || data.total_amount || 0),
+          discount_percent: Number(data.discount_percent || 0),
+          discount_amount: Number(data.discount_amount || 0),
+          total_amount: Number(data.final_amount !== undefined && data.final_amount !== null ? data.final_amount : data.total_amount),
           payment_method: data.payment_method,
           payment_status: data.payment_status,
           payment_ref_id: data.payment_ref_id,
           paid_at: data.paid_at,
+          view_token: data.view_token || '',
           google_form_submitted: Boolean(data.google_form_submitted),
           created_at: data.created_at,
           items: Array.isArray(data.order_items)
@@ -1402,14 +1411,15 @@ export const dbService = {
           need_invoice: Boolean(row.need_invoice),
           invoice_tax_or_cccd: row.invoice_tax_or_cccd || '',
           invoice_address: row.invoice_address || '',
-          subtotal_amount: Number(row.subtotal_amount),
-          discount_percent: Number(row.discount_percent),
-          discount_amount: Number(row.discount_amount),
-          total_amount: Number(row.total_amount),
+          subtotal_amount: Number(row.subtotal_amount || row.total_amount || 0),
+          discount_percent: Number(row.discount_percent || 0),
+          discount_amount: Number(row.discount_amount || 0),
+          total_amount: Number(row.final_amount !== undefined && row.final_amount !== null ? row.final_amount : row.total_amount),
           payment_method: row.payment_method,
           payment_status: row.payment_status,
           payment_ref_id: row.payment_ref_id,
           paid_at: row.paid_at,
+          view_token: row.view_token || '',
           google_form_submitted: Boolean(row.google_form_submitted),
           created_at: row.created_at,
           items: Array.isArray(row.order_items)
@@ -1451,8 +1461,18 @@ export const dbService = {
       if (updates.paid_at !== undefined) {
         supabaseUpdates.paid_at = updates.paid_at;
       }
+      if (updates.payment_ref_id !== undefined) {
+        supabaseUpdates.payment_ref_id = updates.payment_ref_id;
+      }
+      if (updates.google_form_submitted !== undefined) {
+        supabaseUpdates.google_form_submitted = updates.google_form_submitted;
+      }
       supabaseUpdates.updated_at = new Date().toISOString();
-      await supabaseAdmin.from('orders').update(supabaseUpdates).eq('order_code', normalized);
+      const { error } = await supabaseAdmin.from('orders').update(supabaseUpdates).eq('order_code', normalized);
+      if (error) {
+        console.error('[dbService] Error updating order status in Supabase:', error);
+        throw error;
+      }
     }
 
     const db = loadLocalDb();
@@ -1935,7 +1955,10 @@ export const dbService = {
           if (order.id && uuidRegex.test(order.id)) {
             insertPayload.order_id = order.id;
           }
-          await supabaseAdmin.from('user_library').upsert(insertPayload, { onConflict: 'user_id,product_slug,format_code' });
+          const { error: libErr } = await supabaseAdmin.from('user_library').upsert(insertPayload, { onConflict: 'user_id,product_slug,format_code' });
+          if (libErr) {
+            console.error('[dbService] Error granting order to user_library in Supabase:', libErr);
+          }
         }
       }
 
