@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS product_formats (
     price NUMERIC(12, 0) NOT NULL,
     original_price NUMERIC(12, 0),
     gdrive_folder_id VARCHAR(255),
+    drive_url TEXT DEFAULT '',
     is_default BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     order_index INT DEFAULT 0,

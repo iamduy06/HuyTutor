@@ -205,6 +205,7 @@ CREATE TABLE IF NOT EXISTS public.product_formats (
   format_code VARCHAR(50) NOT NULL,
   price INT NOT NULL DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
+  drive_url TEXT DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
