@@ -11,7 +11,14 @@ const PORT = Number(process.env.PORT);
 // Áp dụng bảo vệ Strict Origin & Chặn CLI (curl, python, scripts)
 app.use(corsGuardMiddleware);
 
-app.use(express.json({ limit: '25mb' }));
+app.use(
+  express.json({
+    limit: '25mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Health check cho Render & UptimeRobot

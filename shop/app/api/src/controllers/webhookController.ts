@@ -13,16 +13,55 @@ export const webhookController = {
   async handleSepayWebhook(req: Request, res: Response): Promise<void> {
     try {
       const configuredSecret = process.env.SEPAY_WEBHOOK_SECRET;
+      const signatureHeader = (req.headers['x-sepay-signature'] as string) || '';
+      const timestampHeader = (req.headers['x-sepay-timestamp'] as string) || '';
       const authHeader = (req.headers.authorization || '').trim();
 
       if (configuredSecret && !configuredSecret.includes('your_sepay')) {
-        const expectedHeader = authHeader.startsWith('Apikey ')
-          ? `Apikey ${configuredSecret}`
-          : configuredSecret;
-        const isMatch =
-          authHeader.length === expectedHeader.length &&
-          crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedHeader));
-        if (!isMatch) {
+        let isAuthenticated = false;
+
+        // 1. Phương thức xác thực HMAC-SHA256 (SePay khuyến nghị sử dụng)
+        if (signatureHeader && timestampHeader) {
+          const timestampNum = parseInt(timestampHeader, 10);
+          const nowSeconds = Math.floor(Date.now() / 1000);
+
+          // Chống tấn công phát lại (Replay Attack): Cho phép sai lệch tối đa 5 phút (300 giây)
+          if (!isNaN(timestampNum) && Math.abs(nowSeconds - timestampNum) <= 300) {
+            const rawBody = (req as any).rawBody
+              ? (req as any).rawBody.toString('utf8')
+              : JSON.stringify(req.body);
+            const signedPayload = timestampHeader + '.' + rawBody;
+            const expectedHash = crypto
+              .createHmac('sha256', configuredSecret)
+              .update(signedPayload)
+              .digest('hex');
+            const providedHash = signatureHeader.replace(/^sha256=/, '').trim();
+
+            const bufExpected = Buffer.from(expectedHash, 'hex');
+            const bufProvided = Buffer.from(providedHash, 'hex');
+
+            if (
+              bufExpected.length === bufProvided.length &&
+              crypto.timingSafeEqual(bufExpected, bufProvided)
+            ) {
+              isAuthenticated = true;
+            }
+          }
+        }
+
+        // 2. Phương thức xác thực API Key dự phòng (Authorization: Apikey <secret>)
+        if (!isAuthenticated && authHeader) {
+          const cleanAuth = authHeader.replace(/^Apikey\s+/i, '').replace(/^Bearer\s+/i, '').trim();
+          if (
+            cleanAuth.length === configuredSecret.length &&
+            crypto.timingSafeEqual(Buffer.from(cleanAuth), Buffer.from(configuredSecret))
+          ) {
+            isAuthenticated = true;
+          }
+        }
+
+        if (!isAuthenticated) {
+          console.warn('[SePay Webhook] Xác thực thất bại: Chữ ký HMAC-SHA256 hoặc API Key không khớp.');
           res.status(401).json({ ok: false, error: 'Invalid SePay Webhook Secret' });
           return;
         }
