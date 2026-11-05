@@ -58,6 +58,7 @@ router.delete('/admin/categories/:slug', adminAuthMiddleware, adminController.de
 router.post('/admin/products', adminAuthMiddleware, adminController.upsertProduct);
 router.put('/admin/products/:slug', adminAuthMiddleware, adminController.upsertProduct);
 router.delete('/admin/products/:slug', adminAuthMiddleware, adminController.deleteProduct);
+router.get('/admin/menus', adminAuthMiddleware, adminController.getMenus);
 router.put('/admin/menus', adminAuthMiddleware, adminController.updateMenus);
 router.get('/admin/configs', adminAuthMiddleware, adminController.getSiteConfigs);
 router.put('/admin/configs/:key', adminAuthMiddleware, adminController.updateSiteConfig);

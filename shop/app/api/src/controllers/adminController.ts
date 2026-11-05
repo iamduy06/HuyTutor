@@ -221,6 +221,21 @@ export const adminController = {
    * PUT /api/admin/menus
    * Cập nhật danh sách Menu điều hướng động
    */
+  async getMenus(_req: Request, res: Response): Promise<void> {
+    try {
+      const menus = await dbService.getMenus(true);
+      res.json({
+        ok: true,
+        menus,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải danh sách Menu.',
+      });
+    }
+  },
+
   async updateMenus(req: Request, res: Response): Promise<void> {
     try {
       const { menus } = req.body;

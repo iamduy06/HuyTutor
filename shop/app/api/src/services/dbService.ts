@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { supabaseAdmin, isSupabaseConfigured } from '../config/supabase';
 import {
   INITIAL_MENUS,
@@ -534,9 +535,9 @@ export const dbService = {
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         let query = supabaseAdmin
-          .from('navigation_menus')
-          .select('id, title, url, order_index, is_active, navigation_items(id, label, url, order_index, is_highlight, is_active)')
-          .order('order_index', { ascending: true });
+          .from('menus')
+          .select('id, title, slug, parent_id, sort_order, is_active, children')
+          .order('sort_order', { ascending: true });
         if (!includeInactive) {
           query = query.eq('is_active', true);
         }
@@ -544,71 +545,94 @@ export const dbService = {
         if (!error && data) {
           return data.map((m: any) => ({
             id: String(m.id),
-            title: m.title,
-            slug: m.url,
-            parent_id: null,
-            sort_order: m.order_index,
-            is_active: m.is_active,
-            children: (m.navigation_items || [])
-              .filter((sub: any) => includeInactive || sub.is_active)
-              .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
-              .map((sub: any) => ({
-                id: String(sub.id),
-                label: sub.label,
-                url: sub.url,
-                order_index: sub.order_index || 0,
-                is_highlight: Boolean(sub.is_highlight),
-              })),
+            title: m.title || '',
+            slug: m.slug || '',
+            parent_id: m.parent_id ? String(m.parent_id) : null,
+            sort_order: typeof m.sort_order === 'number' ? m.sort_order : 0,
+            is_active: m.is_active !== false,
+            children: Array.isArray(m.children)
+              ? m.children
+                  .filter((sub: any) => includeInactive || sub.is_active !== false)
+                  .map((sub: any, idx: number) => ({
+                    id: String(sub.id || `sub_${idx + 1}`),
+                    label: sub.label || sub.title || '',
+                    url: sub.url || sub.slug || '',
+                    order_index: typeof sub.order_index === 'number' ? sub.order_index : idx + 1,
+                    is_highlight: Boolean(sub.is_highlight),
+                    is_active: sub.is_active !== false,
+                  }))
+              : [],
           })) as SeedMenu[];
+        }
+        if (error) {
+          console.error('[dbService] Supabase getMenus query error:', error);
         }
       } catch (err) {
         console.error('[dbService] Supabase getMenus error:', err);
       }
-      return [];
     }
     const db = loadLocalDb();
-    const list = includeInactive ? db.menus : db.menus.filter((m) => m.is_active);
-    return list.sort((a, b) => a.sort_order - b.sort_order);
+    const list = includeInactive ? (db.menus || []) : (db.menus || []).filter((m) => m.is_active);
+    return (list || []).sort((a, b) => a.sort_order - b.sort_order);
   },
 
   async updateMenus(menus: SeedMenu[]): Promise<SeedMenu[]> {
+    const isUuid = (val: string) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+    const rowsToInsert = menus.map((m, idx) => ({
+      id: isUuid(m.id) ? m.id : randomUUID(),
+      title: (m.title || '').trim(),
+      slug: (m.slug || '').trim(),
+      parent_id: isUuid(m.parent_id || '') ? m.parent_id : null,
+      sort_order: typeof m.sort_order === 'number' ? m.sort_order : idx + 1,
+      is_active: m.is_active !== false,
+      children: Array.isArray(m.children)
+        ? m.children.map((sub, sIdx) => ({
+            id: sub.id || `sub_${sIdx + 1}`,
+            label: (sub.label || '').trim(),
+            url: (sub.url || '').trim(),
+            order_index: typeof sub.order_index === 'number' ? sub.order_index : sIdx + 1,
+            is_highlight: Boolean(sub.is_highlight),
+            is_active: (sub as any).is_active !== false,
+          }))
+        : [],
+    }));
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        for (const m of menus) {
-          const numId = Number(m.id);
-          const menuId = !isNaN(numId) ? numId : undefined;
-          const { data: upsertedMenu } = await supabaseAdmin.from('navigation_menus').upsert({
-            ...(menuId ? { id: menuId } : {}),
-            title: m.title,
-            url: m.slug,
-            order_index: m.sort_order,
-            is_active: m.is_active,
-          }).select().single();
+        // Delete all existing menus to sync the full dynamic list
+        const { error: delError } = await supabaseAdmin
+          .from('menus')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
-          if (upsertedMenu && Array.isArray(m.children)) {
-            await supabaseAdmin.from('navigation_items').delete().eq('menu_id', upsertedMenu.id);
-            if (m.children.length > 0) {
-              await supabaseAdmin.from('navigation_items').insert(
-                m.children.map((sub, idx) => ({
-                  menu_id: upsertedMenu.id,
-                  label: sub.label,
-                  url: sub.url,
-                  order_index: sub.order_index || idx + 1,
-                  is_highlight: Boolean(sub.is_highlight),
-                  is_active: true,
-                }))
-              );
-            }
+        if (delError) {
+          console.error('[dbService] Supabase delete error in updateMenus:', delError);
+          throw delError;
+        }
+
+        if (rowsToInsert.length > 0) {
+          const { error: insertError } = await supabaseAdmin
+            .from('menus')
+            .insert(rowsToInsert);
+
+          if (insertError) {
+            console.error('[dbService] Supabase insert error in updateMenus:', insertError);
+            throw insertError;
           }
         }
       } catch (err) {
-        console.error('[dbService] Error updating navigation_menus in Supabase:', err);
+        console.error('[dbService] Error updating menus in Supabase:', err);
+        throw err;
       }
     }
+
     const db = loadLocalDb();
-    db.menus = menus;
+    db.menus = rowsToInsert as any;
     saveLocalDb(db);
-    return db.menus;
+    return rowsToInsert as any;
   },
 
   async getSiteConfigs(): Promise<SiteConfigs> {
