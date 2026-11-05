@@ -23,11 +23,6 @@ export function isOriginAllowed(origin: string): boolean {
     return true;
   }
 
-  // 3. Vercel deployment preview and production domains
-  if (/^https:\/\/([a-zA-Z0-9_\-\.]+\.)?vercel\.app$/.test(clean) || clean === 'https://vercel.app') {
-    return true;
-  }
-
   // 4. Origins configured in environment
   return allowedOriginsList.some((allowed) => {
     if (allowed.includes('*')) {
