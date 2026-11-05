@@ -343,8 +343,9 @@ export interface ComboRule {
 
 export interface ProductFormat {
   format_code: UiFormatCode;
-  price: number;
+  price: number | '';
   is_active: boolean;
+  drive_url?: string;
 }
 
 export interface ProductSpec {
@@ -950,8 +951,9 @@ export interface PaymentInstruction {
   };
 }
 
-export function formatVnd(amount: number): string {
-  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
+export function formatVnd(amount: number | string | undefined | null): string {
+  const num = typeof amount === 'number' ? amount : Number(amount) || 0;
+  return `${Math.round(num).toLocaleString('vi-VN')}đ`;
 }
 
 export interface UserProfile {

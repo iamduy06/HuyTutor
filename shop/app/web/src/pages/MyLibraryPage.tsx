@@ -280,19 +280,11 @@ export const MyLibraryPage: React.FC = () => {
                             <a
                               href={item.access_drive_url}
                               target="_blank"
-                              rel="noreferrer"
-                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3 py-1.5 rounded-sm transition"
+                              rel="noopener noreferrer"
+                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-1.5 rounded-sm transition inline-flex items-center gap-1.5"
                             >
-                              Mở Google Drive
+                              Xem tài liệu
                             </a>
-                          ) : matchedProd ? (
-                            <button
-                              type="button"
-                              onClick={() => setSampleModalProduct(matchedProd)}
-                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3 py-1.5 rounded-sm transition"
-                            >
-                              Xem bản đọc thử
-                            </button>
                           ) : null}
 
                           {matchedProd && (

@@ -186,9 +186,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const resolveFormatPrice = (product: Product, formatCode: UiFormatCode): number => {
     const found = product.formats.find((f) => f.format_code === formatCode);
-    if (found) return found.price;
+    if (found) return Number(found.price) || 0;
     const firstActive = product.formats.find((f) => f.is_active) || product.formats[0];
-    return firstActive ? firstActive.price : 150000;
+    return firstActive ? (Number(firstActive.price) || 0) : 0;
   };
 
   const addToCart = (product: Product, formatCode: UiFormatCode, quantity = 1) => {

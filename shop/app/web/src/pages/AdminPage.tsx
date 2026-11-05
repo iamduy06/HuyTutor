@@ -35,11 +35,11 @@ import {
 } from '../types';
 
 const DEFAULT_FORMATS: ProductFormat[] = [
-  { format_code: 'Word', price: 229000, is_active: true },
-  { format_code: 'PDF', price: 150000, is_active: true },
-  { format_code: 'Flashcard', price: 100000, is_active: true },
-  { format_code: 'Trang tính', price: 120000, is_active: false },
-  { format_code: 'Thiết kế', price: 180000, is_active: false },
+  { format_code: 'Word', price: '' as any, is_active: true, drive_url: '' },
+  { format_code: 'PDF', price: '' as any, is_active: true, drive_url: '' },
+  { format_code: 'Flashcard', price: '' as any, is_active: true, drive_url: '' },
+  { format_code: 'Trang tính', price: '' as any, is_active: false, drive_url: '' },
+  { format_code: 'Thiết kế', price: '' as any, is_active: false, drive_url: '' },
 ];
 
 export type AdminTab =
@@ -290,7 +290,7 @@ export const AdminPage: React.FC = () => {
   const handleSelectProductToEdit = (prod: Product) => {
     const mergedFormats: ProductFormat[] = UI_FORMATS.map((code) => {
       const found = prod.formats.find((f) => f.format_code === code);
-      return found || { format_code: code, price: 150000, is_active: false };
+      return found || { format_code: code, price: '' as any, is_active: false, drive_url: '' };
     });
 
     const initialBlocks: ProductDetailBlockItem[] =
@@ -371,8 +371,8 @@ export const AdminPage: React.FC = () => {
 
   const handleFormatChange = (
     formatCode: UiFormatCode,
-    field: 'price' | 'is_active',
-    value: number | boolean
+    field: 'price' | 'is_active' | 'drive_url',
+    value: number | boolean | string
   ) => {
     setEditingProduct((prev) => {
       const current = prev.formats || DEFAULT_FORMATS;
@@ -1335,7 +1335,7 @@ export const AdminPage: React.FC = () => {
               {/* 3. Bảng cấu hình 5 Định dạng & Giá riêng biệt + Ánh xạ Google Form tự động */}
               <div className="border border-gray-200 rounded-md p-4 space-y-3">
                 <div className="text-xs font-extrabold text-gray-900 uppercase">
-                  Cấu hình 5 Định dạng hiển thị &amp; Giá bán riêng biệt (`product_formats`)
+                  [CẤU HÌNH 5 ĐỊNH DẠNG HIỂN THỊ &amp; GIÁ BÁN RIÊNG BIỆT] - [Cấu hình bật bán, giá bán và liên kết tài liệu Google Drive cho từng định dạng]
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse border border-gray-200">
@@ -1345,10 +1345,10 @@ export const AdminPage: React.FC = () => {
                         <th className="border border-gray-200 p-2 text-left">
                           Định dạng trên Web
                         </th>
-                        <th className="border border-gray-200 p-2 text-left">
-                          Ánh xạ sang Ghi chú Google Form (`entry.906534887`)
-                        </th>
                         <th className="border border-gray-200 p-2 text-left">Giá bán (VNĐ)</th>
+                        <th className="border border-gray-200 p-2 text-left">
+                          Đường link Google Drive (File gốc / Thư mục)
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1371,24 +1371,58 @@ export const AdminPage: React.FC = () => {
                           <td className="border border-gray-200 p-2 font-bold text-gray-900">
                             {fmt.format_code}
                           </td>
-                          <td className="border border-gray-200 p-2 text-[#e60049] font-bold">
-                            {FORMAT_TO_GOOGLE_FORM_MAP[fmt.format_code]}
-                          </td>
                           <td className="border border-gray-200 p-2">
                             <input
                               type="number"
                               min={0}
                               step={1000}
-                              value={fmt.price}
-                              onChange={(e) =>
+                              placeholder="Để trống"
+                              value={fmt.price === 0 || fmt.price === '' || fmt.price === undefined || fmt.price === null ? '' : fmt.price}
+                              onChange={(e) => {
+                                const raw = e.target.value;
                                 handleFormatChange(
                                   fmt.format_code,
                                   'price',
-                                  Number(e.target.value)
-                                )
-                              }
+                                  raw === '' ? ('' as any) : Number(raw)
+                                );
+                              }}
                               className="w-32 border border-gray-300 rounded-sm px-2 py-1 text-xs font-bold"
                             />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            {fmt.format_code === 'Flashcard' ? (
+                              <div className="flex items-center gap-1.5 text-gray-400 italic text-[11px] py-1">
+                                <span className="inline-block w-2 h-2 rounded-full bg-blue-400"></span>
+                                Tự động xử lý tài khoản Flashcard
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="url"
+                                  value={fmt.drive_url || ''}
+                                  placeholder="https://drive.google.com/..."
+                                  onChange={(e) =>
+                                    handleFormatChange(
+                                      fmt.format_code,
+                                      'drive_url',
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full min-w-[220px] border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                                />
+                                {fmt.drive_url && (
+                                  <a
+                                    href={fmt.drive_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Mở thử liên kết"
+                                    className="text-gray-600 hover:text-[#e60049] text-xs px-2 py-1 border border-gray-200 rounded-sm hover:border-[#e60049] transition shrink-0 whitespace-nowrap"
+                                  >
+                                    Mở thử
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
