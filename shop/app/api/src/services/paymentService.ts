@@ -1,4 +1,5 @@
 import { SeedOrder } from './dbService';
+import { exchangeRateService } from './exchangeRateService';
 
 export interface PaymentInitInfo {
   method: 'sepay' | 'paypal';
@@ -24,7 +25,7 @@ export function buildPaymentInstruction(order: SeedOrder): PaymentInitInfo {
   const bankName = process.env.SEPAY_BANK_NAME || 'MBBank';
   const bankAccount = process.env.SEPAY_BANK_ACCOUNT || '';
   const accountHolder = process.env.SEPAY_ACCOUNT_HOLDER || '';
-  const exchangeRate = Number(process.env.USD_EXCHANGE_RATE) || 25000;
+  const exchangeRate = exchangeRateService.getEffectiveRateSync();
   const paypalClientId = process.env.PAYPAL_CLIENT_ID || '';
   const paypalMode = process.env.PAYPAL_MODE || 'sandbox';
 

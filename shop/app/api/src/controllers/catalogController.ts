@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { dbService, SeedProduct } from '../services/dbService';
+import { exchangeRateService } from '../services/exchangeRateService';
 
 /**
  * Loại bỏ hoàn toàn đường link Google Drive (drive_url) khỏi payload trả về cho khách xem web công khai
@@ -43,7 +44,11 @@ export const catalogController = {
         siteConfigs,
         clientRegion: {
           country: req.clientCountry || 'VN',
-          recommendedGateway: req.recommendedGateway || 'sepay',
+          isVietnam: req.isVietnam !== false,
+          allowedGateways: req.allowedGateways || (req.clientCountry === 'VN' ? ['sepay'] : ['sepay', 'paypal']),
+          defaultGateway: 'sepay',
+          usdExchangeRate: (await exchangeRateService.getExchangeRateInfo()).effectiveRate,
+          usdLiveRate: (await exchangeRateService.getExchangeRateInfo()).liveRate,
         },
         mediaDomain: process.env.R2_DOMAIN ? process.env.R2_DOMAIN : '',
       });

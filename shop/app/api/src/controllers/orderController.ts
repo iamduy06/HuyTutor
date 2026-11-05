@@ -211,8 +211,20 @@ export const orderController = {
       const orderCode = `${prefix}${randomDigits}`;
       const viewToken = crypto.randomBytes(16).toString('hex');
 
+      const isVietnam = req.clientCountry === 'VN';
+
+      // KIỂM SOÁT BẢO MẬT: Người dùng tại Việt Nam BẮT BUỘC thanh toán qua VietQR, chặn đứng PayPal
+      if (isVietnam && paymentMethod === 'paypal') {
+        res.status(400).json({
+          ok: false,
+          error: 'Khách hàng tại Việt Nam bắt buộc thanh toán qua VietQR ngân hàng. Cổng PayPal chỉ hỗ trợ cho khách hàng ở nước ngoài.',
+        });
+        return;
+      }
+
+      // Khách hàng ở nước ngoài: được chọn 'paypal' hoặc 'sepay'. Khách tại VN: luôn là 'sepay'.
       const chosenGateway: 'sepay' | 'paypal' =
-        paymentMethod === 'paypal' || req.recommendedGateway === 'paypal' ? 'paypal' : 'sepay';
+        !isVietnam && paymentMethod === 'paypal' ? 'paypal' : 'sepay';
 
       const validGroups = ['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'] as const;
       const normalizedGroup = validGroups.includes(customerGroup) ? customerGroup : 'Giáo viên';
