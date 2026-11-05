@@ -15,39 +15,7 @@ export interface GoogleFormSyncResult {
 }
 
 /**
- * Danh sách 25 sản phẩm có sẵn trong Google Form (Checkboxes).
- * Nếu tên sản phẩm không nằm trong danh sách này, hệ thống sẽ tự động gửi dưới dạng __other_option__.
- */
-export const GOOGLE_FORM_PREDEFINED_PRODUCTS = [
-  'Đọc điền - Đọc hiểu Tiếng Anh cơ bản | Lớp 6',
-  'Đọc điền - Đọc hiểu Tiếng Anh cơ bản | Lớp 7',
-  'Đọc điền - Đọc hiểu Tiếng Anh cơ bản | Lớp 8',
-  'Đọc điền - Đọc hiểu Tiếng Anh cơ bản | Lớp 9',
-  'Tuyển tập từ vựng chi tiết Tiếng Anh 10',
-  'Tuyển tập từ vựng chi tiết Tiếng Anh 11',
-  'Tuyển tập từ vựng chi tiết Tiếng Anh 12',
-  'Đột phá đề thi THPTQG môn Tiếng Anh (30 đề)',
-  'Thực chiến đề thi THPTQG môn Tiếng Anh theo chủ đề (30 đề)',
-  'Bộ đề chuẩn cấu trúc – ôn luyện nước rút môn Tiếng Anh (30 đề)',
-  'Bộ đề chốt hạ môn tiếng Anh (30 đề)',
-  'Bộ đề thi thử ngôn ngữ Anh - ĐGNL BCA (30 đề)',
-  'Sổ tay từ vựng tiếng Anh trọng tâm (B1-C2)',
-  '1400 câu cụm động từ (Intermediate)',
-  'Chuyên đề nền tảng tốt nghiệp THPT',
-  'Chuyên đề điền từ quảng cáo - tờ rơi - thông báo',
-  '2500 cụm từ cố định thông dụng',
-  'Cấp quyền truy cập tài khoản vào hệ thống flashcard (gói 6 tháng)',
-  'Cấp quyền truy cập tài khoản vào hệ thống flashcard (gói 1 năm)',
-  'Cấp quyền truy cập tài khoản vào hệ thống flashcard (gói 2 năm)',
-  'Cấp quyền truy cập tài khoản vào hệ thống flashcard (gói 3 năm)',
-  'Cấp quyền truy cập nhóm flashcard tương ứng tài liệu đã mua',
-  'Cấp quyền truy cập nhóm flashcard',
-  'Mẫu thu học phí theo buổi',
-  'Mẫu thu học phí theo tháng',
-] as const;
-
-/**
- * Danh sách các lựa chọn Nhóm khách hàng trong Google Form (Multiple Choice).
+ * Danh sách nhóm khách hàng định sẵn chuẩn (giữ nguyên theo nghiệp vụ hệ thống & Google Form).
  */
 export const GOOGLE_FORM_CUSTOMER_GROUPS = [
   'Giáo viên công lập',
@@ -59,7 +27,7 @@ export const GOOGLE_FORM_CUSTOMER_GROUPS = [
 ] as const;
 
 /**
- * Danh sách các định dạng ghi chú trong Google Form (Multiple Choice).
+ * Danh sách các định dạng ghi chú chuẩn (giữ nguyên theo nghiệp vụ hệ thống & Google Form).
  */
 export const GOOGLE_FORM_FORMAT_NOTES = [
   'Word dài',
@@ -69,17 +37,69 @@ export const GOOGLE_FORM_FORMAT_NOTES = [
   'Thiết kế',
 ] as const;
 
+// Bộ nhớ đệm danh sách tùy chọn sản phẩm lấy động từ Google Form (không hardcode danh sách sản phẩm)
+let formOptionsCache: { [entryId: string]: string[] } | null = null;
+let formOptionsCacheTime = 0;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 giờ
+
 /**
- * Tự động gửi dữ liệu đơn hàng đã thanh toán vào Google Form nội bộ (14 entry IDs)
- * Tuân thủ tuyệt đối cấu trúc payload của Google Forms:
- * - Ngày mua hàng (Date): gửi đủ _year, _month, _day
- * - Thời gian thanh toán (Time): gửi đủ _hour, _minute
- * - Checkboxes (Tên sản phẩm): nếu không nằm trong danh sách định sẵn, gửi kèm __other_option__
- * - Multiple Choice (Nhóm khách, Ghi chú): nếu không nằm trong danh sách, gửi kèm __other_option__
- * - fvv: '1', pageHistory: '0'
- * - Địa chỉ & MST/CCCD chỉ điền khi need_invoice = true, ngược lại để trống ""
- * - Điểm khuyến mãi đã sử dụng & Đơn vị khác luôn để trống ""
- * - Người bán luôn là "Website"
+ * Đọc động các tùy chọn sản phẩm hiện tại từ Google Form trực tiếp qua URL viewform.
+ * Tuyệt đối không hardcode danh sách sản phẩm tài liệu.
+ */
+export async function fetchDynamicFormOptions(
+  formUrl: string
+): Promise<{ [entryId: string]: string[] }> {
+  const now = Date.now();
+  if (formOptionsCache && now - formOptionsCacheTime < CACHE_TTL_MS) {
+    return formOptionsCache;
+  }
+
+  try {
+    const viewUrl = formUrl.replace(/\/formResponse.*$/, '/viewform');
+    const res = await fetch(viewUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+      },
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      const fbMatch = text.match(/var FB_PUBLIC_LOAD_DATA_ = (\[[\s\S]+?\]);\s*<\/script>/);
+      if (fbMatch) {
+        const data = JSON.parse(fbMatch[1]);
+        const questions = data[1]?.[1] || [];
+        const optionsMap: { [entryId: string]: string[] } = {};
+
+        for (const q of questions) {
+          const entryId = q[4]?.[0]?.[0];
+          const opts = q[4]?.[0]?.[1]
+            ? q[4][0][1].map((o: any) => o[0]).filter(Boolean)
+            : [];
+          if (entryId && opts.length > 0) {
+            optionsMap[String(entryId)] = opts;
+          }
+        }
+
+        formOptionsCache = optionsMap;
+        formOptionsCacheTime = now;
+        return optionsMap;
+      }
+    }
+  } catch (err) {
+    console.warn('[googleFormService] Không thể tải tùy chọn động từ Google Form, sử dụng chế độ fallback linh hoạt:', err);
+  }
+
+  return formOptionsCache || {};
+}
+
+/**
+ * Tự động gửi dữ liệu đơn hàng đã thanh toán vào Google Form nội bộ (14 entry IDs).
+ * Tên sản phẩm được lấy trực tiếp và linh hoạt từ:
+ *   1. item.google_form_product_name (nhập trong Admin CMS khi thêm/sửa tài liệu)
+ *   2. Tra cứu từ database (dbService.getProductBySlugOrId)
+ *   3. item.product_title
+ * Nhóm khách hàng được giữ nguyên theo danh mục chuẩn của hệ thống.
  */
 export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleFormSyncResult> {
   const formUrl = process.env.GOOGLE_FORM_ACTION_URL;
@@ -101,12 +121,30 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
   const mappedNote = mapFormatToGoogleFormNote(order.selected_format as UiFormatCode);
   const discountRatio = 1 - (order.discount_percent || 0) / 100;
 
+  // Lấy các tùy chọn thực tế từ Google Form động cho sản phẩm
+  const dynamicOptions = await fetchDynamicFormOptions(formUrl);
+
   const submissions: GoogleFormSyncResult['submissions'] = [];
   let allSuccess = true;
 
   for (const item of order.items) {
     const netAmount = Math.round(item.subtotal * discountRatio);
-    const productName = (item.google_form_product_name || item.product_title || '').trim();
+
+    // Lấy tên sản phẩm chuẩn điền vào Google Forms từ cấu hình của tài liệu khi thêm sản phẩm
+    let productName = (item.google_form_product_name || '').trim();
+    if (!productName && item.product_id) {
+      try {
+        const prod = await dbService.getProductBySlugOrId(item.product_id);
+        if (prod) {
+          productName = (prod.google_form_product_name || prod.title || '').trim();
+        }
+      } catch {
+        // Tiếp tục dùng fallback nếu tra cứu lỗi
+      }
+    }
+    if (!productName) {
+      productName = (item.product_title || 'Tài liệu').trim();
+    }
 
     const payloadRecord: Record<string, string> = {
       // 1. Tên khách hàng (Paragraph)
@@ -155,21 +193,20 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
       pageHistory: '0',
     };
 
-    // 6. Sản phẩm (Checkboxes)
-    const isPredefinedProd = GOOGLE_FORM_PREDEFINED_PRODUCTS.some(
-      (p) => p.toLowerCase() === productName.toLowerCase()
+    // 6. Tên sản phẩm chuẩn (Checkboxes - entry.2088729906)
+    // So khớp động với tùy chọn hiện có của Google Form; nếu không khớp thì gửi kèm __other_option__
+    const formProductOptions = dynamicOptions['2088729906'] || [];
+    const matchedProduct = formProductOptions.find(
+      (opt) => opt.toLowerCase() === productName.toLowerCase()
     );
-    if (isPredefinedProd) {
-      const exactMatch = GOOGLE_FORM_PREDEFINED_PRODUCTS.find(
-        (p) => p.toLowerCase() === productName.toLowerCase()
-      )!;
-      payloadRecord['entry.2088729906'] = exactMatch;
+    if (matchedProduct) {
+      payloadRecord['entry.2088729906'] = matchedProduct;
     } else {
       payloadRecord['entry.2088729906'] = '__other_option__';
       payloadRecord['entry.2088729906.other_option_response'] = productName;
     }
 
-    // 8. Ghi chú (Multiple choice)
+    // 8. Ghi chú định dạng (Multiple choice - entry.906534887)
     const isPredefinedNote = GOOGLE_FORM_FORMAT_NOTES.some(
       (n) => n.toLowerCase() === mappedNote.toLowerCase()
     );
@@ -183,7 +220,8 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
       payloadRecord['entry.906534887.other_option_response'] = mappedNote;
     }
 
-    // 10. Nhóm khách hàng (Multiple choice)
+    // 10. Nhóm khách hàng (Multiple choice - entry.1680953650)
+    // Giữ nguyên theo các nhóm chuẩn của hệ thống
     const rawGroup = (order.customer_group || '').trim();
     let mappedGroup: string;
     if (rawGroup === 'Giáo viên' || rawGroup === 'Giáo viên công lập') {
