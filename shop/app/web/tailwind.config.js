@@ -12,7 +12,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Bricolage Grotesque"', '"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },

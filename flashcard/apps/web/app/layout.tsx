@@ -8,7 +8,7 @@ import { getServerToken } from "@/lib/serverAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 
 const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
   variable: "--font-bricolage",
   display: "swap",
 });

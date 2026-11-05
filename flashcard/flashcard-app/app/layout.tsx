@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { createClient } from "@/lib/supabase/server";
 
 const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
   variable: "--font-bricolage",
   weight: ["400", "600", "700", "800"],
 });

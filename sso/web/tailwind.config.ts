@@ -27,7 +27,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Bricolage Grotesque"', '"Be Vietnam Pro"', 'system-ui', '-apple-system', 'sans-serif'],
       },
       borderRadius: {
         none: "0px",
