@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { dbService, SeedOrder, SeedOrderItem, SeedProductFormat } from '../services/dbService';
 import { isValidUiFormat, UiFormatCode, mapFormatToGoogleFormNote } from '../constants/formatMapping';
@@ -153,12 +154,29 @@ export const orderController = {
           (p) => p.id === slugOrId || p.slug === slugOrId || p.code === slugOrId
         );
 
-        const fmtObj = dbProd?.formats.find((f: SeedProductFormat) => f.format_code === selectedFormat);
-        const unitPrice = fmtObj ? fmtObj.price : Number(rawItem.unitPrice || 150000);
+        // SEC-06: Chặn đứng thao túng giá từ client - Bắt buộc sản phẩm và định dạng phải tồn tại trong DB
+        if (!dbProd) {
+          res.status(400).json({
+            ok: false,
+            error: `Sản phẩm với mã/slug "${slugOrId}" không tồn tại trên hệ thống.`,
+          });
+          return;
+        }
+
+        const fmtObj = dbProd.formats.find((f: SeedProductFormat) => f.format_code === selectedFormat);
+        if (!fmtObj || typeof fmtObj.price !== 'number' || fmtObj.price <= 0) {
+          res.status(400).json({
+            ok: false,
+            error: `Sản phẩm "${dbProd.title}" không hỗ trợ định dạng "${selectedFormat}".`,
+          });
+          return;
+        }
+
+        const unitPrice = fmtObj.price;
         const lineSubtotal = unitPrice * qty;
 
         subtotalAmount += lineSubtotal;
-        if (!dbProd || dbProd.is_combo_eligible) {
+        if (dbProd.is_combo_eligible) {
           totalEligibleBooks += qty;
         }
 
@@ -258,9 +276,43 @@ export const orderController = {
         return;
       }
 
+      // SEC-05: Chống IDOR & Rò rỉ thông tin cá nhân khách hàng (PII)
+      const incomingToken = String(req.query.token || '').trim();
+      const isAuthorized =
+        Boolean(order.view_token && incomingToken && incomingToken === order.view_token) ||
+        Boolean(req.user && order.user_id && req.user.id === order.user_id) ||
+        Boolean(req.user && req.user.role === 'admin');
+
+      const safeOrder = isAuthorized
+        ? order
+        : {
+            order_code: order.order_code,
+            payment_status: order.payment_status,
+            payment_method: order.payment_method,
+            total_amount: order.total_amount,
+            subtotal_amount: order.subtotal_amount,
+            discount_amount: order.discount_amount,
+            selected_format: order.selected_format,
+            created_at: order.created_at,
+            customer_name: order.customer_name ? `${order.customer_name.slice(0, 2)}***` : '',
+            customer_email: order.customer_email
+              ? order.customer_email.replace(/(.{2})(.*)(?=@)/, '$1***')
+              : '',
+            customer_phone: order.customer_phone
+              ? `*******${order.customer_phone.slice(-3)}`
+              : '',
+            items: (order.items || []).map((it) => ({
+              product_title: it.product_title,
+              format_code: it.format_code,
+              quantity: it.quantity,
+              unit_price: it.unit_price,
+              subtotal: it.subtotal,
+            })),
+          };
+
       res.json({
         ok: true,
-        order,
+        order: safeOrder,
         mappedGoogleFormNote: mapFormatToGoogleFormNote(order.selected_format),
         paymentInstruction: buildPaymentInstruction(order),
       });

@@ -118,6 +118,7 @@ export interface SeedOrder {
   payment_status: 'pending' | 'paid' | 'failed';
   payment_ref_id?: string;
   paid_at?: string;
+  view_token?: string;
   google_form_submitted: boolean;
   created_at: string;
   items: SeedOrderItem[];
@@ -1236,6 +1237,7 @@ export const dbService = {
         payment_status: order.payment_status || 'pending',
         payment_method: order.payment_method || 'vietqr',
         payment_ref_id: order.payment_ref_id || '',
+        view_token: order.view_token || '',
         google_form_submitted: Boolean(order.google_form_submitted),
       };
       if (order.user_id) {

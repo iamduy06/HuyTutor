@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
 import { extractOrderCodeFromContent } from '../services/paymentService';
@@ -12,16 +13,19 @@ export const webhookController = {
   async handleSepayWebhook(req: Request, res: Response): Promise<void> {
     try {
       const configuredSecret = process.env.SEPAY_WEBHOOK_SECRET;
-      const authHeader = req.headers.authorization || '';
+      const authHeader = (req.headers.authorization || '').trim();
 
-      if (
-        process.env.NODE_ENV === 'production' &&
-        configuredSecret &&
-        !configuredSecret.includes('your_sepay') &&
-        !authHeader.includes(configuredSecret)
-      ) {
-        res.status(401).json({ ok: false, error: 'Invalid SePay Webhook Secret' });
-        return;
+      if (configuredSecret && !configuredSecret.includes('your_sepay')) {
+        const expectedHeader = authHeader.startsWith('Apikey ')
+          ? `Apikey ${configuredSecret}`
+          : configuredSecret;
+        const isMatch =
+          authHeader.length === expectedHeader.length &&
+          crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedHeader));
+        if (!isMatch) {
+          res.status(401).json({ ok: false, error: 'Invalid SePay Webhook Secret' });
+          return;
+        }
       }
 
       const content = String(req.body.content || req.body.description || '');
@@ -60,10 +64,11 @@ export const webhookController = {
         return;
       }
 
-      if (transferAmount > 0 && transferAmount < order.total_amount) {
+      // SEC-04: Bắt buộc số tiền chuyển khoản phải đủ thanh toán đơn hàng
+      if (transferAmount < order.total_amount) {
         res.status(400).json({
           ok: false,
-          error: `Số tiền chuyển khoản (${transferAmount}đ) nhỏ hơn tổng tiền đơn hàng (${order.total_amount}đ).`,
+          error: `Số tiền chuyển khoản (${transferAmount}đ) không đủ để thanh toán đơn hàng (${order.total_amount}đ).`,
         });
         return;
       }
@@ -97,6 +102,23 @@ export const webhookController = {
    */
   async handlePaypalWebhook(req: Request, res: Response): Promise<void> {
     try {
+      // SEC-03: Kiểm tra khóa bí mật xác thực nguồn gốc từ PayPal nếu đã cấu hình
+      const configuredSecret = process.env.PAYPAL_WEBHOOK_SECRET;
+      const incomingSecret =
+        (req.headers['x-paypal-webhook-secret'] as string) ||
+        (req.headers.authorization as string) ||
+        '';
+
+      if (configuredSecret) {
+        const isSecretValid =
+          incomingSecret.length === configuredSecret.length &&
+          crypto.timingSafeEqual(Buffer.from(incomingSecret), Buffer.from(configuredSecret));
+        if (!isSecretValid) {
+          res.status(401).json({ ok: false, error: 'Unauthorized PayPal Webhook signature.' });
+          return;
+        }
+      }
+
       const orderCode = String(
         req.body.orderCode ||
           req.body.resource?.purchase_units?.[0]?.custom_id ||
@@ -155,48 +177,6 @@ export const webhookController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi xử lý PayPal Webhook.',
-      });
-    }
-  },
-
-  /**
-   * POST /api/webhook/simulate-payment
-   * Endpoint hỗ trợ kiểm thử nhanh luồng Thanh toán thành công -> Bắn 14 entry Google Form -> Cấp quyền
-   */
-  async simulatePaymentSuccess(req: Request, res: Response): Promise<void> {
-    try {
-      const { orderCode } = req.body;
-      if (!orderCode) {
-        res.status(400).json({ ok: false, error: 'Vui lòng truyền orderCode.' });
-        return;
-      }
-
-      const order = await dbService.getOrderByCode(String(orderCode));
-      if (!order) {
-        res.status(404).json({
-          ok: false,
-          error: `Không tìm thấy đơn hàng ${orderCode}.`,
-        });
-        return;
-      }
-
-      const updatedOrder = await dbService.updateOrderStatus(order.order_code, {
-        payment_status: 'paid',
-        payment_ref_id: `SIMULATED-${Date.now()}`,
-        paid_at: new Date().toISOString(),
-      });
-
-      const formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
-
-      res.json({
-        ok: true,
-        order: await dbService.getOrderByCode(order.order_code),
-        googleFormSync: formSyncResult,
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        ok: false,
-        error: err?.message || 'Lỗi giả lập xác nhận thanh toán.',
       });
     }
   },

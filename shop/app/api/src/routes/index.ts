@@ -46,10 +46,9 @@ router.get('/catalog/categories/:slug', catalogController.getCategoryDetail);
 router.post('/orders', optionalAuth, orderController.createOrder);
 router.get('/orders/:orderCode', orderController.getOrderStatus);
 
-// 5. Luồng Webhook Thanh toán tự động (SePay VietQR, PayPal & Giả lập Test)
+// 5. Luồng Webhook Thanh toán tự động (SePay VietQR, PayPal)
 router.post('/webhook/sepay', webhookController.handleSepayWebhook);
 router.post('/webhook/paypal', webhookController.handlePaypalWebhook);
-router.post('/webhook/simulate-payment', webhookController.simulatePaymentSuccess);
 
 // 6. Luồng Quản trị Admin CRUD (100% qua Backend API)
 router.get('/admin/overview', adminAuthMiddleware, adminController.getDashboardOverview);
