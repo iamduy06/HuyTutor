@@ -57,18 +57,38 @@ export const Footer: React.FC = () => {
               </div>
             ))}
             <div className="flex items-center gap-2 pt-1">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.id || social.platform}
-                  href={social.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={social.label}
-                  className="w-6 h-6 rounded-full bg-gray-900 text-white flex items-center justify-center text-[11px] font-bold hover:bg-[#e60049] transition"
-                >
-                  {social.icon || social.platform.charAt(0).toUpperCase()}
-                </a>
-              ))}
+              {socialLinks.map((social) => {
+                const iconSrc =
+                  social.icon_url ||
+                  (social.icon && (social.icon.startsWith('http') || social.icon.startsWith('/') || social.icon.startsWith('data:'))
+                    ? social.icon
+                    : null);
+                return (
+                  <a
+                    key={social.id || social.platform}
+                    href={social.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={social.label}
+                    title={social.label}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition overflow-hidden shrink-0 ${
+                      iconSrc
+                        ? 'bg-white border border-gray-200 hover:border-[#e60049] hover:scale-105 shadow-2xs'
+                        : 'bg-gray-900 text-white hover:bg-[#e60049] text-[11px] font-bold'
+                    }`}
+                  >
+                    {iconSrc ? (
+                      <img
+                        src={iconSrc}
+                        alt={social.label}
+                        className="w-full h-full object-contain p-0.5"
+                      />
+                    ) : (
+                      social.icon || social.platform.charAt(0).toUpperCase()
+                    )}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -207,6 +207,8 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const [uploadingSocialIdx, setUploadingSocialIdx] = useState<number | null>(null);
+
   const handleSaveSocials = async () => {
     setSavingConfig(true);
     try {
@@ -217,6 +219,76 @@ export const AdminPage: React.FC = () => {
     } finally {
       setSavingConfig(false);
     }
+  };
+
+  const handleUploadSocialIcon = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    idx: number
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSocialIdx(idx);
+    try {
+      const oldUrl = adminSocials[idx]?.icon_url;
+      const res = await apiClient.uploadFile(file, { folder: 'social-icons' });
+
+      // Nếu đang thay thế ảnh cũ trên R2, xóa ảnh cũ vật lý
+      if (oldUrl && oldUrl !== res.url) {
+        apiClient.deleteR2File(oldUrl).catch((err) => {
+          console.warn('Lỗi xóa file R2 cũ:', err);
+        });
+      }
+
+      setAdminSocials((prev) =>
+        prev.map((s, i) =>
+          i === idx ? { ...s, icon_url: res.url, icon: res.url } : s
+        )
+      );
+      showToast('Tải ảnh biểu tượng lên Cloudflare R2 thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi tải ảnh biểu tượng lên R2.');
+    } finally {
+      setUploadingSocialIdx(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteSocialIcon = async (idx: number) => {
+    const currentUrl =
+      adminSocials[idx]?.icon_url ||
+      (adminSocials[idx]?.icon?.startsWith('http') ? adminSocials[idx]?.icon : '');
+
+    if (currentUrl) {
+      try {
+        await apiClient.deleteR2File(currentUrl);
+      } catch (err) {
+        console.warn('Lỗi xóa file R2:', err);
+      }
+    }
+
+    setAdminSocials((prev) =>
+      prev.map((s, i) =>
+        i === idx
+          ? {
+              ...s,
+              icon_url: '',
+              icon: s.platform ? s.platform.charAt(0).toUpperCase() : '★',
+            }
+          : s
+      )
+    );
+    showToast('Đã xóa hình ảnh biểu tượng khỏi Cloudflare R2.');
+  };
+
+  const handleDeleteSocialRow = async (idx: number) => {
+    const soc = adminSocials[idx];
+    if (soc?.icon_url) {
+      apiClient.deleteR2File(soc.icon_url).catch(() => {});
+    } else if (soc?.icon && soc.icon.startsWith('http')) {
+      apiClient.deleteR2File(soc.icon).catch(() => {});
+    }
+    setAdminSocials((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleSavePolicies = async () => {
@@ -2533,11 +2605,8 @@ export const AdminPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
                 <div>
                   <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    2. Cấu hình Đường dẫn Mạng xã hội Footer
+                    [CẤU HÌNH ĐƯỜNG DẪN MẠNG XÃ HỘI FOOTER] - [Quản lý liên kết các kênh mạng xã hội chính thức (Facebook, YouTube, TikTok, Zalo) hiển thị ở góc Footer]
                   </h2>
-                  <p className="text-xs text-gray-600">
-                    Quản lý liên kết các kênh mạng xã hội chính thức (Facebook, YouTube, TikTok, Zalo) hiển thị ở góc Footer.
-                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -2552,6 +2621,7 @@ export const AdminPage: React.FC = () => {
                           label: 'Kênh mới',
                           url: 'https://',
                           icon: '★',
+                          icon_url: '',
                           is_active: true,
                         },
                       ]);
@@ -2576,94 +2646,144 @@ export const AdminPage: React.FC = () => {
                   <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
                     <tr>
                       <th className="border border-gray-200 p-2.5 w-28">Nền tảng</th>
-                      <th className="border border-gray-200 p-2.5 w-48">Tên hiển thị</th>
+                      <th className="border border-gray-200 p-2.5 w-40">Tên hiển thị</th>
                       <th className="border border-gray-200 p-2.5">Đường dẫn (URL chính thức)</th>
-                      <th className="border border-gray-200 p-2.5 w-20 text-center">Biểu tượng</th>
-                      <th className="border border-gray-200 p-2.5 w-24 text-center">Kích hoạt</th>
-                      <th className="border border-gray-200 p-2.5 w-20 text-center">Xóa</th>
+                      <th className="border border-gray-200 p-2.5 w-48 text-center">Biểu tượng (Tải ảnh / Ký tự)</th>
+                      <th className="border border-gray-200 p-2.5 w-20 text-center">Kích hoạt</th>
+                      <th className="border border-gray-200 p-2.5 w-16 text-center">Xóa</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {adminSocials.map((soc, idx) => (
-                      <tr key={soc.id || idx} className="hover:bg-gray-50">
-                        <td className="border border-gray-200 p-2">
-                          <input
-                            type="text"
-                            value={soc.platform}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminSocials((prev) =>
-                                prev.map((s, i) => (i === idx ? { ...s, platform: val } : s))
-                              );
-                            }}
-                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2">
-                          <input
-                            type="text"
-                            value={soc.label}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminSocials((prev) =>
-                                prev.map((s, i) => (i === idx ? { ...s, label: val } : s))
-                              );
-                            }}
-                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2">
-                          <input
-                            type="text"
-                            value={soc.url}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminSocials((prev) =>
-                                prev.map((s, i) => (i === idx ? { ...s, url: val } : s))
-                              );
-                            }}
-                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2 text-center">
-                          <input
-                            type="text"
-                            value={soc.icon}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdminSocials((prev) =>
-                                prev.map((s, i) => (i === idx ? { ...s, icon: val } : s))
-                              );
-                            }}
-                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={soc.is_active}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setAdminSocials((prev) =>
-                                prev.map((s, i) => (i === idx ? { ...s, is_active: checked } : s))
-                              );
-                            }}
-                            className="w-4 h-4 text-[#e60049] rounded"
-                          />
-                        </td>
-                        <td className="border border-gray-200 p-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdminSocials((prev) => prev.filter((_, i) => i !== idx));
-                            }}
-                            className="text-red-600 hover:text-red-800 text-[11px] font-bold"
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {adminSocials.map((soc, idx) => {
+                      const hasImage = !!(
+                        soc.icon_url ||
+                        (soc.icon && (soc.icon.startsWith('http') || soc.icon.startsWith('/') || soc.icon.startsWith('data:')))
+                      );
+                      const imageSrc = soc.icon_url || (hasImage ? soc.icon : '');
+
+                      return (
+                        <tr key={soc.id || idx} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 p-2">
+                            <input
+                              type="text"
+                              value={soc.platform}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminSocials((prev) =>
+                                  prev.map((s, i) => (i === idx ? { ...s, platform: val } : s))
+                                );
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <input
+                              type="text"
+                              value={soc.label}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminSocials((prev) =>
+                                  prev.map((s, i) => (i === idx ? { ...s, label: val } : s))
+                                );
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <input
+                              type="text"
+                              value={soc.url}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminSocials((prev) =>
+                                  prev.map((s, i) => (i === idx ? { ...s, url: val } : s))
+                                );
+                              }}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2">
+                            <div className="flex items-center justify-center gap-2">
+                              {hasImage ? (
+                                <div className="relative inline-flex items-center justify-center w-8 h-8 bg-gray-50 border border-gray-300 rounded p-0.5 group shrink-0">
+                                  {/* Nút X đỏ hình tròn xóa vĩnh viễn trên R2 */}
+                                  <button
+                                    type="button"
+                                    title="Xóa hình ảnh biểu tượng khỏi Cloudflare R2"
+                                    onClick={() => handleDeleteSocialIcon(idx)}
+                                    className="absolute -top-2 -right-2 z-10 w-4.5 h-4.5 bg-red-600 hover:bg-red-700 active:scale-90 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow border border-white cursor-pointer transition"
+                                  >
+                                    ✕
+                                  </button>
+                                  <img
+                                    src={imageSrc}
+                                    alt={soc.label}
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                              ) : null}
+
+                              {/* Nút tải ảnh hoặc đổi ảnh */}
+                              <label
+                                className={`inline-flex items-center gap-1 px-2 py-1 bg-white border border-dashed border-gray-300 hover:border-[#e60049] text-gray-700 hover:text-[#e60049] rounded cursor-pointer text-[10px] font-bold transition shrink-0 ${                                  uploadingSocialIdx === idx ? 'opacity-50 pointer-events-none' : ''                                }`}
+                              >
+                                {uploadingSocialIdx === idx ? (
+                                  <span className="text-[#e60049]">Đang tải...</span>
+                                ) : (
+                                  <span>{hasImage ? '🔄 Đổi ảnh' : '📤 Tải ảnh'}</span>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleUploadSocialIcon(e, idx)}
+                                  disabled={uploadingSocialIdx === idx}
+                                  className="hidden"
+                                />
+                              </label>
+
+                              {/* Nhập text ký tự dự phòng nếu không có ảnh */}
+                              {!hasImage && (
+                                <input
+                                  type="text"
+                                  title="Ký tự văn bản hiển thị nếu chưa có ảnh (ví dụ: f, ▶, Zalo)"
+                                  value={soc.icon || ''}
+                                  placeholder="f"
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setAdminSocials((prev) =>
+                                      prev.map((s, i) => (i === idx ? { ...s, icon: val } : s))
+                                    );
+                                  }}
+                                  className="w-8 border border-gray-300 rounded text-center py-1 text-xs shrink-0"
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="border border-gray-200 p-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={soc.is_active}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setAdminSocials((prev) =>
+                                  prev.map((s, i) => (i === idx ? { ...s, is_active: checked } : s))
+                                );
+                              }}
+                              className="w-4 h-4 text-[#e60049] rounded"
+                            />
+                          </td>
+                          <td className="border border-gray-200 p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSocialRow(idx)}
+                              className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

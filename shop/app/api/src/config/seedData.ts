@@ -128,6 +128,7 @@ export interface FooterSocialLink {
   label: string;
   url: string;
   icon: string;
+  icon_url?: string;
   is_active: boolean;
 }
 
