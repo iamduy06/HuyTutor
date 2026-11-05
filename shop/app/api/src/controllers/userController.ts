@@ -6,6 +6,7 @@ export const userController = {
   /**
    * GET /api/user/library
    * Lấy danh sách tài liệu trong Tủ sách cá nhân của người dùng hiện tại
+   * Tự động bổ sung access_drive_url từ product_formats nếu đơn hàng cũ chưa kịp lưu link
    */
   async getLibrary(req: Request, res: Response): Promise<void> {
     try {
@@ -26,8 +27,14 @@ export const userController = {
             p.id === item.product_slug ||
             p.title === item.product_title
         );
+        const matchedFormat = matchedProd?.formats?.find(
+          (f) => f.format_code === item.format_code
+        );
+        const resolvedDriveUrl = item.access_drive_url || matchedFormat?.drive_url || '';
+
         return {
           ...item,
+          access_drive_url: resolvedDriveUrl,
           thumbnail_url: matchedProd?.thumbnail_url || '',
           cover_tag: matchedProd?.cover_tag || '',
           code: matchedProd?.code || item.product_slug.toUpperCase(),
@@ -131,4 +138,3 @@ export const userController = {
     }
   },
 };
-

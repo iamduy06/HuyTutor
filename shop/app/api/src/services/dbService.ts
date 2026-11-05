@@ -55,6 +55,7 @@ export interface SeedProductFormat {
   format_code: UiFormatCode;
   price: number;
   is_active: boolean;
+  drive_url?: string;
 }
 
 export interface SeedProduct {
@@ -318,11 +319,11 @@ function buildNormalizedSeedState(): DbState {
   const baseProducts: SeedProduct[] = INITIAL_PRODUCTS.map((p) => {
     const cat = categories.find((c) => c.id === p.category_id || c.slug === p.category_id);
     const defaultFormats: SeedProductFormat[] = [
-      { format_code: 'Word', price: 229000, is_active: true },
-      { format_code: 'PDF', price: 150000, is_active: true },
-      { format_code: 'Flashcard', price: 100000, is_active: true },
-      { format_code: 'Trang tính', price: 120000, is_active: false },
-      { format_code: 'Thiết kế', price: 180000, is_active: false },
+      { format_code: 'Word', price: 229000, is_active: true, drive_url: '' },
+      { format_code: 'PDF', price: 150000, is_active: true, drive_url: '' },
+      { format_code: 'Flashcard', price: 100000, is_active: true, drive_url: '' },
+      { format_code: 'Trang tính', price: 120000, is_active: false, drive_url: '' },
+      { format_code: 'Thiết kế', price: 180000, is_active: false, drive_url: '' },
     ];
 
     const mappedFormats: SeedProductFormat[] = defaultFormats.map((df) => {
@@ -332,6 +333,7 @@ function buildNormalizedSeedState(): DbState {
           format_code: existing.ui_format_name,
           price: existing.price,
           is_active: existing.is_active,
+          drive_url: (existing as any).drive_url || '',
         };
       }
       return df;
@@ -893,6 +895,7 @@ export const dbService = {
                   format_code: f.format_code as UiFormatCode,
                   price: Number(f.price),
                   is_active: Boolean(f.is_active),
+                  drive_url: f.drive_url || '',
                 }))
               : [],
             detail_blocks:
@@ -1120,10 +1123,17 @@ export const dbService = {
             format_code: fmt.format_code,
             price: Number(fmt.price) || 0,
             is_active: fmt.is_active !== false,
+            drive_url: fmt.drive_url || '',
           }));
           const { error: fmtErr } = await supabaseAdmin.from('product_formats').insert(formatRows);
           if (fmtErr) {
-            console.error('[dbService] Error inserting product_formats in Supabase:', fmtErr);
+            if (fmtErr.code === '42703') {
+              console.warn('[dbService] Column drive_url not found in Supabase product_formats, retrying without drive_url');
+              const fallbackRows = formatRows.map(({ drive_url, ...rest }) => rest);
+              await supabaseAdmin.from('product_formats').insert(fallbackRows);
+            } else {
+              console.error('[dbService] Error inserting product_formats in Supabase:', fmtErr);
+            }
           }
         }
       }
@@ -1928,6 +1938,10 @@ export const dbService = {
       );
       const productSlug = matchedProduct?.slug || item.product_id || 'tai-lieu';
       const watermarkedUrl = matchedProduct?.sample_pdf_url || '';
+      const matchedFormat = matchedProduct?.formats?.find(
+        (f) => f.format_code === item.format_code
+      );
+      const driveUrl = matchedFormat?.drive_url || '';
 
       if (shouldTrySupabaseAuth() && supabaseAdmin) {
         const { data: existingLib, error } = await supabaseAdmin
@@ -1946,7 +1960,7 @@ export const dbService = {
             product_slug: productSlug,
             product_title: item.product_title,
             format_code: item.format_code,
-            access_drive_url: '',
+            access_drive_url: driveUrl,
             watermarked_pdf_url: watermarkedUrl,
             is_active: true,
           };
@@ -1977,7 +1991,7 @@ export const dbService = {
           product_slug: productSlug,
           product_title: item.product_title,
           format_code: item.format_code,
-          access_drive_url: '',
+          access_drive_url: driveUrl,
           watermarked_pdf_url: watermarkedUrl,
           download_count: 0,
           is_active: true,

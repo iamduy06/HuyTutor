@@ -1,5 +1,19 @@
 import { Request, Response } from 'express';
-import { dbService } from '../services/dbService';
+import { dbService, SeedProduct } from '../services/dbService';
+
+/**
+ * Loại bỏ hoàn toàn đường link Google Drive (drive_url) khỏi payload trả về cho khách xem web công khai
+ * để bảo vệ tài sản số và ngăn ngừa việc đào link tải lậu.
+ */
+function sanitizeProductForPublic(product: SeedProduct): any {
+  if (!product) return product;
+  return {
+    ...product,
+    formats: Array.isArray(product.formats)
+      ? product.formats.map(({ drive_url, ...fmt }) => fmt)
+      : [],
+  };
+}
 
 export const catalogController = {
   /**
@@ -10,13 +24,15 @@ export const catalogController = {
    */
   async getInitData(req: Request, res: Response): Promise<void> {
     try {
-      const [menus, categories, comboRules, products, siteConfigs] = await Promise.all([
+      const [menus, categories, comboRules, rawProducts, siteConfigs] = await Promise.all([
         dbService.getMenus(false),
         dbService.getCategories(),
         dbService.getComboRules(),
         dbService.getProducts({ includeInactive: false }),
         dbService.getSiteConfigs(),
       ]);
+
+      const products = rawProducts.map(sanitizeProductForPublic);
 
       res.json({
         ok: true,
@@ -46,11 +62,13 @@ export const catalogController = {
     try {
       const categorySlug = typeof req.query.category === 'string' ? req.query.category : undefined;
       const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-      const products = await dbService.getProducts({
+      const rawProducts = await dbService.getProducts({
         categorySlug,
         search,
         includeInactive: false,
       });
+
+      const products = rawProducts.map(sanitizeProductForPublic);
 
       res.json({
         ok: true,
@@ -71,8 +89,8 @@ export const catalogController = {
   async getProductDetail(req: Request, res: Response): Promise<void> {
     try {
       const slug = String(req.params.slug || '');
-      const product = await dbService.getProductBySlugOrId(slug);
-      if (!product) {
+      const rawProduct = await dbService.getProductBySlugOrId(slug);
+      if (!rawProduct) {
         res.status(404).json({
           ok: false,
           error: `Không tìm thấy sản phẩm với mã/slug "${slug}".`,
@@ -81,14 +99,17 @@ export const catalogController = {
       }
 
       const allInCat = await dbService.getProducts({
-        categorySlug: product.category_slug,
+        categorySlug: rawProduct.category_slug,
         includeInactive: false,
       });
-      const relatedProducts = allInCat.filter((p) => p.slug !== product.slug).slice(0, 3);
+      const relatedProducts = allInCat
+        .filter((p) => p.slug !== rawProduct.slug)
+        .slice(0, 3)
+        .map(sanitizeProductForPublic);
 
       res.json({
         ok: true,
-        product,
+        product: sanitizeProductForPublic(rawProduct),
         relatedProducts,
       });
     } catch (err: any) {
@@ -115,7 +136,7 @@ export const catalogController = {
         return;
       }
 
-      const products = await dbService.getProducts({
+      const rawProducts = await dbService.getProducts({
         categorySlug: slug,
         includeInactive: false,
       });
@@ -123,7 +144,7 @@ export const catalogController = {
       res.json({
         ok: true,
         category,
-        products,
+        products: rawProducts.map(sanitizeProductForPublic),
       });
     } catch (err: any) {
       res.status(500).json({
