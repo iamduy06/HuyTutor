@@ -254,6 +254,55 @@ export const MyLibraryPage: React.FC = () => {
                         p.id === item.product_slug ||
                         p.title === item.product_title
                     );
+
+                    const isWord = item.format_code === 'Word';
+                    const isPdf = item.format_code === 'PDF';
+
+                    // Tìm định dạng Word hoặc PDF tương ứng cùng sản phẩm trong Tủ sách
+                    const siblingWord = isPdf
+                      ? libraryItems.find(
+                          (lib) =>
+                            (lib.product_slug === item.product_slug ||
+                              lib.product_title === item.product_title) &&
+                            lib.format_code === 'Word' &&
+                            lib.is_active
+                        )
+                      : null;
+
+                    const siblingPdf = isWord
+                      ? libraryItems.find(
+                          (lib) =>
+                            (lib.product_slug === item.product_slug ||
+                              lib.product_title === item.product_title) &&
+                            lib.format_code === 'PDF' &&
+                            lib.is_active
+                        )
+                      : null;
+
+                    // Link PDF chính thức của sản phẩm
+                    const directPdfUrl =
+                      isPdf
+                        ? item.access_drive_url ||
+                          item.watermarked_pdf_url ||
+                          matchedProd?.formats.find((f) => f.format_code === 'PDF')?.drive_url ||
+                          matchedProd?.sample_pdf_url ||
+                          ''
+                        : siblingPdf?.access_drive_url ||
+                          siblingPdf?.watermarked_pdf_url ||
+                          matchedProd?.formats.find((f) => f.format_code === 'PDF')?.drive_url ||
+                          matchedProd?.sample_pdf_url ||
+                          '';
+
+                    // Link Google Drive tải bản Word gốc
+                    const directWordUrl =
+                      isWord
+                        ? item.access_drive_url ||
+                          matchedProd?.formats.find((f) => f.format_code === 'Word')?.drive_url ||
+                          ''
+                        : siblingWord?.access_drive_url ||
+                          matchedProd?.formats.find((f) => f.format_code === 'Word')?.drive_url ||
+                          '';
+
                     return (
                       <div
                         key={item.id}
@@ -275,19 +324,61 @@ export const MyLibraryPage: React.FC = () => {
                             Cấp quyền ngày:{' '}
                             {new Date(item.granted_at).toLocaleDateString('vi-VN')}
                           </p>
+
+                          {/* Trạng thái nếu đã có đủ cả Word và PDF */}
+                          {(siblingWord || siblingPdf) && (
+                            <div className="text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-xs w-fit">
+                              ✓ Đã nâng cấp (Sở hữu cả PDF và Word)
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
-                          {item.access_drive_url ? (
+                          {/* 1. Nút tải file Word nếu là Word hoặc đã nâng cấp Word */}
+                          {(isWord || siblingWord) && directWordUrl && (
+                            <a
+                              href={directWordUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3 py-1.5 rounded-sm transition inline-flex items-center gap-1 shadow-xs"
+                            >
+                              📝 Tải Word (Google Drive)
+                            </a>
+                          )}
+
+                          {/* 2. Nút mở/tải PDF chính thức của sản phẩm */}
+                          {(isPdf || siblingPdf) && directPdfUrl && (
+                            <a
+                              href={directPdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-white border border-[#e60049] text-[#e60049] hover:bg-pink-50 font-bold text-xs px-3 py-1.5 rounded-sm transition inline-flex items-center gap-1"
+                            >
+                              📄 Tải / Mở link PDF của sản phẩm
+                            </a>
+                          )}
+
+                          {/* 3. Nút Nâng cấp lên Word nếu mới chỉ có PDF */}
+                          {isPdf && !siblingWord && matchedProd && (
+                            <Link
+                              to={`${buildProductUrl(matchedProd.category_slug, matchedProd.slug)}?format=Word`}
+                              className="bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs px-3 py-1.5 rounded-sm transition inline-flex items-center gap-1"
+                            >
+                              ⚡ Nâng cấp lên Word (Chỉ bù tiền)
+                            </Link>
+                          )}
+
+                          {/* 4. Đối với các định dạng khác (Flashcard, Trang tính, Thiết kế) */}
+                          {!isWord && !isPdf && item.access_drive_url && (
                             <a
                               href={item.access_drive_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3.5 py-1.5 rounded-sm transition inline-flex items-center gap-1.5"
+                              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-3 py-1.5 rounded-sm transition inline-flex items-center gap-1.5"
                             >
-                              Xem tài liệu
+                              Xem tài liệu ({item.format_code})
                             </a>
-                          ) : null}
+                          )}
 
                           {matchedProd && (
                             <Link

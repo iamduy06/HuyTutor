@@ -17,6 +17,7 @@ import {
 import { SmartLink } from './SmartLink';
 import { buildProductUrl } from '../utils/urlHelper';
 import { useAuth } from '../context/AuthContext';
+import { useStore } from '../context/StoreContext';
 
 /**
  * Khởi tạo danh sách các khối (detail_blocks) từ dữ liệu thực tế của sản phẩm
@@ -239,9 +240,15 @@ export const ProductHeroBlock: React.FC<{
   onAddToCart: (fmt: UiFormatCode) => void;
 }> = ({ config, product, selectedFormat, onSelectFormat, onBuyNow, onAddToCart }) => {
   const { isItemInLibrary } = useAuth();
+  const { checkOwnershipStatus } = useStore();
   if (!config || config.is_active === false) return null;
 
-  const isAlreadyOwned = isItemInLibrary && isItemInLibrary(product.slug, selectedFormat);
+  const ownershipStatus = checkOwnershipStatus
+    ? checkOwnershipStatus(product.slug, selectedFormat)
+    : { canPurchase: true, isUpgrade: false };
+
+  const isUpgrade = ownershipStatus.isUpgrade;
+  const isBlocked = !ownershipStatus.canPurchase;
 
   const activeFormats =
     Array.isArray(product.formats) && product.formats.filter((f) => f.is_active).length > 0
@@ -251,7 +258,13 @@ export const ProductHeroBlock: React.FC<{
   const currentFormatObj =
     activeFormats.find((f) => f.format_code === selectedFormat) || activeFormats[0];
   const currentPrice = currentFormatObj ? currentFormatObj.price : 0;
-  const isFreeGift = currentPrice === 0 || product.category_slug === 'gifts';
+  const numCurrentPrice = Number(currentPrice || 0);
+  const isFreeGift = numCurrentPrice === 0 || product.category_slug === 'gifts';
+
+  const pdfFormatObj = activeFormats.find((f) => f.format_code === 'PDF');
+  const rawPdfPrice = Number(pdfFormatObj?.price || 0);
+  const upgradeOffset = isUpgrade ? Math.min(rawPdfPrice, numCurrentPrice) : 0;
+  const upgradeAmountToPay = isUpgrade ? Math.max(0, numCurrentPrice - upgradeOffset) : numCurrentPrice;
 
   const displayTitle = config.title?.trim() || product.title;
   const displayImage = config.image_url?.trim() || product.thumbnail_url;
@@ -266,8 +279,9 @@ export const ProductHeroBlock: React.FC<{
     ? config.specs.filter((sp) => (sp.label && sp.label.trim()) || (sp.val && sp.val.trim()))
     : [];
 
-  const primaryCtaText =
-    config.primary_cta_text?.trim() || (isFreeGift ? 'Tải về miễn phí' : 'Đặt hàng');
+  const primaryCtaText = isUpgrade
+    ? `Nâng cấp lên Word (${formatVnd(upgradeAmountToPay)})`
+    : config.primary_cta_text?.trim() || (isFreeGift ? 'Tải về miễn phí' : 'Đặt hàng');
   const primaryAction = config.primary_cta_action || 'buy_now';
 
   return (
@@ -346,19 +360,34 @@ export const ProductHeroBlock: React.FC<{
 
           {/* Huy hiệu giá bán */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="inline-block bg-[#e60049] text-white text-xs sm:text-sm font-extrabold px-3 py-1 rounded-xs shadow-2xs">
-              {config.price_override_text?.trim()
-                ? config.price_override_text.trim()
-                : isFreeGift
-                  ? 'Miễn phí 100%'
-                  : formatVnd(currentPrice)}
-            </span>
+            {isUpgrade ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 line-through font-bold">
+                  {formatVnd(currentPrice)}
+                </span>
+                <span className="inline-block bg-[#e60049] text-white text-xs sm:text-sm font-extrabold px-3 py-1 rounded-xs shadow-2xs">
+                  {formatVnd(upgradeAmountToPay)} (Bù chênh lệch)
+                </span>
+              </div>
+            ) : (
+              <span className="inline-block bg-[#e60049] text-white text-xs sm:text-sm font-extrabold px-3 py-1 rounded-xs shadow-2xs">
+                {config.price_override_text?.trim()
+                  ? config.price_override_text.trim()
+                  : isFreeGift
+                    ? 'Miễn phí 100%'
+                    : formatVnd(currentPrice)}
+              </span>
+            )}
 
             {/* Bộ chọn định dạng (nếu có nhiều hơn 1 định dạng đang bật) */}
             {config.show_format_selector !== false && !isFreeGift && activeFormats.length > 1 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {activeFormats.map((fmt) => {
                   const isSelected = fmt.format_code === selectedFormat;
+                  const fmtStatus = checkOwnershipStatus
+                    ? checkOwnershipStatus(product.slug, fmt.format_code)
+                    : { canPurchase: true, isUpgrade: false };
+
                   return (
                     <button
                       key={fmt.format_code}
@@ -370,7 +399,7 @@ export const ProductHeroBlock: React.FC<{
                           : 'bg-white text-gray-700 border-gray-300 hover:border-[#e60049]'
                       }`}
                     >
-                      {fmt.format_code} ({formatVnd(fmt.price)})
+                      {fmt.format_code} {fmtStatus.isUpgrade ? '(Nâng cấp)' : `(${formatVnd(fmt.price)})`}
                     </button>
                   );
                 })}
@@ -400,14 +429,25 @@ export const ProductHeroBlock: React.FC<{
         </div>
       </div>
 
-      {/* Cảnh báo đã sở hữu trong Tủ sách cá nhân */}
-      {isAlreadyOwned && (
+      {/* Thông báo Nâng cấp định dạng */}
+      {isUpgrade && (
+        <div className="p-3 bg-pink-50 border border-pink-200 rounded-md flex flex-wrap items-center justify-between gap-3 text-xs text-gray-800">
+          <div className="flex items-center gap-2">
+            <span className="text-base text-[#e60049]">💡</span>
+            <span>
+              Bạn đã sở hữu bản <strong>PDF</strong>. Bạn chỉ cần bù thêm{' '}
+              <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(currentPrice)}) để sở hữu toàn quyền định dạng <strong>Word</strong>!
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Cảnh báo đã sở hữu trong Tủ sách cá nhân (ngăn chặn) */}
+      {isBlocked && (
         <div className="p-3 bg-amber-50 border border-amber-300 rounded-md flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 font-semibold">
           <div className="flex items-center gap-2">
             <span className="text-base">⚠️</span>
-            <span>
-              Bạn đã sở hữu tài liệu này ở định dạng <strong>{selectedFormat}</strong> trong Tủ sách cá nhân.
-            </span>
+            <span>{ownershipStatus.errorMessage}</span>
           </div>
           <SmartLink
             to="/my-library"
@@ -420,7 +460,11 @@ export const ProductHeroBlock: React.FC<{
 
       {/* Cụm Nút Đặt Hàng / Mua Ngay & Link Phụ (Trải rộng chuẩn mẫu huytutor.io.vn) */}
       <div className="space-y-2.5 pt-1">
-        {primaryAction === 'custom_link' && config.primary_cta_link?.trim() ? (
+        {isBlocked ? (
+          <div className="block w-full bg-gray-100 border border-gray-300 text-gray-500 font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center">
+            {ownershipStatus.errorMessage}
+          </div>
+        ) : primaryAction === 'custom_link' && config.primary_cta_link?.trim() ? (
           <SmartLink
             to={config.primary_cta_link}
             className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-xs"
@@ -436,14 +480,14 @@ export const ProductHeroBlock: React.FC<{
                   ? onAddToCart(selectedFormat)
                   : onBuyNow(selectedFormat)
               }
-              className="sm:col-span-8 w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs transition shadow-xs"
+              className="sm:col-span-8 w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs transition shadow-xs cursor-pointer"
             >
               {primaryCtaText}
             </button>
             <button
               type="button"
               onClick={() => onAddToCart(selectedFormat)}
-              className="sm:col-span-4 w-full bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border border-[#e60049] font-bold text-xs sm:text-sm py-2.5 rounded-xs transition"
+              className="sm:col-span-4 w-full bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border border-[#e60049] font-bold text-xs sm:text-sm py-2.5 rounded-xs transition cursor-pointer"
             >
               Thêm vào giỏ hàng
             </button>
@@ -456,7 +500,7 @@ export const ProductHeroBlock: React.FC<{
                 ? onAddToCart(selectedFormat)
                 : onBuyNow(selectedFormat)
             }
-            className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-xs"
+            className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-xs cursor-pointer"
           >
             {primaryCtaText}
           </button>

@@ -10,6 +10,7 @@ export const ProductFormatSelectionModal: React.FC = () => {
     formatModalInitialFormat,
     formatModalDefaultAction,
     closeFormatModal,
+    checkOwnershipStatus,
     addToCart,
     buyNow,
   } = useStore();
@@ -55,16 +56,26 @@ export const ProductFormatSelectionModal: React.FC = () => {
   const effectiveQty = isFlashcard ? Math.max(1, quantity) : 1;
   const lineTotal = unitPrice * effectiveQty;
 
-  const isOwned = Boolean(
-    isItemInLibrary && isItemInLibrary(formatModalProduct.slug, selectedFormat)
-  );
+  const ownershipStatus = checkOwnershipStatus
+    ? checkOwnershipStatus(formatModalProduct.slug, selectedFormat)
+    : { canPurchase: true, isUpgrade: false };
+
+  const isUpgrade = ownershipStatus.isUpgrade;
+  const isBlocked = !ownershipStatus.canPurchase;
+
+  const pdfFormatObj = availableFormats.find((f) => f.format_code === 'PDF');
+  const rawPdfPrice = Number(pdfFormatObj?.price || 0);
+  const upgradeOffset = isUpgrade ? Math.min(rawPdfPrice, unitPrice) : 0;
+  const upgradeAmountToPay = isUpgrade ? Math.max(0, unitPrice - upgradeOffset) : unitPrice;
 
   const handleAddToCart = () => {
+    if (isBlocked) return;
     addToCart(formatModalProduct, selectedFormat, effectiveQty);
     closeFormatModal();
   };
 
   const handleBuyNow = () => {
+    if (isBlocked) return;
     buyNow(formatModalProduct, selectedFormat, effectiveQty);
     closeFormatModal();
   };
@@ -117,14 +128,30 @@ export const ProductFormatSelectionModal: React.FC = () => {
               <h4 className="font-extrabold text-sm text-gray-900 line-clamp-2 leading-snug">
                 {formatModalProduct.title}
               </h4>
-              <div className="pt-0.5">
-                <span className="text-base font-extrabold text-[#e60049]">
-                  {formatVnd(unitPrice)}
-                </span>
-                {isFlashcard && effectiveQty > 1 && (
-                  <span className="text-gray-500 text-[11px] ml-2">
-                    (Tổng: <strong>{formatVnd(lineTotal)}</strong>)
-                  </span>
+              <div className="pt-0.5 flex flex-wrap items-baseline gap-2">
+                {isUpgrade ? (
+                  <>
+                    <span className="text-xs text-gray-400 line-through font-semibold">
+                      {formatVnd(unitPrice)}
+                    </span>
+                    <span className="text-base font-extrabold text-[#e60049]">
+                      {formatVnd(upgradeAmountToPay)}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-xs">
+                      Bù chênh lệch
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-base font-extrabold text-[#e60049]">
+                      {formatVnd(unitPrice)}
+                    </span>
+                    {isFlashcard && effectiveQty > 1 && (
+                      <span className="text-gray-500 text-[11px] ml-1">
+                        (Tổng: <strong>{formatVnd(lineTotal)}</strong>)
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -138,9 +165,10 @@ export const ProductFormatSelectionModal: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               {availableFormats.map((fmt) => {
                 const isSelected = fmt.format_code === selectedFormat;
-                const fmtOwned = Boolean(
-                  isItemInLibrary && isItemInLibrary(formatModalProduct.slug, fmt.format_code)
-                );
+                const fmtStatus = checkOwnershipStatus
+                  ? checkOwnershipStatus(formatModalProduct.slug, fmt.format_code)
+                  : { canPurchase: true, isUpgrade: false };
+
                 return (
                   <button
                     key={fmt.format_code}
@@ -165,11 +193,15 @@ export const ProductFormatSelectionModal: React.FC = () => {
                     <span className="text-[11px] font-extrabold text-gray-700">
                       {formatVnd(fmt.price)}
                     </span>
-                    {fmtOwned && (
-                      <span className="text-[9px] text-amber-700 font-bold mt-1 bg-amber-100/70 px-1.5 py-0.5 rounded-xs w-fit">
-                        Đã có trong Tủ sách
+                    {fmtStatus.isUpgrade ? (
+                      <span className="text-[9px] text-[#e60049] font-bold mt-1 bg-pink-100/80 px-1.5 py-0.5 rounded-xs w-fit">
+                        Nâng cấp bù tiền
                       </span>
-                    )}
+                    ) : !fmtStatus.canPurchase ? (
+                      <span className="text-[9px] text-amber-700 font-bold mt-1 bg-amber-100/70 px-1.5 py-0.5 rounded-xs w-fit">
+                        Đã sở hữu
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -213,45 +245,79 @@ export const ProductFormatSelectionModal: React.FC = () => {
                   </span>
                 </div>
               </div>
+            ) : isUpgrade ? (
+              <div className="p-3 bg-pink-50 border border-pink-200 rounded text-[11px] text-gray-800 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#e60049]">
+                  <span>💡</span>
+                  <span>ƯU ĐÃI NÂNG CẤP ĐỊNH DẠNG</span>
+                </div>
+                <p className="leading-relaxed">
+                  Bạn đã sở hữu bản <strong>PDF</strong> trong Tủ sách cá nhân. Bạn chỉ cần bù thêm khoản tiền chênh lệch{' '}
+                  <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(unitPrice)}) để sở hữu bản <strong>Word</strong> toàn quyền chỉnh sửa!
+                </p>
+              </div>
+            ) : isBlocked ? (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 font-semibold flex items-start gap-2">
+                <span className="shrink-0 text-sm">⚠️</span>
+                <span>{ownershipStatus.errorMessage}</span>
+              </div>
             ) : (
               <div className="bg-gray-50 border border-gray-200 rounded p-2.5 text-[11px] text-gray-600 leading-relaxed">
                 ℹ️ Định dạng <strong>{selectedFormat}</strong> là tài liệu số có bản quyền, hệ thống tự động đặt số lượng <strong>1</strong> cho mỗi đơn hàng.
               </div>
             )}
           </div>
-
-          {/* Cảnh báo nếu đã sở hữu trong Tủ sách */}
-          {isOwned && (
-            <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 font-medium">
-              ⚠️ Tài khoản <strong>{user?.fullName || user?.email}</strong> đã sở hữu định dạng <strong>{selectedFormat}</strong> trong Tủ sách cá nhân. Bạn vẫn có thể mua thêm nếu có nhu cầu cấp quyền mới.
-            </div>
-          )}
         </div>
 
         {/* Footer Actions */}
         <div className="p-4 bg-gray-50 border-t border-gray-200 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            className={`w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              formatModalDefaultAction === 'add_to_cart'
-                ? 'bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border-2 border-[#e60049]'
-                : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-300'
-            }`}
-          >
-            <span>🛒 Thêm vào giỏ</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleBuyNow}
-            className={`w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer text-white shadow-xs ${
-              formatModalDefaultAction === 'buy_now'
-                ? 'bg-[#e60049] hover:bg-[#cc0041] ring-2 ring-pink-300'
-                : 'bg-[#e60049] hover:bg-[#cc0041]'
-            }`}
-          >
-            <span>⚡ Mua ngay</span>
-          </button>
+          {isBlocked ? (
+            <div className="col-span-2 text-center py-2.5 px-3 rounded-xs text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+              {ownershipStatus.errorMessage}
+            </div>
+          ) : isUpgrade ? (
+            <>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border border-[#e60049]"
+              >
+                <span>🛒 Thêm nâng cấp ({formatVnd(upgradeAmountToPay)})</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className="w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer text-white bg-[#e60049] hover:bg-[#cc0041] shadow-xs"
+              >
+                <span>⚡ Nâng cấp ngay ({formatVnd(upgradeAmountToPay)})</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className={`w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  formatModalDefaultAction === 'add_to_cart'
+                    ? 'bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border-2 border-[#e60049]'
+                    : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-300'
+                }`}
+              >
+                <span>🛒 Thêm vào giỏ</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className={`w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer text-white shadow-xs ${
+                  formatModalDefaultAction === 'buy_now'
+                    ? 'bg-[#e60049] hover:bg-[#cc0041] ring-2 ring-pink-300'
+                    : 'bg-[#e60049] hover:bg-[#cc0041]'
+                }`}
+              >
+                <span>⚡ Mua ngay</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
