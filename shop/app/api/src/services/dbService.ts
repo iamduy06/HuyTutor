@@ -2032,8 +2032,62 @@ export const dbService = {
   },
 
   async syncPaidOrdersToUserLibrary(user: SeedUser): Promise<void> {
-    const orders = await this.getAllOrders();
-    const userPaidOrders = orders.filter(
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const cleanEmail = user.email.trim().toLowerCase();
+      const { data, error } = await supabaseAdmin
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('payment_status', 'paid')
+        .or(`user_id.eq.${user.id},customer_email.ilike.${cleanEmail}`);
+      if (!error && Array.isArray(data)) {
+        for (const row of data) {
+          const ord: SeedOrder = {
+            id: row.id,
+            user_id: user.id,
+            order_code: row.order_code,
+            customer_name: row.customer_name,
+            customer_email: row.customer_email,
+            customer_phone: row.customer_phone,
+            customer_group: row.customer_group,
+            selected_format: row.selected_format,
+            flashcard_quantity: row.flashcard_quantity,
+            need_invoice: Boolean(row.need_invoice),
+            invoice_tax_or_cccd: row.invoice_tax_or_cccd || '',
+            invoice_address: row.invoice_address || '',
+            subtotal_amount: Number(row.subtotal_amount || 0),
+            discount_percent: Number(row.discount_percent || 0),
+            discount_amount: Number(row.discount_amount || 0),
+            total_amount: Number(
+              row.final_amount !== undefined && row.final_amount !== null
+                ? row.final_amount
+                : row.total_amount
+            ),
+            payment_method: row.payment_method,
+            payment_status: row.payment_status,
+            payment_ref_id: row.payment_ref_id,
+            paid_at: row.paid_at,
+            view_token: row.view_token || '',
+            google_form_submitted: Boolean(row.google_form_submitted),
+            created_at: row.created_at,
+            items: Array.isArray(row.order_items)
+              ? row.order_items.map((it: any) => ({
+                  product_id: it.product_id || '',
+                  product_title: it.product_title,
+                  google_form_product_name: it.google_form_product_name,
+                  format_code: it.format_code,
+                  unit_price: Number(it.unit_price),
+                  quantity: Number(it.quantity),
+                  subtotal: Number(it.subtotal),
+                }))
+              : [],
+          };
+          await this.grantOrderToUserLibrary(ord);
+        }
+        return;
+      }
+    }
+    const db = loadLocalDb();
+    const userPaidOrders = db.orders.filter(
       (o) =>
         o.payment_status === 'paid' &&
         (o.user_id === user.id ||
@@ -2068,9 +2122,58 @@ export const dbService = {
   },
 
   async getUserOrders(userId: string, email: string): Promise<SeedOrder[]> {
-    const allOrders = await this.getAllOrders();
     const cleanEmail = email.trim().toLowerCase();
-    return allOrders.filter(
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('orders')
+        .select('*, order_items(*)')
+        .or(`user_id.eq.${userId},customer_email.ilike.${cleanEmail}`)
+        .order('created_at', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id || null,
+          order_code: row.order_code,
+          customer_name: row.customer_name,
+          customer_email: row.customer_email,
+          customer_phone: row.customer_phone,
+          customer_group: row.customer_group,
+          selected_format: row.selected_format,
+          flashcard_quantity: row.flashcard_quantity,
+          need_invoice: Boolean(row.need_invoice),
+          invoice_tax_or_cccd: row.invoice_tax_or_cccd || '',
+          invoice_address: row.invoice_address || '',
+          subtotal_amount: Number(row.subtotal_amount || row.total_amount || 0),
+          discount_percent: Number(row.discount_percent || 0),
+          discount_amount: Number(row.discount_amount || 0),
+          total_amount: Number(
+            row.final_amount !== undefined && row.final_amount !== null
+              ? row.final_amount
+              : row.total_amount
+          ),
+          payment_method: row.payment_method,
+          payment_status: row.payment_status,
+          payment_ref_id: row.payment_ref_id,
+          paid_at: row.paid_at,
+          view_token: row.view_token || '',
+          google_form_submitted: Boolean(row.google_form_submitted),
+          created_at: row.created_at,
+          items: Array.isArray(row.order_items)
+            ? row.order_items.map((it: any) => ({
+                product_id: it.product_id || '',
+                product_title: it.product_title,
+                google_form_product_name: it.google_form_product_name,
+                format_code: it.format_code,
+                unit_price: Number(it.unit_price),
+                quantity: Number(it.quantity),
+                subtotal: Number(it.subtotal),
+              }))
+            : [],
+        }));
+      }
+    }
+    const db = loadLocalDb();
+    return db.orders.filter(
       (o) =>
         o.user_id === userId || o.customer_email.trim().toLowerCase() === cleanEmail
     );
