@@ -33,7 +33,7 @@ export const ProductDetailPage: React.FC = () => {
   }>();
   const navigate = useNavigate();
 
-  const { products, addToCart, buyNow } = useStore();
+  const { products, openFormatModal } = useStore();
 
   // Tự động chuẩn hóa nếu người dùng truy cập qua tiền tố cũ (tai-lieu, san-pham, catalog)
   useEffect(() => {
@@ -121,8 +121,8 @@ export const ProductDetailPage: React.FC = () => {
         }}
         selectedFormat={selectedFormat}
         onSelectFormat={setSelectedFormat}
-        onBuyNow={(fmt) => buyNow(product, fmt, 1)}
-        onAddToCart={(fmt) => addToCart(product, fmt, 1)}
+        onBuyNow={(fmt) => openFormatModal(product, 'buy_now', fmt)}
+        onAddToCart={(fmt) => openFormatModal(product, 'add_to_cart', fmt)}
       />
     </main>
   );

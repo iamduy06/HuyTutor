@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthModal } from './components/AuthModal';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
+import { ProductFormatSelectionModal } from './components/ProductFormatSelectionModal';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -139,6 +140,7 @@ export const App: React.FC = () => {
             {/* Global Drawers & Modals */}
             <CartDrawer />
             <CheckoutModal />
+            <ProductFormatSelectionModal />
             <SearchModal />
             <SampleModal />
             <AuthModal />
