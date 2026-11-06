@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProductImageFrame } from './ProductImageFrame';
 import {
   BottomCtaBlockConfig,
@@ -555,6 +555,14 @@ export const TopicAccordionBlock: React.FC<{
     });
     return init;
   });
+
+  useEffect(() => {
+    const init: Record<string, boolean> = {};
+    accordions.forEach((acc) => {
+      init[acc.id] = acc.default_open ?? false;
+    });
+    setOpenMap(init);
+  }, [config?.accordions]);
 
   if (!config || config.is_active === false) return null;
 

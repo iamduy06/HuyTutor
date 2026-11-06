@@ -32,6 +32,7 @@ import {
   SampleGroupsBlockConfig,
   SamplePreviewGroup,
   TopicAccordionBlockConfig,
+  TopicAccordionBox,
   UniversalBlockItem,
   UniversalPageContext,
 } from '../types';
@@ -619,39 +620,109 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
 
   if (block.type === 'topic_accordion') {
     const accCfg = cfg as TopicAccordionBlockConfig;
+    const currentAcc = accCfg.accordions?.[0] || {
+      id: 'acc_0',
+      title: 'Danh sách chủ đề',
+      default_open: true,
+      items: [],
+    };
+    const isDefaultOpen = currentAcc.default_open !== false;
+
+    const updateAccordion = (patch: Partial<TopicAccordionBox>) => {
+      onUpdateConfig({
+        accordions: [
+          {
+            ...currentAcc,
+            ...patch,
+          },
+        ],
+      });
+    };
+
     return (
       <div className="space-y-4">
-        <div>
-          <label className="block font-bold text-gray-700 mb-1">Tiêu đề khu vực Accordion</label>
-          <input
-            type="text"
-            value={accCfg.section_heading || ''}
-            onChange={(e) => onUpdateConfig({ section_heading: e.target.value })}
-            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
-            placeholder="Bản xem thử & Danh sách chuyên đề"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Tiêu đề khu vực Accordion</label>
+            <input
+              type="text"
+              value={accCfg.section_heading || ''}
+              onChange={(e) => onUpdateConfig({ section_heading: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="Bản xem thử & Danh sách chuyên đề"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Thanh điều hướng nhảy nhanh</label>
+            <label className="inline-flex items-center gap-2 pt-2 cursor-pointer text-xs font-semibold text-gray-800">
+              <input
+                type="checkbox"
+                checked={accCfg.show_quick_anchor_nav !== false}
+                onChange={(e) => onUpdateConfig({ show_quick_anchor_nav: e.target.checked })}
+                className="accent-[#e60049] cursor-pointer"
+              />
+              <span>Hiển thị thanh nút nhảy nhanh tới từng nhóm đọc thử A4</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Tiêu đề thanh chủ đề (Hộp Accordion)</label>
+            <input
+              type="text"
+              value={currentAcc.title || 'Danh sách chủ đề'}
+              onChange={(e) => updateAccordion({ title: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="Danh sách 30 đề thi / Danh sách chủ đề"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Trạng thái mặc định khi vào trang</label>
+            <div className="flex items-center gap-4 pt-1.5">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-800">
+                <input
+                  type="radio"
+                  name="accordion_default_state"
+                  checked={isDefaultOpen}
+                  onChange={() => updateAccordion({ default_open: true })}
+                  className="accent-[#e60049] cursor-pointer"
+                />
+                <span>Mặc định MỞ RỘNG (Expand)</span>
+              </label>
+
+              <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-800">
+                <input
+                  type="radio"
+                  name="accordion_default_state"
+                  checked={!isDefaultOpen}
+                  onChange={() => updateAccordion({ default_open: false })}
+                  className="accent-[#e60049] cursor-pointer"
+                />
+                <span>Mặc định THU GỌN (Collapse)</span>
+              </label>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">
+              {isDefaultOpen
+                ? 'Nội dung sẽ mở sẵn toàn bộ ngay khi khách vào trang.'
+                : 'Nội dung sẽ thu gọn lại, người xem bấm vào thanh tiêu đề mới xổ danh sách ra.'}
+            </p>
+          </div>
         </div>
 
         <div>
           <label className="block font-bold text-gray-700 mb-1">Các đề / chủ đề liệt kê (mỗi dòng một mục)</label>
           <textarea
-            rows={5}
-            value={(accCfg.accordions?.[0]?.items || []).join('\n')}
+            rows={6}
+            value={(currentAcc.items || []).join('\n')}
             onChange={(e) => {
               const items = e.target.value.split('\n').filter((l) => l.trim().length > 0);
-              onUpdateConfig({
-                accordions: [
-                  {
-                    id: 'acc_0',
-                    title: accCfg.accordions?.[0]?.title || 'Danh sách chủ đề',
-                    default_open: true,
-                    items,
-                  },
-                ],
-              });
+              updateAccordion({ items });
             }}
-            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
-            placeholder="Đề 01: Khởi động cơ bản&#10;Đề 02: Tăng tốc nâng cao..."
+            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs leading-relaxed"
+            placeholder="Đề 01: Khởi động cơ bản&#10;Đề 02: Tăng tốc nâng cao&#10;Đề 03: Về đích điểm 10..."
           />
         </div>
       </div>

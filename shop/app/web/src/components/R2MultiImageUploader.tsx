@@ -1,6 +1,12 @@
 import React, { useRef, useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
+
+// Cấu hình worker cho pdfjs-dist
+if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+}
 
 export interface R2MultiImageUploaderProps {
   label?: string;
@@ -13,6 +19,58 @@ export interface R2MultiImageUploaderProps {
   aspectRatioHint?: string;
   className?: string;
 }
+
+/**
+ * Hàm phân tích file PDF và tự động render toàn bộ các trang sang File ảnh WebP độ nét cao
+ */
+const convertPdfFileToImages = async (
+  pdfFile: File,
+  onPageProgress: (current: number, total: number) => void
+): Promise<File[]> => {
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(arrayBuffer),
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+    cMapPacked: true,
+  });
+  const pdfDoc = await loadingTask.promise;
+  const numPages = pdfDoc.numPages;
+  const imageFiles: File[] = [];
+
+  const baseName = pdfFile.name
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[^a-zA-Z0-9_\-]/g, '_');
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    onPageProgress(pageNum, numPages);
+    const page = await pdfDoc.getPage(pageNum);
+
+    // Scale 2.0 đảm bảo độ phân giải A4 siêu nét (~1600 x 2260px)
+    const viewport = page.getViewport({ scale: 2.0 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) continue;
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/webp', 0.92);
+    });
+
+    if (blob) {
+      const pageIndexStr = String(pageNum).padStart(2, '0');
+      const pageFile = new File([blob], `${baseName}_trang_${pageIndexStr}.webp`, {
+        type: 'image/webp',
+        lastModified: Date.now(),
+      });
+      imageFiles.push(pageFile);
+    }
+  }
+
+  return imageFiles;
+};
 
 export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
   label,
@@ -29,6 +87,11 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploading, setIsUploading] = useState(false);
+  const [pdfRenderingStatus, setPdfRenderingStatus] = useState<{
+    fileName: string;
+    current: number;
+    total: number;
+  } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
     total: number;
@@ -37,23 +100,63 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
   const [isDeletingUrl, setIsDeletingUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Xử lý tải lên nhiều file cùng một lúc
+  // Xử lý tải lên nhiều file cùng một lúc (hỗ trợ cả File PDF tự động render & File ảnh)
   const uploadFiles = async (fileList: FileList | File[]) => {
-    const rawFiles = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
-    if (rawFiles.length === 0) {
-      showToast('Vui lòng chọn ít nhất 1 file hình ảnh hợp lệ (PNG, JPG, WEBP...).');
+    const rawList = Array.from(fileList);
+    const pdfFiles = rawList.filter(
+      (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    const imageFiles = rawList.filter(
+      (f) => f.type.startsWith('image/') && !f.name.toLowerCase().endsWith('.pdf')
+    );
+
+    if (pdfFiles.length === 0 && imageFiles.length === 0) {
+      showToast('Vui lòng chọn file hình ảnh (PNG, JPG, WEBP...) hoặc file PDF.');
       return;
     }
 
-    // Tự động sắp xếp tự nhiên theo tên file chuẩn Windows Explorer (1, 2, ..., 9, 10, A-Z)
-    // Khắc phục triệt để lỗi Windows File Dialog trả về danh sách file bị đảo ngược khi chọn nhiều file
-    const files = [...rawFiles].sort((a, b) =>
+    setIsUploading(true);
+    const allImagesToUpload: File[] = [...imageFiles];
+
+    // 1. Nếu có file PDF, tự động phân tích & render toàn bộ trang sang ảnh WebP độ nét cao
+    if (pdfFiles.length > 0) {
+      for (let pIdx = 0; pIdx < pdfFiles.length; pIdx++) {
+        const pdfFile = pdfFiles[pIdx];
+        setPdfRenderingStatus({
+          fileName: pdfFile.name,
+          current: 0,
+          total: 0,
+        });
+
+        try {
+          const renderedPages = await convertPdfFileToImages(pdfFile, (curr, total) => {
+            setPdfRenderingStatus({
+              fileName: pdfFile.name,
+              current: curr,
+              total,
+            });
+          });
+          allImagesToUpload.push(...renderedPages);
+          showToast(`Đã render ${renderedPages.length} trang từ file PDF "${pdfFile.name}"!`);
+        } catch (err: any) {
+          console.error(`Lỗi render file PDF ${pdfFile.name}:`, err);
+          showToast(`Lỗi render file PDF "${pdfFile.name}": ${err?.message || 'Không thể đọc PDF'}`);
+        }
+      }
+      setPdfRenderingStatus(null);
+    }
+
+    if (allImagesToUpload.length === 0) {
+      setIsUploading(false);
+      return;
+    }
+
+    // 2. Tự động sắp xếp tự nhiên theo tên file chuẩn Windows Explorer (1, 2, ..., 9, 10, A-Z)
+    const files = [...allImagesToUpload].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
     );
 
-    setIsUploading(true);
     setUploadProgress({ current: 0, total: files.length, percent: 0 });
-
     const newUrls: string[] = [];
     let successCount = 0;
     let failCount = 0;
@@ -88,10 +191,10 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
     setUploadProgress(null);
 
     if (failCount === 0) {
-      showToast(`Đã tải thành công ${successCount} ảnh lên Cloudflare R2!`);
+      showToast(`Đã tải thành công ${successCount} trang ảnh lên Cloudflare R2!`);
     } else {
       showToast(
-        `Đã tải lên ${successCount} ảnh thành công (${failCount} ảnh thất bại, vui lòng thử lại).`
+        `Đã tải lên ${successCount} trang thành công (${failCount} trang thất bại, vui lòng thử lại).`
       );
     }
 
@@ -199,7 +302,7 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
         </div>
       )}
 
-      {/* Khu vực Dropzone Kéo Thả / Bấm Chọn Nhiều Ảnh Cùng Lúc */}
+      {/* Khu vực Dropzone Kéo Thả / Bấm Chọn File PDF hoặc Nhiều Ảnh Cùng Lúc */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -215,7 +318,7 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*"
+          accept="image/*,.pdf,application/pdf"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -240,10 +343,12 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
                 />
               </svg>
               <span>
-                Đang tải lên Cloudflare R2 ({uploadProgress?.current}/{uploadProgress?.total} ảnh -{' '}
-                {uploadProgress?.percent}%)...
+                {pdfRenderingStatus
+                  ? `Đang tự động render file PDF "${pdfRenderingStatus.fileName}": Trang ${pdfRenderingStatus.current}/${pdfRenderingStatus.total}...`
+                  : `Đang tải lên Cloudflare R2 (${uploadProgress?.current}/${uploadProgress?.total} trang - ${uploadProgress?.percent}%)...`}
               </span>
             </div>
+
             {uploadProgress && (
               <div className="w-full max-w-xs mx-auto bg-gray-200 rounded-full h-1.5 overflow-hidden">
                 <div
@@ -269,11 +374,11 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
               </svg>
             </div>
             <div className="text-xs font-bold text-gray-700">
-              Kéo thả các file ảnh vào đây hoặc{' '}
-              <span className="text-[#e60049] underline">bấm để chọn nhiều ảnh cùng lúc</span>
+              Kéo thả <span className="text-[#e60049] font-black">file PDF</span> hoặc các ảnh vào đây, hoặc{' '}
+              <span className="text-[#e60049] underline font-bold">bấm để chọn file PDF/Ảnh</span>
             </div>
             <p className="text-[11px] text-gray-500">
-              Hỗ trợ chọn nhiều file (Ctrl + A, Shift + Click). Đặt tên 12 số tự động lưu trên Cloudflare R2.
+              🔥 Hỗ trợ file PDF (tự động render toàn bộ trang sang ảnh A4 độ nét cao) hoặc chọn nhiều ảnh (PNG, JPG, WEBP).
             </p>
           </div>
         )}
@@ -302,7 +407,7 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
               onClick={() => fileInputRef.current?.click()}
               className="text-[11px] font-bold text-[#e60049] bg-pink-50 hover:bg-pink-100 border border-pink-200 px-2.5 py-1 rounded-xs transition cursor-pointer"
             >
-              + Chọn thêm ảnh
+              + Chọn thêm file PDF / Ảnh
             </button>
             <button
               type="button"
