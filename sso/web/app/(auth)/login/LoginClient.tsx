@@ -88,7 +88,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
         if (data.error?.code === 'DEVICE_LIMIT_EXCEEDED') {
           setBlocked({
             message: data.error.message || 'Tài khoản đã đạt giới hạn thiết bị.',
-            contactUrl: data.error.contactUrl || 'https://web.facebook.com/huytutor',
+            contactUrl: data.error.contactUrl || '',
           });
           setLoading(false);
           return;
@@ -169,15 +169,17 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
                   <CheckCircle className="w-3.5 h-3.5" />
                   <span>Xem danh sách thiết bị của bạn</span>
                 </a>
-                <a
-                  href={blocked.contactUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Liên hệ Admin mở khóa thiết bị</span>
-                </a>
+                {blocked.contactUrl && (
+                  <a
+                    href={blocked.contactUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Liên hệ Admin mở khóa thiết bị</span>
+                  </a>
+                )}
               </div>
             </div>
           </div>

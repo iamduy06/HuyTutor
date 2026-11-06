@@ -287,129 +287,28 @@ export const authService = {
   },
 
   /**
-   * Đổi mật khẩu khi đang đăng nhập (băm bằng SHA3-256).
+   * Đổi mật khẩu: Đã chuyển hướng 100% sang SSO tập trung.
    */
-  async changePassword(params: {
+  async changePassword(_params: {
     userId: string;
     currentPassword: string;
     newPassword: string;
   }) {
-    const user = await dbService.getUserById(params.userId);
-    if (!user) {
-      throw new Error('Không tìm thấy tài khoản.');
-    }
-
-    if (!verifySha3_256(String(params.currentPassword || ''), user.password_hash)) {
-      throw new Error('Mật khẩu hiện tại không chính xác.');
-    }
-
-    const cleanNew = String(params.newPassword || '');
-    if (cleanNew.length < 6) {
-      throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự.');
-    }
-
-    const newHash = hashSha3_256(cleanNew);
-    await dbService.updateUser(user.id, {
-      password_hash: newHash,
-      reset_password_token: null,
-      reset_password_expires_at: null,
-    });
-
-    return { ok: true, message: 'Đã cập nhật mật khẩu mới thành công.' };
+    throw new Error('Tính năng đổi mật khẩu đã chuyển sang cổng SSO tập trung (sso.huytutor.edu.vn).');
   },
 
   /**
-   * Yêu cầu Quên mật khẩu:
-   * - Lưu reset_password_token vào bảng public.users (hạn 15 phút)
-   * - Gửi email khôi phục qua cổng Email của Supabase (supabaseAdmin.auth.admin.generateLink)
+   * Quên mật khẩu: Đã chuyển hướng 100% sang SSO tập trung.
    */
-  async forgotPassword(email: string, frontendOrigin?: string) {
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    if (!cleanEmail) {
-      throw new Error('Vui lòng nhập địa chỉ email của bạn.');
-    }
-
-    const user = await dbService.getUserByEmail(cleanEmail);
-    if (!user) {
-      return {
-        ok: true,
-        message:
-          'Nếu địa chỉ email này đã đăng ký trên hệ thống, liên kết đặt lại mật khẩu đã được gửi tới hộp thư của bạn.',
-      };
-    }
-
-    const resetToken = generateSecureToken(24);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    await dbService.updateUser(user.id, {
-      reset_password_token: resetToken,
-      reset_password_expires_at: expiresAt,
-    });
-
-    const baseOrigin = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
-    const resetLink = `${baseOrigin}/reset-password?token=${resetToken}`;
-
-    if (isSupabaseConfigured && supabaseAdmin) {
-      try {
-        await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery',
-          email: cleanEmail,
-          options: {
-            redirectTo: resetLink,
-          },
-        });
-      } catch (err: any) {
-        console.warn('[authService] Supabase Email Gateway warning:', err?.message);
-      }
-    }
-
-    return {
-      ok: true,
-      message:
-        'Đã tạo yêu cầu khôi phục mật khẩu. Vui lòng kiểm tra hộp thư email của bạn để đặt lại mật khẩu mới.',
-    };
+  async forgotPassword(_email: string, _frontendOrigin?: string) {
+    throw new Error('Tính năng khôi phục mật khẩu đã chuyển sang cổng SSO tập trung (sso.huytutor.edu.vn).');
   },
 
   /**
-   * Đặt lại mật khẩu mới từ reset_password_token (băm bằng SHA3-256)
-   * và thu hồi toàn bộ các phiên đăng nhập cũ.
+   * Đặt lại mật khẩu: Đã chuyển hướng 100% sang SSO tập trung.
    */
-  async resetPassword(token: string, newPassword: string) {
-    const cleanToken = String(token || '').trim();
-    const cleanPassword = String(newPassword || '');
-
-    if (!cleanToken) {
-      throw new Error('Mã khôi phục mật khẩu không hợp lệ.');
-    }
-    if (cleanPassword.length < 6) {
-      throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự.');
-    }
-
-    const user = await dbService.getUserByResetToken(cleanToken);
-    if (
-      !user ||
-      !user.reset_password_expires_at ||
-      new Date(user.reset_password_expires_at).getTime() < Date.now()
-    ) {
-      throw new Error(
-        'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn (15 phút). Vui lòng gửi lại yêu cầu mới.'
-      );
-    }
-
-    const newHash = hashSha3_256(cleanPassword);
-    await dbService.updateUser(user.id, {
-      password_hash: newHash,
-      reset_password_token: null,
-      reset_password_expires_at: null,
-    });
-
-    // Thu hồi toàn bộ các phiên cũ để đảm bảo an toàn
-    await dbService.revokeAllUserSessions(user.id);
-
-    return {
-      ok: true,
-      message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
-    };
+  async resetPassword(_token: string, _newPassword: string) {
+    throw new Error('Tính năng đặt lại mật khẩu đã chuyển sang cổng SSO tập trung (sso.huytutor.edu.vn).');
   },
 };
 
