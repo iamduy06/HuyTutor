@@ -551,7 +551,7 @@ export const TopicAccordionBlock: React.FC<{
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     accordions.forEach((acc) => {
-      init[acc.id] = acc.default_open ?? false;
+      init[acc.id] = acc.default_open !== false;
     });
     return init;
   });
@@ -559,7 +559,7 @@ export const TopicAccordionBlock: React.FC<{
   useEffect(() => {
     const init: Record<string, boolean> = {};
     accordions.forEach((acc) => {
-      init[acc.id] = acc.default_open ?? false;
+      init[acc.id] = acc.default_open !== false;
     });
     setOpenMap(init);
   }, [config?.accordions]);
@@ -576,22 +576,14 @@ export const TopicAccordionBlock: React.FC<{
 
   return (
     <section className="space-y-4">
-      {config.section_heading?.trim() && (
-        <div className="border-b-2 border-gray-500 pb-2">
-          <h2 className="text-sm sm:text-base font-extrabold text-[#e60049]">
-            {config.section_heading}
-          </h2>
-        </div>
-      )}
-
       {/* Thanh nút nhảy nhanh tới từng nhóm đọc thử (nếu có từ 2 nhóm trở lên) */}
       {config.show_quick_anchor_nav && activeSampleGroups.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pb-1">
           {activeSampleGroups.map((grp) => (
             <a
               key={grp.id}
               href={`#sample-group-${grp.id}`}
-              className="px-3 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition"
+              className="px-3 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition shadow-2xs"
             >
               {grp.title}
             </a>
@@ -599,32 +591,45 @@ export const TopicAccordionBlock: React.FC<{
         </div>
       )}
 
-      {/* Các hộp thu gọn / mở rộng (VD: Danh sách chủ đề Đề 1 -> Đề 30) */}
+      {/* Accordion danh sách chủ đề - Tiêu đề tới thẳng danh sách chuẩn Ảnh 2 */}
       {accordions.map((acc) => {
-        const isOpen = openMap[acc.id] ?? acc.default_open ?? false;
+        const isOpen = openMap[acc.id] ?? (acc.default_open !== false);
         const cleanItems = (acc.items || []).filter((it) => it && it.trim());
+        const displayTitle = acc.title?.trim() || config.section_heading?.trim() || 'Danh sách chủ đề';
 
         return (
-          <div key={acc.id} className="border-b border-gray-200 pb-3">
+          <div key={acc.id} className="w-full">
             <button
               type="button"
               onClick={() => setOpenMap((prev) => ({ ...prev, [acc.id]: !isOpen }))}
-              className="w-full flex items-center justify-between py-2 text-left group"
+              className="w-full flex items-center justify-between py-1 text-left group cursor-pointer focus:outline-hidden"
+              aria-expanded={isOpen}
             >
-              <span className="text-xs sm:text-sm font-extrabold text-[#e60049] group-hover:opacity-80 transition">
-                {acc.title}
-              </span>
-              <span className="text-[#e60049] font-bold text-xs px-2">
-                {isOpen ? '▴' : '▾'}
+              <h2 className="text-base sm:text-lg font-extrabold text-[#e60049] group-hover:opacity-85 transition tracking-tight">
+                {displayTitle}
+              </h2>
+              <span className="text-gray-700 p-1 flex items-center justify-center">
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                </svg>
               </span>
             </button>
 
+            {/* Đường gạch phân cách ngang ngay dưới tiêu đề chuẩn Ảnh 2 */}
+            <div className="border-b border-gray-400 my-2" />
+
+            {/* Danh sách chủ đề với dấu gạch vuông ▪ chuẩn Ảnh 2 */}
             {isOpen && cleanItems.length > 0 && (
-              <ul className="mt-2 space-y-1.5 pl-4 text-xs sm:text-[13px] text-gray-800 leading-relaxed">
+              <ul className="space-y-2 py-1 pl-1 text-[13px] sm:text-sm text-gray-900 leading-relaxed font-normal">
                 {cleanItems.map((line, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 bg-gray-800 rounded-2xs mt-1.5 shrink-0 inline-block" />
-                    <span>{line}</span>
+                  <li key={i} className="flex items-start">
+                    <span className="inline-block w-1.5 h-1.5 bg-black rounded-none shrink-0 mr-2.5 mt-1.5" />
+                    <span className="font-normal text-gray-900">{line}</span>
                   </li>
                 ))}
               </ul>
@@ -639,91 +644,231 @@ export const TopicAccordionBlock: React.FC<{
 /**
  * ============================================================================
  * PHẦN 4: KHỐI CÁC NHÓM ĐỌC THỬ ĐA PHÂN MỤC (SampleGroupsBlock)
- * Hiển thị từng nhóm (Demo đề thi, Demo đáp án, Demo bảng từ vựng, Ma trận...)
- * Các trang ảnh A4 đứng độc lập một mình, tuyệt đối không bọc khung giả lập!
+ * Hỗ trợ đóng / mở (Collapse / Expand) cả khối lớn lẫn từng nhóm con bên trong!
  * ============================================================================
  */
 export const SampleGroupsBlock: React.FC<{
   config?: SampleGroupsBlockConfig | null;
 }> = ({ config }) => {
-  if (!config || config.is_active === false) return null;
+  const activeGroups = (config?.groups || []).filter((g) => g.is_active !== false);
 
-  const activeGroups = (config.groups || []).filter((g) => g.is_active !== false);
-  if (activeGroups.length === 0) return null;
+  const [isMasterOpen, setIsMasterOpen] = useState<boolean>(() => config?.default_open !== false);
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    activeGroups.forEach((g) => {
+      init[g.id] = g.default_open !== false;
+    });
+    return init;
+  });
+
+  useEffect(() => {
+    setIsMasterOpen(config?.default_open !== false);
+    const init: Record<string, boolean> = {};
+    activeGroups.forEach((g) => {
+      init[g.id] = g.default_open !== false;
+    });
+    setOpenMap(init);
+  }, [config?.default_open, config?.groups]);
+
+  if (!config || config.is_active === false || activeGroups.length === 0) return null;
+
+  const handleToggleMaster = () => {
+    const nextMaster = !isMasterOpen;
+    setIsMasterOpen(nextMaster);
+    const updated: Record<string, boolean> = {};
+    activeGroups.forEach((g) => {
+      updated[g.id] = nextMaster;
+    });
+    setOpenMap(updated);
+  };
+
+  const handleToggleGroup = (groupId: string) => {
+    setOpenMap((prev) => {
+      const nextVal = !prev[groupId];
+      const updated = { ...prev, [groupId]: nextVal };
+      const hasAnyOpen = Object.values(updated).some(Boolean);
+      setIsMasterOpen(hasAnyOpen);
+      return updated;
+    });
+  };
+
+  const handleExpandAll = () => {
+    setIsMasterOpen(true);
+    const updated: Record<string, boolean> = {};
+    activeGroups.forEach((g) => {
+      updated[g.id] = true;
+    });
+    setOpenMap(updated);
+  };
+
+  const handleCollapseAll = () => {
+    setIsMasterOpen(false);
+    const updated: Record<string, boolean> = {};
+    activeGroups.forEach((g) => {
+      updated[g.id] = false;
+    });
+    setOpenMap(updated);
+  };
+
+  const hasMasterHeader = Boolean(config.section_heading?.trim());
+  const showControls = config.show_collapse_all_buttons !== false;
 
   return (
-    <div id="khu-vuc-doc-thu" className="space-y-10 select-none">
-      {activeGroups.map((group) => {
-        const cleanImages = (group.images || []).filter((u) => u && u.trim());
-        const hasPdf = group.media_type === 'pdf' && Boolean(group.pdf_url?.trim());
-        const hasImages = group.media_type === 'images' && cleanImages.length > 0;
+    <div id="khu-vuc-doc-thu" className="space-y-6 select-none">
+      {/* Thanh điều khiển khối lớn (Master Bar) nếu có tiêu đề lớn hoặc nút điều khiển */}
+      {(hasMasterHeader || showControls) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#e60049] pb-2">
+          {hasMasterHeader ? (
+            <button
+              type="button"
+              onClick={handleToggleMaster}
+              className="flex items-center gap-2 group text-left cursor-pointer focus:outline-hidden"
+              aria-expanded={isMasterOpen}
+            >
+              <h2 className="text-base sm:text-lg font-extrabold text-[#e60049] group-hover:opacity-85 transition tracking-tight">
+                {config.section_heading}
+              </h2>
+              <span className="text-gray-700">
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${isMasterOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+          ) : (
+            <div />
+          )}
 
-        if (!hasPdf && !hasImages) return null;
+          {showControls && (
+            <div className="flex items-center gap-3 text-xs font-bold">
+              <button
+                type="button"
+                onClick={handleExpandAll}
+                className="text-[#e60049] hover:underline cursor-pointer"
+              >
+                Mở rộng tất cả ▾
+              </button>
+              <span className="text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={handleCollapseAll}
+                className="text-gray-600 hover:text-gray-900 hover:underline cursor-pointer"
+              >
+                Thu gọn tất cả ▴
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
-        return (
-          <section
-            key={group.id}
-            id={`sample-group-${group.id}`}
-            onContextMenu={(e) => e.preventDefault()}
-            className="space-y-4 scroll-mt-20"
-          >
-            {group.title?.trim() && (
-              <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-extrabold text-[#e60049]">
-                  {group.title}
-                </h3>
-                {group.description?.trim() && (
-                  <p className="text-xs text-gray-600">{group.description}</p>
-                )}
-              </div>
-            )}
+      {/* Hiển thị từng nhóm đọc thử bên trong */}
+      {isMasterOpen && (
+        <div className="space-y-8">
+          {activeGroups.map((group) => {
+            const cleanImages = (group.images || []).filter((u) => u && u.trim());
+            const hasPdf = group.media_type === 'pdf' && Boolean(group.pdf_url?.trim());
+            const hasImages = group.media_type === 'images' && cleanImages.length > 0;
 
-            {hasPdf ? (
-              <div className="relative bg-white border border-gray-200 rounded-md overflow-hidden shadow-xs">
-                {group.watermark_enabled && (
-                  <div className="watermark-pattern pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
-                    {group.watermark_text && (
-                      <span className="text-[#e60049]/15 font-extrabold text-lg uppercase -rotate-12 tracking-widest text-center px-4">
-                        {group.watermark_text}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <iframe
-                  src={group.pdf_url}
-                  title={group.title || 'Bản đọc thử PDF'}
-                  className="w-full h-[680px] border-0"
-                />
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {cleanImages.map((imgUrl, idx) => (
-                  <div
-                    key={idx}
-                    className="relative overflow-hidden rounded-sm shadow-xs border border-gray-200/70 bg-white"
-                  >
-                    {group.watermark_enabled && (
-                      <div className="watermark-pattern pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
-                        {group.watermark_text && (
-                          <span className="text-[#e60049]/10 font-extrabold text-base sm:text-xl uppercase -rotate-12 tracking-widest text-center px-4">
-                            {group.watermark_text}
-                          </span>
+            if (!hasPdf && !hasImages) return null;
+
+            const isGroupOpen = openMap[group.id] ?? (group.default_open !== false);
+
+            return (
+              <section
+                key={group.id}
+                id={`sample-group-${group.id}`}
+                onContextMenu={(e) => e.preventDefault()}
+                className="space-y-3 scroll-mt-20"
+              >
+                {/* Header nhóm có thể đóng/mở chuẩn Ảnh 2 & Ảnh 3 */}
+                {group.title?.trim() && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleGroup(group.id)}
+                      className="w-full flex items-center justify-between py-1 text-left group cursor-pointer focus:outline-hidden"
+                      aria-expanded={isGroupOpen}
+                    >
+                      <div>
+                        <h3 className="text-base sm:text-lg font-extrabold text-[#e60049] group-hover:opacity-85 transition tracking-tight">
+                          {group.title}
+                        </h3>
+                        {group.description?.trim() && (
+                          <p className="text-xs text-gray-500 font-normal mt-0.5">{group.description}</p>
                         )}
                       </div>
-                    )}
-                    <img
-                      src={imgUrl}
-                      alt={`${group.title || 'Trang đọc thử'} - Trang ${idx + 1}`}
-                      className="w-full h-auto block pointer-events-none select-none"
-                      loading="lazy"
-                    />
+                      <span className="text-gray-700 p-1 flex items-center justify-center">
+                        <svg
+                          className={`w-4 h-4 transition-transform duration-200 ${isGroupOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
+                    </button>
+
+                    {/* Đường kẻ ngang phân cách ngay dưới tiêu đề nhóm */}
+                    <div className="border-b border-gray-400 my-2" />
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
+                )}
+
+                {/* Nội dung đọc thử (khi nhóm đang mở) */}
+                {isGroupOpen && (
+                  hasPdf ? (
+                    <div className="relative bg-white border border-gray-200 rounded-md overflow-hidden shadow-xs">
+                      {group.watermark_enabled && (
+                        <div className="watermark-pattern pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
+                          {group.watermark_text && (
+                            <span className="text-[#e60049]/15 font-extrabold text-lg uppercase -rotate-12 tracking-widest text-center px-4">
+                              {group.watermark_text}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <iframe
+                        src={group.pdf_url}
+                        title={group.title || 'Bản đọc thử PDF'}
+                        className="w-full h-[680px] border-0"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {cleanImages.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="relative overflow-hidden rounded-sm shadow-xs border border-gray-200/70 bg-white"
+                        >
+                          {group.watermark_enabled && (
+                            <div className="watermark-pattern pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
+                              {group.watermark_text && (
+                                <span className="text-[#e60049]/10 font-extrabold text-base sm:text-xl uppercase -rotate-12 tracking-widest text-center px-4">
+                                  {group.watermark_text}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <img
+                            src={imgUrl}
+                            alt={`${group.title || 'Trang đọc thử'} - Trang ${idx + 1}`}
+                            className="w-full h-auto block pointer-events-none select-none"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

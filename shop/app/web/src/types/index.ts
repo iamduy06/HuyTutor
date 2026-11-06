@@ -441,11 +441,15 @@ export interface SamplePreviewGroup {
   pdf_url?: string;
   watermark_enabled?: boolean;
   watermark_text?: string;
+  default_open?: boolean; // Mặc định mở rộng (true) hay thu gọn (false) nhóm này
   is_active: boolean;
   sort_order: number;
 }
 
 export interface SampleGroupsBlockConfig {
+  section_heading?: string; // Tiêu đề lớn của cả khối (tùy chọn)
+  default_open?: boolean; // Mặc định mở rộng (true) hay thu gọn (false) cả khối lớn
+  show_collapse_all_buttons?: boolean; // Hiển thị nút bấm Thu gọn / Mở rộng tất cả
   groups: SamplePreviewGroup[];
   is_active?: boolean;
 }
