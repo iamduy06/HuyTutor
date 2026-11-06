@@ -8,6 +8,7 @@ import { AdminUserRecord,
   Product,
   SiteConfigs,
   UiFormatCode,
+  UpgradeQuote,
   UserLibraryItem,
   UserProfile,
   UserSessionItem, ClientRegion } from '../types';
@@ -328,6 +329,13 @@ export const apiClient = {
   }> {
     const q = token ? `?token=${encodeURIComponent(token)}` : '';
     return requestJson(`/api/orders/${encodeURIComponent(orderCode)}${q}`);
+  },
+
+  async getUpgradeQuote(slug: string): Promise<{
+    ok: boolean;
+    quote: UpgradeQuote;
+  }> {
+    return requestJson(`/api/orders/upgrade-quote?slug=${encodeURIComponent(slug)}`);
   },
 
   async simulatePaymentSuccess(orderCode: string): Promise<{

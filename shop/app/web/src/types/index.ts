@@ -915,6 +915,10 @@ export interface CartItem {
   quantity: number;
   selected: boolean;
   isComboEligible: boolean;
+  isUpgrade?: boolean;
+  upgradeFromFormat?: UiFormatCode;
+  upgradeOffset?: number;
+  originalPrice?: number;
 }
 
 export interface OrderItemRecord {
@@ -957,6 +961,18 @@ export interface OrderRecord {
   client_user_agent?: string;
   created_at: string;
   items: OrderItemRecord[];
+}
+
+export interface UpgradeQuote {
+  eligible: boolean;
+  code?: 'ELIGIBLE' | 'ALREADY_OWNS_WORD' | 'NO_PDF_OWNED' | 'INVALID_FORMAT';
+  message?: string;
+  formatFrom?: UiFormatCode;
+  formatTo?: UiFormatCode;
+  paidAmount?: number;
+  wordPrice?: number;
+  offsetAmount?: number;
+  amountToPay?: number;
 }
 
 export interface PaymentInstruction {

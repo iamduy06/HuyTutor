@@ -43,6 +43,7 @@ router.get('/catalog/products/:slug', catalogController.getProductDetail);
 router.get('/catalog/categories/:slug', catalogController.getCategoryDetail);
 
 // 4. Luồng Tạo Đơn hàng & Kiểm tra trạng thái thanh toán
+router.get('/orders/upgrade-quote', requireAuth, orderController.getUpgradeQuote);
 router.post('/orders', optionalAuth, orderController.createOrder);
 router.get('/orders/:orderCode', orderController.getOrderStatus);
 
