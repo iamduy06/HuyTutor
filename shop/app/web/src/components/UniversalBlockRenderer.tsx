@@ -113,16 +113,19 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
   onSelectFlashcardPackage = () => {},
   onRegisterFlashcardGroup = () => {},
 }) => {
-  if (!Array.isArray(blocks) || blocks.length === 0) {
-    return null;
-  }
+  // Chuẩn hóa danh sách khối và đảm bảo tuân thủ nghiêm ngặt quy tắc React Hooks (không gọi hook sau conditional return)
+  const safeBlocks = Array.isArray(blocks) ? blocks : [];
 
-  const activeBlocks = blocks.filter((b) => b && b.is_active !== false);
+  const activeBlocks = React.useMemo(() => {
+    return safeBlocks.filter((b) => b && b.is_active !== false);
+  }, [safeBlocks]);
 
   // Lấy danh sách sections cho CategoryHeroBlock nếu có
-  const categorySections = activeBlocks
-    .filter((b) => b.type === 'category_section')
-    .map((b) => b.config as CategorySectionBlockConfig);
+  const categorySections = React.useMemo(() => {
+    return activeBlocks
+      .filter((b) => b.type === 'category_section')
+      .map((b) => b.config as CategorySectionBlockConfig);
+  }, [activeBlocks]);
 
   // Lấy danh sách sample groups cho TopicAccordionBlock nếu có
   const allSampleGroups = React.useMemo(() => {
@@ -138,6 +141,10 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
     }
     return list;
   }, [activeBlocks]);
+
+  if (activeBlocks.length === 0) {
+    return null;
+  }
 
   return (
     <>
