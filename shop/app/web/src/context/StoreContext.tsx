@@ -54,6 +54,15 @@ interface StoreContextValue {
   setIsCheckoutOpen: (open: boolean) => void;
   sampleModalProduct: Product | null;
   setSampleModalProduct: (product: Product | null) => void;
+  formatModalProduct: Product | null;
+  formatModalInitialFormat?: UiFormatCode;
+  formatModalDefaultAction: 'add_to_cart' | 'buy_now';
+  openFormatModal: (
+    product: Product,
+    defaultAction?: 'add_to_cart' | 'buy_now',
+    initialFormat?: UiFormatCode
+  ) => void;
+  closeFormatModal: () => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
 }
@@ -98,6 +107,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [sampleModalProduct, setSampleModalProduct] = useState<Product | null>(null);
+  const [formatModalProduct, setFormatModalProduct] = useState<Product | null>(null);
+  const [formatModalInitialFormat, setFormatModalInitialFormat] = useState<UiFormatCode | undefined>(undefined);
+  const [formatModalDefaultAction, setFormatModalDefaultAction] = useState<'add_to_cart' | 'buy_now'>('add_to_cart');
+
+  const openFormatModal = (
+    product: Product,
+    defaultAction: 'add_to_cart' | 'buy_now' = 'add_to_cart',
+    initialFormat?: UiFormatCode
+  ) => {
+    setFormatModalProduct(product);
+    setFormatModalDefaultAction(defaultAction);
+    setFormatModalInitialFormat(initialFormat);
+  };
+
+  const closeFormatModal = () => {
+    setFormatModalProduct(null);
+    setFormatModalInitialFormat(undefined);
+  };
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -524,6 +552,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsCheckoutOpen,
         sampleModalProduct,
         setSampleModalProduct,
+        formatModalProduct,
+        formatModalInitialFormat,
+        formatModalDefaultAction,
+        openFormatModal,
+        closeFormatModal,
         toastMessage,
         showToast,
       }}
