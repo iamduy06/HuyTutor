@@ -75,6 +75,32 @@ export function getShopBaseUrl(): string {
   return shopUrl.trim().replace(/\/+$/, '');
 }
 
+/**
+ * Strict R2 / Email Logo URL loader: reads EMAIL_LOGO_URL or derives from R2_DOMAIN.
+ */
+export function getEmailLogoUrl(): string {
+  const directLogo = process.env.EMAIL_LOGO_URL?.trim();
+  if (directLogo) return directLogo;
+
+  const r2Domain = process.env.R2_DOMAIN?.trim();
+  if (r2Domain) {
+    return `${r2Domain.replace(/\/+$/, '')}/email-logo.png`;
+  }
+
+  throw new Error('[ENV_ERROR] Missing required environment variable: EMAIL_LOGO_URL or R2_DOMAIN');
+}
+
+/**
+ * Strict Fanpage URL loader: reads FANPAGE_URL from env variables.
+ */
+export function getFanpageUrl(): string {
+  const fanpageUrl = process.env.FANPAGE_URL?.trim();
+  if (!fanpageUrl) {
+    throw new Error('[ENV_ERROR] Missing required environment variable: FANPAGE_URL');
+  }
+  return fanpageUrl.replace(/\/+$/, '');
+}
+
 let cachedTransporter: Transporter | null = null;
 
 function getTransporter(): Transporter {
@@ -227,7 +253,7 @@ export function renderConfirmSignupTemplate(token: string, email?: string): stri
     <div class="email-container">
       
       <div class="header">
-        <img src="https://drive.google.com/thumbnail?id=1chYG_qCghZCS2li7fgixW8rHcBAL8rPC&sz=w200" alt="Huy Tutor Flashcard" class="logo-img">
+        <img src="${getEmailLogoUrl()}" alt="Huy Tutor Flashcard" class="logo-img">
       </div>
 
       <div class="content">
@@ -246,7 +272,7 @@ export function renderConfirmSignupTemplate(token: string, email?: string): stri
           © <strong>Huy Tutor</strong> &nbsp;|&nbsp; Standard & Detailed<br>
           <div class="footer-links" style="margin-top: 8px;">
             <a href="${shopUrl}">Website</a> &nbsp;•&nbsp; 
-            <a href="https://www.facebook.com/huytutor">Fanpage</a>
+            <a href="${getFanpageUrl()}">Fanpage</a>
           </div>
         </div>
       </div>
@@ -389,7 +415,7 @@ export function renderResetPasswordTemplate(token: string): string {
     <div class="email-container">
       
       <div class="header">
-        <img src="https://drive.google.com/thumbnail?id=1chYG_qCghZCS2li7fgixW8rHcBAL8rPC&sz=w200" alt="Huy Tutor Flashcard" class="logo-img">
+        <img src="${getEmailLogoUrl()}" alt="Huy Tutor Flashcard" class="logo-img">
       </div>
 
       <div class="content">
@@ -410,7 +436,7 @@ export function renderResetPasswordTemplate(token: string): string {
           © <strong>Huy Tutor</strong> &nbsp;|&nbsp; Standard & Detailed<br>
           <div class="footer-links" style="margin-top: 8px;">
             <a href="${shopUrl}">Website</a> &nbsp;•&nbsp; 
-            <a href="https://www.facebook.com/huytutor">Fanpage</a>
+            <a href="${getFanpageUrl()}">Fanpage</a>
           </div>
         </div>
       </div>

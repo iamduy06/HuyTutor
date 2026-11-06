@@ -16,27 +16,44 @@ export function isOriginAllowed(origin: string): boolean {
   if (!origin) return false;
   const clean = origin.trim().replace(/\/+$/, '');
 
-  // 1. Local development environments
-  if (
-    clean.startsWith('http://localhost') ||
-    clean.startsWith('http://127.0.0.1')
-  ) {
-    return true;
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    return false;
   }
 
-  // 2. Official production & staging subdomains of huytutor.edu.vn
-  if (/^https:\/\/([a-zA-Z0-9_\-\.]+\.)?huytutor\.edu\.vn$/.test(clean)) {
-    return true;
+  // 1. Local development environments: strict hostname check for loopback
+  if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return true;
+    }
   }
 
-  // 4. Configured origins from environment variables
+  // 2. Official production & staging subdomains derived dynamically from COOKIE_DOMAIN
+  const cookieDomain = process.env.COOKIE_DOMAIN?.trim().replace(/^\.+/, '');
+  if (cookieDomain) {
+    const escaped = cookieDomain.replace(/\./g, '\\.');
+    // Matches https://cookieDomain or https://*.cookieDomain with valid DNS labels
+    const domainRegex = new RegExp(`^https:\\/\\/([a-zA-Z0-9-]+\\.)*${escaped}$`);
+    if (domainRegex.test(clean)) {
+      return true;
+    }
+  }
+
+  // 3. Configured origins from environment variables
   const configured = getConfiguredOrigins();
   return configured.some((allowed) => {
+    if (allowed === clean) return true;
     if (allowed.includes('*')) {
-      const reg = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+      // Escape regex special chars except *, then replace * with safe DNS label regex
+      const safePattern = allowed
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '[a-zA-Z0-9-]+');
+      const reg = new RegExp(`^${safePattern}$`);
       return reg.test(clean);
     }
-    return allowed === clean;
+    return false;
   });
 }
 
