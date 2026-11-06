@@ -689,30 +689,6 @@ export const SampleGroupsBlock: React.FC<{
 
   return (
     <div id="khu-vuc-doc-thu" className="space-y-6 select-none">
-      {/* Thanh nút nhảy nhanh tới từng nhóm đọc thử A4 thuộc nhóm Demo Đọc Thử */}
-      {activeGroups.length > 1 && config.show_quick_anchor_nav !== false && (
-        <div className="flex flex-wrap gap-2.5 pb-1">
-          {activeGroups.map((grp) => (
-            <a
-              key={grp.id}
-              href={`#sample-group-${grp.id}`}
-              onClick={() => {
-                // Tự động mở nhóm đó nếu nhóm đó đang bị thu gọn
-                if (!openMap[grp.id]) {
-                  setOpenMap((prev) => ({ ...prev, [grp.id]: true }));
-                }
-                if (!isMasterOpen) {
-                  setIsMasterOpen(true);
-                }
-              }}
-              className="px-3.5 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition shadow-2xs"
-            >
-              {grp.title}
-            </a>
-          ))}
-        </div>
-      )}
-
       {/* Thanh điều khiển khối lớn (Master Bar) nếu có tiêu đề lớn hoặc nút điều khiển */}
       {(hasMasterHeader || showControls) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#e60049] pb-2">
@@ -763,9 +739,30 @@ export const SampleGroupsBlock: React.FC<{
         </div>
       )}
 
-      {/* Hiển thị từng nhóm đọc thử bên trong */}
+      {/* Hiển thị từng nhóm đọc thử bên trong: Chỉ hiển thị khi khối ĐANG MỞ (isMasterOpen === true) */}
       {isMasterOpen && (
         <div className="space-y-8">
+          {/* Thanh nút nhảy nhanh: Nằm DƯỚI tiêu đề lớn của khối, tự động ẩn theo khối khi khối đóng */}
+          {activeGroups.length > 1 && config.show_quick_anchor_nav !== false && (
+            <div className="flex flex-wrap gap-2.5 pb-1">
+              {activeGroups.map((grp) => (
+                <a
+                  key={grp.id}
+                  href={`#sample-group-${grp.id}`}
+                  onClick={() => {
+                    // Tự động mở nhóm đó nếu nhóm đó đang bị thu gọn
+                    if (!openMap[grp.id]) {
+                      setOpenMap((prev) => ({ ...prev, [grp.id]: true }));
+                    }
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition shadow-2xs"
+                >
+                  {grp.title}
+                </a>
+              ))}
+            </div>
+          )}
+
           {activeGroups.map((group) => {
             const cleanImages = (group.images || []).filter((u) => u && u.trim());
             const hasPdf = group.media_type === 'pdf' && Boolean(group.pdf_url?.trim());
