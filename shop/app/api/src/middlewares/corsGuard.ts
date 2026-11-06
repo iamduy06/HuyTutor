@@ -86,7 +86,7 @@ export function corsGuardMiddleware(req: Request, res: Response, next: NextFunct
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, X-Requested-With, X-Device-Id, X-Device-Name, X-Session-Token, X-Admin-Key'
+      'Content-Type, Authorization, X-Requested-With, X-Device-Id, X-Device-Name, X-Session-Token, X-Admin-Key, X-Client-Timezone'
     );
   } else if (referer) {
     // 4. Validate Referer if present

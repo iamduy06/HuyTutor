@@ -120,7 +120,11 @@ export async function ipDetectMiddleware(req: Request, _res: Response, next: Nex
   const queryCountry = typeof req.query.country === 'string' ? req.query.country.toUpperCase().trim() : '';
   const cfCountry = (req.headers['cf-ipcountry'] as string | undefined)?.toUpperCase().trim();
   const vercelCountry = (req.headers['x-vercel-ip-country'] as string | undefined)?.toUpperCase().trim();
-  const clientTimezone = (req.headers['x-client-timezone'] as string | undefined)?.trim();
+  const clientTimezone = (
+    typeof req.query.tz === 'string'
+      ? req.query.tz
+      : (req.headers['x-client-timezone'] as string | undefined)
+  )?.trim();
   const clientIp = extractClientIp(req);
   req.clientIp = clientIp;
 

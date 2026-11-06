@@ -33,14 +33,6 @@ function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
   if (savedToken) {
     headers['Authorization'] = `Bearer ${savedToken}`;
   }
-  if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) headers['x-client-timezone'] = tz;
-    } catch {
-      // ignore timezone error
-    }
-  }
   if (extra) {
     const entries =
       extra instanceof Headers
@@ -221,7 +213,14 @@ export const apiClient = {
     clientRegion: ClientRegion;
     mediaDomain: string;
   }> {
-    const query = countryOverride ? `?country=${countryOverride}` : '';
+    const tz =
+      typeof Intl !== 'undefined' && Intl.DateTimeFormat
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+        : '';
+    const params = new URLSearchParams();
+    if (countryOverride) params.set('country', countryOverride);
+    if (tz) params.set('tz', tz);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return requestJson(`/api/catalog/init${query}`);
   },
 
