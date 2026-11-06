@@ -1,6 +1,7 @@
 import { AdminUserRecord,
   CategoryItem,
   ComboRule,
+  CustomerGroupType,
   MenuItem,
   OrderRecord,
   PaymentInstruction,
@@ -78,7 +79,7 @@ export const apiClient = {
     password: string;
     fullName: string;
     phone?: string;
-    customerGroup?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    customerGroup?: CustomerGroupType | 'Giáo viên' | 'Khác';
     schoolOrOrg?: string;
   }): Promise<{
     ok: boolean;
@@ -185,7 +186,7 @@ export const apiClient = {
   async updateUserProfile(payload: {
     fullName?: string;
     phone?: string;
-    customerGroup?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    customerGroup?: CustomerGroupType | 'Giáo viên' | 'Khác';
     schoolOrOrg?: string;
     defaultTaxCccd?: string;
     defaultInvoiceAddress?: string;
@@ -267,7 +268,7 @@ export const apiClient = {
     customerEmail: string;
     customerEmailConfirm: string;
     customerPhone: string;
-    customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    customerGroup: CustomerGroupType;
     needInvoice: boolean;
     invoiceTaxOrCccd: string;
     invoiceAddress: string;

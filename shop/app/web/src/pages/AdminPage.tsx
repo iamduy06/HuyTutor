@@ -175,6 +175,8 @@ export const AdminPage: React.FC = () => {
   const [adminPolicies, setAdminPolicies] = useState<FooterPolicyLink[]>([]);
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const [savingConfig, setSavingConfig] = useState(false);
+  const [enableVatInvoice, setEnableVatInvoice] = useState<boolean>(false);
+  const [savingCheckoutConfig, setSavingCheckoutConfig] = useState(false);
 
   useEffect(() => {
     if (adminMenus.length === 0 && storeMenus && storeMenus.length > 0) {
@@ -189,7 +191,24 @@ export const AdminPage: React.FC = () => {
     if (siteConfigs?.footer_policy_links) {
       setAdminPolicies(siteConfigs.footer_policy_links);
     }
+    if (siteConfigs?.checkout_config !== undefined) {
+      setEnableVatInvoice(Boolean(siteConfigs.checkout_config?.enable_vat_invoice));
+    }
   }, [siteConfigs]);
+
+  const handleSaveCheckoutConfig = async () => {
+    setSavingCheckoutConfig(true);
+    try {
+      await updateSiteConfig('checkout_config', {
+        enable_vat_invoice: enableVatInvoice,
+      });
+      showToast('Đã lưu cấu hình hiển thị tùy chọn Xuất hóa đơn VAT thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi lưu cấu hình Thanh toán.');
+    } finally {
+      setSavingCheckoutConfig(false);
+    }
+  };
 
   const handleSaveMenus = async () => {
     setSavingConfig(true);
@@ -1827,6 +1846,55 @@ export const AdminPage: React.FC = () => {
 
         {/* TAB 2: QUẢN LÝ ĐƠN HÀNG & BẮN LẠI 14 ENTRY GOOGLE FORM */}
         {activeTab === 'orders' && (
+          <div className="space-y-5">
+            {/* KHỐI CẤU HÌNH FORM THANH TOÁN & TÙY CHỌN XUẤT HÓA ĐƠN VAT */}
+            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
+                      CẤU HÌNH THANH TOÁN
+                    </span>
+                    <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                      [CẤU HÌNH TÙY CHỌN XUẤT HÓA ĐƠN VAT] - [BẬT HOẶC TẮT HIỂN THỊ TRƯỜNG YÊU CẦU XUẤT HÓA ĐƠN VAT ĐIỆN TỬ TRÊN GIAO DIỆN THANH TOÁN]
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Điều khiển việc hiển thị mục &ldquo;Yêu cầu xuất hóa đơn VAT điện tử&rdquo; (MST/CCCD &amp; Địa chỉ) tại cửa sổ Thanh toán của khách hàng.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveCheckoutConfig}
+                  disabled={savingCheckoutConfig}
+                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50 shrink-0"
+                >
+                  {savingCheckoutConfig ? 'Đang lưu...' : 'Lưu Cấu Hình Thanh Toán'}
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-sm p-3">
+                <input
+                  type="checkbox"
+                  checked={enableVatInvoice}
+                  onChange={(e) => setEnableVatInvoice(e.target.checked)}
+                  className="accent-[#e60049] w-4 h-4 cursor-pointer"
+                />
+                <span>
+                  Hiển thị tùy chọn &ldquo;Yêu cầu xuất hóa đơn VAT điện tử&rdquo; trên giao diện Thanh toán
+                </span>
+                <span
+                  className={`ml-auto px-2 py-0.5 rounded-sm text-[10px] font-extrabold uppercase ${
+                    enableVatInvoice
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {enableVatInvoice ? 'ĐANG HIỂN THỊ' : 'ĐANG ẨN'}
+                </span>
+              </label>
+            </div>
+
           <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
             <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1932,6 +2000,7 @@ export const AdminPage: React.FC = () => {
               </div>
             )}
           </div>
+          </div>
         )}
 
         {/* TAB 3: BẢNG ĐỐI SOÁT 14 ENTRY GOOGLE FORM */}
@@ -2027,8 +2096,10 @@ export const AdminPage: React.FC = () => {
                   <tr className="bg-gray-50">
                     <td className="border p-2">10</td>
                     <td className="border p-2 font-mono font-bold">entry.1680953650</td>
-                    <td className="border p-2 font-bold">Nhóm khách hàng</td>
-                    <td className="border p-2">Giáo viên / Học sinh / Phụ huynh / Khác</td>
+                    <td className="border p-2 font-bold">Bạn là... (Nhóm khách hàng)</td>
+                    <td className="border p-2">
+                      Giáo viên công lập / Giáo viên ngoài công lập / Gia sư / Học sinh / Phụ huynh / Chủ trung tâm
+                    </td>
                   </tr>
                   <tr>
                     <td className="border p-2">11</td>

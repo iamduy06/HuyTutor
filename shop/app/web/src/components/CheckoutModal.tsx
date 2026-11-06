@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { getClientErrorMessage } from '../utils/errorHandler';
 import {
+  CUSTOMER_GROUP_OPTIONS,
+  CustomerGroupType,
   formatVnd,
   OrderRecord,
   PaymentInstruction,
@@ -26,6 +28,7 @@ export const CheckoutModal: React.FC = () => {
     clientRegion,
     setRegionOverride,
     clearSelectedCartItems,
+    siteConfigs,
     showToast,
   } = useStore();
 
@@ -33,15 +36,14 @@ export const CheckoutModal: React.FC = () => {
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerEmailConfirm, setCustomerEmailConfirm] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [customerGroup, setCustomerGroup] = useState<
-    'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác'
-  >('Giáo viên');
+  const [customerGroup, setCustomerGroup] = useState<CustomerGroupType | ''>('');
   const [needInvoice, setNeedInvoice] = useState(false);
   const [invoiceTaxOrCccd, setInvoiceTaxOrCccd] = useState('');
   const [invoiceAddress, setInvoiceAddress] = useState('');
   const [flashcardQuantity, setFlashcardQuantity] = useState<number>(1);
   const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>('sepay');
   const isVietnamUser = clientRegion.isVietnam !== false && clientRegion.country === 'VN';
+  const isVatInvoiceEnabled = Boolean(siteConfigs?.checkout_config?.enable_vat_invoice);
   const [consentOrderProcessing, setConsentOrderProcessing] = useState(false);
   const [consentMarketingEmails, setConsentMarketingEmails] = useState(false);
 
@@ -53,7 +55,11 @@ export const CheckoutModal: React.FC = () => {
       setCustomerEmailConfirm((prev) => prev || user.email || '');
       setCustomerPhone((prev) => prev || user.phone || '');
       if (user.customerGroup) {
-        setCustomerGroup(user.customerGroup);
+        if ((CUSTOMER_GROUP_OPTIONS as readonly string[]).includes(user.customerGroup)) {
+          setCustomerGroup((prev) => prev || (user.customerGroup as CustomerGroupType));
+        } else if (user.customerGroup === 'Giáo viên') {
+          setCustomerGroup((prev) => prev || 'Giáo viên công lập');
+        }
       }
       if (user.defaultTaxCccd) {
         setInvoiceTaxOrCccd((prev) => prev || user.defaultTaxCccd);
@@ -139,14 +145,36 @@ export const CheckoutModal: React.FC = () => {
 
     const email1 = customerEmail.trim().toLowerCase();
     const email2 = customerEmailConfirm.trim().toLowerCase();
-    if (!email1 || email1 !== email2) {
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+
+    if (!email1 || !gmailRegex.test(email1)) {
+      setFormError(
+        'Vui lòng nhập đúng định dạng địa chỉ Gmail (@gmail.com) để hệ thống cấp quyền truy cập tài liệu.'
+      );
+      return;
+    }
+
+    if (!email2 || !gmailRegex.test(email2)) {
+      setFormError(
+        'Vui lòng xác nhận lại Gmail lần 2 đúng định dạng @gmail.com.'
+      );
+      return;
+    }
+
+    if (email1 !== email2) {
       setFormError(
         'Gmail xác nhận lần 2 không khớp với Gmail lần 1. Vui lòng kiểm tra và nhập lại chính xác.'
       );
       return;
     }
 
-    if (needInvoice && (!invoiceTaxOrCccd.trim() || !invoiceAddress.trim())) {
+    if (!customerGroup || !(CUSTOMER_GROUP_OPTIONS as readonly string[]).includes(customerGroup)) {
+      setFormError('Vui lòng chọn mục "Bạn là..." trước khi tiến hành thanh toán.');
+      return;
+    }
+
+    const effectiveNeedInvoice = isVatInvoiceEnabled && needInvoice;
+    if (effectiveNeedInvoice && (!invoiceTaxOrCccd.trim() || !invoiceAddress.trim())) {
       setFormError('Vui lòng nhập đầy đủ MST/CCCD và Địa chỉ khi tích chọn Xuất hóa đơn VAT.');
       return;
     }
@@ -164,9 +192,9 @@ export const CheckoutModal: React.FC = () => {
         customerEmailConfirm: email2,
         customerPhone: customerPhone.trim(),
         customerGroup,
-        needInvoice,
-        invoiceTaxOrCccd: needInvoice ? invoiceTaxOrCccd.trim() : '',
-        invoiceAddress: needInvoice ? invoiceAddress.trim() : '',
+        needInvoice: effectiveNeedInvoice,
+        invoiceTaxOrCccd: effectiveNeedInvoice ? invoiceTaxOrCccd.trim() : '',
+        invoiceAddress: effectiveNeedInvoice ? invoiceAddress.trim() : '',
         flashcardQuantity: activeFormat === 'Flashcard' ? flashcardQuantity : null,
         paymentMethod: isVietnamUser ? 'sepay' : selectedGateway,
         consentOrderProcessing: true,
@@ -338,14 +366,13 @@ export const CheckoutModal: React.FC = () => {
 
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Số điện thoại / Zalo *
+                    Số điện thoại / Zalo
                   </label>
                   <input
                     type="text"
-                    required
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="Ví dụ: 0912345678"
+                    placeholder="Ví dụ: 0912345678 (Không bắt buộc)"
                     className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-[#e60049]"
                   />
                 </div>
@@ -369,12 +396,16 @@ export const CheckoutModal: React.FC = () => {
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#e60049] mb-1">
-                    Xác nhận lại Gmail lần 2 (tự nhập, không sao chép) *
+                    Xác nhận lại Gmail lần 2 *
                   </label>
                   <input
                     type="email"
                     required
                     onPaste={(e) => {
+                      e.preventDefault();
+                      showToast('Vui lòng tự gõ lại Gmail lần 2 để tránh nhầm lẫn địa chỉ nhận.');
+                    }}
+                    onDrop={(e) => {
                       e.preventDefault();
                       showToast('Vui lòng tự gõ lại Gmail lần 2 để tránh nhầm lẫn địa chỉ nhận.');
                     }}
@@ -390,21 +421,22 @@ export const CheckoutModal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Đối tượng khách hàng *
+                    Bạn là... *
                   </label>
                   <select
+                    required
                     value={customerGroup}
-                    onChange={(e) =>
-                      setCustomerGroup(
-                        e.target.value as 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác'
-                      )
-                    }
+                    onChange={(e) => setCustomerGroup(e.target.value as CustomerGroupType)}
                     className="w-full border border-gray-300 rounded-sm px-3 py-2 text-xs bg-white focus:outline-none focus:border-[#e60049]"
                   >
-                    <option value="Giáo viên">Giáo viên</option>
-                    <option value="Học sinh">Học sinh</option>
-                    <option value="Phụ huynh">Phụ huynh</option>
-                    <option value="Khác">Khác</option>
+                    <option value="" disabled>
+                      -- Chọn đối tượng --
+                    </option>
+                    {CUSTOMER_GROUP_OPTIONS.map((grp) => (
+                      <option key={grp} value={grp}>
+                        {grp}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -425,49 +457,51 @@ export const CheckoutModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Checkbox Xuất hóa đơn VAT */}
-              <div className="border border-gray-200 rounded-md p-3.5">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-800">
-                  <input
-                    type="checkbox"
-                    checked={needInvoice}
-                    onChange={(e) => setNeedInvoice(e.target.checked)}
-                    className="accent-[#e60049] w-4 h-4"
-                  />
-                  Yêu cầu xuất hóa đơn VAT điện tử
-                </label>
+              {/* Checkbox Xuất hóa đơn VAT (Chỉ hiển thị khi được bật cấu hình trong Admin) */}
+              {isVatInvoiceEnabled && (
+                <div className="border border-gray-200 rounded-md p-3.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={needInvoice}
+                      onChange={(e) => setNeedInvoice(e.target.checked)}
+                      className="accent-[#e60049] w-4 h-4"
+                    />
+                    Yêu cầu xuất hóa đơn VAT điện tử
+                  </label>
 
-                {needInvoice && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-100">
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                        Mã số thuế hoặc CCCD *
-                      </label>
-                      <input
-                        type="text"
-                        required={needInvoice}
-                        value={invoiceTaxOrCccd}
-                        onChange={(e) => setInvoiceTaxOrCccd(e.target.value)}
-                        placeholder="Nhập MST cơ quan hoặc số CCCD"
-                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
-                      />
+                  {needInvoice && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-100">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Mã số thuế hoặc CCCD *
+                        </label>
+                        <input
+                          type="text"
+                          required={needInvoice}
+                          value={invoiceTaxOrCccd}
+                          onChange={(e) => setInvoiceTaxOrCccd(e.target.value)}
+                          placeholder="Nhập MST cơ quan hoặc số CCCD"
+                          className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Địa chỉ xuất hóa đơn *
+                        </label>
+                        <input
+                          type="text"
+                          required={needInvoice}
+                          value={invoiceAddress}
+                          onChange={(e) => setInvoiceAddress(e.target.value)}
+                          placeholder="Nhập địa chỉ đơn vị / cá nhân"
+                          className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                        Địa chỉ xuất hóa đơn *
-                      </label>
-                      <input
-                        type="text"
-                        required={needInvoice}
-                        value={invoiceAddress}
-                        onChange={(e) => setInvoiceAddress(e.target.value)}
-                        placeholder="Nhập địa chỉ đơn vị / cá nhân"
-                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-[#e60049]"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Tóm tắt sản phẩm & tiền thanh toán */}
               <div className="bg-gray-50 border border-gray-200 rounded-md p-3.5 space-y-2 text-xs">

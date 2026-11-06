@@ -23,6 +23,21 @@ export const FORMAT_TO_GOOGLE_FORM_MAP: Record<UiFormatCode, GoogleFormNoteValue
   'Thiết kế': 'Thiết kế',
 };
 
+export const CUSTOMER_GROUP_OPTIONS = [
+  'Giáo viên công lập',
+  'Giáo viên ngoài công lập',
+  'Gia sư',
+  'Học sinh',
+  'Phụ huynh',
+  'Chủ trung tâm',
+] as const;
+
+export type CustomerGroupType = (typeof CUSTOMER_GROUP_OPTIONS)[number];
+
+export interface CheckoutConfig {
+  enable_vat_invoice: boolean;
+}
+
 export interface MenuItemChild {
   id: string;
   label: string;
@@ -247,6 +262,7 @@ export interface SiteConfigs {
   soan_tai_lieu_page_config?: SoanTaiLieuPageConfig;
   donate_page_config?: DonatePageConfig;
   campaign_frame?: CampaignFrameConfig;
+  checkout_config?: CheckoutConfig;
   [key: string]: any;
 }
 
@@ -912,7 +928,7 @@ export interface OrderRecord {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
-  customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  customer_group: CustomerGroupType | 'Giáo viên' | 'Khác';
   selected_format: UiFormatCode;
   flashcard_quantity: number | null;
   need_invoice: boolean;
@@ -969,7 +985,7 @@ export interface UserProfile {
   fullName: string;
   phone: string;
   role: 'user' | 'admin' | 'subadmin';
-  customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  customerGroup: CustomerGroupType | 'Giáo viên' | 'Khác';
   schoolOrOrg: string;
   defaultTaxCccd: string;
   defaultInvoiceAddress: string;
