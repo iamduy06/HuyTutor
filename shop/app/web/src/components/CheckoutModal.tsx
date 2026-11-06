@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
@@ -100,6 +100,25 @@ export const CheckoutModal: React.FC = () => {
   if (!isCheckoutOpen) return null;
 
   const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
+
+  // Tính toán số tiền thực tế đồng bộ với số lượng Flashcard tài khoản
+  const displaySubtotal = useMemo(() => {
+    if (activeFormat === 'Flashcard' && selectedCartItems.length > 0) {
+      return selectedCartItems.reduce(
+        (acc, it) => acc + it.unitPrice * Math.max(1, flashcardQuantity),
+        0
+      );
+    }
+    return subtotalAmount;
+  }, [activeFormat, selectedCartItems, flashcardQuantity, subtotalAmount]);
+
+  const displayTotal = useMemo(() => {
+    if (activeFormat === 'Flashcard' && selectedCartItems.length > 0) {
+      const discount = Math.round((displaySubtotal * discountPercent) / 100);
+      return Math.max(0, displaySubtotal - discount);
+    }
+    return totalAmount;
+  }, [activeFormat, selectedCartItems, flashcardQuantity, displaySubtotal, discountPercent, totalAmount]);
 
   const handleClose = () => {
     setIsCheckoutOpen(false);
@@ -204,7 +223,7 @@ export const CheckoutModal: React.FC = () => {
           productTitle: it.title,
           formatCode: it.formatCode,
           unitPrice: it.unitPrice,
-          quantity: it.quantity,
+          quantity: activeFormat === 'Flashcard' ? Math.max(1, flashcardQuantity) : it.quantity,
         })),
       });
 
@@ -331,7 +350,7 @@ export const CheckoutModal: React.FC = () => {
                       <span>
                         Số tiền quy đổi:{' '}
                         <strong>
-                          ~${(totalAmount / (clientRegion.usdExchangeRate || 26000)).toFixed(2)} USD
+                          ~${(displayTotal / (clientRegion.usdExchangeRate || 26000)).toFixed(2)} USD
                         </strong>
                       </span>
                       <span className="text-gray-500 text-[10px]">
@@ -508,27 +527,31 @@ export const CheckoutModal: React.FC = () => {
                 <div className="font-bold text-gray-800 border-b border-gray-200 pb-1.5">
                   Danh sách tài liệu ({selectedCartItems.length} tài liệu - Định dạng {activeFormat}):
                 </div>
-                {selectedCartItems.map((it) => (
-                  <div key={it.cartItemId} className="flex justify-between text-gray-700">
-                    <span>
-                      {it.title} ({it.formatCode} x{it.quantity})
-                    </span>
-                    <span className="font-bold">{formatVnd(it.unitPrice * it.quantity)}</span>
-                  </div>
-                ))}
+                {selectedCartItems.map((it) => {
+                  const effectiveQty =
+                    activeFormat === 'Flashcard' ? Math.max(1, flashcardQuantity) : it.quantity;
+                  return (
+                    <div key={it.cartItemId} className="flex justify-between text-gray-700">
+                      <span>
+                        {it.title} ({it.formatCode} x{effectiveQty})
+                      </span>
+                      <span className="font-bold">{formatVnd(it.unitPrice * effectiveQty)}</span>
+                    </div>
+                  );
+                })}
                 <div className="border-t border-gray-200 pt-2 flex justify-between text-gray-600">
                   <span>Tạm tính:</span>
-                  <span>{formatVnd(subtotalAmount)}</span>
+                  <span>{formatVnd(displaySubtotal)}</span>
                 </div>
                 {discountPercent > 0 && (
                   <div className="flex justify-between text-[#e60049] font-bold">
                     <span>Ưu đãi Combo (-{discountPercent}%):</span>
-                    <span>-{formatVnd(discountAmount)}</span>
+                    <span>-{formatVnd(displaySubtotal - displayTotal)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1">
                   <span>Tổng thanh toán:</span>
-                  <span className="text-[#e60049]">{formatVnd(totalAmount)}</span>
+                  <span className="text-[#e60049]">{formatVnd(displayTotal)}</span>
                 </div>
               </div>
 

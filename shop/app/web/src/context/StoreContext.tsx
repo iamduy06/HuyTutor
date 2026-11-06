@@ -387,8 +387,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Hợp nhất / thay thế: xóa item cũ và giữ item mới
         nextItems = prev
           .filter((it) => it.cartItemId !== cartItemId)
-          .map((it, idx) =>
-            idx === existingOtherIndex
+          .map((it) =>
+            it.cartItemId === newCartItemId
               ? {
                   ...it,
                   quantity: newFormatCode === 'Flashcard' ? it.quantity + newQty : 1,
