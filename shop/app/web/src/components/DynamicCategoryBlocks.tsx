@@ -26,58 +26,15 @@ export function buildInitialCategoryBlocks(
   category: CategoryItem,
   categoryProducts: Product[]
 ): CategoryBlockItem[] {
+  if (!category) return [];
+
   if (Array.isArray(category.blocks) && category.blocks.length > 0) {
     return [...category.blocks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
 
-  if (category.slug === 'gifts') {
-    return [
-      {
-        id: 'block_gift_hero',
-        type: 'gift_hero_anchors',
-        title_label: 'Tiêu đề & Nút chuyển mục',
-        is_active: true,
-        sort_order: 1,
-        config: {
-          title: 'Tài liệu miễn phí',
-          subtitle: '',
-          anchors: [
-            { id: 'anc_1', label: 'Đề chính thức', target_url: '/gifts/de-thi-chinh-thuc' },
-            { id: 'anc_2', label: 'Đề trường, sở', target_url: '/gifts/de-truong-so' },
-            { id: 'anc_3', label: '200 câu collocations', target_url: '/gifts/200-cau-collocations' },
-            { id: 'anc_4', label: '100 câu idioms', target_url: '/gifts/100-cau-idioms' },
-            { id: 'anc_5', label: '296 collocations', target_url: '/gifts/296-collocations' },
-          ],
-        } as GiftHeroAnchorsConfig,
-      },
-      {
-        id: 'block_gift_form',
-        type: 'gift_form_embed',
-        title_label: 'Khung nhúng Form nhận quà',
-        is_active: true,
-        sort_order: 2,
-        config: {
-          form_title: 'Nhận tài liệu miễn phí từ Huy Tutor',
-          form_url: '',
-          iframe_height: 750,
-        } as GiftFormEmbedConfig,
-      },
-      {
-        id: 'block_gift_donate',
-        type: 'gift_donate_cta',
-        title_label: 'Khung kêu gọi Ủng hộ tác giả',
-        is_active: true,
-        sort_order: 3,
-        config: {
-          prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
-          button_text: 'Ủng hộ tác giả',
-          target_url: '/donate',
-          is_active: true,
-        } as GiftDonateCtaConfig,
-      },
-    ];
+  if (!category.name?.trim() && categoryProducts.length === 0) {
+    return [];
   }
-
 
   // Tự động gom nhóm các sản phẩm theo sub_section
   const sectionMap = new Map<string, Product[]>();
@@ -133,7 +90,7 @@ export function buildInitialCategoryBlocks(
       is_active: true,
       sort_order: 1,
       config: {
-        title: category.name || 'Danh mục tài liệu',
+        title: category.name || '',
         subtitle: category.description || '',
         show_pink_glow: true,
         anchor_mode: 'auto_from_sections',
@@ -183,6 +140,10 @@ export const CategoryHeroBlock: React.FC<{
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '')}`,
       }));
+  }
+
+  if (!displayTitle && !displaySubtitle && anchorLinks.length === 0) {
+    return null;
   }
 
   const handleScrollToAnchor = (e: React.MouseEvent, anchorId: string) => {
@@ -484,28 +445,35 @@ export const GiftHeroAnchorsBlock: React.FC<{
   config?: GiftHeroAnchorsConfig | null;
 }> = ({ config }) => {
   if (!config) return null;
+  const anchors = (config.anchors || []).filter((a) => a && a.label?.trim());
+  if (!config.title?.trim() && !config.subtitle?.trim() && anchors.length === 0) {
+    return null;
+  }
 
   return (
     <section className="text-center pt-6 pb-2 space-y-6">
-      <h1 className="text-xl sm:text-2xl font-extrabold text-[#e60049] tracking-tight">
-        {config.title || 'Tài liệu miễn phí'}
-      </h1>
-      {config.subtitle && (
+      {config.title?.trim() && (
+        <h1 className="text-xl sm:text-2xl font-extrabold text-[#e60049] tracking-tight">
+          {config.title}
+        </h1>
+      )}
+      {config.subtitle?.trim() && (
         <p className="text-xs text-gray-600 max-w-lg mx-auto">{config.subtitle}</p>
       )}
 
-      {/* Cụm nút Anchor chuẩn mẫu Ảnh 2 */}
-      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-2xl mx-auto">
-        {(config.anchors || []).map((anc) => (
-          <Link
-            key={anc.id}
-            to={anc.target_url || '#'}
-            className="bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] sm:text-xs font-bold px-4 py-2 rounded-sm shadow-sm transition transform hover:-translate-y-0.5"
-          >
-            {anc.label}
-          </Link>
-        ))}
-      </div>
+      {anchors.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-2xl mx-auto">
+          {anchors.map((anc) => (
+            <Link
+              key={anc.id}
+              to={anc.target_url || '#'}
+              className="bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] sm:text-xs font-bold px-4 py-2 rounded-sm shadow-sm transition transform hover:-translate-y-0.5"
+            >
+              {anc.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </section>
   );
 };
@@ -517,7 +485,7 @@ export const GiftFormEmbedBlock: React.FC<{
   const [role, setRole] = useState('Giáo viên THPT');
   const [submitted, setSubmitted] = useState(false);
 
-  if (!config) return null;
+  if (!config || (!config.form_url?.trim() && !config.form_title?.trim())) return null;
 
   // Nếu có form_url (Google Form nhúng): render Iframe
   if (config.form_url?.trim()) {
@@ -525,7 +493,7 @@ export const GiftFormEmbedBlock: React.FC<{
       <section className="max-w-2xl mx-auto bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <iframe
           src={config.form_url}
-          title={config.form_title || 'Nhận tài liệu miễn phí'}
+          title={config.form_title || ''}
           width="100%"
           height={config.iframe_height || 750}
           className="w-full border-0"
@@ -536,16 +504,12 @@ export const GiftFormEmbedBlock: React.FC<{
     );
   }
 
-  // Mẫu Form nội bộ chuẩn giao diện Ảnh 2 (Zero-Downtime, không cần Google Form ngoài)
   return (
     <section className="max-w-xl mx-auto bg-white border border-gray-200 rounded-md p-6 shadow-sm space-y-4">
       <div className="border-b border-gray-100 pb-3">
         <h2 className="text-sm sm:text-base font-extrabold text-gray-900 text-center">
-          {config.form_title || 'Nhận tài liệu miễn phí từ Huy Tutor'}
+          {config.form_title}
         </h2>
-        <p className="text-[11px] text-gray-500 text-center mt-1">
-          Hệ thống sẽ gửi file Word &amp; PDF trực tiếp vào hòm thư Gmail của bạn
-        </p>
       </div>
 
       {submitted ? (
@@ -620,21 +584,29 @@ export const GiftFormEmbedBlock: React.FC<{
 export const GiftDonateCtaBlock: React.FC<{
   config?: GiftDonateCtaConfig | null;
 }> = ({ config }) => {
-  if (!config || config.is_active === false) return null;
+  if (
+    !config ||
+    config.is_active === false ||
+    (!config.prompt_text?.trim() && !config.button_text?.trim())
+  ) {
+    return null;
+  }
 
   return (
     <section className="text-center py-6 border-t border-gray-100 space-y-3">
-      <p className="text-xs font-bold text-gray-800">
-        {config.prompt_text || 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!'}
-      </p>
-      <div>
-        <Link
-          to={config.target_url || '/donate'}
-          className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white text-xs font-bold px-6 py-2 rounded-sm transition shadow-sm"
-        >
-          {config.button_text || 'Ủng hộ tác giả'}
-        </Link>
-      </div>
+      {config.prompt_text?.trim() && (
+        <p className="text-xs font-bold text-gray-800">{config.prompt_text}</p>
+      )}
+      {config.button_text?.trim() && (
+        <div>
+          <Link
+            to={config.target_url || '/donate'}
+            className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white text-xs font-bold px-6 py-2 rounded-sm transition shadow-sm"
+          >
+            {config.button_text}
+          </Link>
+        </div>
+      )}
     </section>
   );
 };

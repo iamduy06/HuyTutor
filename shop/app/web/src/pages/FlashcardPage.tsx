@@ -3,6 +3,7 @@ import { buildInitialFlashcardBlocks } from '../components/DynamicFlashcardBlock
 import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
 import {
+  FlashcardGroupPricingBlockConfig,
   FlashcardIndividualPackageItem,
   Product,
 } from '../types';
@@ -14,45 +15,52 @@ export const FlashcardPage: React.FC = () => {
     return buildInitialFlashcardBlocks(siteConfigs?.flashcard_page_blocks);
   }, [siteConfigs?.flashcard_page_blocks]);
 
-  const flashcardProduct: Product =
-    products.find((p) => p.slug.includes('flashcard')) || {
-      id: 'prod-flashcard-1',
-      category_id: 'cat-flashcard',
+  const existingFlashcardProd = useMemo(() => {
+    return products.find(
+      (p) =>
+        p.slug.includes('flashcard') ||
+        p.formats?.some((f) => f.format_code === 'Flashcard' && f.is_active)
+    );
+  }, [products]);
+
+  const handleRegisterFlashcard = (priceOverride?: number, pkgTitle?: string) => {
+    const baseProd: Product = existingFlashcardProd || {
+      id: 'flashcard-pkg',
+      category_id: 'flashcard',
       category_slug: 'flashcard',
       category_name: 'Flashcard',
-      sub_section: 'Tiện ích',
-      code: 'FC-ALL',
-      title: 'Flashcard từ vựng - tổng hợp mọi tài liệu',
-      slug: 'flashcard-tu-vung',
-      google_form_product_name: 'Flashcard từ vựng - tổng hợp mọi tài liệu',
-      badge_text: 'Mới',
-      short_desc: 'Hệ thống Flashcard học từ vựng trực tuyến 4 chế độ luyện tập.',
-      cover_tag: 'Học từ vựng\ncơ bản đến\nnâng cao',
+      sub_section: '',
+      code: 'FC',
+      title: pkgTitle || 'Flashcard',
+      slug: 'flashcard',
+      google_form_product_name: pkgTitle || 'Flashcard',
+      badge_text: '',
+      short_desc: '',
+      cover_tag: '',
       thumbnail_url: '',
       preview_type: 'images',
       sample_pdf_source: 'r2',
       sample_pdf_url: '',
-      watermark_enabled: true,
-      watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+      watermark_enabled: false,
+      watermark_text: '',
       preview_images: [],
       specs: [],
       topics: [],
       features: [],
-      is_featured: true,
+      is_featured: false,
       is_combo_eligible: false,
       is_active: true,
-      formats: [{ format_code: 'Flashcard', price: 100000, is_active: true }],
+      formats: [{ format_code: 'Flashcard', price: priceOverride || 0, is_active: true }],
     };
 
-  const handleRegisterFlashcard = (priceOverride?: number, pkgTitle?: string) => {
     const customProd: Product = {
-      ...flashcardProduct,
-      title: pkgTitle || flashcardProduct.title,
-      google_form_product_name: pkgTitle || flashcardProduct.google_form_product_name,
+      ...baseProd,
+      title: pkgTitle || baseProd.title,
+      google_form_product_name: pkgTitle || baseProd.google_form_product_name,
       formats: [
         {
           format_code: 'Flashcard',
-          price: priceOverride || 100000,
+          price: priceOverride ?? 0,
           is_active: true,
         },
       ],
@@ -61,7 +69,13 @@ export const FlashcardPage: React.FC = () => {
   };
 
   const handleSelectPackage = (pkg: FlashcardIndividualPackageItem) => {
-    handleRegisterFlashcard(pkg.price, `Flashcard Huy Tutor - ${pkg.label}`);
+    handleRegisterFlashcard(pkg.price, pkg.label);
+  };
+
+  const handleRegisterGroup = () => {
+    const groupBlock = blocks.find((b) => b.type === 'flashcard_group_pricing');
+    const cfg = groupBlock?.config as FlashcardGroupPricingBlockConfig | undefined;
+    handleRegisterFlashcard(cfg?.default_price || 0, cfg?.default_title || cfg?.cta_button_text || 'Flashcard');
   };
 
   return (
@@ -70,13 +84,11 @@ export const FlashcardPage: React.FC = () => {
         blocks={blocks}
         context={{
           pageType: 'flashcard',
-          product: flashcardProduct,
+          product: existingFlashcardProd,
           allProducts: products,
         }}
         onSelectFlashcardPackage={handleSelectPackage}
-        onRegisterFlashcardGroup={() => {
-          handleRegisterFlashcard(100000, 'Flashcard Nhóm - Đăng ký nhóm học');
-        }}
+        onRegisterFlashcardGroup={handleRegisterGroup}
       />
     </div>
   );

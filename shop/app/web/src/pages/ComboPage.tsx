@@ -5,7 +5,7 @@ import { useStore } from '../context/StoreContext';
 import { ComboPackageItem, ComboPackagesBlockConfig, Product, UiFormatCode } from '../types';
 
 export const ComboPage: React.FC = () => {
-  const { products, siteConfigs, addToCart, setIsCartOpen } = useStore();
+  const { products, siteConfigs, addToCart, buyNow, setIsCartOpen } = useStore();
 
   const blocks = useMemo(() => {
     return buildInitialComboBlocks(products, siteConfigs?.combo_page_blocks);
@@ -16,14 +16,18 @@ export const ComboPage: React.FC = () => {
       .map((id) => products.find((p) => p.id === id || p.slug === id))
       .filter(Boolean) as Product[];
 
-    const list = pkgProducts.length > 0 ? pkgProducts : products.slice(0, 3);
+    if (pkgProducts.length === 0) return;
+
     const format: UiFormatCode = pkg.format_badge?.toLowerCase().includes('pdf')
       ? 'PDF'
       : 'Word';
 
-    for (const prod of list) {
-      addToCart(prod, format, 1);
+    if (pkg.action_type === 'open_checkout') {
+      buyNow(pkgProducts[0], format, 1);
+      return;
     }
+
+    addToCart(pkgProducts[0], format, 1);
     setIsCartOpen(true);
   };
 
@@ -32,12 +36,6 @@ export const ComboPage: React.FC = () => {
     const packagesConfig = packagesBlock?.config as ComboPackagesBlockConfig | undefined;
     if (packagesConfig?.packages && packagesConfig.packages.length > 0) {
       handleSelectPackage(packagesConfig.packages[0]);
-    } else {
-      const defaultList = products.slice(0, 3);
-      for (const prod of defaultList) {
-        addToCart(prod, 'Word', 1);
-      }
-      setIsCartOpen(true);
     }
   };
 

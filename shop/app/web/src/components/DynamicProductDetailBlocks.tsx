@@ -37,12 +37,12 @@ export function buildInitialDetailBlocksFromProduct(product: Product): ProductDe
         is_active: true,
         sort_order: 1,
         config: {
-          title: product.title || 'Đề thi chính thức môn Tiếng Anh',
-          subtitle: product.short_desc || 'File Word + File PDF có lời giải chi tiết',
+          title: product.title || '',
+          subtitle: product.short_desc || '',
           download_url: product.download_url || product.sample_pdf_url || '',
           preview_images: product.preview_images || [],
           sample_pdf_url: product.sample_pdf_url || '',
-          watermark_text: product.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+          watermark_text: product.watermark_text || '',
         },
       },
       {
@@ -52,7 +52,7 @@ export function buildInitialDetailBlocksFromProduct(product: Product): ProductDe
         is_active: true,
         sort_order: 2,
         config: {
-          heading: 'Các bộ đề thi thử nổi bật do Huy Tutor biên soạn',
+          heading: '',
           product_ids: product.cross_sell_product_ids || [],
         },
       },
@@ -63,8 +63,8 @@ export function buildInitialDetailBlocksFromProduct(product: Product): ProductDe
         is_active: true,
         sort_order: 3,
         config: {
-          prompt_text: 'Ủng hộ tác giả để có thêm những tài liệu chất lượng!',
-          button_text: 'Ủng hộ tác giả',
+          prompt_text: '',
+          button_text: '',
           target_url: '/donate',
           is_active: true,
         },

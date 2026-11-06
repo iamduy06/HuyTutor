@@ -169,7 +169,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'combo_banner':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-3">
+              <div key={key} className="max-w-[920px] mx-auto py-3 empty:hidden">
                 <ComboBannerBlock config={cfg as ComboBannerBlockConfig} />
               </div>
             );
@@ -185,7 +185,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'category_banner':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-3">
+              <div key={key} className="max-w-[920px] mx-auto py-3 empty:hidden">
                 <CategoryBannerBlock config={cfg as CategoryBannerBlockConfig} />
               </div>
             );
@@ -193,7 +193,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           case 'product_hero':
             if (context?.product) {
               return (
-                <div key={key} className="max-w-[920px] mx-auto py-4">
+                <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                   <ProductHeroBlock
                     config={cfg as ProductHeroBlockConfig}
                     product={context.product}
@@ -212,7 +212,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'flashcard_banner':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-3">
+              <div key={key} className="max-w-[920px] mx-auto py-3 empty:hidden">
                 <FlashcardBannerBlock config={cfg as FlashcardBannerBlockConfig} />
               </div>
             );
@@ -299,7 +299,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'combo_packages':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <ComboPackagesBlock
                   config={cfg as ComboPackagesBlockConfig}
                   allProducts={context?.allProducts || []}
@@ -310,7 +310,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'combo_sections':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <ComboSectionsBlock
                   config={cfg as ComboSectionsBlockConfig}
                   allProducts={context?.allProducts || []}
@@ -320,7 +320,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'category_section':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <CategorySectionBlock
                   config={cfg as CategorySectionBlockConfig}
                   allCategoryProducts={context?.allProducts || []}
@@ -330,7 +330,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'related_products':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <RelatedProductsBlock
                   config={cfg as RelatedProductsBlockConfig}
                   autoRelatedProducts={context?.allProducts || []}
@@ -340,7 +340,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'gift_cross_sell':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <GiftCrossSellBlock
                   config={cfg}
                   allProducts={context?.allProducts || []}
@@ -353,14 +353,14 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           // ==========================================
           case 'product_intro':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-2">
+              <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <ProductIntroBlock config={cfg as ProductIntroBlockConfig} />
               </div>
             );
 
           case 'topic_accordion':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-2">
+              <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <TopicAccordionBlock
                   config={cfg as TopicAccordionBlockConfig}
                   sampleGroups={allSampleGroups}
@@ -370,7 +370,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'sample_groups':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <SampleGroupsBlock config={cfg as SampleGroupsBlockConfig} />
               </div>
             );
@@ -380,35 +380,35 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'combo_notice':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-2">
+              <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <ComboNoticeBlock config={cfg as ComboNoticeBlockConfig} />
               </div>
             );
 
           case 'category_notice':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-2">
+              <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <CategoryNoticeBlock config={cfg as CategoryNoticeBlockConfig} />
               </div>
             );
 
           case 'flashcard_features':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <FlashcardFeaturesBlock config={cfg as FlashcardFeaturesBlockConfig} />
               </div>
             );
 
           case 'flashcard_contact_notice':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-2">
+              <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <FlashcardContactNoticeBlock config={cfg as FlashcardContactNoticeBlockConfig} />
               </div>
             );
 
           case 'gift_form_embed':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <GiftFormEmbedBlock config={cfg} />
               </div>
             );
@@ -418,14 +418,14 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           // ==========================================
           case 'flashcard_free_tier':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <FlashcardFreeTierBlock config={cfg as FlashcardFreeTierBlockConfig} />
               </div>
             );
 
           case 'flashcard_pricing_packages':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <FlashcardPricingBlock
                   config={cfg as FlashcardPricingBlockConfig}
                   onSelectPackage={onSelectFlashcardPackage}
@@ -435,7 +435,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'flashcard_group_pricing':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <FlashcardGroupPricingBlock
                   config={cfg as FlashcardGroupPricingBlockConfig}
                   onRegisterGroup={onRegisterFlashcardGroup}
@@ -448,7 +448,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           // ==========================================
           case 'bottom_cta':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <BottomCtaBlock
                   config={cfg as BottomCtaBlockConfig}
                   selectedFormat={selectedFormat}
@@ -460,7 +460,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'combo_bottom_cta':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <ComboBottomCtaBlock
                   config={cfg as ComboBottomCtaBlockConfig}
                   onActionClick={onTriggerComboBuy}
@@ -474,7 +474,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           case 'gift_preview_download':
             if (context?.product) {
               return (
-                <div key={key} className="max-w-[920px] mx-auto py-4">
+                <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                   <GiftPreviewDownloadBlock config={cfg} product={context.product} />
                 </div>
               );
@@ -483,7 +483,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
 
           case 'gift_donate_cta':
             return (
-              <div key={key} className="max-w-[920px] mx-auto py-4">
+              <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <GiftDonateCtaBlock config={cfg} />
               </div>
             );

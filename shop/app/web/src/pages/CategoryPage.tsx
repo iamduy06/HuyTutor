@@ -11,19 +11,8 @@ export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug
 
   const { products, categories, isLoading } = useStore();
 
-  const categoryInfo = useMemo(() => {
-    return (
-      categories.find((c) => c.slug === activeSlug) ||
-      ({
-        id: activeSlug,
-        slug: activeSlug,
-        name: 'Danh mục tài liệu',
-        description: '',
-        sort_order: 1,
-        is_active: true,
-        blocks: [],
-      } as CategoryItem)
-    );
+  const categoryInfo = useMemo<CategoryItem | undefined>(() => {
+    return categories.find((c) => c.slug === activeSlug && c.is_active !== false);
   }, [categories, activeSlug]);
 
   const categoryProducts = useMemo(() => {
@@ -31,6 +20,7 @@ export const CategoryPage: React.FC<{ categorySlug?: string }> = ({ categorySlug
   }, [products, activeSlug]);
 
   const blocks = useMemo(() => {
+    if (!categoryInfo) return [];
     return buildInitialCategoryBlocks(categoryInfo, categoryProducts);
   }, [categoryInfo, categoryProducts]);
 
