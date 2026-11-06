@@ -928,6 +928,12 @@ export interface OrderRecord {
   paid_at?: string;
   view_token?: string;
   google_form_submitted: boolean;
+  consent_order_processing?: boolean;
+  consent_marketing_emails?: boolean;
+  consent_timestamp?: string;
+  consent_policy_version?: string;
+  client_ip?: string;
+  client_user_agent?: string;
   created_at: string;
   items: OrderItemRecord[];
 }

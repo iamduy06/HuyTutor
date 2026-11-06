@@ -274,6 +274,8 @@ export const apiClient = {
     invoiceAddress: string;
     flashcardQuantity?: number | null;
     paymentMethod: 'sepay' | 'paypal';
+    consentOrderProcessing: boolean;
+    consentMarketingEmails?: boolean;
     items: Array<{
       productId: string;
       productTitle: string;

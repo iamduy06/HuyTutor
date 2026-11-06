@@ -482,42 +482,10 @@ export const DonatePage: React.FC = () => {
  * ============================================================================
  */
 export const DEFAULT_PRIVACY_POLICY_CONFIG: PolicyPageConfig = {
-  title: 'Chính sách bảo mật thông tin (Privacy Policy)',
-  description:
-    'Cam kết bảo vệ dữ liệu cá nhân, tài khoản đăng nhập và thông tin giao dịch của khách hàng tại Hệ sinh thái Huy Tutor.',
-  last_updated: 'Cập nhật ngày 01/01/2026',
-  sections: [
-    {
-      id: 'priv_1',
-      title: '1. Mục đích thu thập thông tin cá nhân',
-      content:
-        'Huy Tutor chỉ thu thập các thông tin tối thiểu cần thiết để phục vụ quá trình cung cấp tài liệu: Địa chỉ Gmail (để phân quyền truy cập Google Drive và kích hoạt hệ thống Flashcard), Họ tên hiển thị và Số điện thoại (để hỗ trợ tra cứu đơn hàng và xử lý kỹ thuật khi có sự cố).',
-    },
-    {
-      id: 'priv_2',
-      title: '2. Phạm vi sử dụng thông tin',
-      content:
-        'Thông tin cá nhân chỉ được sử dụng trong nội bộ hệ thống nhằm: Xác thực tài khoản SSO tập trung, lưu trữ lịch sử đơn hàng trong Tủ sách cá nhân (My Library), gửi thông báo tự động khi đơn hàng hoàn tất hoặc cập nhật tài liệu mới.',
-    },
-    {
-      id: 'priv_3',
-      title: '3. Cơ chế bảo mật Master Cookie & Thiết bị',
-      content:
-        'Hệ thống áp dụng cơ chế xác thực Master Cookie (ht_sso_token) với mã hóa tiêu chuẩn ngành, gắn cờ HttpOnly, Secure và SameSite để ngăn chặn triệt để tấn công XSS/CSRF. Đối với phân hệ Flashcard, hệ thống áp dụng cơ chế bảo toàn hạn mức thiết bị (Device Guard) để bảo vệ tài khoản của học viên.',
-    },
-    {
-      id: 'priv_4',
-      title: '4. Thời gian lưu trữ dữ liệu',
-      content:
-        'Dữ liệu tài khoản và lịch sử sở hữu tài liệu được lưu trữ bảo mật vĩnh viễn trên cơ sở dữ liệu để đảm bảo Quý Thầy/Cô và học sinh có thể tải lại tài liệu bất kỳ lúc nào tại mục Tủ sách cá nhân.',
-    },
-    {
-      id: 'priv_5',
-      title: '5. Cam kết tuyệt đối không chia sẻ cho bên thứ ba',
-      content:
-        'Huy Tutor cam kết không bán, trao đổi, chia sẻ hoặc tiết lộ thông tin cá nhân của người dùng cho bất kỳ bên thứ ba nào vì mục đích thương mại, ngoại trừ các cổng thanh toán được tích hợp chính thức (SePay, VietQR, PayPal) nhằm mục đích đối soát giao dịch.',
-    },
-  ],
+  title: 'Chính sách bảo mật',
+  description: '',
+  last_updated: '',
+  sections: [],
 };
 
 export const DEFAULT_PAYMENT_DELIVERY_POLICY_CONFIG: PolicyPageConfig = {
@@ -655,6 +623,11 @@ export const PolicyPageRenderer: React.FC<{ config: PolicyPageConfig }> = ({ con
       </div>
 
       {/* DANH SÁCH MỤC NỘI DUNG */}
+      {(!config.sections || config.sections.length === 0) && (
+        <div className="py-12 text-center text-xs text-gray-500 bg-gray-50 rounded-xs border border-dashed border-gray-300">
+          Nội dung đang được quản trị viên cập nhật.
+        </div>
+      )}
       <div className="space-y-6">
         {(config.sections || []).map((sec, idx) => (
           <article

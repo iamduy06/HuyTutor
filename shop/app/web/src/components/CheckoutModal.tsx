@@ -42,6 +42,8 @@ export const CheckoutModal: React.FC = () => {
   const [flashcardQuantity, setFlashcardQuantity] = useState<number>(1);
   const [selectedGateway, setSelectedGateway] = useState<'sepay' | 'paypal'>('sepay');
   const isVietnamUser = clientRegion.isVietnam !== false && clientRegion.country === 'VN';
+  const [consentOrderProcessing, setConsentOrderProcessing] = useState(false);
+  const [consentMarketingEmails, setConsentMarketingEmails] = useState(false);
 
   // Tự động điền thông tin từ tài khoản đang đăng nhập
   useEffect(() => {
@@ -149,6 +151,11 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
+    if (!consentOrderProcessing) {
+      setFormError('Vui lòng đồng ý để Hộ kinh doanh Huy Crecom xử lý thông tin cho mục đích giao đơn hàng này.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await apiClient.createOrder({
@@ -162,6 +169,8 @@ export const CheckoutModal: React.FC = () => {
         invoiceAddress: needInvoice ? invoiceAddress.trim() : '',
         flashcardQuantity: activeFormat === 'Flashcard' ? flashcardQuantity : null,
         paymentMethod: isVietnamUser ? 'sepay' : selectedGateway,
+        consentOrderProcessing: true,
+        consentMarketingEmails: Boolean(consentMarketingEmails),
         items: selectedCartItems.map((it) => ({
           productId: it.slug,
           productTitle: it.title,
@@ -487,6 +496,34 @@ export const CheckoutModal: React.FC = () => {
                   <span>Tổng thanh toán:</span>
                   <span className="text-[#e60049]">{formatVnd(totalAmount)}</span>
                 </div>
+              </div>
+
+              {/* Điều khoản & Đồng ý Xử lý Dữ liệu Cá nhân (Nghị định 13/2023/NĐ-CP) */}
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3.5 space-y-2.5">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={consentOrderProcessing}
+                    onChange={(e) => setConsentOrderProcessing(e.target.checked)}
+                    className="accent-[#e60049] mt-0.5 rounded-xs w-4 h-4 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-gray-700 leading-snug">
+                    Tôi đồng ý để Hộ kinh doanh Huy Crecom xử lý họ tên, số điện thoại/email, địa chỉ của tôi cho mục đích xử lý và giao đơn hàng này. <span className="text-[#e60049] font-bold">*</span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={consentMarketingEmails}
+                    onChange={(e) => setConsentMarketingEmails(e.target.checked)}
+                    className="accent-[#e60049] mt-0.5 rounded-xs w-4 h-4 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-gray-700 leading-snug">
+                    Tôi đồng ý nhận email giới thiệu sản phẩm, ưu đãi từ Hộ kinh doanh Huy Crecom. Tôi có thể hủy bất cứ lúc nào.
+                  </span>
+                </label>
               </div>
 
               <button

@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SampleModal } from './components/SampleModal';
 import { SearchModal } from './components/SearchModal';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { AuthProvider } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
 import { AdminPage } from './pages/AdminPage';
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
             <SearchModal />
             <SampleModal />
             <AuthModal />
+            <CookieConsentBanner />
           </div>
         </StoreProvider>
       </AuthProvider>
