@@ -216,18 +216,29 @@ CREATE TABLE IF NOT EXISTS public.orders (
   customer_name TEXT NOT NULL,
   customer_email TEXT NOT NULL,
   customer_phone TEXT DEFAULT '',
+  customer_group VARCHAR(100) DEFAULT '',
   customer_note TEXT DEFAULT '',
+  selected_format VARCHAR(50) DEFAULT 'Word',
+  flashcard_quantity INT DEFAULT NULL,
   need_invoice BOOLEAN DEFAULT false,
   invoice_company TEXT DEFAULT '',
   invoice_tax_code TEXT DEFAULT '',
+  invoice_tax_or_cccd TEXT DEFAULT '',
   invoice_address TEXT DEFAULT '',
-  total_amount INT NOT NULL DEFAULT 0,
+  subtotal_amount INT DEFAULT 0,
+  discount_percent INT DEFAULT 0,
   discount_amount INT DEFAULT 0,
+  total_amount INT NOT NULL DEFAULT 0,
   final_amount INT NOT NULL DEFAULT 0,
   status VARCHAR(50) DEFAULT 'pending',
   payment_status VARCHAR(50) DEFAULT 'pending',
   payment_method VARCHAR(50) DEFAULT 'vietqr',
+  payment_ref_id TEXT DEFAULT '',
   paid_at TIMESTAMPTZ,
+  view_token VARCHAR(100) DEFAULT '',
+  google_form_submitted BOOLEAN DEFAULT false,
+  consent_order_processing BOOLEAN DEFAULT true,
+  consent_marketing_emails BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -258,7 +269,8 @@ CREATE TABLE IF NOT EXISTS public.user_library (
   download_count INT NOT NULL DEFAULT 0,
   last_downloaded_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT true,
-  granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_user_library_user_product_format UNIQUE (user_id, product_slug, format_code)
 );
 
 CREATE TABLE IF NOT EXISTS public.menus (
