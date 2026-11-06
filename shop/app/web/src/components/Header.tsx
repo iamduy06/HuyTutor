@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
@@ -24,6 +24,9 @@ export const Header: React.FC = () => {
   const { user, isAdmin, openAuthModal, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openMobileMenuId, setOpenMobileMenuId] = useState<string | null>(null);
+  const [openDesktopMenuId, setOpenDesktopMenuId] = useState<string | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -43,9 +46,33 @@ export const Header: React.FC = () => {
     showToast('Đã đăng xuất khỏi tài khoản.');
   };
 
+  // Đóng toàn bộ dropdown khi chuyển trang
+  useEffect(() => {
+    setOpenMobileMenuId(null);
+    setOpenDesktopMenuId(null);
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  // Đóng dropdown khi click ra ngoài header
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setOpenMobileMenuId(null);
+        setOpenDesktopMenuId(null);
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, []);
+
+  const activeMobileMenuWithChildren = activeMenus.find(
+    (m) => m.id === openMobileMenuId && Array.isArray(m.children) && m.children.length > 0
+  );
+
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
+      <header ref={headerRef} className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-2xs">
         <div className="max-w-[1360px] mx-auto px-4 h-14 flex items-center justify-between gap-2">
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Huy Tutor Trang chủ">
@@ -56,35 +83,58 @@ export const Header: React.FC = () => {
             />
           </Link>
 
-          {/* Navigation Menu (100% Dynamic từ Backend Database - Zero-Hardcode) */}
-          <nav className="hidden xl:flex items-center gap-3.5 text-[11px] font-semibold text-gray-700 tracking-tight">
+          {/* Navigation Menu (Desktop & Tablet ngang >= 1024px) */}
+          <nav className="hidden lg:flex items-center gap-3.5 text-[11px] font-semibold text-gray-700 tracking-tight">
             {activeMenus.map((item) => {
               const active = isPathActive(item.slug);
               const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+              const isDesktopOpen = openDesktopMenuId === item.id;
 
               if (hasChildren) {
                 return (
-                  <div key={item.id} className="relative group">
-                    <SmartLink
-                      to={item.slug}
-                      openExternalInNewTab={false}
-                      className={
-                        active
-                          ? 'text-[#e60049] font-bold flex items-center gap-0.5 py-4 cursor-pointer'
-                          : 'hover:text-[#e60049] transition flex items-center gap-0.5 py-4 cursor-pointer'
-                      }
-                    >
-                      {item.title}
-                      <span className="text-[9px]">▾</span>
-                    </SmartLink>
+                  <div
+                    key={item.id}
+                    className="relative group"
+                    onMouseEnter={() => setOpenDesktopMenuId(item.id)}
+                    onMouseLeave={() => setOpenDesktopMenuId(null)}
+                  >
+                    <div className="flex items-center gap-0.5 py-4 cursor-pointer">
+                      <SmartLink
+                        to={item.slug}
+                        openExternalInNewTab={false}
+                        className={
+                          active || isDesktopOpen
+                            ? 'text-[#e60049] font-bold flex items-center gap-0.5 cursor-pointer'
+                            : 'hover:text-[#e60049] transition flex items-center gap-0.5 cursor-pointer'
+                        }
+                      >
+                        {item.title}
+                      </SmartLink>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDesktopMenuId((prev) => (prev === item.id ? null : item.id));
+                        }}
+                        className="text-[9px] text-gray-500 hover:text-[#e60049] px-0.5 cursor-pointer"
+                        title="Mở menu con"
+                      >
+                        ▾
+                      </button>
+                    </div>
 
                     {/* Submenu Dropdown */}
-                    <div className="absolute left-0 top-full -mt-1 hidden group-hover:block bg-white border border-gray-200 rounded-md shadow-xl py-1.5 min-w-[220px] z-50">
+                    <div
+                      className={`absolute left-0 top-full -mt-1 bg-white border border-gray-200 rounded-md shadow-xl py-1.5 min-w-[220px] z-50 ${
+                        isDesktopOpen ? 'block' : 'hidden group-hover:block'
+                      }`}
+                    >
                       {item.children!.map((sub) => (
                         <SmartLink
                           key={sub.id}
                           to={sub.url}
                           openExternalInNewTab={false}
+                          onClick={() => setOpenDesktopMenuId(null)}
                           className={`block px-3.5 py-2 text-xs transition ${
                             sub.is_highlight
                               ? 'text-[#e60049] font-bold bg-[#fff5f7] hover:bg-pink-100'
@@ -215,23 +265,113 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Quick Nav (100% Dynamic toàn bộ Menu) */}
-        <div className="xl:hidden border-t border-gray-100 px-4 py-1.5 flex items-center gap-4 overflow-x-auto text-[11px] font-semibold text-gray-700 whitespace-nowrap">
-          {activeMenus.map((item) => (
-            <SmartLink
-              key={item.id}
-              to={item.slug}
-              openExternalInNewTab={false}
-              className={
-                isPathActive(item.slug)
-                  ? 'text-[#e60049] font-bold'
-                  : 'hover:text-[#e60049]'
-              }
-            >
-              {item.title}
-            </SmartLink>
-          ))}
+        {/* Tablet & Mobile Nav Bar (< 1024px) - Hỗ trợ đầy đủ menu con và mở xem nội dung như PC */}
+        <div className="lg:hidden border-t border-gray-100 px-4 py-1.5 flex items-center gap-3 overflow-x-auto text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+          {activeMenus.map((item) => {
+            const active = isPathActive(item.slug);
+            const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+            const isOpen = openMobileMenuId === item.id;
+
+            if (hasChildren) {
+              return (
+                <div key={item.id} className="inline-flex items-center gap-1">
+                  <SmartLink
+                    to={item.slug}
+                    openExternalInNewTab={false}
+                    className={
+                      active || isOpen
+                        ? 'text-[#e60049] font-bold'
+                        : 'hover:text-[#e60049]'
+                    }
+                  >
+                    {item.title}
+                  </SmartLink>
+                  <button
+                    type="button"
+                    onClick={() => setOpenMobileMenuId((prev) => (prev === item.id ? null : item.id))}
+                    className={`px-1.5 py-0.5 rounded-xs text-[10px] cursor-pointer transition flex items-center gap-0.5 ${
+                      isOpen
+                        ? 'bg-[#e60049] text-white font-bold'
+                        : 'bg-pink-50 text-[#e60049] hover:bg-pink-100'
+                    }`}
+                    title={`Mở nội dung các mục trong ${item.title}`}
+                    aria-expanded={isOpen}
+                  >
+                    <span>Mục con</span>
+                    <span className={`text-[9px] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                      ▾
+                    </span>
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <SmartLink
+                key={item.id}
+                to={item.slug}
+                openExternalInNewTab={false}
+                className={
+                  active
+                    ? 'text-[#e60049] font-bold'
+                    : 'hover:text-[#e60049]'
+                }
+              >
+                {item.title}
+              </SmartLink>
+            );
+          })}
         </div>
+
+        {/* Khung hiển thị nội dung menu con cho Tablet & Mobile (Đầy đủ nội dung như ở PC) */}
+        {activeMobileMenuWithChildren && (
+          <div className="lg:hidden bg-white border-t border-b border-gray-200 shadow-xl px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#e60049]" />
+                <span className="text-[11px] font-extrabold uppercase text-[#e60049] tracking-wider">
+                  Nội dung {activeMobileMenuWithChildren.title}
+                </span>
+                {activeMobileMenuWithChildren.slug && activeMobileMenuWithChildren.slug !== '#' && (
+                  <SmartLink
+                    to={activeMobileMenuWithChildren.slug}
+                    onClick={() => setOpenMobileMenuId(null)}
+                    className="text-[10px] text-gray-500 hover:text-[#e60049] underline ml-1"
+                  >
+                    (Xem tất cả)
+                  </SmartLink>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenMobileMenuId(null)}
+                className="text-gray-400 hover:text-gray-700 text-xs font-bold px-2 py-0.5 rounded hover:bg-gray-100 transition cursor-pointer"
+                title="Đóng menu"
+              >
+                ✕ Đóng
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+              {activeMobileMenuWithChildren.children!.map((sub) => (
+                <SmartLink
+                  key={sub.id}
+                  to={sub.url}
+                  openExternalInNewTab={false}
+                  onClick={() => setOpenMobileMenuId(null)}
+                  className={`px-3 py-2 rounded-sm text-xs transition flex items-center justify-between cursor-pointer ${
+                    sub.is_highlight
+                      ? 'text-[#e60049] font-bold bg-[#fff5f7] hover:bg-pink-100 border border-pink-200'
+                      : 'text-gray-700 hover:text-[#e60049] hover:bg-gray-50 border border-gray-100'
+                  }`}
+                >
+                  <span className="font-semibold">{sub.label}</span>
+                  <span className="text-gray-400 text-[10px]">→</span>
+                </SmartLink>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Toast Notification */}
