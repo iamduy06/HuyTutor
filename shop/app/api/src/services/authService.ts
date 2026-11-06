@@ -1,5 +1,5 @@
 import { supabaseAdmin, isSupabaseConfigured } from '../config/supabase';
-import { dbService, SeedUser, SeedUserSession } from './dbService';
+import { dbService, SeedCustomerGroup, SeedUser, SeedUserSession } from './dbService';
 import { hashSha3_256, verifySha3_256, generateSecureToken } from '../utils/hash';
 import { verifySsoJwt } from '../utils/jwt';
 
@@ -11,7 +11,7 @@ export interface PublicUserProfile {
   fullName: string;
   phone: string;
   role: 'user' | 'admin';
-  customerGroup: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  customerGroup: SeedCustomerGroup;
   schoolOrOrg: string;
   defaultTaxCccd: string;
   defaultInvoiceAddress: string;
@@ -30,7 +30,7 @@ export function toPublicUserProfile(user: SeedUser): PublicUserProfile {
       String(user.role || '').toUpperCase() === 'ADMIN'
         ? 'admin'
         : 'user',
-    customerGroup: user.customer_group || 'Giáo viên',
+    customerGroup: user.customer_group || 'Giáo viên công lập',
     schoolOrOrg: user.school_or_org || '',
     defaultTaxCccd: user.default_tax_cccd || '',
     defaultInvoiceAddress: user.default_invoice_address || '',
@@ -53,7 +53,7 @@ export const authService = {
     password: string;
     fullName: string;
     phone?: string;
-    customerGroup?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    customerGroup?: SeedCustomerGroup;
     schoolOrOrg?: string;
     userAgent?: string;
     ipAddress?: string;

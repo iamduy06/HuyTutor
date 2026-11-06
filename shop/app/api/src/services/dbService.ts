@@ -98,6 +98,16 @@ export interface SeedOrderItem {
   subtotal: number;
 }
 
+export type SeedCustomerGroup =
+  | 'Giáo viên công lập'
+  | 'Giáo viên ngoài công lập'
+  | 'Gia sư'
+  | 'Học sinh'
+  | 'Phụ huynh'
+  | 'Chủ trung tâm'
+  | 'Giáo viên'
+  | 'Khác';
+
 export interface SeedOrder {
   id: string;
   user_id?: string | null;
@@ -106,7 +116,7 @@ export interface SeedOrder {
   customer_email: string;
   customer_phone: string;
   customer_note?: string;
-  customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  customer_group: SeedCustomerGroup;
   selected_format: UiFormatCode;
   flashcard_quantity: number | null;
   need_invoice: boolean;
@@ -139,7 +149,7 @@ export interface SeedUser {
   full_name: string;
   phone: string;
   role: 'user' | 'admin' | 'USER' | 'ADMIN';
-  customer_group: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+  customer_group: SeedCustomerGroup;
   school_or_org: string;
   default_tax_cccd: string;
   default_invoice_address: string;
@@ -1605,15 +1615,24 @@ export const dbService = {
     full_name: string;
     phone?: string;
     role?: 'user' | 'admin';
-    customer_group?: 'Giáo viên' | 'Học sinh' | 'Phụ huynh' | 'Khác';
+    customer_group?: SeedCustomerGroup;
     school_or_org?: string;
   }): Promise<SeedUser> {
     const nowIso = new Date().toISOString();
-    const validGroups = ['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'] as const;
+    const validGroups: readonly SeedCustomerGroup[] = [
+      'Giáo viên công lập',
+      'Giáo viên ngoài công lập',
+      'Gia sư',
+      'Học sinh',
+      'Phụ huynh',
+      'Chủ trung tâm',
+      'Giáo viên',
+      'Khác',
+    ] as const;
     const group =
       payload.customer_group && validGroups.includes(payload.customer_group)
         ? payload.customer_group
-        : 'Giáo viên';
+        : 'Giáo viên công lập';
 
     let newUser: SeedUser = {
       id: `usr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,

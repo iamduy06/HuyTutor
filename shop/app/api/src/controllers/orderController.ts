@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { dbService, SeedOrder, SeedOrderItem, SeedProductFormat } from '../services/dbService';
 import { isValidUiFormat, UiFormatCode, mapFormatToGoogleFormNote } from '../constants/formatMapping';
 import { buildPaymentInstruction } from '../services/paymentService';
+import { GOOGLE_FORM_CUSTOMER_GROUPS } from '../services/googleFormService';
 
 export const orderController = {
   /**
@@ -49,13 +50,21 @@ export const orderController = {
       }
 
       const email1 = String(customerEmail || '').trim().toLowerCase();
-      const email2 = String(customerEmailConfirm || customerEmail || '').trim().toLowerCase();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const email2 = String(customerEmailConfirm || '').trim().toLowerCase();
+      const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
 
-      if (!email1 || !emailRegex.test(email1)) {
+      if (!email1 || !gmailRegex.test(email1)) {
         res.status(400).json({
           ok: false,
-          error: 'Địa chỉ Gmail nhận tài liệu không hợp lệ.',
+          error: 'Địa chỉ Gmail nhận tài liệu không hợp lệ (bắt buộc sử dụng định dạng @gmail.com).',
+        });
+        return;
+      }
+
+      if (!email2 || !gmailRegex.test(email2)) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng xác nhận lại địa chỉ Gmail lần 2 đúng định dạng @gmail.com.',
         });
         return;
       }
@@ -67,6 +76,17 @@ export const orderController = {
         });
         return;
       }
+
+      // Kiểm tra bắt buộc mục "Bạn là..." (Đối tượng khách hàng - 6 đối tượng chuẩn Google Form)
+      const rawCustomerGroup = String(customerGroup || '').trim();
+      if (!(GOOGLE_FORM_CUSTOMER_GROUPS as readonly string[]).includes(rawCustomerGroup)) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng chọn mục "Bạn là..." hợp lệ trước khi thanh toán.',
+        });
+        return;
+      }
+      const normalizedGroup = rawCustomerGroup as (typeof GOOGLE_FORM_CUSTOMER_GROUPS)[number];
 
       // 2. Kiểm tra danh sách sản phẩm và Quy tắc Single-Format Checkout
       if (!Array.isArray(items) || items.length === 0) {
@@ -135,8 +155,15 @@ export const orderController = {
         }
       }
 
-      // 3. Kiểm tra điều kiện Xuất hóa đơn VAT
-      const isInvoiceRequested = Boolean(needInvoice);
+      // 3. Tra cứu cấu hình hệ thống (kiểm tra bật/tắt Xuất hóa đơn VAT), giá gốc sản phẩm và quy tắc Combo
+      const [allProducts, comboRules, siteConfigs] = await Promise.all([
+        dbService.getProducts({ includeInactive: true }),
+        dbService.getComboRules(),
+        dbService.getSiteConfigs(),
+      ]);
+
+      const isVatInvoiceEnabled = Boolean((siteConfigs as any)?.checkout_config?.enable_vat_invoice);
+      const isInvoiceRequested = isVatInvoiceEnabled && Boolean(needInvoice);
       if (isInvoiceRequested) {
         if (!invoiceTaxOrCccd || !invoiceAddress) {
           res.status(400).json({
@@ -146,12 +173,6 @@ export const orderController = {
           return;
         }
       }
-
-      // 4. Tra cứu giá gốc chính thức từ Database ở Backend và tính Combo
-      const [allProducts, comboRules] = await Promise.all([
-        dbService.getProducts({ includeInactive: true }),
-        dbService.getComboRules(),
-      ]);
 
       const resolvedItems: SeedOrderItem[] = [];
       let subtotalAmount = 0;
@@ -235,9 +256,6 @@ export const orderController = {
       // Khách hàng ở nước ngoài: được chọn 'paypal' hoặc 'sepay'. Khách tại VN: luôn là 'sepay'.
       const chosenGateway: 'sepay' | 'paypal' =
         !isVietnam && paymentMethod === 'paypal' ? 'paypal' : 'sepay';
-
-      const validGroups = ['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'] as const;
-      const normalizedGroup = validGroups.includes(customerGroup) ? customerGroup : 'Giáo viên';
 
       const newOrder: SeedOrder = {
         id: `ord-${Date.now()}`,
