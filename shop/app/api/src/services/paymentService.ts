@@ -62,10 +62,18 @@ export function buildPaymentInstruction(order: SeedOrder): PaymentInitInfo {
 
 /**
  * Tách mã đơn hàng `DHxxxxx` hoặc `HTxxxxx` từ nội dung chuyển khoản SePay
- * Hỗ trợ các biến thể có khoảng trắng hoặc dấu gạch nối (ví dụ: DH 59124, DH-59124)
+ * Hỗ trợ các biến thể có khoảng trắng hoặc dấu gạch nối (ví dụ: DH 112606390978, DH-112606390978)
+ * Hỗ trợ đầy đủ định dạng timestamp 12 chữ số (MMYYDDssmmms) và từ 4 đến 24 chữ số
  */
 export function extractOrderCodeFromContent(content: string): string | null {
   if (!content) return null;
-  const match = content.toUpperCase().match(/(?:DH|HT)\s*[-_]?\s*\d{4,10}/);
-  return match ? match[0].replace(/[\s-_]/g, '') : null;
+  const upper = content.toUpperCase();
+  const prefix = (process.env.ORDER_CODE_PREFIX || 'DH').toUpperCase();
+  // Regex khớp prefix (DH / HT / prefix tùy biến), khoảng trắng / gạch nối, và từ 4 đến 24 chữ số
+  const regex = new RegExp(`(?:${prefix}|DH|HT)\\s*[-_]?\\s*\\d{4,24}`, 'i');
+  const match = upper.match(regex);
+  if (match) {
+    return match[0].replace(/[\s-_]/g, '');
+  }
+  return null;
 }

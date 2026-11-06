@@ -71,23 +71,36 @@ export const webhookController = {
       const transferAmount = Number(req.body.transferAmount || req.body.amount || 0);
       const referenceCode = String(req.body.referenceCode || req.body.id || `SEPAY-${Date.now()}`);
 
-      const orderCode =
+      let orderCode =
         (req.body.orderCode && String(req.body.orderCode).toUpperCase()) ||
         extractOrderCodeFromContent(content);
+
+      // Dự phòng: nếu khách hàng chỉ nhập dãy số 10-16 số mà không ghi tiền tố DH
+      if (!orderCode) {
+        const rawDigitsMatch = content.match(/\b\d{10,16}\b/);
+        if (rawDigitsMatch) {
+          const prefix = (process.env.ORDER_CODE_PREFIX || 'DH').toUpperCase();
+          orderCode = `${prefix}${rawDigitsMatch[0]}`;
+        }
+      }
 
       if (!orderCode) {
         res.status(200).json({
           ok: true,
           ignored: true,
-          reason: 'Không tìm thấy mã đơn hàng HTxxxxx trong nội dung chuyển khoản.',
+          reason: 'Không tìm thấy mã đơn hàng trong nội dung chuyển khoản.',
         });
         return;
       }
 
       const order = await dbService.getOrderByCode(orderCode);
       if (!order) {
-        res.status(404).json({
+        console.warn(`[SePay Webhook] Không tìm thấy đơn hàng "${orderCode}" trong hệ thống (content: "${content}").`);
+        // QUAN TRỌNG: Trả về HTTP 200 kèm ignored: true để SePay xác nhận webhook đã nhận thành công,
+        // tránh SePay hiểu nhầm URL endpoint bị 404 (Not Found) và spam retry liên tục.
+        res.status(200).json({
           ok: false,
+          ignored: true,
           error: `Không tìm thấy đơn hàng ${orderCode} trong hệ thống.`,
         });
         return;
