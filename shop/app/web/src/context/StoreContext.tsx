@@ -70,6 +70,7 @@ const DEFAULT_SITE_CONFIGS: SiteConfigs = {
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isItemInLibrary } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasInitialHydrated, setHasInitialHydrated] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -138,6 +139,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
     } finally {
       setIsLoading(false);
+      setHasInitialHydrated(true);
     }
   };
 
@@ -526,7 +528,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast,
       }}
     >
-      {children}
+      <React.Fragment key={hasInitialHydrated ? 'hydrated' : 'loading'}>{children}</React.Fragment>
     </StoreContext.Provider>
   );
 };
