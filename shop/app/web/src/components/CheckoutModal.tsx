@@ -97,11 +97,9 @@ export const CheckoutModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [createdOrder, clearSelectedCartItems, showToast]);
 
-  if (!isCheckoutOpen) return null;
-
+  // Tính toán số tiền thực tế đồng bộ với số lượng Flashcard tài khoản
   const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
 
-  // Tính toán số tiền thực tế đồng bộ với số lượng Flashcard tài khoản
   const displaySubtotal = useMemo(() => {
     if (activeFormat === 'Flashcard' && selectedCartItems.length > 0) {
       return selectedCartItems.reduce(
@@ -119,6 +117,8 @@ export const CheckoutModal: React.FC = () => {
     }
     return totalAmount;
   }, [activeFormat, selectedCartItems, flashcardQuantity, displaySubtotal, discountPercent, totalAmount]);
+
+  if (!isCheckoutOpen) return null;
 
   const handleClose = () => {
     setIsCheckoutOpen(false);

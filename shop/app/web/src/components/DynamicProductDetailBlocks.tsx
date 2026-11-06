@@ -541,9 +541,7 @@ export const TopicAccordionBlock: React.FC<{
   config?: TopicAccordionBlockConfig | null;
   sampleGroups?: SamplePreviewGroup[];
 }> = ({ config, sampleGroups = [] }) => {
-  if (!config || config.is_active === false) return null;
-
-  const accordions = (config.accordions || []).filter(
+  const accordions = (config?.accordions || []).filter(
     (acc) => acc.title?.trim() || (acc.items && acc.items.some((it) => it?.trim()))
   );
   const activeSampleGroups = sampleGroups.filter(
@@ -557,6 +555,8 @@ export const TopicAccordionBlock: React.FC<{
     });
     return init;
   });
+
+  if (!config || config.is_active === false) return null;
 
   if (
     !config.section_heading?.trim() &&
