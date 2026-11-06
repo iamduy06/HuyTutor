@@ -2,6 +2,7 @@ import { buildProductUrl } from '../utils/urlHelper';
 import React from 'react';
 import { apiClient } from '../api/client';
 import {
+  BottomCtaBlockConfig,
   CategoryBannerBlockConfig,
   CategoryHeroBlockConfig,
   CategoryNoticeBlockConfig,
@@ -974,18 +975,6 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
           </div>
         </div>
 
-        <div className="border-t border-gray-100 pt-3">
-          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-800">
-            <input
-              type="checkbox"
-              checked={accCfg.show_quick_anchor_nav !== false}
-              onChange={(e) => onUpdateConfig({ show_quick_anchor_nav: e.target.checked })}
-              className="accent-[#e60049] cursor-pointer"
-            />
-            <span>Hiển thị thanh nút nhảy nhanh tới từng nhóm đọc thử A4 (khi có từ 2 nhóm trở lên)</span>
-          </label>
-        </div>
-
         <div>
           <label className="block font-bold text-gray-700 mb-1">Các đề / chủ đề liệt kê (mỗi dòng một mục)</label>
           <textarea
@@ -1137,6 +1126,16 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
                   className="accent-[#e60049] cursor-pointer"
                 />
                 <span>Hiển thị nút 'Mở rộng tất cả / Thu gọn tất cả' cho người xem</span>
+              </label>
+
+              <label className="inline-flex items-center gap-2 pt-1 cursor-pointer font-semibold text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={sampleCfg.show_quick_anchor_nav !== false}
+                  onChange={(e) => onUpdateConfig({ show_quick_anchor_nav: e.target.checked })}
+                  className="accent-[#e60049] cursor-pointer"
+                />
+                <span>Hiển thị thanh nút nhảy nhanh (Demo đề thi, Demo đáp án...)</span>
               </label>
             </div>
           </div>
@@ -1393,7 +1392,85 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   // ==========================================
   // 10. CHUYỂN ĐỔI & CTA (bottom_cta, combo_bottom_cta, gift_donate_cta)
   // ==========================================
-  if (block.type === 'bottom_cta' || block.type === 'combo_bottom_cta') {
+  if (block.type === 'bottom_cta') {
+    const bottomCfg = cfg as BottomCtaBlockConfig;
+    return (
+      <div className="space-y-4 text-xs">
+        <div>
+          <label className="block font-bold text-gray-700 mb-1">
+            Dòng chữ cảm ơn chân trang (hiển thị màu đen căn trái)
+          </label>
+          <input
+            type="text"
+            value={bottomCfg.thank_you_text !== undefined ? bottomCfg.thank_you_text : 'Cảm ơn Quý Thầy/Cô và các bạn đã tham khảo tài liệu này!'}
+            onChange={(e) => onUpdateConfig({ thank_you_text: e.target.value })}
+            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white font-medium"
+            placeholder="Cảm ơn Quý Thầy/Cô và các bạn đã tham khảo tài liệu này!"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">
+              Chữ trên nút Đặt Hàng (nút đỏ hồng)
+            </label>
+            <input
+              type="text"
+              value={bottomCfg.primary_button_text !== undefined ? bottomCfg.primary_button_text : 'Đặt hàng'}
+              onChange={(e) => onUpdateConfig({ primary_button_text: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white font-bold"
+              placeholder="Đặt hàng"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">
+              Hành động nút đặt hàng
+            </label>
+            <select
+              value={bottomCfg.primary_button_action || 'buy_now'}
+              onChange={(e) => onUpdateConfig({ primary_button_action: e.target.value as any })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white font-medium"
+            >
+              <option value="buy_now">Mua ngay (mở modal thanh toán / chọn format)</option>
+              <option value="add_to_cart">Thêm vào giỏ hàng</option>
+              <option value="custom_link">Điều hướng liên kết tùy chỉnh</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">
+              Chữ trên nút phụ (nút viền đen nền trắng)
+            </label>
+            <input
+              type="text"
+              value={bottomCfg.secondary_link_text !== undefined ? bottomCfg.secondary_link_text : 'Mua combo ưu đãi'}
+              onChange={(e) => onUpdateConfig({ secondary_link_text: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="Mua combo ưu đãi (để trống nếu muốn ẩn)"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">
+              Đường dẫn nút phụ (mặc định: /combo-thpt)
+            </label>
+            <input
+              type="text"
+              value={bottomCfg.secondary_link_url || '/combo-thpt'}
+              onChange={(e) => onUpdateConfig({ secondary_link_url: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="/combo-thpt"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === 'combo_bottom_cta') {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
