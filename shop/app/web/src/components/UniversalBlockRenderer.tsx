@@ -370,7 +370,6 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
               <div key={key} className="max-w-[920px] mx-auto py-2 empty:hidden">
                 <TopicAccordionBlock
                   config={cfg as TopicAccordionBlockConfig}
-                  sampleGroups={allSampleGroups}
                 />
               </div>
             );

@@ -539,13 +539,9 @@ export const ProductIntroBlock: React.FC<{
  */
 export const TopicAccordionBlock: React.FC<{
   config?: TopicAccordionBlockConfig | null;
-  sampleGroups?: SamplePreviewGroup[];
-}> = ({ config, sampleGroups = [] }) => {
+}> = ({ config }) => {
   const accordions = (config?.accordions || []).filter(
     (acc) => acc.title?.trim() || (acc.items && acc.items.some((it) => it?.trim()))
-  );
-  const activeSampleGroups = sampleGroups.filter(
-    (g) => g.is_active !== false && g.title?.trim()
   );
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
@@ -564,34 +560,11 @@ export const TopicAccordionBlock: React.FC<{
     setOpenMap(init);
   }, [config?.accordions]);
 
-  if (!config || config.is_active === false) return null;
-
-  if (
-    !config.section_heading?.trim() &&
-    accordions.length === 0 &&
-    (!config.show_quick_anchor_nav || activeSampleGroups.length <= 1)
-  ) {
-    return null;
-  }
+  if (!config || config.is_active === false || accordions.length === 0) return null;
 
   return (
     <section className="space-y-4">
-      {/* Thanh nút nhảy nhanh tới từng nhóm đọc thử (nếu có từ 2 nhóm trở lên) */}
-      {config.show_quick_anchor_nav && activeSampleGroups.length > 1 && (
-        <div className="flex flex-wrap gap-2 pb-1">
-          {activeSampleGroups.map((grp) => (
-            <a
-              key={grp.id}
-              href={`#sample-group-${grp.id}`}
-              className="px-3 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition shadow-2xs"
-            >
-              {grp.title}
-            </a>
-          ))}
-        </div>
-      )}
-
-      {/* Accordion danh sách chủ đề - Tiêu đề tới thẳng danh sách chuẩn Ảnh 2 */}
+      {/* Accordion danh sách chủ đề - Tiêu đề tới thẳng danh sách chuẩn Ảnh 2 (KHÔNG chứa nút demo đề thi) */}
       {accordions.map((acc) => {
         const isOpen = openMap[acc.id] ?? (acc.default_open !== false);
         const cleanItems = (acc.items || []).filter((it) => it && it.trim());
@@ -645,6 +618,7 @@ export const TopicAccordionBlock: React.FC<{
  * ============================================================================
  * PHẦN 4: KHỐI CÁC NHÓM ĐỌC THỬ ĐA PHÂN MỤC (SampleGroupsBlock)
  * Hỗ trợ đóng / mở (Collapse / Expand) cả khối lớn lẫn từng nhóm con bên trong!
+ * Thanh nút nhảy nhanh [Demo đề thi], [Demo đáp án...] thuộc về khối này.
  * ============================================================================
  */
 export const SampleGroupsBlock: React.FC<{
@@ -715,6 +689,30 @@ export const SampleGroupsBlock: React.FC<{
 
   return (
     <div id="khu-vuc-doc-thu" className="space-y-6 select-none">
+      {/* Thanh nút nhảy nhanh tới từng nhóm đọc thử A4 thuộc nhóm Demo Đọc Thử */}
+      {activeGroups.length > 1 && config.show_quick_anchor_nav !== false && (
+        <div className="flex flex-wrap gap-2.5 pb-1">
+          {activeGroups.map((grp) => (
+            <a
+              key={grp.id}
+              href={`#sample-group-${grp.id}`}
+              onClick={() => {
+                // Tự động mở nhóm đó nếu nhóm đó đang bị thu gọn
+                if (!openMap[grp.id]) {
+                  setOpenMap((prev) => ({ ...prev, [grp.id]: true }));
+                }
+                if (!isMasterOpen) {
+                  setIsMasterOpen(true);
+                }
+              }}
+              className="px-3.5 py-1.5 text-xs font-bold text-[#e60049] bg-[#fff0f3] hover:bg-[#e60049] hover:text-white border border-pink-200 rounded-xs transition shadow-2xs"
+            >
+              {grp.title}
+            </a>
+          ))}
+        </div>
+      )}
+
       {/* Thanh điều khiển khối lớn (Master Bar) nếu có tiêu đề lớn hoặc nút điều khiển */}
       {(hasMasterHeader || showControls) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#e60049] pb-2">
@@ -876,6 +874,9 @@ export const SampleGroupsBlock: React.FC<{
 /**
  * ============================================================================
  * PHẦN 5: KHỐI LỜI CẢM ƠN & KÊU GỌI ĐẶT HÀNG CUỐI TRANG (BottomCtaBlock)
+ * Giao diện chuẩn xác 100% theo mẫu:
+ * Dòng chữ cảm ơn màu đen căn trái -> Nút Đặt hàng đỏ hồng toàn chiều rộng ->
+ * Nút Mua combo ưu đãi viền đen nền trắng toàn chiều rộng
  * ============================================================================
  */
 export const BottomCtaBlock: React.FC<{
@@ -886,35 +887,33 @@ export const BottomCtaBlock: React.FC<{
 }> = ({ config, selectedFormat, onBuyNow, onAddToCart }) => {
   if (!config || config.is_active === false) return null;
 
-  if (
-    !config.thank_you_text?.trim() &&
-    !config.primary_button_text?.trim() &&
-    !config.secondary_link_text?.trim()
-  ) {
-    return null;
-  }
-
+  const thankYouText = (config.thank_you_text || (config as any).note_text || 'Cảm ơn Quý Thầy/Cô và các bạn đã tham khảo tài liệu này!').trim();
+  const primaryText = (config.primary_button_text || (config as any).btn_title || 'Đặt hàng').trim();
+  const secondaryText = (config.secondary_link_text || 'Mua combo ưu đãi').trim();
+  const secondaryUrl = (config.secondary_link_url || '/combo-thpt').trim();
   const action = config.primary_button_action || 'buy_now';
 
   return (
-    <section className="space-y-3 pt-4 border-t border-gray-200">
-      {config.thank_you_text?.trim() && (
-        <p className="text-xs sm:text-sm font-extrabold text-[#e60049]">
-          {config.thank_you_text}
+    <section className="space-y-2.5 pt-2">
+      {/* Dòng chữ cảm ơn (Màu đen, font vừa, căn trái chuẩn Ảnh) */}
+      {thankYouText && (
+        <p className="text-xs sm:text-sm font-semibold text-gray-900 text-left leading-normal">
+          {thankYouText}
         </p>
       )}
       {config.sub_text?.trim() && (
-        <p className="text-xs text-gray-700 leading-relaxed">{config.sub_text}</p>
+        <p className="text-xs text-gray-600 leading-relaxed text-left">{config.sub_text}</p>
       )}
 
-      {config.primary_button_text?.trim() && (
+      {/* Nút 1: Đặt hàng (Đỏ hồng toàn chiều rộng, bo góc nhẹ chuẩn Ảnh) */}
+      {primaryText && (
         <div>
           {action === 'custom_link' && config.primary_button_link?.trim() ? (
             <SmartLink
               to={config.primary_button_link}
-              className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-xs"
+              className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-2xs"
             >
-              {config.primary_button_text}
+              {primaryText}
             </SmartLink>
           ) : (
             <button
@@ -924,21 +923,22 @@ export const BottomCtaBlock: React.FC<{
                   ? onAddToCart(selectedFormat)
                   : onBuyNow(selectedFormat)
               }
-              className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-xs"
+              className="block w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs sm:text-sm py-2.5 rounded-xs text-center transition shadow-2xs cursor-pointer"
             >
-              {config.primary_button_text}
+              {primaryText}
             </button>
           )}
         </div>
       )}
 
-      {config.secondary_link_text?.trim() && (
-        <div className="text-center pt-0.5">
+      {/* Nút 2: Mua combo ưu đãi (Khung viền đen nền trắng toàn chiều rộng chuẩn Ảnh) */}
+      {secondaryText && (
+        <div>
           <SmartLink
-            to={config.secondary_link_url || '/combo-thpt'}
-            className="inline-block text-xs sm:text-[13px] font-medium text-gray-700 underline hover:text-[#e60049] transition"
+            to={secondaryUrl}
+            className="block w-full bg-white hover:bg-gray-50 border border-gray-900 text-gray-900 font-medium text-xs sm:text-sm py-2.5 rounded-xs text-center transition cursor-pointer"
           >
-            {config.secondary_link_text}
+            {secondaryText}
           </SmartLink>
         </div>
       )}

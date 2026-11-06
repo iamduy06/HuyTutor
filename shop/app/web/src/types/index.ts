@@ -450,6 +450,7 @@ export interface SampleGroupsBlockConfig {
   section_heading?: string; // Tiêu đề lớn của cả khối (tùy chọn)
   default_open?: boolean; // Mặc định mở rộng (true) hay thu gọn (false) cả khối lớn
   show_collapse_all_buttons?: boolean; // Hiển thị nút bấm Thu gọn / Mở rộng tất cả
+  show_quick_anchor_nav?: boolean; // Hiển thị thanh nút nhảy nhanh giữa các nhóm demo (Demo đề thi, Demo đáp án...)
   groups: SamplePreviewGroup[];
   is_active?: boolean;
 }
