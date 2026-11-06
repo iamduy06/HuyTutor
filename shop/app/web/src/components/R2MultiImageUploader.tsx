@@ -39,11 +39,17 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
 
   // Xử lý tải lên nhiều file cùng một lúc
   const uploadFiles = async (fileList: FileList | File[]) => {
-    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
-    if (files.length === 0) {
+    const rawFiles = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (rawFiles.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 file hình ảnh hợp lệ (PNG, JPG, WEBP...).');
       return;
     }
+
+    // Tự động sắp xếp tự nhiên theo tên file chuẩn Windows Explorer (1, 2, ..., 9, 10, A-Z)
+    // Khắc phục triệt để lỗi Windows File Dialog trả về danh sách file bị đảo ngược khi chọn nhiều file
+    const files = [...rawFiles].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: files.length, percent: 0 });
@@ -149,6 +155,13 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
     next[index] = next[targetIndex];
     next[targetIndex] = temp;
     onImagesChange(next);
+  };
+
+  // Đảo ngược toàn bộ thứ tự trang (1 ⇄ N)
+  const handleReverseOrder = () => {
+    if (images.length <= 1) return;
+    onImagesChange([...images].reverse());
+    showToast('Đã đảo ngược thứ tự các trang ảnh.');
   };
 
   // Xóa toàn bộ ảnh
@@ -276,6 +289,14 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReverseOrder}
+              title="Đảo ngược thứ tự các trang ảnh hiện có"
+              className="text-[11px] font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 px-2.5 py-1 rounded-xs transition cursor-pointer flex items-center gap-1"
+            >
+              <span>⇄ Đảo ngược thứ tự</span>
+            </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
