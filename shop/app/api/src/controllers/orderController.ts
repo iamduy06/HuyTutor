@@ -180,7 +180,10 @@ export const orderController = {
 
       for (const rawItem of items) {
         const slugOrId = String(rawItem.productId || rawItem.slug || rawItem.code || '');
-        const qty = Math.max(1, Number(rawItem.quantity || 1));
+        const qty =
+          selectedFormat === 'Flashcard' && flashcardQuantity
+            ? Math.max(1, Number(flashcardQuantity))
+            : Math.max(1, Number(rawItem.quantity || 1));
         const dbProd = allProducts.find(
           (p) => p.id === slugOrId || p.slug === slugOrId || p.code === slugOrId
         );
@@ -237,9 +240,15 @@ export const orderController = {
       const discountAmount = Math.round((subtotalAmount * discountPercent) / 100);
       const totalAmount = Math.max(0, subtotalAmount - discountAmount);
 
-      const randomDigits = Math.floor(10000 + Math.random() * 90000);
+      const now = new Date();
+      const MM = String(now.getMonth() + 1).padStart(2, '0');
+      const YY = String(now.getFullYear()).slice(-2);
+      const DD = String(now.getDate()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ms = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, '0');
       const prefix = process.env.ORDER_CODE_PREFIX || 'DH';
-      const orderCode = `${prefix}${randomDigits}`;
+      const orderCode = `${prefix}${MM}${YY}${DD}${ss}${mm}${ms}`;
       const viewToken = crypto.randomBytes(16).toString('hex');
 
       const isVietnam = req.clientCountry === 'VN';
@@ -268,7 +277,7 @@ export const orderController = {
         selected_format: selectedFormat,
         flashcard_quantity:
           selectedFormat === 'Flashcard'
-            ? Math.max(1, Number(flashcardQuantity || resolvedItems[0]?.quantity || 1))
+            ? Math.max(1, Number(resolvedItems[0]?.quantity || flashcardQuantity || 1))
             : null,
         need_invoice: isInvoiceRequested,
         invoice_tax_or_cccd: isInvoiceRequested ? String(invoiceTaxOrCccd).trim() : '',

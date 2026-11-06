@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
 import { toPublicUserProfile } from '../services/authService';
+import { GOOGLE_FORM_CUSTOMER_GROUPS } from '../services/googleFormService';
 
 export const userController = {
   /**
@@ -99,10 +100,10 @@ export const userController = {
         defaultInvoiceAddress,
       } = req.body;
 
-      const validGroups = ['Giáo viên', 'Học sinh', 'Phụ huynh', 'Khác'] as const;
-      const safeGroup = validGroups.includes(customerGroup)
-        ? customerGroup
-        : req.user.customerGroup;
+      const isGroupValid =
+        (GOOGLE_FORM_CUSTOMER_GROUPS as readonly string[]).includes(customerGroup) ||
+        ['Giáo viên', 'Khác'].includes(customerGroup);
+      const safeGroup = isGroupValid ? customerGroup : req.user.customerGroup;
 
       const updated = await dbService.updateUser(req.user.id, {
         full_name: fullName ? String(fullName).trim() : req.user.fullName,
