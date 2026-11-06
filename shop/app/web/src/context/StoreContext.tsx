@@ -10,6 +10,7 @@ import {
   SiteConfigs,
   UiFormatCode,
   ClientRegion,
+  formatVnd,
 } from '../types';
 
 interface StoreContextValue {
@@ -40,6 +41,7 @@ interface StoreContextValue {
   toggleCartItemSelect: (cartItemId: string) => void;
   selectOnlyFormat: (formatCode: UiFormatCode) => void;
   updateCartItemQty: (cartItemId: string, delta: number) => void;
+  updateCartItemFormat: (cartItemId: string, newFormatCode: UiFormatCode) => void;
   removeCartItem: (cartItemId: string) => void;
   clearSelectedCartItems: () => void;
 
@@ -355,6 +357,65 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  const updateCartItemFormat = (cartItemId: string, newFormatCode: UiFormatCode) => {
+    setCartItems((prev) => {
+      const item = prev.find((it) => it.cartItemId === cartItemId);
+      if (!item) return prev;
+      if (item.formatCode === newFormatCode) return prev;
+
+      const product = products.find((p) => p.id === item.productId || p.slug === item.slug);
+      const newUnitPrice = product ? resolveFormatPrice(product, newFormatCode) : item.unitPrice;
+
+      if (isItemInLibrary && isItemInLibrary(item.slug, newFormatCode)) {
+        showToast(
+          `⚠️ CẢNH BÁO: Bạn đã sở hữu "${item.title}" (${newFormatCode}) trong Tủ sách cá nhân! Hãy kiểm tra Tủ sách trước khi thanh toán lại.`
+        );
+      }
+
+      const newCartItemId = `${item.slug}__${newFormatCode}`;
+      const newQty = newFormatCode === 'Flashcard' ? item.quantity : 1;
+
+      // Kiểm tra xem giỏ hàng đã có item khác trùng newCartItemId chưa
+      const existingOtherIndex = prev.findIndex(
+        (it) => it.cartItemId === newCartItemId && it.cartItemId !== cartItemId
+      );
+
+      let nextItems: CartItem[];
+      if (existingOtherIndex >= 0) {
+        // Hợp nhất / thay thế: xóa item cũ và giữ item mới
+        nextItems = prev
+          .filter((it) => it.cartItemId !== cartItemId)
+          .map((it, idx) =>
+            idx === existingOtherIndex
+              ? {
+                  ...it,
+                  quantity: newFormatCode === 'Flashcard' ? it.quantity + newQty : 1,
+                  unitPrice: newUnitPrice,
+                  selected: true,
+                }
+              : it
+          );
+      } else {
+        // Cập nhật ngay tại vị trí hiện tại
+        nextItems = prev.map((it) =>
+          it.cartItemId === cartItemId
+            ? {
+                ...it,
+                cartItemId: newCartItemId,
+                formatCode: newFormatCode,
+                unitPrice: newUnitPrice,
+                quantity: newQty,
+                selected: true,
+              }
+            : it
+        );
+      }
+
+      showToast(`Đã đổi định dạng sang ${newFormatCode} (${formatVnd(newUnitPrice)}).`);
+      return nextItems;
+    });
+  };
+
   const updateCartItemQty = (cartItemId: string, delta: number) => {
     setCartItems((prev) => {
       const target = prev.find((it) => it.cartItemId === cartItemId);
@@ -450,6 +511,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleCartItemSelect,
         selectOnlyFormat,
         updateCartItemQty,
+        updateCartItemFormat,
         removeCartItem,
         clearSelectedCartItems,
         isCartOpen,

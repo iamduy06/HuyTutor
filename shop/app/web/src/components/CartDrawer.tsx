@@ -20,7 +20,9 @@ export const CartDrawer: React.FC = () => {
     totalAmount,
     toggleCartItemSelect,
     selectOnlyFormat,
+    products,
     updateCartItemQty,
+    updateCartItemFormat,
     removeCartItem,
   } = useStore();
 
@@ -50,11 +52,8 @@ export const CartDrawer: React.FC = () => {
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-[#fff5f7]">
           <div>
             <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-              Giỏ hàng thông minh ({cartItems.length})
+              Giỏ hàng ({cartItems.length})
             </h2>
-            <p className="text-[11px] text-gray-600 mt-0.5">
-              Lưu nhiều định dạng, thanh toán theo từng định dạng đồng nhất
-            </p>
           </div>
           <button
             type="button"
@@ -139,47 +138,77 @@ export const CartDrawer: React.FC = () => {
                           {formatVnd(item.unitPrice * item.quantity)}
                         </span>
 
-                        {item.formatCode === 'Flashcard' ? (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => updateCartItemQty(item.cartItemId, -1)}
-                              className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
-                            >
-                              -
-                            </button>
-                            <span className="text-xs font-bold w-6 text-center">
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => updateCartItemQty(item.cartItemId, 1)}
-                              className="w-6 h-6 border border-gray-300 rounded-sm text-xs font-bold text-gray-700 hover:border-[#e60049]"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeCartItem(item.cartItemId)}
-                              className="ml-2 text-[11px] text-gray-500 hover:text-[#e60049] font-semibold"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                              SL: 1 (Cố định 1 tài liệu/đơn)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeCartItem(item.cartItemId)}
-                              className="text-[11px] text-gray-500 hover:text-[#e60049] font-semibold"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        )}
+                        {(() => {
+                          const productObj = products.find(
+                            (p) => p.id === item.productId || p.slug === item.slug
+                          );
+                          const availableFormats = (productObj?.formats || []).filter(
+                            (f) => f.is_active
+                          );
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              {/* Bộ chọn đổi định dạng (đồng thời đổi giá luôn) */}
+                              {availableFormats.length > 1 ? (
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[11px] text-gray-500 font-medium">
+                                    Định dạng:
+                                  </label>
+                                  <select
+                                    value={item.formatCode}
+                                    onChange={(e) =>
+                                      updateCartItemFormat(
+                                        item.cartItemId,
+                                        e.target.value as UiFormatCode
+                                      )
+                                    }
+                                    className="text-xs font-bold text-gray-800 bg-white border border-gray-300 hover:border-[#e60049] rounded-xs px-2 py-1 cursor-pointer focus:outline-none focus:border-[#e60049] transition shadow-2xs"
+                                  >
+                                    {availableFormats.map((fmt) => (
+                                      <option key={fmt.format_code} value={fmt.format_code}>
+                                        {fmt.format_code} ({formatVnd(fmt.price)})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-xs">
+                                  {item.formatCode}
+                                </span>
+                              )}
+
+                              {item.formatCode === 'Flashcard' && (
+                                <div className="flex items-center gap-1 border border-gray-300 rounded-xs bg-white px-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCartItemQty(item.cartItemId, -1)}
+                                    className="w-5 h-5 text-xs font-bold text-gray-700 hover:text-[#e60049] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="text-xs font-bold w-5 text-center">
+                                    {item.quantity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCartItemQty(item.cartItemId, 1)}
+                                    className="w-5 h-5 text-xs font-bold text-gray-700 hover:text-[#e60049] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => removeCartItem(item.cartItemId)}
+                                className="text-[11px] text-gray-500 hover:text-[#e60049] font-semibold cursor-pointer ml-1"
+                              >
+                                Xóa
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
