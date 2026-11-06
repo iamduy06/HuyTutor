@@ -49,20 +49,45 @@ function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
-    credentials: 'include',
-    ...init,
-    headers: buildAuthHeaders({
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    }),
-  });
+  const isSafeToRetry = !init?.method || init.method.toUpperCase() === 'GET';
+  const maxAttempts = isSafeToRetry ? 3 : 1;
+  let attempt = 0;
+  let lastError: any = null;
 
-  const data = await response.json();
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || `HTTP Error ${response.status}`);
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const response = await fetch(buildApiUrl(path), {
+        credentials: 'include',
+        ...init,
+        headers: buildAuthHeaders({
+          'Content-Type': 'application/json',
+          ...(init?.headers || {}),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP Error ${response.status}`);
+      }
+      return data as T;
+    } catch (err: any) {
+      lastError = err;
+      const isNetworkError =
+        err?.name === 'TypeError' ||
+        String(err?.message || '').toLowerCase().includes('failed to fetch') ||
+        String(err?.message || '').toLowerCase().includes('networkerror');
+
+      if (isNetworkError && attempt < maxAttempts) {
+        // Chờ 2.5s để Backend Render hoàn tất thức dậy (Cold start recovery)
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        continue;
+      }
+      throw err;
+    }
   }
-  return data as T;
+
+  throw lastError;
 }
 
 /**
