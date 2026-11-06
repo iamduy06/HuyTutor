@@ -10,6 +10,7 @@ import { AdminFlashcardCms } from '../components/AdminFlashcardCms';
 import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminCampaignFrameCms } from '../components/AdminCampaignFrameCms';
 import { R2ImageUploader } from '../components/R2ImageUploader';
+import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import {
@@ -1627,67 +1628,53 @@ export const AdminPage: React.FC = () => {
                 )}
 
                 {editingProduct.preview_type === 'images' && (
-                  <div className="space-y-2 pt-2">
-                    <label className="block text-[11px] font-bold text-gray-700">
-                      Danh sách Link Ảnh đọc thử trên Cloudflare R2 (`preview_images`):
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newPreviewImageUrl}
-                        onChange={(e) => setNewPreviewImageUrl(e.target.value)}
-                        placeholder="https://media.huytutor.edu.vn/previews/trang-1.png"
-                        className="flex-1 border border-gray-300 rounded-sm px-3 py-1.5 text-xs bg-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!newPreviewImageUrl.trim()) return;
-                          setEditingProduct((prev) => ({
-                            ...prev,
-                            preview_images: [
-                              ...(prev.preview_images || []),
-                              newPreviewImageUrl.trim(),
-                            ],
-                          }));
-                          setNewPreviewImageUrl('');
-                        }}
-                        className="bg-[#e60049] text-white font-bold text-xs px-3 py-1.5 rounded-sm"
-                      >
-                        Thêm trang ảnh
-                      </button>
-                    </div>
-                    {(editingProduct.preview_images || []).length > 0 && (
-                      <div className="space-y-1">
-                        {(editingProduct.preview_images || []).map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1 rounded-sm text-[11px]"
-                          >
-                            <span className="truncate max-w-md">
-                              Trang {idx + 1}: {url}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (url) {
-                                  apiClient.deleteR2File(url).catch(() => {});
-                                }
-                                setEditingProduct((prev) => ({
-                                  ...prev,
-                                  preview_images: (prev.preview_images || []).filter(
-                                    (_, i) => i !== idx
-                                  ),
-                                }));
-                              }}
-                              className="text-[#e60049] font-bold ml-2"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        ))}
+                  <div className="space-y-3 pt-2">
+                    <R2MultiImageUploader
+                      label="Tải lên các trang ảnh đọc thử A4 trên Cloudflare R2 (`preview_images`):"
+                      helperText="Kéo thả hoặc chọn nhiều ảnh cùng lúc (PNG, JPG, WEBP) để tải tự động lên Cloudflare R2."
+                      images={editingProduct.preview_images || []}
+                      onImagesChange={(newImgs) =>
+                        setEditingProduct((prev) => ({
+                          ...prev,
+                          preview_images: newImgs,
+                        }))
+                      }
+                      folder="samples/pages"
+                      aspectRatioHint="Khổ A4 dọc tỉ lệ 1:1.414"
+                    />
+
+                    {/* Hoặc thêm thủ công bằng đường link nếu có sẵn */}
+                    <div className="pt-1">
+                      <div className="text-[11px] font-bold text-gray-600 mb-1">
+                        Hoặc nhập thêm link ảnh trực tiếp:
                       </div>
-                    )}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newPreviewImageUrl}
+                          onChange={(e) => setNewPreviewImageUrl(e.target.value)}
+                          placeholder="https://media.huytutor.edu.vn/samples/pages/123456789012.png"
+                          className="flex-1 border border-gray-300 rounded-sm px-3 py-1.5 text-xs bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newPreviewImageUrl.trim()) return;
+                            setEditingProduct((prev) => ({
+                              ...prev,
+                              preview_images: [
+                                ...(prev.preview_images || []),
+                                newPreviewImageUrl.trim(),
+                              ],
+                            }));
+                            setNewPreviewImageUrl('');
+                          }}
+                          className="bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs px-3 py-1.5 rounded-sm"
+                        >
+                          Thêm link
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 

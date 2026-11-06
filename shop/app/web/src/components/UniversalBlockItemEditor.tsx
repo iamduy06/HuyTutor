@@ -36,6 +36,7 @@ import {
   UniversalPageContext,
 } from '../types';
 import { R2ImageUploader } from './R2ImageUploader';
+import { R2MultiImageUploader } from './R2MultiImageUploader';
 
 interface UniversalBlockItemEditorProps {
   block: UniversalBlockItem;
@@ -659,92 +660,282 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
 
   if (block.type === 'sample_groups') {
     const sampleCfg = cfg as SampleGroupsBlockConfig;
-    const currentGroup = sampleCfg.groups?.[0];
+    const groups: SamplePreviewGroup[] =
+      Array.isArray(sampleCfg.groups) && sampleCfg.groups.length > 0
+        ? sampleCfg.groups
+        : [
+            {
+              id: 'sgrp_1',
+              title: 'Demo đề thi',
+              description: '',
+              media_type: 'images',
+              images: [],
+              watermark_enabled: true,
+              watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+              is_active: true,
+              sort_order: 1,
+            },
+          ];
 
+    const handleUpdateGroup = (idx: number, patch: Partial<SamplePreviewGroup>) => {
+      const next = [...groups];
+      next[idx] = { ...next[idx], ...patch };
+      onUpdateConfig({ groups: next });
+    };
+
+    const handleAddGroup = () => {
+      const newGroup: SamplePreviewGroup = {
+        id: `sgrp_${Date.now()}`,
+        title: `Nhóm Đọc Thử ${groups.length + 1}`,
+        description: '',
+        media_type: 'images',
+        images: [],
+        watermark_enabled: true,
+        watermark_text: 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN',
+        is_active: true,
+        sort_order: groups.length + 1,
+      };
+      onUpdateConfig({ groups: [...groups, newGroup] });
+    };
+
+    const handleRemoveGroup = (idx: number) => {
+      const groupToRemove = groups[idx];
+      if (
+        !window.confirm(
+          `Bạn có chắc chắn muốn xóa "${groupToRemove.title || `Nhóm ${idx + 1}`}" và toàn bộ ảnh đi kèm?`
+        )
+      ) {
+        return;
+      }
+      (groupToRemove.images || []).forEach((u) => {
+        if (u) apiClient.deleteR2File(u).catch(() => {});
+      });
+      const next = groups.filter((_, i) => i !== idx).map((g, i) => ({ ...g, sort_order: i + 1 }));
+      onUpdateConfig({ groups: next });
+    };
+
+    const handleMoveGroup = (idx: number, dir: -1 | 1) => {
+      const target = idx + dir;
+      if (target < 0 || target >= groups.length) return;
+      const next = [...groups];
+      const temp = next[idx];
+      next[idx] = next[target];
+      next[target] = temp;
+      onUpdateConfig({ groups: next.map((g, i) => ({ ...g, sort_order: i + 1 })) });
+    };
+
+    return (
+      <div className="space-y-6">
+        {groups.map((group, groupIdx) => (
+          <div
+            key={group.id || groupIdx}
+            className="border border-gray-200 rounded-md p-4 bg-gray-50/50 space-y-4"
+          >
+            {/* Header nhóm */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-xs uppercase tracking-wider">
+                  Nhóm {groupIdx + 1}
+                </span>
+                <span className="font-extrabold text-gray-800 text-xs">
+                  {group.title || `Nhóm đọc thử ${groupIdx + 1}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  title="Di chuyển nhóm lên trên"
+                  disabled={groupIdx === 0}
+                  onClick={() => handleMoveGroup(groupIdx, -1)}
+                  className="px-2 py-0.5 bg-white border border-gray-300 hover:border-gray-400 disabled:opacity-30 rounded-2xs text-[11px] font-bold text-gray-700"
+                >
+                  ↑ Lên
+                </button>
+                <button
+                  type="button"
+                  title="Di chuyển nhóm xuống dưới"
+                  disabled={groupIdx === groups.length - 1}
+                  onClick={() => handleMoveGroup(groupIdx, 1)}
+                  className="px-2 py-0.5 bg-white border border-gray-300 hover:border-gray-400 disabled:opacity-30 rounded-2xs text-[11px] font-bold text-gray-700"
+                >
+                  ↓ Xuống
+                </button>
+                {groups.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveGroup(groupIdx)}
+                    className="px-2 py-0.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-2xs text-[11px] font-bold"
+                  >
+                    ✕ Xóa nhóm
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Các trường cấu hình nhóm */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Tiêu đề nhóm đọc thử</label>
+                <input
+                  type="text"
+                  value={group.title || ''}
+                  onChange={(e) => handleUpdateGroup(groupIdx, { title: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+                  placeholder="Demo Đề thi / Demo Đáp án chi tiết"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Mô tả ngắn (tùy chọn)</label>
+                <input
+                  type="text"
+                  value={group.description || ''}
+                  onChange={(e) => handleUpdateGroup(groupIdx, { description: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+                  placeholder="Bao gồm 5 câu trắc nghiệm đầu tiên..."
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs items-center">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Loại nội dung đọc thử</label>
+                <select
+                  value={group.media_type || 'images'}
+                  onChange={(e) =>
+                    handleUpdateGroup(groupIdx, { media_type: e.target.value as 'images' | 'pdf' })
+                  }
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+                >
+                  <option value="images">Bộ các trang ảnh A4 (Tải lên nhiều ảnh cùng lúc)</option>
+                  <option value="pdf">File PDF nhúng (iframe)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Chữ Watermark bảo vệ bản quyền</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`wm_toggle_${groupIdx}`}
+                    checked={group.watermark_enabled !== false}
+                    onChange={(e) =>
+                      handleUpdateGroup(groupIdx, { watermark_enabled: e.target.checked })
+                    }
+                    className="accent-[#e60049] rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={group.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN'}
+                    onChange={(e) =>
+                      handleUpdateGroup(groupIdx, { watermark_text: e.target.value })
+                    }
+                    disabled={group.watermark_enabled === false}
+                    className="flex-1 border border-gray-300 rounded px-2.5 py-1 focus:border-[#e60049] bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Nếu là PDF */}
+            {group.media_type === 'pdf' ? (
+              <div className="space-y-1">
+                <label className="block font-bold text-gray-700">Đường dẫn File PDF mẫu (Google Drive / Cloudflare R2)</label>
+                <input
+                  type="text"
+                  value={group.pdf_url || ''}
+                  onChange={(e) => handleUpdateGroup(groupIdx, { pdf_url: e.target.value })}
+                  placeholder="https://drive.google.com/file/d/.../preview hoặc https://media.huytutor.edu.vn/..."
+                  className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+                />
+              </div>
+            ) : (
+              /* Bộ tải nhiều ảnh cùng lúc R2MultiImageUploader */
+              <R2MultiImageUploader
+                label={`Tải lên các trang ảnh A4 đọc thử (${group.images?.length || 0} trang)`}
+                helperText="Chọn hoặc kéo thả nhiều file ảnh A4 cùng lúc để tự động tải lên Cloudflare R2."
+                images={group.images || []}
+                onImagesChange={(newImgs) => handleUpdateGroup(groupIdx, { images: newImgs })}
+                folder="samples/pages"
+                aspectRatioHint="Khổ A4 dọc tỉ lệ 1:1.414"
+              />
+            )}
+          </div>
+        ))}
+
+        {/* Nút thêm nhóm đọc thử mới */}
+        <div className="pt-1 text-center">
+          <button
+            type="button"
+            onClick={handleAddGroup}
+            className="inline-flex items-center gap-1.5 bg-white hover:bg-pink-50 text-[#e60049] border-2 border-dashed border-[#e60049] px-4 py-2 rounded font-bold text-xs transition cursor-pointer shadow-2xs"
+          >
+            <span>+ Thêm Nhóm Đọc Thử Mới (Demo Đáp án / Demo Từ vựng...)</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // KHỐI QUÀ TẶNG: gift_preview_download (Xem thử Watermark & Nút Tải ngay)
+  // ==========================================
+  if (block.type === 'gift_preview_download') {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block font-bold text-gray-700 mb-1">Tiêu đề nhóm đọc thử</label>
+            <label className="block font-bold text-gray-700 mb-1">Tiêu đề khối quà tặng</label>
             <input
               type="text"
-              value={currentGroup?.title || ''}
-              onChange={(e) => {
-                const groups = [...(sampleCfg.groups || [])];
-                if (!groups[0]) {
-                  groups[0] = { id: 'g0', title: '', images: [], media_type: 'images', sort_order: 1, is_active: true };
-                }
-                groups[0].title = e.target.value;
-                onUpdateConfig({ groups });
-              }}
-              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
-              placeholder="Demo đề thi / Demo đáp án"
+              value={cfg.title || ''}
+              onChange={(e) => onUpdateConfig({ title: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="Tài liệu quà tặng miễn phí"
             />
           </div>
           <div>
             <label className="block font-bold text-gray-700 mb-1">Chữ Watermark bảo vệ bản quyền</label>
             <input
               type="text"
-              value={currentGroup?.watermark_text || 'TÀI LIỆU ĐỌC THỬ HUY TUTOR - HUYTUTOR.EDU.VN'}
-              onChange={(e) => {
-                const groups = [...(sampleCfg.groups || [])];
-                if (!groups[0]) {
-                  groups[0] = { id: 'g0', title: '', images: [], media_type: 'images', sort_order: 1, is_active: true };
-                }
-                groups[0].watermark_text = e.target.value;
-                onUpdateConfig({ groups });
-              }}
-              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+              value={cfg.watermark_text || 'TÀI LIỆU QUÀ TẶNG - HUYTUTOR.EDU.VN'}
+              onChange={(e) => onUpdateConfig({ watermark_text: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
             />
           </div>
         </div>
 
-        <div>
-          <label className="block font-bold text-gray-700 mb-2">
-            Danh sách các trang ảnh đọc thử A4 ({currentGroup?.images?.length || 0} trang)
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {(currentGroup?.images || []).map((imgUrl, imgIdx) => (
-              <div key={imgIdx} className="relative border rounded p-1 bg-gray-50">
-                <img src={imgUrl} alt={`Trang ${imgIdx + 1}`} className="w-full h-28 object-cover rounded" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (imgUrl) {
-                      apiClient.deleteR2File(imgUrl).catch(() => {});
-                    }
-                    const groups = [...(sampleCfg.groups || [])];
-                    if (groups[0]) {
-                      groups[0].images = groups[0].images.filter((_, i) => i !== imgIdx);
-                      onUpdateConfig({ groups });
-                    }
-                  }}
-                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-full flex items-center justify-center text-xs font-black shadow cursor-pointer transition"
-                  title="Xóa vĩnh viễn trang này khỏi Cloudflare R2"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Mô tả ngắn</label>
+            <input
+              type="text"
+              value={cfg.subtitle || ''}
+              onChange={(e) => onUpdateConfig({ subtitle: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="Nhấn nút bên dưới để tải về miễn phí trọn bộ file Word/PDF."
+            />
           </div>
-
-          <div className="mt-3">
-            <R2ImageUploader
-              label="+ Thêm trang ảnh mẫu A4 mới (Cloudflare R2)"
-              onUrlChange={(url) => {
-                if (!url) return;
-                const groups = [...(sampleCfg.groups || [])];
-                if (!groups[0]) {
-                  groups[0] = { id: 'g0', title: 'Demo', images: [], media_type: 'images', sort_order: 1, is_active: true };
-                }
-                groups[0].images = [...(groups[0].images || []), url];
-                onUpdateConfig({ groups });
-              }}
-              folder="samples/pages"
-              aspectRatioHint="Khổ A4 dọc tỉ lệ 1:1.414"
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">Link tải về trực tiếp (Google Drive)</label>
+            <input
+              type="text"
+              value={cfg.download_url || ''}
+              onChange={(e) => onUpdateConfig({ download_url: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
+              placeholder="https://drive.google.com/..."
             />
           </div>
         </div>
+
+        {/* Danh sách ảnh đọc thử A4 cho quà tặng */}
+        <R2MultiImageUploader
+          label={`Các trang ảnh đọc thử A4 (${(cfg.preview_images || []).length} trang)`}
+          helperText="Kéo thả hoặc chọn nhiều ảnh cùng lúc để tải trực tiếp lên Cloudflare R2."
+          images={cfg.preview_images || []}
+          onImagesChange={(newImgs) => onUpdateConfig({ preview_images: newImgs })}
+          folder="samples/pages"
+          aspectRatioHint="Khổ A4 dọc tỉ lệ 1:1.414"
+        />
       </div>
     );
   }
