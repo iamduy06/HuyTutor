@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -44,13 +45,7 @@ function VerifyEmailContent() {
 
         if (!active) return;
 
-        if (!res.ok || !data.success) {
-        turnstileRef.current?.reset();
-        setTurnstileToken('');
-        setResendStatus({ success: false, message: data.error?.message || 'Không thể gửi lại email xác thực.' });
-        return;
-      }
-      if (res.ok && data.success) {
+        if (res.ok && data.success) {
           setSuccess(true);
           if (data.already_verified) {
             setAlreadyVerified(true);
@@ -60,7 +55,8 @@ function VerifyEmailContent() {
           }
         } else {
           setSuccess(false);
-          const msg = data.error?.message || (typeof data.error === 'string' ? data.error : 'Liên kết xác thực không hợp lệ hoặc đã hết hạn.');
+          const rawMsg = data.error?.message || (typeof data.error === 'string' ? data.error : '');
+          const msg = sanitizeAuthError(rawMsg, 'Liên kết xác thực không hợp lệ hoặc đã hết hạn.');
           setErrorMsg(msg);
         }
       } catch {
@@ -97,12 +93,15 @@ function VerifyEmailContent() {
       if (res.ok && data.success) {
         setResendStatus({ success: true, message: 'Đã gửi lại email xác thực thành công. Vui lòng kiểm tra hộp thư!' });
       } else {
-        setResendStatus({ success: false, message: data.error?.message || 'Không thể gửi lại email xác thực.' });
+        const rawMsg = data.error?.message || (typeof data.error === 'string' ? data.error : '');
+        setResendStatus({ success: false, message: sanitizeAuthError(rawMsg, 'Không thể gửi lại email xác thực.') });
       }
     } catch {
       setResendStatus({ success: false, message: 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.' });
     } finally {
       setResending(false);
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
     }
   }
 
@@ -206,6 +205,14 @@ function VerifyEmailContent() {
           />
         </div>
 
+        <Turnstile
+          ref={turnstileRef}
+          onSuccess={(t) => setTurnstileToken(t)}
+          onError={() => setTurnstileToken('')}
+          onExpire={() => setTurnstileToken('')}
+          action="resend_verification"
+        />
+
         <button
           type="submit"
           disabled={resending}
@@ -218,13 +225,6 @@ function VerifyEmailContent() {
           )}
           <span>Gửi lại mã kích hoạt</span>
         </button>
-        <Turnstile
-          ref={turnstileRef}
-          onSuccess={(t) => setTurnstileToken(t)}
-          onError={() => setTurnstileToken('')}
-          onExpire={() => setTurnstileToken('')}
-          action="resend_verification"
-        />
       </form>
 
       <div className="pt-3 border-t border-gray-200">

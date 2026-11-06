@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -42,7 +43,8 @@ function ResetPasswordContent() {
           setTokenValid(true);
         } else {
           setTokenValid(false);
-          const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Liên kết không hợp lệ hoặc đã hết hạn.');
+          const rawMsg = data.error?.message || (typeof data.error === 'string' ? data.error : '');
+          const errorText = sanitizeAuthError(rawMsg, 'Liên kết không hợp lệ hoặc đã hết hạn.');
           setErrorMsg(errorText);
         }
       } catch {
@@ -88,7 +90,8 @@ function ResetPasswordContent() {
       if (!res.ok || !data.success) {
         turnstileRef.current?.reset();
         setTurnstileToken('');
-        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        const rawMsg = data.error?.message || (typeof data.error === 'string' ? data.error : '');
+        const errorText = sanitizeAuthError(rawMsg, 'Đã có lỗi xảy ra, vui lòng thử lại.');
         setErrorMsg(errorText);
         setLoading(false);
         return;

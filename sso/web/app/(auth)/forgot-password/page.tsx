@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -28,7 +29,10 @@ export default function ForgotPasswordPage() {
       if (!res.ok || !data.success) {
         turnstileRef.current?.reset();
         setTurnstileToken('');
-        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        const errorText = sanitizeAuthError(
+          data.error?.message || (typeof data.error === 'string' ? data.error : ''),
+          'Đã có lỗi xảy ra, vui lòng thử lại.'
+        );
         setErrorMsg(errorText);
         setLoading(false);
         return;
