@@ -279,6 +279,19 @@ export const CategorySectionBlock: React.FC<{
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         {cards.map((item) => {
+          const matchedProd = allCategoryProducts.find(
+            (p) => p.id === (item as any).product_id || p.id === item.id || p.slug === item.id
+          );
+          const displayTitle = (
+            item.display_title ||
+            (item as any).title ||
+            matchedProd?.title ||
+            ''
+          ).trim();
+          const targetUrl = item.target_url || (matchedProd ? buildProductUrl(matchedProd.category_slug, matchedProd.slug) : '#');
+          const buttonText = (item.button_text || (item as any).button_label || 'Đọc thử').trim();
+          const imageUrl = (item.image_url || matchedProd?.thumbnail_url || '').trim();
+
           const isCardBox = item.image_mode === 'card_box';
           const coverLines = (item.tag_text || '')
             .split('\n')
@@ -286,18 +299,18 @@ export const CategorySectionBlock: React.FC<{
             .filter(Boolean);
 
           return (
-            <div key={item.id} className="flex flex-col">
-              {/* Hộp trên cùng: Ảnh bìa sách (Độc lập hoặc Card box có tag) */}
-              {isCardBox ? (
+            <div key={item.id} className="flex flex-col group">
+              {/* Hình ảnh sản phẩm (nguyên bản, bỏ khung bao 3:4 rườm rà) */}
+              {isCardBox && coverLines.length > 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[160px] flex items-center justify-center gap-4 shadow-2xs hover:border-gray-300 transition relative">
                   <SmartLink
-                    to={item.target_url}
+                    to={targetUrl}
                     className="h-full flex items-center justify-center shrink-0"
                   >
-                    {item.image_url && item.image_url.trim() ? (
+                    {imageUrl ? (
                       <img
-                        src={item.image_url}
-                        alt={item.display_title || ''}
+                        src={imageUrl}
+                        alt={displayTitle || ''}
                         className="max-h-[135px] w-auto max-w-full object-contain drop-shadow-md hover:scale-105 transition-transform duration-200 block"
                       />
                     ) : (
@@ -333,39 +346,38 @@ export const CategorySectionBlock: React.FC<{
                   )}
                 </div>
               ) : (
-                /* Chế độ Mặc định: Khung hình chuẩn bo tròn 16px, viền xám, đổ bóng & Khung đè Campaign */
-                <SmartLink to={item.target_url} className="block w-full">
-                  <ProductImageFrame
-                    src={item.image_url}
-                    alt={item.display_title || ''}
-                    ratioMode="preset"
-                    presetRatio="3:4"
-                    objectFit="contain"
-                    rounded="2xl"
-                    showBorder={true}
-                    showShadow={true}
-                    hoverEffect={true}
-                    badgeText={item.badge_text}
-                    fallbackText="Tài liệu"
-                  />
+                /* Chế độ Chuẩn (Giống 100% Ảnh 2): Hiển thị ảnh nguyên bản theo tỉ lệ tự nhiên, bỏ khung bao 3:4 */
+                <SmartLink to={targetUrl} className="block w-full">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={displayTitle || ''}
+                      className="w-full h-auto object-contain rounded-lg hover:scale-[1.01] transition-transform duration-200 block"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[16/10] bg-gray-100 rounded-lg border border-dashed flex items-center justify-center text-gray-400 font-bold text-xs">
+                      Tài liệu
+                    </div>
+                  )}
                 </SmartLink>
               )}
 
               {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
               <SmartLink
-                to={item.target_url}
+                to={targetUrl}
                 className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
               >
-                {item.button_text?.trim() || 'Đọc thử'}
+                {buttonText}
               </SmartLink>
 
               {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
-              {item.display_title && (
+              {displayTitle && (
                 <SmartLink
-                  to={item.target_url}
+                  to={targetUrl}
                   className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
                 >
-                  {item.display_title}
+                  {displayTitle}
                 </SmartLink>
               )}
             </div>
