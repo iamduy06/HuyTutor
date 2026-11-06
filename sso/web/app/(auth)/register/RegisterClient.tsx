@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, Mail, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
 import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
+import { validateRedirectUrl } from '@/lib/urlValidator';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 interface RegisterClientProps {
   defaultFlashcardUrl: string;
@@ -47,7 +49,7 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
       if (res.ok && data.success) {
         setResendStatus({ success: true, message: 'Đã gửi lại email xác thực thành công. Vui lòng kiểm tra hộp thư!' });
       } else {
-        setResendStatus({ success: false, message: data.error?.message || 'Không thể gửi lại email xác thực.' });
+        setResendStatus({ success: false, message: sanitizeAuthError(data.error?.message || 'Không thể gửi lại email xác thực.') });
       }
     } catch {
       setResendStatus({ success: false, message: 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.' });
@@ -99,7 +101,7 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
         if (data.error?.code === 'ACCOUNT_EXISTS_UNACTIVATED') {
           setUnactivatedEmail(data.error?.email || cleanEmail);
         }
-        setErrorMsg(data.error?.message || 'Đăng ký không thành công.');
+        setErrorMsg(sanitizeAuthError(data.error?.message || 'Đăng ký không thành công.'));
         setLoading(false);
         return;
       }
@@ -112,14 +114,15 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
 
       // Fallback in case of immediate login token
       if (redirectUrl) {
+        const safeRedirect = validateRedirectUrl(redirectUrl);
         try {
-          const urlObj = new URL(redirectUrl, window.location.origin);
+          const urlObj = new URL(safeRedirect, window.location.origin);
           if (data.token) {
             urlObj.searchParams.set('sso_token', data.token);
           }
           window.location.href = urlObj.toString();
         } catch {
-          window.location.href = redirectUrl;
+          window.location.href = safeRedirect;
         }
       } else if (app === 'flashcard' && defaultFlashcardUrl) {
         window.location.href = `${defaultFlashcardUrl.replace(/\/+$/, '')}/dashboard`;
@@ -130,14 +133,15 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
       }
     } catch (err: any) {
       console.error('[REGISTER_ERROR]', err);
-      setErrorMsg('Lỗi kết nối máy chủ. Vui lòng thử lại sau.');
+      setErrorMsg(sanitizeAuthError(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.'));
       setLoading(false);
     }
   }
 
   // Render pending verification screen after successful registration
   if (registeredEmail) {
-    const loginLink = `/login?email=${encodeURIComponent(registeredEmail)}${redirectUrl ? '&redirect=' + encodeURIComponent(redirectUrl) : ''}${app ? '&app=' + encodeURIComponent(app) : ''}`;
+    const safeRedirect = redirectUrl ? validateRedirectUrl(redirectUrl) : '';
+    const loginLink = `/login?email=${encodeURIComponent(registeredEmail)}${safeRedirect ? '&redirect=' + encodeURIComponent(safeRedirect) : ''}${app ? '&app=' + encodeURIComponent(app) : ''}`;
 
     return (
       <div className="w-full max-w-md bg-white rounded-sm border border-gray-200 shadow-xs p-6 sm:p-8 text-center">
@@ -363,7 +367,7 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
       <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
         Đã có tài khoản?{' '}
         <a
-          href={`/login${redirectUrl ? '?redirect=' + encodeURIComponent(redirectUrl) : ''}`}
+          href={`/login${redirectUrl ? '?redirect=' + encodeURIComponent(validateRedirectUrl(redirectUrl)) : ''}`}
           className="text-brand font-bold hover:underline"
         >
           Đăng nhập ngay

@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, ExternalLink, CheckCircle } from 'lucide-react';
 import { getDeviceId, getDeviceName } from '@/lib/clientDevice';
 import { Turnstile, type TurnstileRef } from '@/components/Turnstile';
+import { validateRedirectUrl } from '@/lib/urlValidator';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 interface LoginClientProps {
   defaultFlashcardUrl: string;
@@ -46,7 +48,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
       if (res.ok && data.success) {
         setResendStatus('Đã gửi lại email kích hoạt! Vui lòng kiểm tra hộp thư (cả mục Spam).');
       } else {
-        setResendStatus(data.error?.message || 'Không thể gửi email kích hoạt.');
+        setResendStatus(sanitizeAuthError(data.error?.message || 'Không thể gửi email kích hoạt.'));
       }
     } catch {
       setResendStatus('Lỗi kết nối máy chủ.');
@@ -74,7 +76,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
           device_id: getDeviceId(),
           device_name: getDeviceName(),
           app,
-          redirect_url: redirectUrl,
+          redirect_url: redirectUrl ? validateRedirectUrl(redirectUrl) : '',
           turnstileToken,
         }),
       });
@@ -87,7 +89,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
 
         if (data.error?.code === 'DEVICE_LIMIT_EXCEEDED') {
           setBlocked({
-            message: data.error.message || 'Tài khoản đã đạt giới hạn thiết bị.',
+            message: sanitizeAuthError(data.error.message || 'Tài khoản đã đạt giới hạn thiết bị.'),
             contactUrl: data.error.contactUrl || '',
           });
           setLoading(false);
@@ -96,26 +98,27 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
 
         if (data.error?.code === 'ACCOUNT_NOT_ACTIVATED') {
           setUnactivatedEmail(data.error?.email || cleanEmail);
-          setErrorMsg(data.error?.message || 'Tài khoản chưa được kích hoạt qua email.');
+          setErrorMsg(sanitizeAuthError(data.error?.message || 'Tài khoản chưa được kích hoạt qua email.'));
           setLoading(false);
           return;
         }
 
-        setErrorMsg(data.error?.message || 'Email hoặc mật khẩu không chính xác.');
+        setErrorMsg(sanitizeAuthError(data.error?.message || 'Email hoặc mật khẩu không chính xác.'));
         setLoading(false);
         return;
       }
 
       // Successful login
       if (redirectUrl) {
+        const safeRedirect = validateRedirectUrl(redirectUrl);
         try {
-          const urlObj = new URL(redirectUrl, window.location.origin);
+          const urlObj = new URL(safeRedirect, window.location.origin);
           if (data.token) {
             urlObj.searchParams.set('sso_token', data.token);
           }
           window.location.href = urlObj.toString();
         } catch {
-          window.location.href = redirectUrl;
+          window.location.href = safeRedirect;
         }
       } else if (app === 'flashcard' && defaultFlashcardUrl) {
         window.location.href = `${defaultFlashcardUrl.replace(/\/+$/, '')}/dashboard`;
@@ -126,7 +129,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
       }
     } catch (err: any) {
       console.error('[LOGIN_ERROR]', err);
-      setErrorMsg('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+      setErrorMsg(sanitizeAuthError(err, 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.'));
       setLoading(false);
     }
   }
@@ -293,7 +296,7 @@ export default function LoginClient({ defaultFlashcardUrl, defaultShopUrl }: Log
       <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
         Chưa có tài khoản?{' '}
         <a
-          href={`/register${redirectUrl ? '?redirect=' + encodeURIComponent(redirectUrl) : ''}`}
+          href={`/register${redirectUrl ? '?redirect=' + encodeURIComponent(validateRedirectUrl(redirectUrl)) : ''}`}
           className="text-brand font-bold hover:underline"
         >
           Đăng ký ngay

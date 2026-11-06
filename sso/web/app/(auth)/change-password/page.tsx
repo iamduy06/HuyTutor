@@ -3,6 +3,8 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
+import { validateRedirectUrl } from '@/lib/urlValidator';
+import { sanitizeAuthError } from '@/lib/errorHandler';
 
 function ChangePasswordContent() {
   const searchParams = useSearchParams();
@@ -48,7 +50,10 @@ function ChangePasswordContent() {
           window.location.href = `/login?redirect=${encodeURIComponent('/change-password')}`;
           return;
         }
-        const errorText = data.error?.message || (typeof data.error === 'string' ? data.error : 'Đã có lỗi xảy ra, vui lòng thử lại.');
+        const errorText = sanitizeAuthError(
+          data.error?.message || (typeof data.error === 'string' ? data.error : ''),
+          'Đã có lỗi xảy ra, vui lòng thử lại.'
+        );
         setErrorMsg(errorText);
         setLoading(false);
         return;
@@ -93,7 +98,7 @@ function ChangePasswordContent() {
             Mật khẩu mới đã được cập nhật đồng bộ trên toàn bộ hệ thống Huy Tutor.
           </p>
           <a
-            href={redirectUrl || '/'}
+            href={redirectUrl ? validateRedirectUrl(redirectUrl) : '/'}
             className="inline-block px-4 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-xs transition shadow-xs uppercase tracking-wide"
           >
             Quay lại
