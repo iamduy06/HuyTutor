@@ -32,9 +32,12 @@ export const CartDrawer: React.FC = () => {
     new Set(cartItems.map((item) => item.formatCode))
   ) as UiFormatCode[];
 
-  const hasOwnedItemSelected = selectedCartItems.some(
-    (item) => isItemInLibrary && isItemInLibrary(item.slug, item.formatCode)
-  );
+  const hasOwnedItemSelected = selectedCartItems.some((item) => {
+    if (item.isUpgrade) return false;
+    if (!isItemInLibrary) return false;
+    if (item.formatCode === 'PDF' && isItemInLibrary(item.slug, 'Word')) return true;
+    return isItemInLibrary(item.slug, item.formatCode);
+  });
 
   const isCheckoutDisabled =
     selectedCartItems.length === 0 || hasFormatConflict || hasMultipleProductsConflict || hasOwnedItemSelected;
@@ -113,25 +116,47 @@ export const CartDrawer: React.FC = () => {
                       className="mt-1 accent-[#e60049] w-4 h-4 cursor-pointer"
                     />
                     <div className="flex-1 min-w-0">
-                      <div>
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="inline-block bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
                           Định dạng: {item.formatCode}
                         </span>
+                        {item.isUpgrade && (
+                          <span className="inline-block bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
+                            NÂNG CẤP TỪ PDF ➔ WORD
+                          </span>
+                        )}
                       </div>
 
                       <h3 className="text-xs font-bold text-gray-900 mt-1.5 leading-snug">
                         {item.title}
                       </h3>
 
-                      {/* Cảnh báo nếu đã sở hữu trong Tủ sách */}
-                      {alreadyOwned && (
+                      {/* Ưu đãi nâng cấp bù tiền */}
+                      {item.isUpgrade ? (
+                        <div className="mt-2 p-2 bg-pink-50 border border-pink-200 rounded text-[11px] text-gray-800 leading-snug space-y-0.5">
+                          <div className="font-bold text-[#e60049] flex items-center gap-1">
+                            <span>💡</span>
+                            <span>Ưu đãi bù tiền nâng cấp</span>
+                          </div>
+                          <div className="text-[10px] text-gray-600">
+                            Giá Word: {formatVnd(item.originalPrice || item.unitPrice + (item.upgradeOffset || 0))} - Khấu trừ bản PDF: -{formatVnd(item.upgradeOffset || 0)}
+                          </div>
+                        </div>
+                      ) : item.formatCode === 'PDF' && isItemInLibrary && isItemInLibrary(item.slug, 'Word') ? (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-800 font-semibold flex items-start gap-1.5 leading-snug">
+                          <span className="shrink-0">⚠️</span>
+                          <span>
+                            Bạn đã sở hữu định dạng Word, không cần mua thêm bản PDF vì nội dung chúng là giống nhau.
+                          </span>
+                        </div>
+                      ) : alreadyOwned ? (
                         <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-800 font-semibold flex items-start gap-1.5 leading-snug">
                           <span className="shrink-0">⚠️</span>
                           <span>
                             Bạn đã sở hữu tài liệu này ({item.formatCode}) trong Tủ sách cá nhân! Hãy kiểm tra Tủ sách trước khi thanh toán lại.
                           </span>
                         </div>
-                      )}
+                      ) : null}
 
                       <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-100">
                         <span className="text-xs font-extrabold text-[#e60049]">

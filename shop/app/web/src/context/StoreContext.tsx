@@ -36,6 +36,15 @@ interface StoreContextValue {
   discountPercent: number;
   discountAmount: number;
   totalAmount: number;
+  checkOwnershipStatus: (
+    slug: string,
+    formatCode: UiFormatCode
+  ) => {
+    canPurchase: boolean;
+    isUpgrade: boolean;
+    errorMessage?: string;
+    warningMessage?: string;
+  };
   addToCart: (product: Product, formatCode: UiFormatCode, quantity?: number) => void;
   buyNow: (product: Product, formatCode: UiFormatCode, quantity?: number) => void;
   toggleCartItemSelect: (cartItemId: string) => void;
@@ -224,14 +233,88 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return firstActive ? (Number(firstActive.price) || 0) : 0;
   };
 
-  const addToCart = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
-    if (isItemInLibrary && isItemInLibrary(product.slug, formatCode)) {
-      showToast(
-        `⚠️ CẢNH BÁO: Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Bạn có thể vào Tủ sách để tải về mà không cần mua lại.`
-      );
+  const checkOwnershipStatus = (
+    slug: string,
+    formatCode: UiFormatCode
+  ): {
+    canPurchase: boolean;
+    isUpgrade: boolean;
+    errorMessage?: string;
+    warningMessage?: string;
+  } => {
+    if (!isItemInLibrary) return { canPurchase: true, isUpgrade: false };
+
+    const ownsWord = isItemInLibrary(slug, 'Word');
+    const ownsPdf = isItemInLibrary(slug, 'PDF');
+    const ownsCurrent = isItemInLibrary(slug, formatCode);
+
+    // Tình huống 1: Mua PDF mà đã có Word -> Chặn chuyên biệt
+    if (formatCode === 'PDF' && ownsWord) {
+      return {
+        canPurchase: false,
+        isUpgrade: false,
+        errorMessage: 'Bạn đã sở hữu định dạng Word, không cần mua thêm bản PDF vì nội dung chúng là giống nhau.',
+      };
     }
 
-    const unitPrice = resolveFormatPrice(product, formatCode);
+    // Tình huống 2: Mua PDF mà đã có PDF -> Chặn bình thường
+    if (formatCode === 'PDF' && ownsPdf) {
+      return {
+        canPurchase: false,
+        isUpgrade: false,
+        errorMessage: 'Bạn đã sở hữu tài liệu này ở định dạng PDF trong Tủ sách cá nhân.',
+      };
+    }
+
+    // Tình huống 3: Mua Word mà đã có Word -> Chặn bình thường
+    if (formatCode === 'Word' && ownsWord) {
+      return {
+        canPurchase: false,
+        isUpgrade: false,
+        errorMessage: 'Bạn đã sở hữu tài liệu này ở định dạng Word trong Tủ sách cá nhân.',
+      };
+    }
+
+    // Tình huống 4: Mua Word mà đã có PDF (chưa có Word) -> NÂNG CẤP BÙ TIỀN!
+    if (formatCode === 'Word' && ownsPdf && !ownsWord) {
+      return {
+        canPurchase: true,
+        isUpgrade: true,
+        warningMessage: 'Kích hoạt nâng cấp từ PDF lên Word chỉ bù tiền chênh lệch.',
+      };
+    }
+
+    // Các trường hợp khác đã sở hữu
+    if (ownsCurrent) {
+      return {
+        canPurchase: false,
+        isUpgrade: false,
+        errorMessage: `Bạn đã sở hữu tài liệu này ở định dạng ${formatCode} trong Tủ sách cá nhân.`,
+      };
+    }
+
+    return { canPurchase: true, isUpgrade: false };
+  };
+
+  const addToCart = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
+    const status = checkOwnershipStatus(product.slug, formatCode);
+
+    if (!status.canPurchase) {
+      showToast(`⚠️ ${status.errorMessage}`);
+      return;
+    }
+
+    let unitPrice = resolveFormatPrice(product, formatCode);
+    const originalPrice = unitPrice;
+    let upgradeOffset = 0;
+    const isUpgrade = status.isUpgrade;
+
+    if (isUpgrade) {
+      const pdfPrice = resolveFormatPrice(product, 'PDF');
+      upgradeOffset = Math.min(pdfPrice, unitPrice);
+      unitPrice = Math.max(0, unitPrice - upgradeOffset);
+    }
+
     const cartItemId = `${product.slug}__${formatCode}`;
 
     if (formatCode !== 'Flashcard') {
@@ -253,6 +336,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             googleFormProductName: product.google_form_product_name || product.title,
             formatCode,
             unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+            upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
             quantity: 1,
             selected: true,
             isComboEligible: product.is_combo_eligible,
@@ -260,7 +347,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ];
       });
 
-      if (!isItemInLibrary || !isItemInLibrary(product.slug, formatCode)) {
+      if (isUpgrade) {
+        showToast(`Đã thêm bản Nâng cấp lên Word (Chỉ bù ${formatVnd(unitPrice)}) vào giỏ hàng.`);
+      } else {
         showToast(`Đã thêm "${product.title}" (${formatCode}) vào giỏ hàng.`);
       }
       return;
@@ -301,15 +390,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const buyNow = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
-    if (isItemInLibrary && isItemInLibrary(product.slug, formatCode)) {
-      showToast(
-        `⚠️ Bạn đã sở hữu "${product.title}" (${formatCode}) trong Tủ sách cá nhân! Không thể thanh toán lại. Vui lòng vào Tủ sách để tải tài liệu.`
-      );
+    const status = checkOwnershipStatus(product.slug, formatCode);
+
+    if (!status.canPurchase) {
+      showToast(`⚠️ ${status.errorMessage}`);
       setIsCartOpen(true);
       return;
     }
 
-    const unitPrice = resolveFormatPrice(product, formatCode);
+    let unitPrice = resolveFormatPrice(product, formatCode);
+    const originalPrice = unitPrice;
+    let upgradeOffset = 0;
+    const isUpgrade = status.isUpgrade;
+
+    if (isUpgrade) {
+      const pdfPrice = resolveFormatPrice(product, 'PDF');
+      upgradeOffset = Math.min(pdfPrice, unitPrice);
+      unitPrice = Math.max(0, unitPrice - upgradeOffset);
+    }
+
     const cartItemId = `${product.slug}__${formatCode}`;
 
     if (formatCode !== 'Flashcard') {
@@ -324,6 +423,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           googleFormProductName: product.google_form_product_name || product.title,
           formatCode,
           unitPrice,
+          originalPrice,
+          upgradeOffset,
+          isUpgrade,
+          upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
           quantity: 1,
           selected: true,
           isComboEligible: product.is_combo_eligible,
@@ -394,12 +497,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (item.formatCode === newFormatCode) return prev;
 
       const product = products.find((p) => p.id === item.productId || p.slug === item.slug);
-      const newUnitPrice = product ? resolveFormatPrice(product, newFormatCode) : item.unitPrice;
+      const status = checkOwnershipStatus(item.slug, newFormatCode);
 
-      if (isItemInLibrary && isItemInLibrary(item.slug, newFormatCode)) {
-        showToast(
-          `⚠️ CẢNH BÁO: Bạn đã sở hữu "${item.title}" (${newFormatCode}) trong Tủ sách cá nhân! Hãy kiểm tra Tủ sách trước khi thanh toán lại.`
-        );
+      if (!status.canPurchase) {
+        showToast(`⚠️ ${status.errorMessage}`);
+        return prev;
+      }
+
+      let newUnitPrice = product ? resolveFormatPrice(product, newFormatCode) : item.unitPrice;
+      const originalPrice = newUnitPrice;
+      let upgradeOffset = 0;
+      const isUpgrade = status.isUpgrade;
+
+      if (isUpgrade && product) {
+        const pdfPrice = resolveFormatPrice(product, 'PDF');
+        upgradeOffset = Math.min(pdfPrice, newUnitPrice);
+        newUnitPrice = Math.max(0, newUnitPrice - upgradeOffset);
       }
 
       const newCartItemId = `${item.slug}__${newFormatCode}`;
@@ -421,6 +534,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   ...it,
                   quantity: newFormatCode === 'Flashcard' ? it.quantity + newQty : 1,
                   unitPrice: newUnitPrice,
+                  originalPrice,
+                  upgradeOffset,
+                  isUpgrade,
+                  upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
                   selected: true,
                 }
               : it
@@ -434,6 +551,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 cartItemId: newCartItemId,
                 formatCode: newFormatCode,
                 unitPrice: newUnitPrice,
+                originalPrice,
+                upgradeOffset,
+                isUpgrade,
+                upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
                 quantity: newQty,
                 selected: true,
               }
@@ -441,7 +562,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         );
       }
 
-      showToast(`Đã đổi định dạng sang ${newFormatCode} (${formatVnd(newUnitPrice)}).`);
+      if (isUpgrade) {
+        showToast(`Đã chuyển sang bản Nâng cấp Word (Chỉ bù ${formatVnd(newUnitPrice)}).`);
+      } else {
+        showToast(`Đã đổi định dạng sang ${newFormatCode} (${formatVnd(newUnitPrice)}).`);
+      }
       return nextItems;
     });
   };
@@ -536,6 +661,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         discountPercent,
         discountAmount,
         totalAmount,
+        checkOwnershipStatus,
         addToCart,
         buyNow,
         toggleCartItemSelect,

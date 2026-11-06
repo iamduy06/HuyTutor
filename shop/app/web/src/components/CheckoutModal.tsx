@@ -152,13 +152,25 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
-    const hasOwnedItem = selectedCartItems.some(
-      (it) => isItemInLibrary && isItemInLibrary(it.slug, it.formatCode)
-    );
+    const hasOwnedItem = selectedCartItems.some((it) => {
+      if (it.isUpgrade) return false;
+      if (!isItemInLibrary) return false;
+      if (it.formatCode === 'PDF' && isItemInLibrary(it.slug, 'Word')) return true;
+      return isItemInLibrary(it.slug, it.formatCode);
+    });
     if (hasOwnedItem) {
-      setFormError(
-        'Đơn hàng có tài liệu bạn đã sở hữu trong Tủ sách cá nhân. Không thể thanh toán lại. Vui lòng quay lại giỏ hàng và bỏ chọn tài liệu đó.'
+      const isWordOwnedPdfRequest = selectedCartItems.some(
+        (it) => it.formatCode === 'PDF' && isItemInLibrary && isItemInLibrary(it.slug, 'Word')
       );
+      if (isWordOwnedPdfRequest) {
+        setFormError(
+          'Bạn đã sở hữu định dạng Word, không cần mua thêm bản PDF vì nội dung chúng là giống nhau.'
+        );
+      } else {
+        setFormError(
+          'Đơn hàng có tài liệu bạn đã sở hữu trong Tủ sách cá nhân. Không thể thanh toán lại. Vui lòng quay lại giỏ hàng và bỏ chọn tài liệu đó.'
+        );
+      }
       return;
     }
 
@@ -531,11 +543,23 @@ export const CheckoutModal: React.FC = () => {
                   const effectiveQty =
                     activeFormat === 'Flashcard' ? Math.max(1, flashcardQuantity) : it.quantity;
                   return (
-                    <div key={it.cartItemId} className="flex justify-between text-gray-700">
-                      <span>
-                        {it.title} ({it.formatCode} x{effectiveQty})
-                      </span>
-                      <span className="font-bold">{formatVnd(it.unitPrice * effectiveQty)}</span>
+                    <div key={it.cartItemId} className="space-y-1 text-gray-700">
+                      <div className="flex justify-between">
+                        <span>
+                          {it.title} ({it.formatCode} x{effectiveQty})
+                          {it.isUpgrade && (
+                            <span className="ml-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-xs">
+                              Nâng cấp
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-bold">{formatVnd(it.unitPrice * effectiveQty)}</span>
+                      </div>
+                      {it.isUpgrade && (
+                        <div className="text-[10px] text-gray-500 pl-1">
+                          Giá niêm yết: {formatVnd(it.originalPrice || it.unitPrice + (it.upgradeOffset || 0))} - Khấu trừ bản PDF: -{formatVnd(it.upgradeOffset || 0)}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
