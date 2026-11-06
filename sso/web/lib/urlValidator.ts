@@ -45,17 +45,25 @@ export function validateRedirectUrl(
     }
 
     const hostname = parsed.hostname.toLowerCase();
+    const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // Allow localhost / loopback in development / testing
-    if (allowLocalhost && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+    // Allow localhost / loopback in development / testing (http: or https:)
+    if (allowLocalhost && isLoopback) {
       return trimmed;
     }
 
-    const targetDomain = (cookieDomain || process.env.COOKIE_DOMAIN || 'huytutor.edu.vn')
+    // Security: Non-loopback targets MUST strictly use HTTPS to protect master SSO tokens against cleartext transmission
+    if (parsed.protocol !== 'https:') {
+      return '/';
+    }
+
+    // Dynamic target domain from env/parameter without hardcoded fallback (GEMINI.md Rule 1)
+    const targetDomain = (cookieDomain || process.env.COOKIE_DOMAIN || '')
       .trim()
       .replace(/^\.+/, '')
       .toLowerCase();
 
+    // If COOKIE_DOMAIN is unconfigured or empty, fail-safe to relative root '/'
     if (!targetDomain) return '/';
 
     // Hostname must strictly equal targetDomain or end with .targetDomain
