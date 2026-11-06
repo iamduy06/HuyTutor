@@ -22,6 +22,7 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Pending verification state
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
@@ -66,6 +67,11 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
 
     if (password.length < 6) {
       setErrorMsg('Mật khẩu phải có tối thiểu 6 ký tự.');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setErrorMsg('Vui lòng đồng ý với Điều khoản sử dụng và Chính sách bảo mật để tiếp tục.');
       return;
     }
 
@@ -323,6 +329,26 @@ export default function RegisterClient({ defaultFlashcardUrl, defaultShopUrl }: 
           onExpire={() => setTurnstileToken('')}
           action="register"
         />
+
+        <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            required
+            checked={agreedToTerms}
+            onChange={(e) => setAgreedToTerms(e.target.checked)}
+            className="accent-brand mt-0.5 rounded-xs w-4 h-4 cursor-pointer"
+          />
+          <span className="leading-snug">
+            Bằng cách đăng ký, tôi đồng ý với{' '}
+            <a href="#" className="text-brand font-bold hover:underline">
+              Điều khoản sử dụng
+            </a>{' '}
+            và{' '}
+            <a href="#" className="text-brand font-bold hover:underline">
+              Chính sách bảo mật
+            </a>.
+          </span>
+        </label>
 
         <button
           type="submit"
