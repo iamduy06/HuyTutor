@@ -26,9 +26,19 @@ export const orderController = {
         invoiceAddress,
         flashcardQuantity,
         paymentMethod,
+        consentOrderProcessing,
+        consentMarketingEmails,
         items,
       } = req.body;
 
+      // 0. Kiểm tra đồng ý xử lý dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP (PDPD)
+      if (consentOrderProcessing !== true) {
+        res.status(400).json({
+          ok: false,
+          error: 'Bạn cần đồng ý để Hộ kinh doanh Huy Crecom xử lý thông tin cá nhân cho mục đích xử lý và giao đơn hàng này.',
+        });
+        return;
+      }
       // 1. Kiểm tra thông tin khách hàng cơ bản
       if (!customerName || String(customerName).trim().length < 2) {
         res.status(400).json({
@@ -253,6 +263,12 @@ export const orderController = {
         payment_status: 'pending',
         view_token: viewToken,
         google_form_submitted: false,
+        consent_order_processing: true,
+        consent_marketing_emails: Boolean(consentMarketingEmails),
+        consent_timestamp: new Date().toISOString(),
+        consent_policy_version: 'v1.0',
+        client_ip: req.clientIp || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '',
+        client_user_agent: String(req.headers['user-agent'] || ''),
         created_at: new Date().toISOString(),
         items: resolvedItems,
       };
