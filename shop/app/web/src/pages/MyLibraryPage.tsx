@@ -364,7 +364,7 @@ export const MyLibraryPage: React.FC = () => {
                               to={`${buildProductUrl(matchedProd.category_slug, matchedProd.slug)}?format=Word`}
                               className="bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs px-3 py-1.5 rounded-sm transition inline-flex items-center gap-1"
                             >
-                              ⚡ Nâng cấp lên Word (Chỉ bù tiền)
+                              Nâng cấp lên Word (Chỉ bù tiền)
                             </Link>
                           )}
 

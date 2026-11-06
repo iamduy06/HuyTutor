@@ -134,9 +134,8 @@ export const CartDrawer: React.FC = () => {
                       {/* Ưu đãi nâng cấp bù tiền */}
                       {item.isUpgrade ? (
                         <div className="mt-2 p-2 bg-pink-50 border border-pink-200 rounded text-[11px] text-gray-800 leading-snug space-y-0.5">
-                          <div className="font-bold text-[#e60049] flex items-center gap-1">
-                            <span>💡</span>
-                            <span>Ưu đãi bù tiền nâng cấp</span>
+                          <div className="font-bold text-[#e60049]">
+                            Ưu đãi bù tiền nâng cấp
                           </div>
                           <div className="text-[10px] text-gray-600">
                             Giá Word: {formatVnd(item.originalPrice || item.unitPrice + (item.upgradeOffset || 0))} - Khấu trừ bản PDF: -{formatVnd(item.upgradeOffset || 0)}

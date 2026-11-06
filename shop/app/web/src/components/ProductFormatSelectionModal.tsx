@@ -247,13 +247,12 @@ export const ProductFormatSelectionModal: React.FC = () => {
               </div>
             ) : isUpgrade ? (
               <div className="p-3 bg-pink-50 border border-pink-200 rounded text-[11px] text-gray-800 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-[#e60049]">
-                  <span>💡</span>
-                  <span>ƯU ĐÃI NÂNG CẤP ĐỊNH DẠNG</span>
+                <div className="font-bold text-[#e60049]">
+                  ƯU ĐÃI NÂNG CẤP ĐỊNH DẠNG
                 </div>
                 <p className="leading-relaxed">
-                  Bạn đã sở hữu bản <strong>PDF</strong> trong Tủ sách cá nhân. Bạn chỉ cần bù thêm khoản tiền chênh lệch{' '}
-                  <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(unitPrice)}) để sở hữu bản <strong>Word</strong> toàn quyền chỉnh sửa!
+                  Bạn đã sở hữu bản <strong>PDF</strong>. Bạn chỉ cần bù thêm{' '}
+                  <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(unitPrice)}) để nâng cấp lên định dạng <strong>Word</strong>!
                 </p>
               </div>
             ) : isBlocked ? (
@@ -282,14 +281,14 @@ export const ProductFormatSelectionModal: React.FC = () => {
                 onClick={handleAddToCart}
                 className="w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer bg-[#fff0f3] hover:bg-pink-100 text-[#e60049] border border-[#e60049]"
               >
-                <span>🛒 Thêm nâng cấp ({formatVnd(upgradeAmountToPay)})</span>
+                <span>Thêm nâng cấp ({formatVnd(upgradeAmountToPay)})</span>
               </button>
               <button
                 type="button"
                 onClick={handleBuyNow}
                 className="w-full py-2.5 px-3 rounded-xs text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer text-white bg-[#e60049] hover:bg-[#cc0041] shadow-xs"
               >
-                <span>⚡ Nâng cấp ngay ({formatVnd(upgradeAmountToPay)})</span>
+                <span>Nâng cấp ngay ({formatVnd(upgradeAmountToPay)})</span>
               </button>
             </>
           ) : (
@@ -303,7 +302,7 @@ export const ProductFormatSelectionModal: React.FC = () => {
                     : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-300'
                 }`}
               >
-                <span>🛒 Thêm vào giỏ</span>
+                <span>Thêm vào giỏ</span>
               </button>
               <button
                 type="button"
@@ -314,7 +313,7 @@ export const ProductFormatSelectionModal: React.FC = () => {
                     : 'bg-[#e60049] hover:bg-[#cc0041]'
                 }`}
               >
-                <span>⚡ Mua ngay</span>
+                <span>Mua ngay</span>
               </button>
             </>
           )}

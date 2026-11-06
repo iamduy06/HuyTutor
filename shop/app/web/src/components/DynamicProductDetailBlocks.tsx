@@ -432,12 +432,9 @@ export const ProductHeroBlock: React.FC<{
       {/* Thông báo Nâng cấp định dạng */}
       {isUpgrade && (
         <div className="p-3 bg-pink-50 border border-pink-200 rounded-md flex flex-wrap items-center justify-between gap-3 text-xs text-gray-800">
-          <div className="flex items-center gap-2">
-            <span className="text-base text-[#e60049]">💡</span>
-            <span>
-              Bạn đã sở hữu bản <strong>PDF</strong>. Bạn chỉ cần bù thêm{' '}
-              <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(currentPrice)}) để sở hữu toàn quyền định dạng <strong>Word</strong>!
-            </span>
+          <div>
+            Bạn đã sở hữu bản <strong>PDF</strong>. Bạn chỉ cần bù thêm{' '}
+            <strong className="text-[#e60049]">{formatVnd(upgradeAmountToPay)}</strong> (thay vì giá gốc {formatVnd(currentPrice)}) để nâng cấp lên định dạng <strong>Word</strong>!
           </div>
         </div>
       )}
