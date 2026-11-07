@@ -45,21 +45,27 @@ router.get('/admin/subadmins', async (_req: Request, res: Response) => {
     user_count: g.group_users?.length || 0,
     group_users: (g.group_users ?? [])
       .sort((a: any, b: any) => {
-        if (a.is_subadmin && !b.is_subadmin) return -1;
-        if (!a.is_subadmin && b.is_subadmin) return 1;
+        const aSub = Boolean(a.is_subadmin || a.user?.role === 'SUBADMIN');
+        const bSub = Boolean(b.is_subadmin || b.user?.role === 'SUBADMIN');
+        if (aSub && !bSub) return -1;
+        if (!aSub && bSub) return 1;
         return 0;
       })
       .map((gu: any) => {
         const u = gu.user;
+        const isSubadmin = Boolean(gu.is_subadmin || u?.role === 'SUBADMIN');
+        const deckCount = u?.user_decks?.length || 0;
         return {
           id: u?.id,
           email: u?.email,
           role: u?.role,
           created_at: u?.created_at,
           max_devices: u?.max_devices,
-          is_subadmin: gu.is_subadmin,
+          is_subadmin: isSubadmin,
+          is_group_subadmin: isSubadmin,
           device_count: u?.user_devices?.length || 0,
-          personal_deck_count: u?.user_decks?.length || 0,
+          deck_count: deckCount,
+          personal_deck_count: deckCount,
           user_devices: u?.user_devices || [],
           user_decks: u?.user_decks || [],
         };

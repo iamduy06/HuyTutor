@@ -180,6 +180,13 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
 
     const { error: dbErr } = await supabase.from('users').update(updateData).eq('id', id);
     if (dbErr) return res.status(500).json({ error: dbErr.message });
+
+    if (role === 'SUBADMIN') {
+      await supabase.from('group_users').update({ is_subadmin: true }).eq('user_id', id);
+    } else if (role === 'USER') {
+      await supabase.from('group_users').update({ is_subadmin: false }).eq('user_id', id);
+    }
+
     memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true, updateData });
   }
