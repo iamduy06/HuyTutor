@@ -35,9 +35,24 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
   const tokenRef   = useRef(0);
   const cacheRef   = useRef<Map<string, string>>(new Map());
   const inputRef   = useRef<HTMLInputElement>(null);
+  const nextTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isStarted  = useGameStore(s => s.isStarted);
 
   const currentVocab = questions[currentIndex];
+
+  // Cleanup speech, audio and timer on unmount
+  useEffect(() => {
+    return () => {
+      if (nextTimerRef.current) clearTimeout(nextTimerRef.current);
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Phát âm tức thì không độ trễ ──
   const speakWord = useCallback((word: string) => {
@@ -79,11 +94,15 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
     setSubmitted(true);
     submitAnswer(currentIndex, inputValue, correct);
     if (correct) {
-      setTimeout(() => nextQuestion(), 1200);
+      if (nextTimerRef.current) clearTimeout(nextTimerRef.current);
+      nextTimerRef.current = setTimeout(() => nextQuestion(), 1200);
     }
   }
 
-  function handleNext() { nextQuestion(); }
+  function handleNext() {
+    if (nextTimerRef.current) clearTimeout(nextTimerRef.current);
+    nextQuestion();
+  }
 
   if (isFinished) {
     return (
@@ -109,7 +128,7 @@ function ListeningInner({ vocab, allVocab }: { vocab: VocabItem[]; allVocab: Voc
         <div className="flex items-center gap-3">
           <label className="text-sm font-semibold text-muted-foreground">Số câu hỏi:</label>
           <input
-            type="number" min={5} max={Math.min(30, vocab.length)}
+            type="number" min={Math.min(2, vocab.length)} max={Math.min(30, vocab.length)}
             value={questionCount}
             onChange={e => setQuestionCount(Number(e.target.value))}
             className="w-20 text-center border-2 border-[#f0e0e7] rounded-xl px-3 py-2 font-bold text-brand focus:border-brand outline-none"

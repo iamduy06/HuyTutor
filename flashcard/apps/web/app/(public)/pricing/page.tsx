@@ -42,7 +42,7 @@ export default function PricingPage() {
             <li className="check">Nghe phát âm không giới hạn</li>
           </ul>
           <Link
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
+            href="/register"
             target="_blank"
             className="btn-price outline"
           >
@@ -64,7 +64,7 @@ export default function PricingPage() {
             <li className="check">Cập nhật nội dung mới liên tục</li>
           </ul>
           <Link
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
+            href="/register"
             target="_blank"
             className="btn-price outline"
           >
@@ -86,7 +86,7 @@ export default function PricingPage() {
             <li className="check">Hỗ trợ kỹ thuật 24/7</li>
           </ul>
           <Link
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
+            href="/register"
             target="_blank"
             className="btn-price solid"
           >
@@ -108,7 +108,7 @@ export default function PricingPage() {
             <li className="check">Ưu tiên trải nghiệm tính năng mới</li>
           </ul>
           <Link
-            href="https://docs.google.com/forms/d/e/1FAIpQLSfENbzWKlk5YBuyX4aFBY237uZcoY5EnFZsH_FV1Tu0V3OciA/viewform"
+            href="/register"
             target="_blank"
             className="btn-price outline"
           >
@@ -193,7 +193,7 @@ export default function PricingPage() {
           </div>
         </div>
         <p className="text-[0.82em] text-[--muted] mt-4 italic">
-          * Để đăng ký theo nhóm hoặc gói miễn phí, vui lòng liên hệ qua <Link href="https://www.facebook.com/huytutor" target="_blank" className="text-[--red] font-bold">Fanpage Huy Tutor - Tài Liệu Tiếng Anh</Link>.
+          * Để đăng ký theo nhóm hoặc gói miễn phí, vui lòng liên hệ qua <Link href={process.env.SUPPORT_URL ? process.env.SUPPORT_URL : "/register"} className="text-[--red] font-bold">Hỗ trợ Huy Tutor - Tài Liệu Tiếng Anh</Link>.
         </p>
       </div>
 

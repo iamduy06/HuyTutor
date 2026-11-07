@@ -38,6 +38,7 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCache = useRef<Map<string, string>>(new Map());
   const prefetching = useRef<Set<string>>(new Set());
+  const navTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Track seen vocabulary items (word + tab combo)
   const markSeen = useCallback((tabIdx: number, cardIdx: number) => {
@@ -67,9 +68,12 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
     } catch { /* silent — non-critical */ }
   }, [deckId, isDemo, tabs]);
 
-  // Save on unmount
+  // Save on unmount and cleanup timers
   useEffect(() => {
-    return () => { saveProgress(); };
+    return () => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+      saveProgress();
+    };
   }, [saveProgress]);
 
 
@@ -132,29 +136,36 @@ export function FlashcardPlayer({ tabs, deckTitle, deckDesc, isDemo, previewLimi
   }, [currentIndex, currentTab, vocabulary, prefetchNextHalf, speakWord]); // eslint-disable-line
 
   function nextCard() {
+    if (navTimerRef.current) clearTimeout(navTimerRef.current);
     const next = (currentIndex + 1) % vocabulary.length;
     markSeen(currentTab, next);
     setIsFlipped(false);
-    setTimeout(() => setCurrentIndex(next), 50);
+    navTimerRef.current = setTimeout(() => setCurrentIndex(next), 50);
     // Save every 5 navigations
     if ((seenCards.current.size % 5) === 0) saveProgress();
   }
   function prevCard() {
+    if (navTimerRef.current) clearTimeout(navTimerRef.current);
     const prev = (currentIndex - 1 + vocabulary.length) % vocabulary.length;
     markSeen(currentTab, prev);
     setIsFlipped(false);
-    setTimeout(() => setCurrentIndex(prev), 50);
+    navTimerRef.current = setTimeout(() => setCurrentIndex(prev), 50);
   }
   function jumpToCard() {
     const n = parseInt(jumpValue);
     if (n >= 1 && n <= vocabulary.length) {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
       markSeen(currentTab, n - 1);
       setIsFlipped(false);
-      setTimeout(() => setCurrentIndex(n - 1), 50);
+      navTimerRef.current = setTimeout(() => setCurrentIndex(n - 1), 50);
       setJumpValue("");
     }
   }
   function switchTab(idx: number) {
+    if (navTimerRef.current) {
+      clearTimeout(navTimerRef.current);
+      navTimerRef.current = null;
+    }
     saveProgress(); // save khi đổi tab
     setCurrentTab(idx); setCurrentIndex(0); setIsFlipped(false); setIsFirstLoad(false);
     markSeen(idx, 0); // mark first card of new tab

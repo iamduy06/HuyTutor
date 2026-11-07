@@ -25,13 +25,23 @@ export interface Choice {
  * Đáp án sai lấy từ pool (loại trừ correct), lấy meaning.
  */
 export function buildChoices(correct: VocabItem, pool: VocabItem[], count = 4): Choice[] {
-  const distractors = shuffle(pool.filter(v => v.word !== correct.word))
-    .slice(0, count - 1)
-    .map(v => ({ text: v.meaning, isCorrect: false }));
+  const correctMeaning = (correct.meaning || '').trim().toLowerCase();
+  const seenMeanings = new Set<string>([correctMeaning]);
+  const validDistractors: Choice[] = [];
+
+  const shuffledPool = shuffle(pool);
+  for (const item of shuffledPool) {
+    if (item.word === correct.word) continue;
+    const m = (item.meaning || '').trim().toLowerCase();
+    if (!m || seenMeanings.has(m)) continue;
+    seenMeanings.add(m);
+    validDistractors.push({ text: item.meaning, isCorrect: false });
+    if (validDistractors.length >= count - 1) break;
+  }
 
   const choices: Choice[] = [
     { text: correct.meaning, isCorrect: true },
-    ...distractors,
+    ...validDistractors,
   ];
   return shuffle(choices);
 }

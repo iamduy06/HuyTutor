@@ -8,9 +8,9 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "flashcard.huytutor.edu.vn" },
-      { protocol: "https", hostname: "flashcard2.huytutor.edu.vn" },
-      { protocol: "https", hostname: "supabase-proxy.huynhthanhduy06.workers.dev" },
+      { protocol: "https", hostname: "*.huytutor.edu.vn" },
+      { protocol: "https", hostname: "*.workers.dev" },
+
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
@@ -20,6 +20,8 @@ const nextConfig = {
   env: {
     SSO_URL: process.env.SSO_URL,
     APP_URL: process.env.APP_URL,
+    SHOP_URL: process.env.SHOP_URL,
+    SUPPORT_URL: process.env.SUPPORT_URL,
   },
   async rewrites() {
     const rawApiUrl = process.env.API_URL;

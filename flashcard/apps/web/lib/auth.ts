@@ -145,7 +145,14 @@ export async function logoutApi(): Promise<void> {
 
       // Expire non-httpOnly client cookies across domain variations
       const past = "Thu, 01 Jan 1970 00:00:00 GMT";
-      const domains = [".huytutor.edu.vn", "huytutor.edu.vn", window.location.hostname, `.${window.location.hostname}`, ""];
+      const configuredDomain = (typeof process !== "undefined" && process.env?.COOKIE_DOMAIN) || "";
+      const domains = Array.from(new Set([
+        configuredDomain,
+        configuredDomain.replace(/^\./, ""),
+        window.location.hostname,
+        `.${window.location.hostname}`,
+        "",
+      ])).filter((d, i, arr) => d !== undefined);
       const cookieNames = ["ht_sso_token", "hut_access_token", "hut_refresh_token", "hut_device_id", "sb-access-token", "sb-refresh-token"];
 
       for (const name of cookieNames) {

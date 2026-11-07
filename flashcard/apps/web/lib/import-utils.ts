@@ -3,7 +3,16 @@
  * Returns null if invalid format.
  */
 export function parseDateToISO(dateStr: any): string | null {
-  if (!dateStr || typeof dateStr !== 'string') return null;
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) {
+    return isNaN(dateStr.getTime()) ? null : dateStr.toISOString();
+  }
+  if (typeof dateStr === 'number') {
+    // Excel serial dates: days since Dec 30 1899
+    const jsDate = new Date((dateStr - 25569) * 86400 * 1000);
+    return isNaN(jsDate.getTime()) ? null : jsDate.toISOString();
+  }
+  if (typeof dateStr !== 'string') return null;
   const trimmed = dateStr.trim();
   if (!trimmed) return null;
 

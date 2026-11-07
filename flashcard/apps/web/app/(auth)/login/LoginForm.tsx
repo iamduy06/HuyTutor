@@ -5,7 +5,11 @@ import Link from "next/link";
 import { ShieldAlert, ExternalLink, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function LoginForm() {
+interface LoginFormProps {
+  supportUrl?: string;
+}
+
+export function LoginForm({ supportUrl }: LoginFormProps = {}) {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -28,11 +32,19 @@ export function LoginForm() {
             </Link>
           </Button>
 
-          <Button variant="ghost" className="w-full text-xs text-gray-500" asChild>
-            <a href="https://web.facebook.com/huytutor" target="_blank" rel="noopener noreferrer">
-              Liên hệ Admin hỗ trợ
-            </a>
-          </Button>
+          {supportUrl ? (
+            <Button variant="ghost" className="w-full text-xs text-gray-500" asChild>
+              <a href={supportUrl} target="_blank" rel="noopener noreferrer">
+                Liên hệ Admin hỗ trợ
+              </a>
+            </Button>
+          ) : (
+            <Button variant="ghost" className="w-full text-xs text-gray-500" asChild>
+              <Link href="/register">
+                Liên hệ Admin hỗ trợ
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     );

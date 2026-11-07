@@ -70,8 +70,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   }),
   setGameType: (type) => set({ gameType: type }),
-  setPairCount: (n) => set({ pairCount: Math.min(Math.max(n, 5), 20) }),
-  setQuestionCount: (n) => set({ questionCount: Math.min(Math.max(n, 5), 30) }),
+  setPairCount: (n) => set({ pairCount: Math.min(Math.max(n, 2), 20) }),
+  setQuestionCount: (n) => set({ questionCount: Math.min(Math.max(n, 2), 30) }),
 
   startGame: (questions) => set({
     questions,

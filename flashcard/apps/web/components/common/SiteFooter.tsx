@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useBranding } from "@/components/common/BrandingContext";
 
-export function SiteFooter({ shopUrl }: { shopUrl?: string }) {
+export function SiteFooter({ shopUrl, supportUrl }: { shopUrl?: string; supportUrl?: string }) {
   const { branding } = useBranding();
 
   if (branding && branding.allow_custom_branding && branding.show_footer === false) {
@@ -21,10 +21,14 @@ export function SiteFooter({ shopUrl }: { shopUrl?: string }) {
           </Link>
         </>
       ) : null}
-      &nbsp;|&nbsp;
-      <Link href="https://www.facebook.com/huytutor" target="_blank" className="text-[#ed0046] font-semibold hover:underline">
-        Fanpage
-      </Link>
+      {supportUrl ? (
+        <>
+          &nbsp;|&nbsp;
+          <Link href={supportUrl} target="_blank" className="text-[#ed0046] font-semibold hover:underline">
+            Fanpage
+          </Link>
+        </>
+      ) : null}
     </footer>
   );
 }

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 
 /**
  * Retrieves the authenticated JWT token from HttpOnly cookie on the Next.js server.
- * Prioritizes Master SSO cookie (.huytutor.edu.vn) then local hut_access_token.
+ * Prioritizes Master SSO cookie (COOKIE_DOMAIN) then local hut_access_token.
  * Used by Server Components, Layouts, and Server Actions.
  */
 export async function getServerToken(): Promise<string | null> {

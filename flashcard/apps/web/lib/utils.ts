@@ -17,8 +17,11 @@ export function generatePassword(length = 8): string {
   ).join("");
 }
 
-export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("vi-VN", {
+export function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return "Chưa cập nhật";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "Chưa cập nhật";
+  return date.toLocaleDateString("vi-VN", {
     year: "numeric", month: "long", day: "numeric",
   });
 }
@@ -78,7 +81,7 @@ export function getDeckAccess(
   userDeck: { expired_at: string | null } | null
 ): DeckAccess {
   // Admin có toàn quyền
-  if (user?.role === "ADMIN") {
+  if ((user?.role || '').toUpperCase() === "ADMIN") {
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
@@ -140,27 +143,52 @@ export function getCefrColor(cefr: string): string {
 //
 // extractTabs() luôn trả về Tab[] bất kể format nào.
 
-export function extractTabs(raw: FlashcardRow["content"]): Tab[] {
+export function extractTabs(raw: unknown): Tab[] {
   if (!raw) return [];
 
+  let parsed = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  if (!parsed || typeof parsed !== "object") return [];
+
   // Format A: { tabs: [...] }
-  if (!Array.isArray(raw) && "tabs" in raw && Array.isArray((raw as DeckContent).tabs)) {
-    return (raw as DeckContent).tabs;
+  if (!Array.isArray(parsed) && "tabs" in parsed && Array.isArray((parsed as any).tabs)) {
+    return ((parsed as any).tabs as any[])
+      .filter((t) => t && typeof t === "object")
+      .map((t) => ({
+        ...t,
+        vocabulary: Array.isArray(t.vocabulary) ? t.vocabulary : [],
+      }));
   }
 
   // Format C: [{ id, label, vocabulary }, ...]
-  if (Array.isArray(raw)) {
+  if (Array.isArray(parsed)) {
     // Mảng unit
-    if (raw.length > 0 && "vocabulary" in raw[0]) return raw as Tab[];
+    if (parsed.length > 0 && typeof parsed[0] === "object" && parsed[0] !== null && "vocabulary" in parsed[0]) {
+      return parsed.map((t: any) => ({
+        ...t,
+        vocabulary: Array.isArray(t?.vocabulary) ? t.vocabulary : [],
+      }));
+    }
     // Mảng flat word (rất hiếm)
-    return [{ vocabulary: raw as unknown as VocabItem[] }];
+    return [{ vocabulary: parsed as unknown as VocabItem[] }];
   }
 
   // Format B: { id, label, vocabulary }
-  if ("vocabulary" in raw) return [raw as Tab];
+  if ("vocabulary" in parsed && Array.isArray((parsed as any).vocabulary)) {
+    return [parsed as Tab];
+  }
 
   // Format D: { word, phonetic, meaning, ... } ← flat word row
-  if ("word" in raw) return [{ vocabulary: [raw as unknown as VocabItem] }];
+  if ("word" in parsed) {
+    return [{ vocabulary: [parsed as unknown as VocabItem] }];
+  }
 
   return [];
 }

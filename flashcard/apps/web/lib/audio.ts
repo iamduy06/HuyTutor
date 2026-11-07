@@ -331,7 +331,10 @@ export async function smartPlayWord(
   try {
     const url = await fetchDictAudio(clean);
     clearTimeout(fastTimer);
-    if (token !== tokenRef.current) return;
+    if (token !== tokenRef.current) {
+      onDone?.();
+      return;
+    }
 
     if (!url) {
       if (!hasSpokenFallback) {
@@ -344,6 +347,7 @@ export async function smartPlayWord(
     // Nếu đã lỡ đọc TTS rồi thì không ngắt giữa chừng, chỉ preload mp3 cho lần sau
     if (hasSpokenFallback) {
       preloadAudioFile(url);
+      onDone?.();
       return;
     }
 
@@ -366,15 +370,15 @@ export async function smartPlayWord(
 
     audio.oncanplaythrough = () => {
       clearTimeout(playTimer);
-      if (token !== tokenRef.current) return;
       onDone?.();
+      if (token !== tokenRef.current) return;
       audio.play().catch(() => browserTTS(clean));
     };
 
     audio.onerror = () => {
       clearTimeout(playTimer);
+      onDone?.();
       if (token === tokenRef.current) {
-        onDone?.();
         browserTTS(clean);
       }
     };
@@ -383,9 +387,9 @@ export async function smartPlayWord(
   } catch {
     clearTimeout(fastTimer);
     if (token === tokenRef.current && !hasSpokenFallback) {
-      onDone?.();
       browserTTS(clean);
     }
+    onDone?.();
   }
 }
 

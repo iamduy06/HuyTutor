@@ -1,6 +1,6 @@
 export const APP_NAME     = "Huy Tutor Flashcard";
 export const APP_URL      = "";
-export const FACEBOOK_URL = "https://web.facebook.com/huytutor";
+export const FACEBOOK_URL = (typeof process !== "undefined" && process.env?.SUPPORT_URL) || "";
 export const DEMO_LIMIT   = 10;
 
 export const ROUTES = {

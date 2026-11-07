@@ -42,7 +42,7 @@ export function getCookieDomainList(host?: string | null): string[] {
 
   if (host) {
     const cleanHost = host.split(":")[0].trim();
-    if (cleanHost && cleanHost !== "localhost" && cleanHost !== "127.0.0.1") {
+    if (cleanHost && cleanHost.includes(".") && !/^(\d{1,3}\.){3}\d{1,3}$/.test(cleanHost)) {
       domains.add(`.${cleanHost}`);
       domains.add(cleanHost);
 
