@@ -182,26 +182,45 @@ export async function getHistoricalPaidAmount(
 ): Promise<number> {
   const cleanSlug = String(prodSlugOrId || '').toLowerCase().trim();
   try {
-    const userOrders = await dbService.getUserOrders(userId, userEmail);
+    const [userOrders, allProducts] = await Promise.all([
+      dbService.getUserOrders(userId, userEmail),
+      dbService.getProducts(),
+    ]);
+    const prod = allProducts.find(
+      (p) => String(p.id).toLowerCase().trim() === cleanSlug || String(p.slug).toLowerCase().trim() === cleanSlug
+    );
+    const targetSlug = prod ? String(prod.slug).toLowerCase().trim() : cleanSlug;
+    const targetId = prod ? String(prod.id).toLowerCase().trim() : cleanSlug;
+
     const matchedOrder = userOrders.find(
       (o) =>
         o.payment_status === 'paid' &&
         Array.isArray(o.items) &&
-        o.items.some(
-          (it) =>
-            ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
-              (it.product_title || '').trim().toLowerCase() === cleanSlug) &&
+        o.items.some((it) => {
+          const itKey = (it.product_id || '').toLowerCase().trim();
+          const itTitle = (it.product_title || '').trim().toLowerCase();
+          return (
+            (itKey === targetSlug ||
+              itKey === targetId ||
+              itTitle === targetSlug ||
+              (prod && itTitle === prod.title.toLowerCase().trim())) &&
             it.format_code === formatCode
-        )
+          );
+        })
     );
 
     if (matchedOrder && Array.isArray(matchedOrder.items)) {
-      const orderItem = matchedOrder.items.find(
-        (it) =>
-          ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
-            (it.product_title || '').trim().toLowerCase() === cleanSlug) &&
+      const orderItem = matchedOrder.items.find((it) => {
+        const itKey = (it.product_id || '').toLowerCase().trim();
+        const itTitle = (it.product_title || '').trim().toLowerCase();
+        return (
+          (itKey === targetSlug ||
+            itKey === targetId ||
+            itTitle === targetSlug ||
+            (prod && itTitle === prod.title.toLowerCase().trim())) &&
           it.format_code === formatCode
-      );
+        );
+      });
       const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPrice;
       let discountRate = 0;
       if (typeof matchedOrder.discount_percent === 'number' && matchedOrder.discount_percent > 0) {
@@ -546,26 +565,39 @@ export const orderController = {
         })
       );
 
-      const isOwnedSameFormat = (prodIdOrSlug: string): boolean => {
+      const resolveProductKeys = (prodIdOrSlug: string) => {
         const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+        const prod = allProducts.find(
+          (p) => String(p.id).toLowerCase().trim() === clean || String(p.slug).toLowerCase().trim() === clean
+        );
+        return {
+          id: prod ? String(prod.id).toLowerCase().trim() : clean,
+          slug: prod ? String(prod.slug).toLowerCase().trim() : clean,
+        };
+      };
+
+      const isOwnedSameFormat = (prodIdOrSlug: string): boolean => {
+        const { id, slug } = resolveProductKeys(prodIdOrSlug);
         return userLibrary.some(
           (lib) =>
             lib.is_active &&
             lib.format_code === selectedFormat &&
-            (String(lib.product_slug || '').toLowerCase().trim() === clean ||
-              String(lib.id || '').toLowerCase().trim() === clean)
+            (String(lib.product_slug || '').toLowerCase().trim() === slug ||
+              String(lib.product_slug || '').toLowerCase().trim() === id ||
+              String(lib.id || '').toLowerCase().trim() === id)
         );
       };
 
       const isOwnedPdfForWordUpgrade = (prodIdOrSlug: string): boolean => {
         if (selectedFormat !== 'Word') return false;
-        const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+        const { id, slug } = resolveProductKeys(prodIdOrSlug);
         return userLibrary.some(
           (lib) =>
             lib.is_active &&
             lib.format_code === 'PDF' &&
-            (String(lib.product_slug || '').toLowerCase().trim() === clean ||
-              String(lib.id || '').toLowerCase().trim() === clean)
+            (String(lib.product_slug || '').toLowerCase().trim() === slug ||
+              String(lib.product_slug || '').toLowerCase().trim() === id ||
+              String(lib.id || '').toLowerCase().trim() === id)
         );
       };
 
@@ -662,8 +694,8 @@ export const orderController = {
           const cleanId = String(p.id).toLowerCase().trim();
           const cleanSlug = String(p.slug).toLowerCase().trim();
           return !pkgProductIds.some((oid) => {
-            const cOid = String(oid).toLowerCase().trim();
-            return isOwnedSameFormat(cOid) && (cOid === cleanId || cOid === cleanSlug);
+            const { id, slug } = resolveProductKeys(oid);
+            return isOwnedSameFormat(oid) && (slug === cleanSlug || id === cleanId);
           });
         });
         const missingRetailSum = missingProds.reduce((sum, p) => {

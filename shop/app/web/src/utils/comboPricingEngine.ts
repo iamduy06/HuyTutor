@@ -126,27 +126,43 @@ export function evaluateBestComboForCart(params: {
     ])
   );
 
-  // Tập sản phẩm đã sở hữu trong Tủ sách cá nhân
-  const isOwnedSameFormat = (prodIdOrSlug: string): boolean => {
+  // Ánh xạ linh hoạt giữa Product ID (UUID) và Product Slug
+  const resolveProductKeys = (prodIdOrSlug: string) => {
     const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+    const prod = allProducts.find(
+      (p) =>
+        String(p.id || '').toLowerCase().trim() === clean ||
+        String(p.slug || '').toLowerCase().trim() === clean
+    );
+    return {
+      id: prod ? String(prod.id).toLowerCase().trim() : clean,
+      slug: prod ? String(prod.slug).toLowerCase().trim() : clean,
+    };
+  };
+
+  // Tập sản phẩm đã sở hữu trong Tủ sách cá nhân (So khớp cả Slug và ID)
+  const isOwnedSameFormat = (prodIdOrSlug: string): boolean => {
+    const { id, slug } = resolveProductKeys(prodIdOrSlug);
     return userLibrary.some(
       (lib) =>
         lib.is_active &&
         lib.format_code === activeFormat &&
-        (String(lib.product_slug || '').toLowerCase().trim() === clean ||
-          String(lib.id || '').toLowerCase().trim() === clean)
+        (String(lib.product_slug || '').toLowerCase().trim() === slug ||
+          String(lib.product_slug || '').toLowerCase().trim() === id ||
+          String(lib.id || '').toLowerCase().trim() === id)
     );
   };
 
   const isOwnedPdfForWordUpgrade = (prodIdOrSlug: string): boolean => {
     if (activeFormat !== 'Word') return false;
-    const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+    const { id, slug } = resolveProductKeys(prodIdOrSlug);
     return userLibrary.some(
       (lib) =>
         lib.is_active &&
         lib.format_code === 'PDF' &&
-        (String(lib.product_slug || '').toLowerCase().trim() === clean ||
-          String(lib.id || '').toLowerCase().trim() === clean)
+        (String(lib.product_slug || '').toLowerCase().trim() === slug ||
+          String(lib.product_slug || '').toLowerCase().trim() === id ||
+          String(lib.id || '').toLowerCase().trim() === id)
     );
   };
 
@@ -155,13 +171,14 @@ export function evaluateBestComboForCart(params: {
     fmt: UiFormatCode,
     fallbackPrice: number
   ): number => {
-    const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+    const { id, slug } = resolveProductKeys(prodIdOrSlug);
     const matchedLib = userLibrary.find(
       (lib) =>
         lib.is_active &&
         lib.format_code === fmt &&
-        (String(lib.product_slug || '').toLowerCase().trim() === clean ||
-          String(lib.id || '').toLowerCase().trim() === clean)
+        (String(lib.product_slug || '').toLowerCase().trim() === slug ||
+          String(lib.product_slug || '').toLowerCase().trim() === id ||
+          String(lib.id || '').toLowerCase().trim() === id)
     );
     if (matchedLib && typeof matchedLib.paid_amount === 'number' && matchedLib.paid_amount > 0) {
       return matchedLib.paid_amount;
@@ -279,8 +296,8 @@ export function evaluateBestComboForCart(params: {
       const cleanId = String(p.id).toLowerCase().trim();
       const cleanSlug = String(p.slug).toLowerCase().trim();
       return !ownedProductIds.some((oid) => {
-        const cOid = String(oid).toLowerCase().trim();
-        return cOid === cleanId || cOid === cleanSlug;
+        const { id, slug } = resolveProductKeys(oid);
+        return id === cleanId || slug === cleanSlug;
       });
     });
     const missingRetailSum = missingProds.reduce(
