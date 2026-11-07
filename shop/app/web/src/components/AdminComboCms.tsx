@@ -788,14 +788,51 @@ export const EditComboPackagesConfig: React.FC<{
 
             return (
               <div key={pkg.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3.5 shadow-xs">
-                {/* Header thanh công cụ của thẻ gói: Chevron + [▲][▼] + Tiêu đề dạng #1 - Tên gói (X tài liệu) + Xóa */}
+                {/* Header thanh công cụ của thẻ gói: Tiêu đề bên trái, cụm nút [▲][▼], Chevron, Xóa bên phải */}
                 <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    {/* Nút mũi tên Chevron Thu gọn / Mở rộng */}
+                  {/* Bên trái: Tiêu đề dạng #1 - [Tên gói tài liệu] (X tài liệu được chọn) */}
+                  <div
+                    onClick={() => toggleExpand(pkg.id)}
+                    className="flex items-center gap-1.5 cursor-pointer select-none truncate flex-1 min-w-0"
+                    title={isExpanded ? 'Bấm để thu gọn' : 'Bấm để mở rộng'}
+                  >
+                    <span className="font-extrabold text-[#e60049] text-xs shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
+                    <span className="text-xs font-bold text-gray-900 truncate" title={pkg.title}>
+                      {pkgTitle}
+                    </span>
+                    <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
+                      ({totalCount} tài liệu được chọn)
+                    </span>
+                  </div>
+
+                  {/* Bên phải: Cụm nút di chuyển [▲][▼], Nút Chevron thu gọn/mở rộng, Nút Xóa */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => handleMovePackage(idx, 'up')}
+                      className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                      title="Di chuyển Gói này lên trước"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === packages.length - 1}
+                      onClick={() => handleMovePackage(idx, 'down')}
+                      className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                      title="Di chuyển Gói này xuống sau"
+                    >
+                      ▼
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => toggleExpand(pkg.id)}
-                      className="p-1 text-gray-500 hover:text-[#e60049] hover:bg-white border border-transparent hover:border-gray-200 rounded cursor-pointer transition shrink-0"
+                      className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-[#e60049] border border-gray-300 bg-white rounded cursor-pointer transition hover:bg-gray-50"
                       title={isExpanded ? 'Thu gọn thẻ gói này' : 'Mở rộng thẻ gói này'}
                     >
                       <svg
@@ -808,53 +845,14 @@ export const EditComboPackagesConfig: React.FC<{
                       </svg>
                     </button>
 
-                    {/* Cụm nút di chuyển thứ tự [▲ Lên] và [▼ Xuống] */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => handleMovePackage(idx, 'up')}
-                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Di chuyển Gói này lên trước"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        disabled={idx === packages.length - 1}
-                        onClick={() => handleMovePackage(idx, 'down')}
-                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Di chuyển Gói này xuống sau"
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    {/* Tiêu đề dạng #1 - [Tên gói tài liệu] (X tài liệu được chọn) */}
-                    <div
-                      onClick={() => toggleExpand(pkg.id)}
-                      className="flex items-center gap-1.5 cursor-pointer select-none truncate ml-0.5"
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePackage(idx)}
+                      className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer ml-1"
                     >
-                      <span className="font-extrabold text-[#e60049] text-xs shrink-0">
-                        #{idx + 1}
-                      </span>
-                      <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
-                      <span className="text-xs font-bold text-gray-900 truncate" title={pkg.title}>
-                        {pkgTitle}
-                      </span>
-                      <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
-                        ({totalCount} tài liệu được chọn)
-                      </span>
-                    </div>
+                      Xóa thẻ này
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePackage(idx)}
-                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer shrink-0 ml-2"
-                  >
-                    Xóa thẻ này
-                  </button>
                 </div>
 
                 {/* Nội dung chi tiết thẻ gói (Ẩn khi thu gọn) */}
@@ -1168,14 +1166,51 @@ export const EditComboSectionsConfig: React.FC<{
 
             return (
               <div key={group.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3 shadow-xs">
-                {/* Header thanh công cụ của nhóm: Chevron + [▲][▼] + Tiêu đề dạng #1 - Tên nhóm (X tài liệu) + Xóa */}
+                {/* Header thanh công cụ của nhóm: Tiêu đề bên trái, cụm nút [▲][▼], Chevron, Xóa bên phải */}
                 <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    {/* Nút mũi tên Chevron Thu gọn / Mở rộng */}
+                  {/* Bên trái: Tiêu đề dạng #1 - [Tiêu đề nhóm] (X tài liệu được chọn) */}
+                  <div
+                    onClick={() => toggleGroupExpand(group.id)}
+                    className="flex items-center gap-1.5 cursor-pointer select-none truncate flex-1 min-w-0"
+                    title={isExpanded ? 'Bấm để thu gọn' : 'Bấm để mở rộng'}
+                  >
+                    <span className="font-extrabold text-[#e60049] text-xs shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
+                    <span className="text-xs font-bold text-gray-900 truncate" title={group.title}>
+                      {groupTitle}
+                    </span>
+                    <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
+                      ({totalCount} tài liệu được chọn)
+                    </span>
+                  </div>
+
+                  {/* Bên phải: Cụm nút di chuyển [▲][▼], Nút Chevron thu gọn/mở rộng, Nút Xóa */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveGroup(idx, 'up')}
+                      className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                      title="Di chuyển Nhóm này lên trước"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === groups.length - 1}
+                      onClick={() => handleMoveGroup(idx, 'down')}
+                      className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                      title="Di chuyển Nhóm này xuống sau"
+                    >
+                      ▼
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => toggleGroupExpand(group.id)}
-                      className="p-1 text-gray-500 hover:text-[#e60049] hover:bg-white border border-transparent hover:border-gray-200 rounded cursor-pointer transition shrink-0"
+                      className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-[#e60049] border border-gray-300 bg-white rounded cursor-pointer transition hover:bg-gray-50"
                       title={isExpanded ? 'Thu gọn nhóm này' : 'Mở rộng nhóm này'}
                     >
                       <svg
@@ -1188,53 +1223,14 @@ export const EditComboSectionsConfig: React.FC<{
                       </svg>
                     </button>
 
-                    {/* Cụm nút di chuyển thứ tự [▲ Lên] và [▼ Xuống] */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => handleMoveGroup(idx, 'up')}
-                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Di chuyển Nhóm này lên trước"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        disabled={idx === groups.length - 1}
-                        onClick={() => handleMoveGroup(idx, 'down')}
-                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Di chuyển Nhóm này xuống sau"
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    {/* Tiêu đề dạng #1 - [Tiêu đề nhóm] (X tài liệu được chọn) */}
-                    <div
-                      onClick={() => toggleGroupExpand(group.id)}
-                      className="flex items-center gap-1.5 cursor-pointer select-none truncate ml-0.5"
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGroup(idx)}
+                      className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer ml-1"
                     >
-                      <span className="font-extrabold text-[#e60049] text-xs shrink-0">
-                        #{idx + 1}
-                      </span>
-                      <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
-                      <span className="text-xs font-bold text-gray-900 truncate" title={group.title}>
-                        {groupTitle}
-                      </span>
-                      <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
-                        ({totalCount} tài liệu được chọn)
-                      </span>
-                    </div>
+                      Xóa nhóm này
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteGroup(idx)}
-                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer shrink-0 ml-2"
-                  >
-                    Xóa nhóm này
-                  </button>
                 </div>
 
                 {/* Nội dung chi tiết nhóm (Ẩn khi thu gọn) */}
