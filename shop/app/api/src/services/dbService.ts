@@ -188,6 +188,7 @@ export interface SeedUserLibraryItem {
   last_downloaded_at?: string;
   is_active: boolean;
   granted_at: string;
+  paid_amount?: number;
 }
 
 export interface DbState {

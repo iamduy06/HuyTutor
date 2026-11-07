@@ -170,6 +170,58 @@ export async function calculateUpgradeForUser(
   };
 }
 
+/**
+ * Tra cứu số tiền thực tế khách hàng đã thanh toán cho một tài liệu cụ thể trong lịch sử đơn hàng
+ */
+export async function getHistoricalPaidAmount(
+  userId: string,
+  userEmail: string,
+  prodSlugOrId: string,
+  formatCode: UiFormatCode,
+  fallbackPrice: number
+): Promise<number> {
+  const cleanSlug = String(prodSlugOrId || '').toLowerCase().trim();
+  try {
+    const userOrders = await dbService.getUserOrders(userId, userEmail);
+    const matchedOrder = userOrders.find(
+      (o) =>
+        o.payment_status === 'paid' &&
+        Array.isArray(o.items) &&
+        o.items.some(
+          (it) =>
+            ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+              (it.product_title || '').trim().toLowerCase() === cleanSlug) &&
+            it.format_code === formatCode
+        )
+    );
+
+    if (matchedOrder && Array.isArray(matchedOrder.items)) {
+      const orderItem = matchedOrder.items.find(
+        (it) =>
+          ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+            (it.product_title || '').trim().toLowerCase() === cleanSlug) &&
+          it.format_code === formatCode
+      );
+      const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPrice;
+      let discountRate = 0;
+      if (typeof matchedOrder.discount_percent === 'number' && matchedOrder.discount_percent > 0) {
+        discountRate = matchedOrder.discount_percent / 100;
+      } else if (
+        typeof matchedOrder.discount_amount === 'number' &&
+        matchedOrder.discount_amount > 0 &&
+        typeof matchedOrder.subtotal_amount === 'number' &&
+        matchedOrder.subtotal_amount > 0
+      ) {
+        discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
+      }
+      return Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
+    }
+  } catch (err) {
+    console.error('[orderController] Error calculating historical price:', err);
+  }
+  return fallbackPrice;
+}
+
 export const orderController = {
   /**
    * POST /api/orders
@@ -285,109 +337,126 @@ export const orderController = {
       }
       const selectedFormat: UiFormatCode = selectedFormatRaw;
 
-      // 2.1 Quy tắc đơn hàng: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1
+      // 2.1 Quy tắc đơn hàng: Trừ định dạng Flashcard, mỗi tài liệu chỉ được phép đặt số lượng đúng bằng 1 và không trùng lặp
       if (selectedFormat !== 'Flashcard') {
-        if (items.length !== 1 || Number(items[0]?.quantity || 1) !== 1) {
-          res.status(400).json({
-            ok: false,
-            error:
-              'Quy tắc đặt hàng: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1. Vui lòng kiểm tra lại giỏ hàng.',
-          });
-          return;
+        const seenKeys = new Set<string>();
+        for (const item of items) {
+          const qty = Number(item?.quantity || 1);
+          if (qty !== 1) {
+            res.status(400).json({
+              ok: false,
+              error:
+                'Quy tắc đặt hàng: Trừ định dạng Flashcard, mỗi tài liệu chỉ được phép đặt số lượng đúng bằng 1. Vui lòng kiểm tra lại giỏ hàng.',
+            });
+            return;
+          }
+          const pKey = String(item?.productId || item?.slug || item?.code || '').toLowerCase().trim();
+          if (pKey && seenKeys.has(pKey)) {
+            res.status(400).json({
+              ok: false,
+              error:
+                'Quy tắc đặt hàng: Đơn hàng có tài liệu bị trùng lặp. Vui lòng kiểm tra lại giỏ hàng.',
+            });
+            return;
+          }
+          if (pKey) seenKeys.add(pKey);
         }
       }
 
-      // 2.2 Quy tắc phân định sở hữu và nâng cấp định dạng (PDF -> Word Upgrade Rule)
-      let upgradeQuoteResult: Awaited<ReturnType<typeof calculateUpgradeForUser>> | null = null;
-      let isUpgradeOrder = false;
-
-      if (req.user && req.user.id) {
-        const userLibrary = await dbService.getUserLibrary(req.user.id);
-        const firstItem = items[0];
-        const rawSlugOrId = String(firstItem?.productId || firstItem?.slug || firstItem?.code || '').toLowerCase().trim();
-
-        // Tình huống 1: Khách hàng chọn mua PDF
-        if (selectedFormat === 'PDF') {
-          // 1a. Nếu đã có Word -> Chặn chuyên biệt
-          const ownsWord = userLibrary.some(
-            (lib) =>
-              ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId || lib.id === rawSlugOrId) &&
-              lib.format_code === 'Word' &&
-              lib.is_active
-          );
-          if (ownsWord) {
-            res.status(400).json({
-              ok: false,
-              error: 'Bạn đã sở hữu định dạng Word, không cần mua thêm bản PDF vì nội dung chúng là giống nhau.',
-            });
-            return;
-          }
-
-          // 1b. Nếu đã có PDF -> Chặn bình thường
-          const ownsPdf = userLibrary.some(
-            (lib) =>
-              ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId || lib.id === rawSlugOrId) &&
-              lib.format_code === 'PDF' &&
-              lib.is_active
-          );
-          if (ownsPdf) {
-            res.status(400).json({
-              ok: false,
-              error: 'Bạn đã sở hữu tài liệu này ở định dạng PDF trong Tủ sách cá nhân. Không thể thanh toán lại.',
-            });
-            return;
-          }
-        } else if (selectedFormat === 'Word') {
-          // Tình huống 2: Khách hàng chọn mua Word
-          // 2a. Nếu đã có Word -> Chặn bình thường
-          const ownsWord = userLibrary.some(
-            (lib) =>
-              ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId || lib.id === rawSlugOrId) &&
-              lib.format_code === 'Word' &&
-              lib.is_active
-          );
-          if (ownsWord) {
-            res.status(400).json({
-              ok: false,
-              error: 'Bạn đã sở hữu tài liệu này ở định dạng Word trong Tủ sách cá nhân. Không thể thanh toán lại.',
-            });
-            return;
-          }
-
-          // 2b. Nếu đã có PDF -> KHÔNG NGĂN CHẶN! Kích hoạt chế độ Nâng cấp bù tiền
-          const ownsPdf = userLibrary.some(
-            (lib) =>
-              ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId || lib.id === rawSlugOrId) &&
-              lib.format_code === 'PDF' &&
-              lib.is_active
-          );
-          if (ownsPdf) {
-            isUpgradeOrder = true;
-          }
-        } else {
-          // Tình huống 3: Các định dạng khác (Flashcard, Trang tính, Thiết kế)
-          const ownsSame = userLibrary.some(
-            (lib) =>
-              ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId || lib.id === rawSlugOrId) &&
-              lib.format_code === selectedFormat &&
-              lib.is_active
-          );
-          if (ownsSame) {
-            res.status(400).json({
-              ok: false,
-              error: `Bạn đã sở hữu tài liệu này ở định dạng ${selectedFormat} trong Tủ sách cá nhân. Không thể thanh toán lại.`,
-            });
-            return;
-          }
-        }
-      }
-
-      // 3. Tra cứu cấu hình hệ thống (kiểm tra bật/tắt Xuất hóa đơn VAT), giá gốc sản phẩm và quy tắc Combo
+      // 3. Tra cứu cấu hình hệ thống (kiểm tra bật/tắt Xuất hóa đơn VAT), giá gốc sản phẩm, quy tắc Combo và Tủ sách
       const [allProducts, comboRules, siteConfigs] = await Promise.all([
         dbService.getProducts({ includeInactive: true }),
         dbService.getComboRules(),
         dbService.getSiteConfigs(),
       ]);
+
+      // 2.2 Quy tắc phân định sở hữu và nâng cấp định dạng (PDF -> Word Upgrade Rule) trên từng tài liệu
+      let userLibrary: Awaited<ReturnType<typeof dbService.getUserLibrary>> = [];
+
+      if (req.user && req.user.id) {
+        userLibrary = await dbService.getUserLibrary(req.user.id);
+
+        for (const item of items) {
+          const rawSlugOrId = String(item?.productId || item?.slug || item?.code || '').toLowerCase().trim();
+          const dbProd = allProducts.find(
+            (p) =>
+              p.id.toLowerCase() === rawSlugOrId ||
+              p.slug.toLowerCase() === rawSlugOrId ||
+              p.code.toLowerCase() === rawSlugOrId
+          );
+          const itemTitle = dbProd?.title || item?.productTitle || '';
+
+          // Tình huống 1: Khách hàng chọn mua PDF
+          if (selectedFormat === 'PDF') {
+            const ownsWord = userLibrary.some(
+              (lib) =>
+                ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId ||
+                  (dbProd && (lib.product_slug || '').toLowerCase().trim() === dbProd.slug.toLowerCase()) ||
+                  lib.id === rawSlugOrId) &&
+                lib.format_code === 'Word' &&
+                lib.is_active
+            );
+            if (ownsWord) {
+              res.status(400).json({
+                ok: false,
+                error: `Bạn đã sở hữu định dạng Word của tài liệu "${itemTitle || 'này'}", không cần mua thêm bản PDF vì nội dung chúng là giống nhau.`,
+              });
+              return;
+            }
+
+            const ownsPdf = userLibrary.some(
+              (lib) =>
+                ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId ||
+                  (dbProd && (lib.product_slug || '').toLowerCase().trim() === dbProd.slug.toLowerCase()) ||
+                  lib.id === rawSlugOrId) &&
+                lib.format_code === 'PDF' &&
+                lib.is_active
+            );
+            if (ownsPdf) {
+              res.status(400).json({
+                ok: false,
+                error: `Bạn đã sở hữu tài liệu "${itemTitle || 'này'}" ở định dạng PDF trong Tủ sách cá nhân. Không thể thanh toán lại.`,
+              });
+              return;
+            }
+          } else if (selectedFormat === 'Word') {
+            // Tình huống 2: Khách hàng chọn mua Word
+            const ownsWord = userLibrary.some(
+              (lib) =>
+                ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId ||
+                  (dbProd && (lib.product_slug || '').toLowerCase().trim() === dbProd.slug.toLowerCase()) ||
+                  lib.id === rawSlugOrId) &&
+                lib.format_code === 'Word' &&
+                lib.is_active
+            );
+            if (ownsWord) {
+              res.status(400).json({
+                ok: false,
+                error: `Bạn đã sở hữu tài liệu "${itemTitle || 'này'}" ở định dạng Word trong Tủ sách cá nhân. Không thể thanh toán lại.`,
+              });
+              return;
+            }
+            // Nếu đã có PDF -> Không chặn, sẽ kích hoạt khấu trừ nâng cấp bù tiền ở bước tính giá!
+          } else {
+            // Tình huống 3: Các định dạng khác (Flashcard, Trang tính, Thiết kế)
+            const ownsSame = userLibrary.some(
+              (lib) =>
+                ((lib.product_slug || '').toLowerCase().trim() === rawSlugOrId ||
+                  (dbProd && (lib.product_slug || '').toLowerCase().trim() === dbProd.slug.toLowerCase()) ||
+                  lib.id === rawSlugOrId) &&
+                lib.format_code === selectedFormat &&
+                lib.is_active
+            );
+            if (ownsSame) {
+              res.status(400).json({
+                ok: false,
+                error: `Bạn đã sở hữu tài liệu "${itemTitle || 'này'}" ở định dạng ${selectedFormat} trong Tủ sách cá nhân. Không thể thanh toán lại.`,
+              });
+              return;
+            }
+          }
+        }
+      }
 
       const isVatInvoiceEnabled = Boolean((siteConfigs as any)?.checkout_config?.enable_vat_invoice);
       const isInvoiceRequested = isVatInvoiceEnabled && Boolean(needInvoice);
@@ -460,33 +529,235 @@ export const orderController = {
       let discountAmount = 0;
       let totalAmount = 0;
 
-      if (isUpgradeOrder && req.user && req.user.id) {
-        const rawSlugOrId = String(items[0]?.productId || items[0]?.slug || items[0]?.code || '').toLowerCase().trim();
-        upgradeQuoteResult = await calculateUpgradeForUser(req.user.id, email1, rawSlugOrId, allProducts);
-        if (upgradeQuoteResult && upgradeQuoteResult.eligible) {
-          subtotalAmount = upgradeQuoteResult.wordPrice || subtotalAmount;
-          discountAmount = upgradeQuoteResult.offsetAmount || 0;
-          discountPercent = subtotalAmount > 0 ? Math.round((discountAmount / subtotalAmount) * 100) : 0;
-          totalAmount =
-            upgradeQuoteResult.amountToPay !== undefined
-              ? upgradeQuoteResult.amountToPay
-              : Math.max(0, subtotalAmount - discountAmount);
+      // 3.1 Đánh giá Gói Combo tối ưu nhất và Khấu trừ tài liệu đã sở hữu
+      const comboBlocks = (siteConfigs as any)?.combo_page_blocks || [];
+      const pkgBlock = comboBlocks.find((b: any) => b.type === 'combo_packages');
+      const comboPackages: any[] = (pkgBlock?.config?.packages || []) as any[];
+
+      const userId = req.user?.id || '';
+      const orderProductKeys = new Set(
+        resolvedItems.flatMap((it) => {
+          const dbP = allProducts.find((p) => p.id === it.product_id || p.slug === it.product_id);
+          return [
+            String(it.product_id || '').toLowerCase().trim(),
+            dbP ? String(dbP.id).toLowerCase().trim() : '',
+            dbP ? String(dbP.slug).toLowerCase().trim() : '',
+          ].filter(Boolean);
+        })
+      );
+
+      const isOwnedSameFormat = (prodIdOrSlug: string): boolean => {
+        const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+        return userLibrary.some(
+          (lib) =>
+            lib.is_active &&
+            lib.format_code === selectedFormat &&
+            (String(lib.product_slug || '').toLowerCase().trim() === clean ||
+              String(lib.id || '').toLowerCase().trim() === clean)
+        );
+      };
+
+      const isOwnedPdfForWordUpgrade = (prodIdOrSlug: string): boolean => {
+        if (selectedFormat !== 'Word') return false;
+        const clean = String(prodIdOrSlug || '').toLowerCase().trim();
+        return userLibrary.some(
+          (lib) =>
+            lib.is_active &&
+            lib.format_code === 'PDF' &&
+            (String(lib.product_slug || '').toLowerCase().trim() === clean ||
+              String(lib.id || '').toLowerCase().trim() === clean)
+        );
+      };
+
+      interface CandidateCombo {
+        pkg: any;
+        comboPrice: number;
+        totalOriginalPrice: number;
+        comboDiscountAmount: number;
+        discountPercent: number;
+        pkgProductIds: string[];
+        cartProductIds: string[];
+        ownedOffsetAmount: number;
+        comboPayable: number;
+        extraItemsPayable: number;
+        totalPayable: number;
+      }
+
+      const candidateCombos: CandidateCombo[] = [];
+
+      for (const pkg of comboPackages) {
+        const pkgProductIds: string[] = Array.isArray(pkg.product_ids) ? pkg.product_ids : [];
+        if (pkgProductIds.length === 0) continue;
+
+        const pricings: any[] = Array.isArray(pkg.format_pricings) ? pkg.format_pricings : [];
+        const formatPricing = pricings.find((fp: any) => fp.format_code === selectedFormat && fp.is_enabled);
+
+        let comboPrice = 0;
+        if (formatPricing && typeof formatPricing.combo_price === 'number' && formatPricing.combo_price > 0) {
+          comboPrice = formatPricing.combo_price;
         } else {
-          res.status(400).json({
-            ok: false,
-            error: upgradeQuoteResult?.message || 'Không đủ điều kiện nâng cấp tài liệu.',
-          });
-          return;
-        }
-      } else {
-        // Tính chiết khấu Combo tự động theo số lượng sách đủ điều kiện
-        for (const rule of comboRules) {
-          if (totalEligibleBooks >= rule.min_quantity && rule.discount_percent > discountPercent) {
-            discountPercent = rule.discount_percent;
+          const badgeFormat = (pkg.format_badge || '').toLowerCase().includes('pdf') ? 'PDF' : 'Word';
+          if (badgeFormat === selectedFormat) {
+            const match = (pkg.discount_badge || '').match(/(\d+)\s*%/);
+            const discountPct = match ? parseInt(match[1], 10) : 0;
+            const pkgProds = allProducts.filter(
+              (p) => pkgProductIds.includes(p.id) || pkgProductIds.includes(p.slug)
+            );
+            const sumOrig = pkgProds.reduce((sum, p) => {
+              const fmt = p.formats?.find((f: any) => f.format_code === selectedFormat && f.is_active);
+              return sum + (fmt ? Number(fmt.price || 0) : 0);
+            }, 0);
+            comboPrice = discountPct > 0 ? Math.round((sumOrig * (100 - discountPct)) / 100) : sumOrig;
           }
         }
-        discountAmount = Math.round((subtotalAmount * discountPercent) / 100);
-        totalAmount = Math.max(0, subtotalAmount - discountAmount);
+
+        if (comboPrice <= 0) continue;
+
+        let allAccountedFor = true;
+        const cartProductIds: string[] = [];
+        let ownedOffsetAmount = 0;
+
+        for (const prodKey of pkgProductIds) {
+          const cleanKey = String(prodKey).toLowerCase().trim();
+          const inOrder = orderProductKeys.has(cleanKey);
+          const dbProd = allProducts.find(
+            (p) =>
+              String(p.id).toLowerCase().trim() === cleanKey ||
+              String(p.slug).toLowerCase().trim() === cleanKey
+          );
+          const fmtObj = dbProd?.formats?.find((f: any) => f.format_code === selectedFormat);
+          const retailPrice = fmtObj ? Number(fmtObj.price || 0) : 0;
+          const pdfFmt = dbProd?.formats?.find((f: any) => f.format_code === 'PDF');
+          const pdfRetailPrice = pdfFmt ? Number(pdfFmt.price || 0) : 0;
+
+          if (inOrder) {
+            cartProductIds.push(prodKey);
+            if (selectedFormat === 'Word' && isOwnedPdfForWordUpgrade(prodKey)) {
+              const paidPdf = await getHistoricalPaidAmount(userId, email1, prodKey, 'PDF', pdfRetailPrice);
+              ownedOffsetAmount += Math.min(paidPdf, retailPrice);
+            }
+          } else if (isOwnedSameFormat(prodKey)) {
+            const paidSame = await getHistoricalPaidAmount(userId, email1, prodKey, selectedFormat, retailPrice);
+            ownedOffsetAmount += Math.min(paidSame, retailPrice);
+          } else {
+            allAccountedFor = false;
+            break;
+          }
+        }
+
+        if (!allAccountedFor || cartProductIds.length === 0) continue;
+
+        const pkgProds = allProducts.filter(
+          (p) => pkgProductIds.includes(p.id) || pkgProductIds.includes(p.slug)
+        );
+        const totalOriginalPrice = pkgProds.reduce((sum, p) => {
+          const fmt = p.formats?.find((f: any) => f.format_code === selectedFormat && f.is_active);
+          return sum + (fmt ? Number(fmt.price || 0) : 0);
+        }, 0);
+        const comboDiscountAmount = Math.max(0, totalOriginalPrice - comboPrice);
+        const discountPercent =
+          totalOriginalPrice > 0 ? Math.round((comboDiscountAmount / totalOriginalPrice) * 100) : 0;
+
+        const comboPayable = Math.max(0, comboPrice - ownedOffsetAmount);
+
+        // Các tài liệu ngoài combo (nếu có): Tính giá lẻ hoặc nâng cấp PDF -> Word lẻ
+        const comboKeySet = new Set(
+          pkgProductIds.flatMap((id) => {
+            const prod = allProducts.find((p) => p.id === id || p.slug === id);
+            return [
+              String(id).toLowerCase().trim(),
+              prod ? String(prod.id).toLowerCase().trim() : '',
+              prod ? String(prod.slug).toLowerCase().trim() : '',
+            ].filter(Boolean);
+          })
+        );
+
+        let extraItemsPayable = 0;
+        for (const item of resolvedItems) {
+          const itId = String(item.product_id || '').toLowerCase().trim();
+          const isPartOfCombo = comboKeySet.has(itId);
+          if (!isPartOfCombo) {
+            const isUpgrade = selectedFormat === 'Word' && isOwnedPdfForWordUpgrade(itId);
+            if (isUpgrade) {
+              const dbProd = allProducts.find((p) => p.id === itId || p.slug === itId);
+              const pdfFmt = dbProd?.formats?.find((f: any) => f.format_code === 'PDF');
+              const pdfRetailPrice = pdfFmt ? Number(pdfFmt.price || 0) : 0;
+              const paidPdf = await getHistoricalPaidAmount(userId, email1, itId, 'PDF', pdfRetailPrice);
+              const upgradeOffset = Math.min(paidPdf, item.unit_price);
+              extraItemsPayable += Math.max(0, item.unit_price - upgradeOffset) * item.quantity;
+            } else {
+              extraItemsPayable += item.unit_price * item.quantity;
+            }
+          }
+        }
+
+        const totalPayable = comboPayable + extraItemsPayable;
+
+        candidateCombos.push({
+          pkg,
+          comboPrice,
+          totalOriginalPrice,
+          comboDiscountAmount,
+          discountPercent,
+          pkgProductIds,
+          cartProductIds,
+          ownedOffsetAmount,
+          comboPayable,
+          extraItemsPayable,
+          totalPayable,
+        });
+      }
+
+      if (candidateCombos.length > 0) {
+        candidateCombos.sort((a, b) => {
+          if (b.pkgProductIds.length !== a.pkgProductIds.length) {
+            return b.pkgProductIds.length - a.pkgProductIds.length;
+          }
+          if (b.cartProductIds.length !== a.cartProductIds.length) {
+            return b.cartProductIds.length - a.cartProductIds.length;
+          }
+          return a.totalPayable - b.totalPayable;
+        });
+
+        const best = candidateCombos[0];
+        totalAmount = Math.max(0, best.totalPayable);
+        discountAmount = Math.max(0, subtotalAmount - totalAmount);
+        discountPercent = subtotalAmount > 0 ? Math.round((discountAmount / subtotalAmount) * 100) : 0;
+      } else {
+        // Không khớp gói Combo nào -> Tính theo giá lẻ / nâng cấp đơn lẻ
+        let runningTotal = 0;
+        for (const item of resolvedItems) {
+          const itId = String(item.product_id || '').toLowerCase().trim();
+          const isUpgrade = selectedFormat === 'Word' && isOwnedPdfForWordUpgrade(itId);
+          if (isUpgrade) {
+            const dbProd = allProducts.find((p) => p.id === itId || p.slug === itId);
+            const pdfFmt = dbProd?.formats?.find((f: any) => f.format_code === 'PDF');
+            const pdfRetailPrice = pdfFmt ? Number(pdfFmt.price || 0) : 0;
+            const paidPdf = await getHistoricalPaidAmount(userId, email1, itId, 'PDF', pdfRetailPrice);
+            const upgradeOffset = Math.min(paidPdf, item.unit_price);
+            runningTotal += Math.max(0, item.unit_price - upgradeOffset) * item.quantity;
+          } else {
+            runningTotal += item.unit_price * item.quantity;
+          }
+        }
+
+        // Áp dụng comboRules (chiết khấu số lượng sách đủ điều kiện) nếu không có gói cố định
+        let legacyDiscountPercent = 0;
+        for (const rule of comboRules) {
+          if (totalEligibleBooks >= rule.min_quantity && rule.discount_percent > legacyDiscountPercent) {
+            legacyDiscountPercent = rule.discount_percent;
+          }
+        }
+        if (legacyDiscountPercent > 0) {
+          discountPercent = legacyDiscountPercent;
+          const legacyDiscountAmt = Math.round((runningTotal * legacyDiscountPercent) / 100);
+          totalAmount = Math.max(0, runningTotal - legacyDiscountAmt);
+          discountAmount = Math.max(0, subtotalAmount - totalAmount);
+        } else {
+          totalAmount = Math.max(0, runningTotal);
+          discountAmount = Math.max(0, subtotalAmount - totalAmount);
+          discountPercent = subtotalAmount > 0 ? Math.round((discountAmount / subtotalAmount) * 100) : 0;
+        }
       }
 
       const now = new Date();

@@ -16,22 +16,63 @@ export const userController = {
         return;
       }
 
-      const [libraryItems, allProducts] = await Promise.all([
+      const [libraryItems, allProducts, userOrders] = await Promise.all([
         dbService.getUserLibrary(req.user.id),
         dbService.getProducts({ includeInactive: true }),
+        dbService.getUserOrders(req.user.id, req.user.email),
       ]);
 
       const enriched = libraryItems.map((item) => {
+        const cleanSlug = String(item.product_slug || '').toLowerCase().trim();
         const matchedProd = allProducts.find(
           (p) =>
-            p.slug === item.product_slug ||
-            p.id === item.product_slug ||
+            (p.slug && String(p.slug).toLowerCase().trim() === cleanSlug) ||
+            (p.id && String(p.id).toLowerCase().trim() === cleanSlug) ||
             p.title === item.product_title
         );
         const matchedFormat = matchedProd?.formats?.find(
-          (f) => f.format_code === item.format_code
+          (f: any) => f.format_code === item.format_code
         );
         const resolvedDriveUrl = item.access_drive_url || matchedFormat?.drive_url || '';
+        const fallbackPrice = Number(matchedFormat?.price || 0);
+
+        // Tính toán số tiền thực tế khách đã thanh toán cho tài liệu này từ lịch sử đơn hàng
+        let paidAmount = fallbackPrice;
+        const matchedOrder = userOrders.find(
+          (o) =>
+            o.payment_status === 'paid' &&
+            ((item.order_code && o.order_code === item.order_code) ||
+              (item.order_id && o.id === item.order_id) ||
+              (Array.isArray(o.items) &&
+                o.items.some(
+                  (it) =>
+                    ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+                      (it.product_title || '').trim() === (item.product_title || '').trim()) &&
+                    it.format_code === item.format_code
+                )))
+        );
+
+        if (matchedOrder && Array.isArray(matchedOrder.items)) {
+          const orderItem = matchedOrder.items.find(
+            (it) =>
+              ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+                (it.product_title || '').trim() === (item.product_title || '').trim()) &&
+              it.format_code === item.format_code
+          );
+          const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPrice;
+          let discountRate = 0;
+          if (typeof matchedOrder.discount_percent === 'number' && matchedOrder.discount_percent > 0) {
+            discountRate = matchedOrder.discount_percent / 100;
+          } else if (
+            typeof matchedOrder.discount_amount === 'number' &&
+            matchedOrder.discount_amount > 0 &&
+            typeof matchedOrder.subtotal_amount === 'number' &&
+            matchedOrder.subtotal_amount > 0
+          ) {
+            discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
+          }
+          paidAmount = Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
+        }
 
         return {
           ...item,
@@ -41,6 +82,7 @@ export const userController = {
           code: matchedProd?.code || item.product_slug.toUpperCase(),
           sample_pdf_url: item.watermarked_pdf_url || matchedProd?.sample_pdf_url || '',
           preview_images: matchedProd?.preview_images || [],
+          paid_amount: paidAmount,
         };
       });
 
