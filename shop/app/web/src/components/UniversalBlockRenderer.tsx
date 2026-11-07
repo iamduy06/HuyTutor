@@ -93,7 +93,7 @@ export interface UniversalBlockRendererProps {
   onBuyNow?: (fmt: UiFormatCode) => void;
   isFormatOwned?: boolean;
   isProductOwnedInAnyFormat?: boolean;
-  onOpenComboCheckout?: (pkg: any) => void;
+  onOpenComboCheckout?: (pkg: any, selectedFormat?: UiFormatCode) => void;
   onTriggerComboBuy?: () => void;
   onSelectFlashcardPackage?: (pkg: FlashcardIndividualPackageItem) => void;
   onRegisterFlashcardGroup?: () => void;
@@ -310,7 +310,7 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
                 <ComboPackagesBlock
                   config={cfg as ComboPackagesBlockConfig}
                   allProducts={context?.allProducts || []}
-                  onSelectPackage={onOpenComboCheckout || (() => {})}
+                  onSelectPackage={(pkg, fmt) => onOpenComboCheckout && onOpenComboCheckout(pkg, fmt)}
                 />
               </div>
             );

@@ -14,6 +14,7 @@ export const CartDrawer: React.FC = () => {
     selectedFormats,
     hasFormatConflict,
     hasMultipleProductsConflict,
+    comboEvaluation,
     subtotalAmount,
     discountPercent,
     discountAmount,
@@ -130,6 +131,25 @@ export const CartDrawer: React.FC = () => {
                       <h3 className="text-xs font-bold text-gray-900 mt-1.5 leading-snug">
                         {item.title}
                       </h3>
+
+                      {/* Huy hiệu thuộc Gói Combo hoặc Tính giá lẻ */}
+                      {comboEvaluation.matchedCombo && (
+                        <div className="mt-1">
+                          {comboEvaluation.comboProductIds.some(
+                            (id) =>
+                              id.toLowerCase() === item.productId.toLowerCase() ||
+                              id.toLowerCase() === item.slug.toLowerCase()
+                          ) ? (
+                            <span className="text-[10px] font-bold text-[#e60049] bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-xs">
+                              Thuộc gói: {comboEvaluation.matchedCombo.title}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-gray-600 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-xs">
+                              Tính giá lẻ
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Ưu đãi nâng cấp bù tiền */}
                       {item.isUpgrade ? (
@@ -271,14 +291,21 @@ export const CartDrawer: React.FC = () => {
           </div>
         )}
 
-        {/* Cảnh báo Giới hạn 1 sản phẩm cho non-Flashcard */}
+        {/* Ghi chú khi đơn có cả gói Combo và sách lẻ ngoài Combo */}
+        {comboEvaluation.matchedCombo && comboEvaluation.hasExtraItems && (
+          <div className="mx-5 mb-2 p-2.5 bg-blue-50/70 border border-blue-200 rounded text-[11px] text-blue-900 leading-snug">
+            Áp dụng giá ưu đãi cho gói "{comboEvaluation.matchedCombo.title}" ({comboEvaluation.matchedCombo.matchedProductIds.length} tài liệu). {comboEvaluation.extraItems.length} tài liệu còn lại được tính theo giá lẻ.
+          </div>
+        )}
+
+        {/* Cảnh báo Giới hạn số lượng tài liệu số */}
         {hasMultipleProductsConflict && (
           <div className="mx-5 mb-2 p-3 bg-red-50 border border-red-400 rounded-md text-[11px] text-red-700 leading-relaxed">
             <p className="font-extrabold uppercase mb-1">
-              ⚠️ Giới hạn đơn hàng (Trừ Flashcard):
+              Giới hạn số lượng tài liệu số:
             </p>
             <p>
-              Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt <strong>tối đa 1 sản phẩm</strong> với số lượng 1. Vui lòng chỉ chọn 1 tài liệu để tiếp tục thanh toán.
+              Trừ định dạng Flashcard, mỗi tài liệu chỉ được phép đặt với số lượng 1. Vui lòng giảm số lượng về 1 để tiếp tục thanh toán.
             </p>
           </div>
         )}
@@ -286,16 +313,21 @@ export const CartDrawer: React.FC = () => {
         {/* Tổng kết & Nút Tiến hành thanh toán */}
         <div className="p-5 border-t border-gray-200 bg-gray-50 space-y-2">
           <div className="flex justify-between text-xs text-gray-600">
-            <span>Tạm tính ({selectedCartItems.length} mục đã chọn):</span>
+            <span>Tạm tính ({selectedCartItems.length} tài liệu đã chọn):</span>
             <span className="font-bold text-gray-800">{formatVnd(subtotalAmount)}</span>
           </div>
 
-          {discountPercent > 0 && (
+          {comboEvaluation.matchedCombo ? (
+            <div className="flex justify-between text-xs text-[#e60049] font-bold">
+              <span>Ưu đãi gói combo ({comboEvaluation.matchedCombo.title}):</span>
+              <span>-{formatVnd(comboEvaluation.comboDiscountAmount)}</span>
+            </div>
+          ) : discountPercent > 0 ? (
             <div className="flex justify-between text-xs text-[#e60049] font-bold">
               <span>Ưu đãi Combo tự động (-{discountPercent}%):</span>
               <span>-{formatVnd(discountAmount)}</span>
             </div>
-          )}
+          ) : null}
 
           <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1 border-t border-gray-200">
             <span>Tổng thanh toán:</span>

@@ -5,30 +5,24 @@ import { useStore } from '../context/StoreContext';
 import { ComboPackageItem, ComboPackagesBlockConfig, Product, UiFormatCode } from '../types';
 
 export const ComboPage: React.FC = () => {
-  const { products, siteConfigs, addToCart, buyNow, setIsCartOpen } = useStore();
+  const { products, siteConfigs, addComboToCart } = useStore();
 
   const blocks = useMemo(() => {
     return buildInitialComboBlocks(products, siteConfigs?.combo_page_blocks);
   }, [products, siteConfigs?.combo_page_blocks]);
 
-  const handleSelectPackage = (pkg: ComboPackageItem) => {
+  const handleSelectPackage = (pkg: ComboPackageItem, selectedFormat?: UiFormatCode) => {
     const pkgProducts = (pkg.product_ids || [])
       .map((id) => products.find((p) => p.id === id || p.slug === id))
       .filter(Boolean) as Product[];
 
     if (pkgProducts.length === 0) return;
 
-    const format: UiFormatCode = pkg.format_badge?.toLowerCase().includes('pdf')
-      ? 'PDF'
-      : 'Word';
+    const format: UiFormatCode =
+      selectedFormat ||
+      (pkg.format_badge?.toLowerCase().includes('pdf') ? 'PDF' : 'Word');
 
-    if (pkg.action_type === 'open_checkout') {
-      buyNow(pkgProducts[0], format, 1);
-      return;
-    }
-
-    addToCart(pkgProducts[0], format, 1);
-    setIsCartOpen(true);
+    addComboToCart(pkg, format, pkg.action_type);
   };
 
   const handleSelectFirstCombo = () => {

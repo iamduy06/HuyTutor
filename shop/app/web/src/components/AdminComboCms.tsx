@@ -6,6 +6,7 @@ import {
   ComboBannerBlockConfig,
   ComboBlockType,
   ComboBottomCtaBlockConfig,
+  ComboFormatPricing,
   ComboHeroBlockConfig,
   ComboNoticeBlockConfig,
   ComboPackageItem,
@@ -14,6 +15,9 @@ import {
   ComboSectionGroupItem,
   ComboSectionsBlockConfig,
   Product,
+  UiFormatCode,
+  UI_FORMATS,
+  formatVnd,
 } from '../types';
 import {
   buildInitialComboBlocks,
@@ -65,6 +69,10 @@ const COMBO_BLOCK_META: Record<
   },
 };
 
+import { ensurePackageFormatPricings } from '../utils/comboPricingEngine';
+
+export { ensurePackageFormatPricings };
+
 export const AdminComboCms: React.FC = () => {
   const { siteConfigs, updateSiteConfig, products, showToast } = useStore();
 
@@ -84,8 +92,85 @@ export const AdminComboCms: React.FC = () => {
     }
   }, [siteConfigs?.combo_page_blocks]);
 
+  // Kiểm tra tính hợp lệ và ràng buộc giá của toàn bộ gói Combo trước khi lưu
+  const validateComboBlocks = (): string | null => {
+    for (const block of blocks) {
+      if (block.type === 'combo_packages') {
+        const cfg = block.config as ComboPackagesBlockConfig;
+        const packages = cfg?.packages || [];
+        for (let i = 0; i < packages.length; i++) {
+          const pkg = packages[i];
+          const comboTitle = pkg.title?.trim() || `Gói #${i + 1}`;
+          if (!pkg.product_ids || pkg.product_ids.length === 0) {
+            return `Gói combo "${comboTitle}" phải chọn ít nhất 1 tài liệu.`;
+          }
+
+          const pricings = ensurePackageFormatPricings(pkg);
+          const enabledPricings = pricings.filter((fp) => fp.is_enabled);
+          if (enabledPricings.length === 0) {
+            return `Vui lòng nhập giá ưu đãi cho định dạng ${pricings[0]?.format_code || 'Word'} của gói "${comboTitle}".`;
+          }
+
+          const selectedProds = products.filter(
+            (p) => (pkg.product_ids || []).includes(p.id) || (pkg.product_ids || []).includes(p.slug)
+          );
+
+          for (const fp of enabledPricings) {
+            const formatCode = fp.format_code;
+            if (fp.combo_price === '' || isNaN(Number(fp.combo_price)) || Number(fp.combo_price) <= 0) {
+              return `Vui lòng nhập giá ưu đãi cho định dạng ${formatCode} của gói "${comboTitle}".`;
+            }
+
+            const comboPrice = Number(fp.combo_price);
+
+            // Kiểm tra từng tài liệu trong gói có hỗ trợ định dạng này không
+            for (const prod of selectedProds) {
+              const fmtObj = (prod.formats || []).find(
+                (f) => f.format_code === formatCode && f.is_active && Number(f.price) > 0
+              );
+              if (!fmtObj) {
+                return `Tài liệu "${prod.title}" trong gói "${comboTitle}" chưa hỗ trợ định dạng ${formatCode}.`;
+              }
+            }
+
+            const formatPrices = selectedProds.map((prod) => {
+              const fmtObj = (prod.formats || []).find((f) => f.format_code === formatCode);
+              return Number(fmtObj?.price || 0);
+            });
+
+            const totalCount = selectedProds.length;
+            const totalOriginalPrice = formatPrices.reduce((sum, pr) => sum + pr, 0);
+            const minPrice = formatPrices.length > 0 ? Math.min(...formatPrices) : 0;
+            const nMinus1 = totalCount - 1;
+            const maxSubsetPrice = totalCount >= 2 ? totalOriginalPrice - minPrice : 0;
+
+            if (totalCount >= 2) {
+              if (comboPrice <= maxSubsetPrice) {
+                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) không hợp lệ: Phải lớn hơn tổng giá của ${nMinus1} sản phẩm cao nhất trong gói (${formatVnd(maxSubsetPrice)}) để đảm bảo tổng các sản phẩm lẻ không bao giờ vượt quá giá combo.`;
+              }
+              if (comboPrice >= totalOriginalPrice) {
+                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) phải nhỏ hơn tổng giá gốc của ${totalCount} sản phẩm (${formatVnd(totalOriginalPrice)}).`;
+              }
+            } else if (totalCount === 1) {
+              if (comboPrice >= totalOriginalPrice) {
+                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) phải nhỏ hơn tổng giá gốc của ${totalCount} sản phẩm (${formatVnd(totalOriginalPrice)}).`;
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   // Lưu cấu hình vào Database
   const handleSaveBlocks = async () => {
+    const validationError = validateComboBlocks();
+    if (validationError) {
+      showToast(validationError);
+      return;
+    }
+
     setSaving(true);
     try {
       await updateSiteConfig('combo_page_blocks', blocks);
@@ -611,10 +696,15 @@ export const EditComboPackagesConfig: React.FC<{
     const newPkg: ComboPackageItem = {
       id: `pkg_${Date.now()}`,
       title: 'TÊN GÓI COMBO MỚI',
-      discount_badge: 'GIẢM 20%',
+      discount_badge: '',
       format_badge: 'File Word',
       tag_text: 'Combo',
       product_ids: [],
+      format_pricings: UI_FORMATS.map((fmt) => ({
+        format_code: fmt,
+        is_enabled: fmt === 'Word' || fmt === 'PDF',
+        combo_price: '',
+      })),
       action_type: 'add_to_cart',
     };
     onUpdate({ packages: [...packages, newPkg] });
@@ -632,6 +722,18 @@ export const EditComboPackagesConfig: React.FC<{
     onUpdate({ packages: list });
   };
 
+  const handleUpdateFormatPricing = (
+    pkgIdx: number,
+    formatCode: UiFormatCode,
+    partial: Partial<ComboFormatPricing>
+  ) => {
+    const currentPricings = ensurePackageFormatPricings(packages[pkgIdx]);
+    const updatedPricings = currentPricings.map((fp) =>
+      fp.format_code === formatCode ? { ...fp, ...partial } : fp
+    );
+    handleUpdatePackage(pkgIdx, { format_pricings: updatedPricings });
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -642,7 +744,7 @@ export const EditComboPackagesConfig: React.FC<{
             value={config.section_title || ''}
             onChange={(e) => onUpdate({ section_title: e.target.value })}
             placeholder="Ưu đãi cao nhất"
-            className="w-full border border-gray-300 rounded px-2.5 py-1.5"
+            className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs"
           />
         </div>
         <div>
@@ -652,7 +754,7 @@ export const EditComboPackagesConfig: React.FC<{
             value={config.sub_text || ''}
             onChange={(e) => onUpdate({ sub_text: e.target.value })}
             placeholder="Sử dụng ưu đãi thành viên để được giảm thêm trên đơn hàng."
-            className="w-full border border-gray-300 rounded px-2.5 py-1.5"
+            className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs"
           />
         </div>
       </div>
@@ -663,88 +765,228 @@ export const EditComboPackagesConfig: React.FC<{
           <button
             type="button"
             onClick={handleAddPackage}
-            className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041]"
+            className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041] transition cursor-pointer"
           >
             + Thêm Thẻ Gói Mới
           </button>
         </div>
 
-        <div className="space-y-3">
-          {packages.map((pkg, idx) => (
-            <div key={pkg.id} className="border border-gray-200 rounded p-3 bg-gray-50/70 space-y-3">
-              <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                <span className="font-extrabold text-[#e60049]">Gói #{idx + 1}</span>
-                <button
-                  type="button"
-                  onClick={() => handleDeletePackage(idx)}
-                  className="text-red-600 hover:underline font-bold text-[11px]"
-                >
-                  Xóa thẻ này
-                </button>
-              </div>
+        <div className="space-y-4">
+          {packages.map((pkg, idx) => {
+            const formatPricings = ensurePackageFormatPricings(pkg);
+            const selectedProds = allProducts.filter(
+              (p) => (pkg.product_ids || []).includes(p.id) || (pkg.product_ids || []).includes(p.slug)
+            );
+            const totalCount = selectedProds.length;
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Tên gói tài liệu</label>
-                  <textarea
-                    rows={2}
-                    value={pkg.title}
-                    onChange={(e) => handleUpdatePackage(idx, { title: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Mức giảm giá</label>
-                  <input
-                    type="text"
-                    value={pkg.discount_badge}
-                    onChange={(e) => handleUpdatePackage(idx, { discount_badge: e.target.value })}
-                    placeholder="GIẢM 25%"
-                    className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-xs font-bold text-red-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Định dạng</label>
-                  <select
-                    value={pkg.format_badge}
-                    onChange={(e) => handleUpdatePackage(idx, { format_badge: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-xs"
+            return (
+              <div key={pkg.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3.5 shadow-xs">
+                <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-[#e60049] text-xs">Gói #{idx + 1}</span>
+                    <span className="text-[11px] text-gray-500 font-medium">
+                      ({totalCount} tài liệu được chọn)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePackage(idx)}
+                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer"
                   >
-                    <option value="File Word">File Word</option>
-                    <option value="File PDF">File PDF</option>
-                  </select>
+                    Xóa thẻ này
+                  </button>
                 </div>
-              </div>
 
-              {/* Chọn tài liệu thuộc gói */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                  Chọn các tài liệu trong gói ({pkg.product_ids?.length || 0} sách đã chọn):
-                </label>
-                <div className="max-h-36 overflow-y-auto border border-gray-200 rounded p-2 bg-white grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {allProducts.map((p) => {
-                    const isChecked = (pkg.product_ids || []).includes(p.id);
-                    return (
-                      <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const current = pkg.product_ids || [];
-                            const updated = e.target.checked
-                              ? [...current, p.id]
-                              : current.filter((id) => id !== p.id);
-                            handleUpdatePackage(idx, { product_ids: updated });
-                          }}
-                        />
-                        <span className="text-[11px] text-gray-800 line-clamp-1">{p.title}</span>
-                      </label>
-                    );
-                  })}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Tên gói tài liệu *</label>
+                    <textarea
+                      rows={2}
+                      value={pkg.title}
+                      onChange={(e) => handleUpdatePackage(idx, { title: e.target.value })}
+                      placeholder="Ví dụ: COMBO 3 BỘ ĐỀ THPT 2025"
+                      className="w-full border border-gray-300 rounded px-2.5 py-1.5 bg-white text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Huy hiệu giảm giá (Tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      value={pkg.discount_badge || ''}
+                      onChange={(e) => handleUpdatePackage(idx, { discount_badge: e.target.value })}
+                      placeholder="Để trống tự tính %"
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white text-xs font-bold text-red-600"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">
+                      Nếu để trống, hệ thống tự hiển thị theo % thực tế.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Chọn tài liệu thuộc gói */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Chọn các tài liệu trong gói ({totalCount} sách đã chọn):
+                  </label>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 bg-white grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {allProducts.map((p) => {
+                      const isChecked = (pkg.product_ids || []).includes(p.id);
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const current = pkg.product_ids || [];
+                              const updated = e.target.checked
+                                ? [...current, p.id]
+                                : current.filter((id) => id !== p.id);
+                              handleUpdatePackage(idx, { product_ids: updated });
+                            }}
+                          />
+                          <span className="text-[11px] text-gray-800 line-clamp-1">{p.title}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* BẢNG CẤU HÌNH 5 ĐỊNH DẠNG & GIÁ COMBO (Khởi tạo rỗng, tính động 100%) */}
+                <div className="border border-pink-100 rounded-md bg-white p-3 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-pink-100 pb-2">
+                    <div>
+                      <span className="text-xs font-black uppercase text-[#e60049] flex items-center gap-1.5">
+                        Cấu hình 5 Định dạng &amp; Giá ưu đãi Combo
+                      </span>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Tích chọn định dạng áp dụng và nhập mức giá ưu đãi Combo. Ràng buộc: $S_{'{max(N-1)}'} &lt; P_{'{combo}'} &lt; S_{'{all}'}$.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {UI_FORMATS.map((fmt) => {
+                      const fp = formatPricings.find((item) => item.format_code === fmt) || {
+                        format_code: fmt,
+                        is_enabled: false,
+                        combo_price: '',
+                      };
+
+                      const formatPrices = selectedProds.map((prod) => {
+                        const fmtObj = (prod.formats || []).find(
+                          (f) => f.format_code === fmt && f.is_active && Number(f.price) > 0
+                        );
+                        return fmtObj ? Number(fmtObj.price) : 0;
+                      });
+
+                      const totalOriginalPrice = formatPrices.reduce((sum, pr) => sum + pr, 0);
+                      const minPrice = formatPrices.length > 0 ? Math.min(...formatPrices) : 0;
+                      const maxSubsetPrice = totalCount >= 2 ? totalOriginalPrice - minPrice : 0;
+                      const hasMissingFormat = totalCount > 0 && formatPrices.some((pr) => pr <= 0);
+
+                      const numEntered = fp.combo_price === '' ? null : Number(fp.combo_price);
+                      let isValidPrice = true;
+                      let priceErrorNotice: string | null = null;
+
+                      if (fp.is_enabled && numEntered !== null) {
+                        if (totalCount >= 2) {
+                          if (numEntered <= maxSubsetPrice) {
+                            isValidPrice = false;
+                            priceErrorNotice = `Phải > ${formatVnd(maxSubsetPrice)} (tổng ${totalCount - 1} sách cao nhất)`;
+                          } else if (numEntered >= totalOriginalPrice) {
+                            isValidPrice = false;
+                            priceErrorNotice = `Phải < ${formatVnd(totalOriginalPrice)} (tổng giá gốc ${totalCount} sách)`;
+                          }
+                        } else if (totalCount === 1) {
+                          if (numEntered >= totalOriginalPrice) {
+                            isValidPrice = false;
+                            priceErrorNotice = `Phải < ${formatVnd(totalOriginalPrice)} (giá gốc 1 sách)`;
+                          }
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={fmt}
+                          className={`p-2.5 rounded border text-xs transition ${
+                            fp.is_enabled
+                              ? 'bg-pink-50/40 border-pink-200'
+                              : 'bg-gray-50/60 border-gray-200 opacity-60'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-800">
+                              <input
+                                type="checkbox"
+                                checked={fp.is_enabled}
+                                onChange={(e) =>
+                                  handleUpdateFormatPricing(idx, fmt, { is_enabled: e.target.checked })
+                                }
+                                className="accent-[#e60049] w-4 h-4 cursor-pointer"
+                              />
+                              <span className="text-xs">{fmt}</span>
+                            </label>
+
+                            <div className="flex-1 sm:text-right text-[11px] text-gray-600">
+                              {totalCount === 0 ? (
+                                <span className="text-gray-400">Chọn tài liệu ở trên để tính giá gốc</span>
+                              ) : hasMissingFormat ? (
+                                <span className="text-amber-600 font-semibold">
+                                  Có tài liệu trong gói chưa có giá định dạng này
+                                </span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  <span>
+                                    Tổng gốc: <strong>{formatVnd(totalOriginalPrice)}</strong>
+                                  </span>
+                                  {totalCount >= 2 && (
+                                    <span className="text-gray-500 block text-[10px]">
+                                      Ngưỡng chặn: &gt; {formatVnd(maxSubsetPrice)} và &lt; {formatVnd(totalOriginalPrice)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                              <input
+                                type="number"
+                                disabled={!fp.is_enabled}
+                                value={fp.combo_price === '' ? '' : fp.combo_price}
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleUpdateFormatPricing(idx, fmt, {
+                                    combo_price: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0),
+                                  });
+                                }}
+                                placeholder="Nhập giá ưu đãi..."
+                                className="w-36 border border-gray-300 rounded px-2 py-1 bg-white text-xs font-bold text-[#e60049] disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-[#e60049]"
+                              />
+                              <span className="text-[11px] text-gray-500 font-semibold">đ</span>
+                            </div>
+                          </div>
+
+                          {fp.is_enabled && priceErrorNotice && (
+                            <div className="mt-1 text-[11px] font-bold text-[#e60049] bg-red-50 p-1 rounded border border-red-200">
+                              {priceErrorNotice}
+                            </div>
+                          )}
+
+                          {fp.is_enabled && !priceErrorNotice && numEntered !== null && numEntered > 0 && totalCount > 0 && !hasMissingFormat && (
+                            <div className="mt-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                              Hợp lệ (Tiết kiệm {formatVnd(totalOriginalPrice - numEntered)} - Giảm {Math.round(((totalOriginalPrice - numEntered) / totalOriginalPrice) * 100)}%)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

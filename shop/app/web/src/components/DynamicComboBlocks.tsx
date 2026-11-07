@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ProductImageFrame } from './ProductImageFrame';
 import {
@@ -13,7 +13,9 @@ import {
   ComboSectionsBlockConfig,
   Product,
   UiFormatCode,
+  formatVnd,
 } from '../types';
+import { ensurePackageFormatPricings, getProductRetailPrice } from '../utils/comboPricingEngine';
 import { SmartLink } from './SmartLink';
 import { buildProductUrl } from '../utils/urlHelper';
 
@@ -196,8 +198,10 @@ export const ComboHeroBlock: React.FC<{
 export const ComboPackagesBlock: React.FC<{
   config?: ComboPackagesBlockConfig | null;
   allProducts: Product[];
-  onSelectPackage: (pkg: ComboPackageItem) => void;
+  onSelectPackage: (pkg: ComboPackageItem, selectedFormat: UiFormatCode) => void;
 }> = ({ config, allProducts, onSelectPackage }) => {
+  const [selectedFormatMap, setSelectedFormatMap] = useState<Record<string, UiFormatCode>>({});
+
   if (!config || !Array.isArray(config.packages) || config.packages.length === 0) return null;
 
   return (
@@ -222,24 +226,86 @@ export const ComboPackagesBlock: React.FC<{
               ? pkg.custom_cover_urls.filter(Boolean)
               : pkgProducts.map((p) => p.thumbnail_url).filter(Boolean);
 
+          const enabledFormats = ensurePackageFormatPricings(pkg).filter(
+            (fp) => fp.is_enabled && typeof fp.combo_price === 'number' && fp.combo_price > 0
+          );
+
+          const currentFormat: UiFormatCode =
+            selectedFormatMap[pkg.id] ||
+            enabledFormats[0]?.format_code ||
+            ((pkg.format_badge || '').toLowerCase().includes('pdf') ? 'PDF' : 'Word');
+
+          const currentComboPrice =
+            enabledFormats.find((fp) => fp.format_code === currentFormat)?.combo_price || 0;
+
+          const totalOriginalPrice = pkgProducts.reduce(
+            (sum, p) => sum + getProductRetailPrice(p, currentFormat),
+            0
+          );
+
+          const discountPct =
+            totalOriginalPrice > 0 && typeof currentComboPrice === 'number' && currentComboPrice > 0
+              ? Math.round(((totalOriginalPrice - currentComboPrice) / totalOriginalPrice) * 100)
+              : 0;
+
+          const badgeText =
+            pkg.discount_badge?.trim() ||
+            (discountPct > 0 ? `GIẢM ${discountPct}%` : '');
+
           return (
             <div
               key={pkg.id}
-              onClick={() => onSelectPackage(pkg)}
-              className="bg-[#f8f9fa] border border-gray-200 rounded-md p-3.5 relative shadow-sm hover:border-[#e60049] transition cursor-pointer flex flex-col justify-between h-[165px]"
+              onClick={() => onSelectPackage(pkg, currentFormat)}
+              className="bg-[#f8f9fa] border border-gray-200 rounded-md p-3.5 relative shadow-sm hover:border-[#e60049] transition cursor-pointer flex flex-col justify-between min-h-[190px]"
             >
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] text-gray-500 font-semibold">
-                  {pkg.format_badge || ''}
-                </span>
-                {pkg.tag_text?.trim() && (
-                  <span className="bg-[#e60049] text-white text-[9px] font-bold px-2 py-0.5 rounded-sm">
-                    {pkg.tag_text}
+              {/* Thanh trên cùng: Lựa chọn định dạng & Huy hiệu */}
+              <div className="flex justify-between items-center gap-1.5 flex-wrap">
+                {enabledFormats.length > 1 ? (
+                  <div
+                    className="flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {enabledFormats.map((fp) => (
+                      <button
+                        key={fp.format_code}
+                        type="button"
+                        onClick={() =>
+                          setSelectedFormatMap((prev) => ({
+                            ...prev,
+                            [pkg.id]: fp.format_code,
+                          }))
+                        }
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-xs transition cursor-pointer ${
+                          currentFormat === fp.format_code
+                            ? 'bg-[#e60049] text-white shadow-xs'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {fp.format_code}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-gray-600 font-bold bg-gray-100 px-1.5 py-0.5 rounded-xs">
+                    {currentFormat}
                   </span>
                 )}
+
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {pkg.tag_text?.trim() && (
+                    <span className="bg-[#e60049] text-white text-[9px] font-bold px-2 py-0.5 rounded-xs">
+                      {pkg.tag_text}
+                    </span>
+                  )}
+                  {badgeText && (
+                    <span className="bg-[#b30038] text-white text-[10px] font-black px-2 py-0.5 rounded-xs shrink-0">
+                      {badgeText}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Hàng ảnh sách mini trong gói (chỉ hiển thị khi có ảnh thật) */}
+              {/* Hàng ảnh sách mini trong gói */}
               {coverImages.length > 0 && (
                 <div className="flex items-center justify-center gap-1.5 my-2 overflow-hidden">
                   {coverImages.slice(0, 5).map((img, i) => (
@@ -247,22 +313,47 @@ export const ComboPackagesBlock: React.FC<{
                       key={i}
                       src={img}
                       alt=""
-                      className="w-8 h-11 object-contain bg-white rounded-sm shadow border border-white"
+                      className="w-9 h-12 object-contain bg-white rounded-xs shadow-xs border border-white"
                     />
                   ))}
                 </div>
               )}
 
-              <div className="flex items-end justify-between gap-1 pt-1 border-t border-gray-200">
-                <div className="text-[9px] font-extrabold text-[#e60049] leading-tight whitespace-pre-line">
+              {/* Tên gói và Bảng giá niêm yết chuẩn mực (không hiển thị khấu trừ cá nhân hóa) */}
+              <div className="space-y-1 pt-1.5 border-t border-gray-200">
+                <div className="text-[11px] font-extrabold text-gray-900 leading-snug line-clamp-2">
                   {pkg.title}
                 </div>
-                {pkg.discount_badge?.trim() && (
-                  <span className="bg-[#b30038] text-white text-[10px] font-black px-2 py-1 rounded-sm shrink-0">
-                    {pkg.discount_badge}
+                <div className="flex items-baseline justify-between pt-0.5">
+                  <div className="flex items-baseline gap-1.5">
+                    {totalOriginalPrice > 0 && typeof currentComboPrice === 'number' && totalOriginalPrice > currentComboPrice && (
+                      <span className="text-[10px] text-gray-400 line-through font-semibold">
+                        {formatVnd(totalOriginalPrice)}
+                      </span>
+                    )}
+                    <span className="text-xs font-black text-[#e60049]">
+                      {typeof currentComboPrice === 'number' && currentComboPrice > 0
+                        ? formatVnd(currentComboPrice)
+                        : formatVnd(totalOriginalPrice)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 font-semibold">
+                    ({pkgProducts.length} tài liệu)
                   </span>
-                )}
+                </div>
               </div>
+
+              {/* Nút bấm hành động */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectPackage(pkg, currentFormat);
+                }}
+                className="w-full mt-2.5 bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[10px] py-1.5 rounded-xs transition cursor-pointer"
+              >
+                Thêm gói combo vào giỏ ({typeof currentComboPrice === 'number' && currentComboPrice > 0 ? formatVnd(currentComboPrice) : formatVnd(totalOriginalPrice)})
+              </button>
             </div>
           );
         })}

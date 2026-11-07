@@ -533,6 +533,12 @@ export interface ComboHeroBlockConfig {
   gradient_theme?: 'amber' | 'rose' | 'indigo' | 'emerald';
 }
 
+export interface ComboFormatPricing {
+  format_code: UiFormatCode;
+  is_enabled: boolean;
+  combo_price: number | '';
+}
+
 export interface ComboPackageItem {
   id: string;
   title: string;
@@ -540,6 +546,7 @@ export interface ComboPackageItem {
   format_badge: string;
   tag_text: string;
   product_ids: string[];
+  format_pricings?: ComboFormatPricing[];
   custom_cover_urls?: string[];
   action_type: 'open_checkout' | 'add_to_cart';
 }
@@ -919,6 +926,8 @@ export interface CartItem {
   upgradeFromFormat?: UiFormatCode;
   upgradeOffset?: number;
   originalPrice?: number;
+  comboPackageId?: string;
+  comboPackageTitle?: string;
 }
 
 export interface OrderItemRecord {
@@ -1039,6 +1048,7 @@ export interface UserLibraryItem {
   last_downloaded_at?: string;
   is_active: boolean;
   granted_at: string;
+  paid_amount?: number;
   thumbnail_url?: string;
   cover_tag?: string;
   code?: string;

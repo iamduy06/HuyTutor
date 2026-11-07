@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { apiClient } from '../api/client';
 import {
   CartItem,
   CategoryItem,
+  ComboPackageItem,
+  ComboPackagesBlockConfig,
   ComboRule,
   MenuItem,
   Product,
@@ -12,6 +14,11 @@ import {
   ClientRegion,
   formatVnd,
 } from '../types';
+import {
+  evaluateBestComboForCart,
+  detectComboTransitionNotice,
+  ComboCartEvaluation,
+} from '../utils/comboPricingEngine';
 
 interface StoreContextValue {
   isLoading: boolean;
@@ -32,6 +39,7 @@ interface StoreContextValue {
   selectedFormats: UiFormatCode[];
   hasFormatConflict: boolean;
   hasMultipleProductsConflict: boolean;
+  comboEvaluation: ComboCartEvaluation;
   subtotalAmount: number;
   discountPercent: number;
   discountAmount: number;
@@ -46,6 +54,11 @@ interface StoreContextValue {
     warningMessage?: string;
   };
   addToCart: (product: Product, formatCode: UiFormatCode, quantity?: number) => void;
+  addComboToCart: (
+    pkg: ComboPackageItem,
+    formatCode: UiFormatCode,
+    actionType?: 'open_checkout' | 'add_to_cart'
+  ) => void;
   buyNow: (product: Product, formatCode: UiFormatCode, quantity?: number) => void;
   toggleCartItemSelect: (cartItemId: string) => void;
   selectOnlyFormat: (formatCode: UiFormatCode) => void;
@@ -86,7 +99,7 @@ const DEFAULT_SITE_CONFIGS: SiteConfigs = {
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isItemInLibrary } = useAuth();
+  const { isItemInLibrary, userLibrary } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasInitialHydrated, setHasInitialHydrated] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -319,13 +332,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (formatCode !== 'Flashcard') {
       setCartItems((prev) => {
-        const hasOtherItem = prev.some((it) => it.cartItemId !== cartItemId);
-        if (hasOtherItem) {
-          showToast(
-            `⚠️ Quy tắc: Trừ Flashcard, mỗi đơn chỉ được đặt 1 sản phẩm. Giỏ hàng đã được chọn tài liệu mới.`
-          );
+        const normalized = prev.map((it) => ({
+          ...it,
+          selected: it.formatCode === formatCode ? it.selected : false,
+        }));
+        const existingIdx = normalized.findIndex((it) => it.cartItemId === cartItemId);
+        if (existingIdx >= 0) {
+          const next = [...normalized];
+          next[existingIdx] = {
+            ...next[existingIdx],
+            selected: true,
+            quantity: 1,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+          };
+          return next;
         }
         return [
+          ...normalized,
           {
             cartItemId,
             productId: product.id,
@@ -412,26 +438,49 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const cartItemId = `${product.slug}__${formatCode}`;
 
     if (formatCode !== 'Flashcard') {
-      setCartItems([
-        {
-          cartItemId,
-          productId: product.id,
-          slug: product.slug,
-          categorySlug: product.category_slug,
-          code: product.code,
-          title: product.title,
-          googleFormProductName: product.google_form_product_name || product.title,
-          formatCode,
-          unitPrice,
-          originalPrice,
-          upgradeOffset,
-          isUpgrade,
-          upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
-          quantity: 1,
-          selected: true,
-          isComboEligible: product.is_combo_eligible,
-        },
-      ]);
+      setCartItems((prev) => {
+        const normalized = prev.map((it) => ({
+          ...it,
+          selected: it.formatCode === formatCode ? it.selected : false,
+        }));
+        const existingIdx = normalized.findIndex((it) => it.cartItemId === cartItemId);
+        if (existingIdx >= 0) {
+          const next = [...normalized];
+          next[existingIdx] = {
+            ...next[existingIdx],
+            selected: true,
+            quantity: 1,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+          };
+          return next;
+        }
+        return [
+          ...normalized,
+          {
+            cartItemId,
+            productId: product.id,
+            slug: product.slug,
+            categorySlug: product.category_slug,
+            code: product.code,
+            title: product.title,
+            googleFormProductName: product.google_form_product_name || product.title,
+            formatCode,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+            upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+            quantity: 1,
+            selected: true,
+            isComboEligible: product.is_combo_eligible,
+          },
+        ];
+      });
+      setIsCheckoutOpen(true);
+      return;
     } else {
       setCartItems((prev) => {
         const deselectedOtherFormats = prev.map((it) => ({
@@ -471,6 +520,98 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
+  };
+
+  const addComboToCart = (
+    pkg: ComboPackageItem,
+    formatCode: UiFormatCode,
+    actionType?: 'open_checkout' | 'add_to_cart'
+  ) => {
+    const pkgProducts = products.filter(
+      (p) => (pkg.product_ids || []).includes(p.id) || (pkg.product_ids || []).includes(p.slug)
+    );
+    if (pkgProducts.length === 0) return;
+
+    // Lọc các sản phẩm chưa sở hữu ở định dạng này (canPurchase là true nếu chưa sở hữu hoặc là nâng cấp PDF -> Word)
+    const unownedProducts = pkgProducts.filter((p) => {
+      const status = checkOwnershipStatus(p.slug, formatCode);
+      return status.canPurchase;
+    });
+
+    if (unownedProducts.length === 0) {
+      showToast(
+        `Bạn đã sở hữu toàn bộ tài liệu định dạng ${formatCode} của gói "${pkg.title}" trong Tủ sách cá nhân.`
+      );
+      return;
+    }
+
+    setCartItems((prev) => {
+      // Bỏ chọn các định dạng khác định dạng formatCode để giỏ hàng đồng nhất
+      const updated = prev.map((it) => ({
+        ...it,
+        selected: it.formatCode === formatCode ? it.selected : false,
+      }));
+
+      for (const product of unownedProducts) {
+        const status = checkOwnershipStatus(product.slug, formatCode);
+        let unitPrice = resolveFormatPrice(product, formatCode);
+        const originalPrice = unitPrice;
+        let upgradeOffset = 0;
+        const isUpgrade = status.isUpgrade;
+
+        if (isUpgrade) {
+          const pdfPrice = resolveFormatPrice(product, 'PDF');
+          upgradeOffset = Math.min(pdfPrice, unitPrice);
+          unitPrice = Math.max(0, unitPrice - upgradeOffset);
+        }
+
+        const cartItemId = `${product.slug}__${formatCode}`;
+        const existingIdx = updated.findIndex((it) => it.cartItemId === cartItemId);
+        if (existingIdx >= 0) {
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            selected: true,
+            quantity: 1,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+            comboPackageId: pkg.id,
+            comboPackageTitle: pkg.title,
+          };
+        } else {
+          updated.push({
+            cartItemId,
+            productId: product.id,
+            slug: product.slug,
+            categorySlug: product.category_slug,
+            code: product.code,
+            title: product.title,
+            googleFormProductName: product.google_form_product_name || product.title,
+            formatCode,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+            upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+            quantity: 1,
+            selected: true,
+            isComboEligible: product.is_combo_eligible,
+            comboPackageId: pkg.id,
+            comboPackageTitle: pkg.title,
+          });
+        }
+      }
+      return updated;
+    });
+
+    showToast(`Đã thêm gói "${pkg.title}" (${formatCode}) vào giỏ hàng.`);
+
+    if (actionType === 'open_checkout') {
+      setIsCheckoutOpen(true);
+    } else {
+      setIsCartOpen(true);
+    }
   };
 
   const toggleCartItemSelect = (cartItemId: string) => {
@@ -606,14 +747,80 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const hasFormatConflict = selectedFormats.length > 1;
 
-  // Quy tắc: Trừ định dạng Flashcard, mỗi đơn hàng chỉ được đặt tối đa 1 sản phẩm với số lượng 1
+  // Quy tắc: Trừ định dạng Flashcard, mỗi sản phẩm trong đơn chỉ được đặt với số lượng 1
   const hasMultipleProductsConflict = useMemo(() => {
-    const isNonFlashcard = selectedFormats.some((fmt) => fmt !== 'Flashcard');
-    if (!isNonFlashcard) return false;
-    return selectedCartItems.length > 1 || selectedCartItems.some((it) => it.quantity > 1);
-  }, [selectedFormats, selectedCartItems]);
+    return selectedCartItems.some((it) => it.formatCode !== 'Flashcard' && it.quantity > 1);
+  }, [selectedCartItems]);
+
+  const comboPackages = useMemo(() => {
+    const blocks = siteConfigs?.combo_page_blocks || [];
+    const pkgBlock = blocks.find((b: any) => b.type === 'combo_packages');
+    const cfg = pkgBlock?.config as ComboPackagesBlockConfig | undefined;
+    return (cfg?.packages || []) as ComboPackageItem[];
+  }, [siteConfigs?.combo_page_blocks]);
+
+  const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
+
+  const comboEvaluation = useMemo(() => {
+    if (hasFormatConflict || selectedCartItems.length === 0) {
+      return {
+        matchedCombo: null,
+        comboProductIds: [],
+        extraItems: [],
+        originalSubtotal: selectedCartItems.reduce(
+          (acc, it) => acc + (it.originalPrice || it.unitPrice + (it.upgradeOffset || 0)) * it.quantity,
+          0
+        ),
+        comboDiscountAmount: 0,
+        ownedOffsetAmount: selectedCartItems.reduce((acc, it) => acc + (it.upgradeOffset || 0), 0),
+        finalPayableAmount: selectedCartItems.reduce((acc, it) => acc + it.unitPrice * it.quantity, 0),
+        hasExtraItems: false,
+      };
+    }
+    return evaluateBestComboForCart({
+      selectedCartItems,
+      activeFormat,
+      allComboPackages: comboPackages,
+      allProducts: products,
+      userLibrary,
+    });
+  }, [selectedCartItems, hasFormatConflict, activeFormat, comboPackages, products, userLibrary]);
+
+  const prevMatchedComboRef = useRef<{ id: string | null; title: string | null; count: number }>({
+    id: null,
+    title: null,
+    count: 0,
+  });
+
+  useEffect(() => {
+    const prev = prevMatchedComboRef.current;
+    const newCombo = comboEvaluation.matchedCombo;
+    const notice = detectComboTransitionNotice({
+      prevComboId: prev.id,
+      prevComboTitle: prev.title,
+      prevComboProductCount: prev.count,
+      newEvaluation: comboEvaluation,
+    });
+    if (notice) {
+      showToast(notice);
+    }
+    prevMatchedComboRef.current = {
+      id: newCombo ? newCombo.packageId : null,
+      title: newCombo ? newCombo.title : null,
+      count: newCombo ? newCombo.matchedProductIds.length : 0,
+    };
+  }, [comboEvaluation.matchedCombo?.packageId]);
 
   const { subtotalAmount, discountPercent, discountAmount, totalAmount } = useMemo(() => {
+    if (comboEvaluation.matchedCombo) {
+      return {
+        subtotalAmount: comboEvaluation.originalSubtotal,
+        discountPercent: comboEvaluation.matchedCombo.discountPercent,
+        discountAmount: comboEvaluation.comboDiscountAmount,
+        totalAmount: comboEvaluation.finalPayableAmount,
+      };
+    }
+
     const subtotal = selectedCartItems.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
@@ -631,12 +838,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const discAmt = Math.round((subtotal * bestDiscount) / 100);
     return {
-      subtotalAmount: subtotal,
+      subtotalAmount: comboEvaluation.originalSubtotal || subtotal,
       discountPercent: bestDiscount,
       discountAmount: discAmt,
       totalAmount: Math.max(0, subtotal - discAmt),
     };
-  }, [selectedCartItems, comboRules]);
+  }, [comboEvaluation, selectedCartItems, comboRules]);
 
   return (
     <StoreContext.Provider
@@ -657,12 +864,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         selectedFormats,
         hasFormatConflict,
         hasMultipleProductsConflict,
+        comboEvaluation,
         subtotalAmount,
         discountPercent,
         discountAmount,
         totalAmount,
         checkOwnershipStatus,
         addToCart,
+        addComboToCart,
         buyNow,
         toggleCartItemSelect,
         selectOnlyFormat,

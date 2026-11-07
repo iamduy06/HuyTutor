@@ -21,6 +21,7 @@ export const CheckoutModal: React.FC = () => {
     selectedFormats,
     hasFormatConflict,
     hasMultipleProductsConflict,
+    comboEvaluation,
     subtotalAmount,
     discountPercent,
     discountAmount,
@@ -147,7 +148,7 @@ export const CheckoutModal: React.FC = () => {
 
     if (hasMultipleProductsConflict) {
       setFormError(
-        'Trừ định dạng Flashcard, mỗi đơn hàng chỉ được phép đặt tối đa 1 sản phẩm với số lượng 1. Vui lòng điều chỉnh lại giỏ hàng.'
+        'Trừ định dạng Flashcard, mỗi tài liệu chỉ được phép đặt với số lượng 1. Vui lòng điều chỉnh lại giỏ hàng.'
       );
       return;
     }
@@ -542,18 +543,40 @@ export const CheckoutModal: React.FC = () => {
                 {selectedCartItems.map((it) => {
                   const effectiveQty =
                     activeFormat === 'Flashcard' ? Math.max(1, flashcardQuantity) : it.quantity;
+                  const isComboItem =
+                    comboEvaluation.matchedCombo &&
+                    comboEvaluation.comboProductIds.some(
+                      (id) =>
+                        id.toLowerCase() === it.productId.toLowerCase() ||
+                        id.toLowerCase() === it.slug.toLowerCase()
+                    );
                   return (
                     <div key={it.cartItemId} className="space-y-1 text-gray-700">
-                      <div className="flex justify-between">
-                        <span>
-                          {it.title} ({it.formatCode} x{effectiveQty})
-                          {it.isUpgrade && (
-                            <span className="ml-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-xs">
-                              Nâng cấp
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-bold">{formatVnd(it.unitPrice * effectiveQty)}</span>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span>
+                            {it.title} ({it.formatCode} x{effectiveQty})
+                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {comboEvaluation.matchedCombo && (
+                              isComboItem ? (
+                                <span className="text-[10px] font-bold text-[#e60049] bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-xs">
+                                  Thuộc gói: {comboEvaluation.matchedCombo.title}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-gray-600 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-xs">
+                                  Tính giá lẻ
+                                </span>
+                              )
+                            )}
+                            {it.isUpgrade && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-xs">
+                                Nâng cấp
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="font-bold shrink-0">{formatVnd(it.unitPrice * effectiveQty)}</span>
                       </div>
                       {it.isUpgrade && (
                         <div className="text-[10px] text-gray-500 pl-1">
@@ -563,17 +586,45 @@ export const CheckoutModal: React.FC = () => {
                     </div>
                   );
                 })}
+
+                {/* Dòng 1: Tổng giá gốc */}
                 <div className="border-t border-gray-200 pt-2 flex justify-between text-gray-600">
-                  <span>Tạm tính:</span>
-                  <span>{formatVnd(displaySubtotal)}</span>
+                  <span>Tổng giá gốc:</span>
+                  <span>{formatVnd(comboEvaluation.originalSubtotal || displaySubtotal)}</span>
                 </div>
-                {discountPercent > 0 && (
+
+                {/* Dòng 2: Ưu đãi gói Combo */}
+                {comboEvaluation.matchedCombo ? (
+                  <div className="flex justify-between text-[#e60049] font-bold">
+                    <span>Ưu đãi gói combo ({comboEvaluation.matchedCombo.title}):</span>
+                    <span>-{formatVnd(comboEvaluation.comboDiscountAmount)}</span>
+                  </div>
+                ) : discountPercent > 0 ? (
                   <div className="flex justify-between text-[#e60049] font-bold">
                     <span>Ưu đãi Combo (-{discountPercent}%):</span>
                     <span>-{formatVnd(displaySubtotal - displayTotal)}</span>
                   </div>
+                ) : null}
+
+                {/* Dòng 3: Khấu trừ tài liệu đã sở hữu */}
+                {comboEvaluation.ownedOffsetAmount > 0 && (
+                  <div className="space-y-0.5 border-t border-gray-100 pt-1">
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>
+                        Khấu trừ tài liệu đã sở hữu ({comboEvaluation.matchedCombo ? comboEvaluation.matchedCombo.ownedProductIds.length : 1} tài liệu):
+                      </span>
+                      <span>-{formatVnd(comboEvaluation.ownedOffsetAmount)}</span>
+                    </div>
+                    {comboEvaluation.matchedCombo && comboEvaluation.matchedCombo.ownedProductTitles.length > 0 && (
+                      <div className="text-[10px] text-gray-500 pl-1 leading-snug">
+                        Bạn đã sở hữu {comboEvaluation.matchedCombo.ownedProductTitles.join(', ')}. Hệ thống tự động trừ {formatVnd(comboEvaluation.matchedCombo.ownedOffsetAmount)} đã mua khỏi giá gói combo.
+                      </div>
+                    )}
+                  </div>
                 )}
-                <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1">
+
+                {/* Dòng 4: Tổng thanh toán */}
+                <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1.5 border-t border-gray-200">
                   <span>Tổng thanh toán:</span>
                   <span className="text-[#e60049]">{formatVnd(displayTotal)}</span>
                 </div>
