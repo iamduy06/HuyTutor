@@ -658,7 +658,26 @@ export const orderController = {
         const discountPercent =
           totalOriginalPrice > 0 ? Math.round((comboDiscountAmount / totalOriginalPrice) * 100) : 0;
 
-        const comboPayable = Math.max(0, comboPrice - ownedOffsetAmount);
+        const missingProds = pkgProds.filter((p) => {
+          const cleanId = String(p.id).toLowerCase().trim();
+          const cleanSlug = String(p.slug).toLowerCase().trim();
+          return !pkgProductIds.some((oid) => {
+            const cOid = String(oid).toLowerCase().trim();
+            return isOwnedSameFormat(cOid) && (cOid === cleanId || cOid === cleanSlug);
+          });
+        });
+        const missingRetailSum = missingProds.reduce((sum, p) => {
+          const fmt = p.formats?.find((f: any) => f.format_code === selectedFormat && f.is_active);
+          return sum + (fmt ? Number(fmt.price || 0) : 0);
+        }, 0);
+
+        const discountedComboPayable = comboPrice - ownedOffsetAmount;
+        let comboPayable = 0;
+        if (discountedComboPayable > 0) {
+          comboPayable = missingRetailSum > 0 ? Math.min(missingRetailSum, discountedComboPayable) : discountedComboPayable;
+        } else {
+          comboPayable = missingRetailSum > 0 ? missingRetailSum : 0;
+        }
 
         // Các tài liệu ngoài combo (nếu có): Tính giá lẻ hoặc nâng cấp PDF -> Word lẻ
         const comboKeySet = new Set(

@@ -274,7 +274,32 @@ export function evaluateBestComboForCart(params: {
     const discountPercent =
       totalOriginalPrice > 0 ? Math.round((comboDiscountAmount / totalOriginalPrice) * 100) : 0;
 
-    const comboPayable = Math.max(0, comboPrice - ownedOffsetAmount);
+    // Tính tổng giá bán lẻ của các tài liệu trong gói mà khách chưa sở hữu
+    const missingProds = pkgProds.filter((p) => {
+      const cleanId = String(p.id).toLowerCase().trim();
+      const cleanSlug = String(p.slug).toLowerCase().trim();
+      return !ownedProductIds.some((oid) => {
+        const cOid = String(oid).toLowerCase().trim();
+        return cOid === cleanId || cOid === cleanSlug;
+      });
+    });
+    const missingRetailSum = missingProds.reduce(
+      (sum, p) => sum + getProductRetailPrice(p, activeFormat),
+      0
+    );
+
+    // Mức thanh toán ưu đãi combo sau khi khấu trừ tiền tài liệu đã mua
+    const discountedComboPayable = comboPrice - ownedOffsetAmount;
+
+    // Khách hàng luôn được hưởng mức giá tối ưu nhất:
+    // - Nếu combo sau khấu trừ > 0: lấy mức tối ưu giữa (giá lẻ các cuốn còn thiếu) và (combo sau khấu trừ)
+    // - Nếu combo sau khấu trừ <= 0: khách chỉ cần thanh toán theo giá lẻ các cuốn còn thiếu
+    let comboPayable = 0;
+    if (discountedComboPayable > 0) {
+      comboPayable = missingRetailSum > 0 ? Math.min(missingRetailSum, discountedComboPayable) : discountedComboPayable;
+    } else {
+      comboPayable = missingRetailSum > 0 ? missingRetailSum : 0;
+    }
 
     // Tính toán các sản phẩm còn dư nằm ngoài combo (tính giá lẻ bình thường hoặc giá nâng cấp lẻ)
     const comboKeySet = new Set(

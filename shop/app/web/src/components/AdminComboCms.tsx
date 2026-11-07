@@ -139,21 +139,9 @@ export const AdminComboCms: React.FC = () => {
 
             const totalCount = selectedProds.length;
             const totalOriginalPrice = formatPrices.reduce((sum, pr) => sum + pr, 0);
-            const minPrice = formatPrices.length > 0 ? Math.min(...formatPrices) : 0;
-            const nMinus1 = totalCount - 1;
-            const maxSubsetPrice = totalCount >= 2 ? totalOriginalPrice - minPrice : 0;
 
-            if (totalCount >= 2) {
-              if (comboPrice <= maxSubsetPrice) {
-                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) không hợp lệ: Phải lớn hơn tổng giá của ${nMinus1} sản phẩm cao nhất trong gói (${formatVnd(maxSubsetPrice)}) để đảm bảo tổng các sản phẩm lẻ không bao giờ vượt quá giá combo.`;
-              }
-              if (comboPrice >= totalOriginalPrice) {
-                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) phải nhỏ hơn tổng giá gốc của ${totalCount} sản phẩm (${formatVnd(totalOriginalPrice)}).`;
-              }
-            } else if (totalCount === 1) {
-              if (comboPrice >= totalOriginalPrice) {
-                return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) phải nhỏ hơn tổng giá gốc của ${totalCount} sản phẩm (${formatVnd(totalOriginalPrice)}).`;
-              }
+            if (comboPrice >= totalOriginalPrice) {
+              return `Giá ưu đãi định dạng ${formatCode} của gói "${comboTitle}" (${formatVnd(comboPrice)}) phải nhỏ hơn tổng giá gốc của ${totalCount} sản phẩm (${formatVnd(totalOriginalPrice)}).`;
             }
           }
         }
@@ -833,7 +821,7 @@ export const EditComboPackagesConfig: React.FC<{
                         Cấu hình 5 Định dạng &amp; Giá ưu đãi Combo
                       </span>
                       <p className="text-[10px] text-gray-500 mt-0.5">
-                        Tích chọn định dạng áp dụng và nhập mức giá ưu đãi Combo. Ràng buộc: $S_{'{max(N-1)}'} &lt; P_{'{combo}'} &lt; S_{'{all}'}$.
+                        Tích chọn định dạng áp dụng và nhập mức giá ưu đãi Combo (yêu cầu nhỏ hơn tổng giá gốc lẻ của gói).
                       </p>
                     </div>
                   </div>
@@ -854,8 +842,6 @@ export const EditComboPackagesConfig: React.FC<{
                       });
 
                       const totalOriginalPrice = formatPrices.reduce((sum, pr) => sum + pr, 0);
-                      const minPrice = formatPrices.length > 0 ? Math.min(...formatPrices) : 0;
-                      const maxSubsetPrice = totalCount >= 2 ? totalOriginalPrice - minPrice : 0;
                       const hasMissingFormat = totalCount > 0 && formatPrices.some((pr) => pr <= 0);
 
                       const numEntered = fp.combo_price === '' ? null : Number(fp.combo_price);
@@ -863,19 +849,12 @@ export const EditComboPackagesConfig: React.FC<{
                       let priceErrorNotice: string | null = null;
 
                       if (fp.is_enabled && numEntered !== null) {
-                        if (totalCount >= 2) {
-                          if (numEntered <= maxSubsetPrice) {
-                            isValidPrice = false;
-                            priceErrorNotice = `Phải > ${formatVnd(maxSubsetPrice)} (tổng ${totalCount - 1} sách cao nhất)`;
-                          } else if (numEntered >= totalOriginalPrice) {
-                            isValidPrice = false;
-                            priceErrorNotice = `Phải < ${formatVnd(totalOriginalPrice)} (tổng giá gốc ${totalCount} sách)`;
-                          }
-                        } else if (totalCount === 1) {
-                          if (numEntered >= totalOriginalPrice) {
-                            isValidPrice = false;
-                            priceErrorNotice = `Phải < ${formatVnd(totalOriginalPrice)} (giá gốc 1 sách)`;
-                          }
+                        if (numEntered <= 0) {
+                          isValidPrice = false;
+                          priceErrorNotice = 'Giá ưu đãi phải > 0đ';
+                        } else if (numEntered >= totalOriginalPrice) {
+                          isValidPrice = false;
+                          priceErrorNotice = `Phải < ${formatVnd(totalOriginalPrice)} (tổng giá gốc ${totalCount} sách)`;
                         }
                       }
 
@@ -913,9 +892,9 @@ export const EditComboPackagesConfig: React.FC<{
                                   <span>
                                     Tổng gốc: <strong>{formatVnd(totalOriginalPrice)}</strong>
                                   </span>
-                                  {totalCount >= 2 && (
+                                  {totalCount >= 1 && (
                                     <span className="text-gray-500 block text-[10px]">
-                                      Ngưỡng chặn: &gt; {formatVnd(maxSubsetPrice)} và &lt; {formatVnd(totalOriginalPrice)}
+                                      Nhập giá ưu đãi &lt; {formatVnd(totalOriginalPrice)}
                                     </span>
                                   )}
                                 </div>
