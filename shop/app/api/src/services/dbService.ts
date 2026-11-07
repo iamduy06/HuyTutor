@@ -549,6 +549,28 @@ function saveLocalDb(state: DbState): void {
   }
 }
 
+export interface CascadeDeleteProductReport {
+  deletedProduct: {
+    id: string;
+    slug: string;
+    title: string;
+    category_slug: string;
+  };
+  autoDeleted: {
+    database: string[];
+    cmsCleaned: string[];
+    r2FilesDeleted: string[];
+    r2TotalFiles: number;
+  };
+  manualAttention: {
+    ordersCount: number;
+    ordersNotice: string;
+    libraryCount: number;
+    libraryNotice: string;
+    marketingNotice: string;
+  };
+}
+
 export const dbService = {
   async getMenus(includeInactive = false): Promise<SeedMenu[]> {
     if (isSupabaseConfigured && supabaseAdmin) {
@@ -1188,6 +1210,251 @@ export const dbService = {
     db.products = db.products.filter((p) => p.slug !== slugOrId && p.id !== slugOrId);
     saveLocalDb(db);
     return db.products.length < beforeLen;
+  },
+
+  async cascadeDeleteProduct(
+    slugOrId: string,
+    r2DeletedUrls: string[] = []
+  ): Promise<CascadeDeleteProductReport | null> {
+    const prod = await this.getProductBySlugOrId(slugOrId);
+    if (!prod) return null;
+
+    const prodId = prod.id;
+    const prodSlug = prod.slug;
+    const catSlug = prod.category_slug || '';
+
+    const autoDeletedDb: string[] = [
+      `Bản ghi sản phẩm "${prod.title}" trong bảng products & 5 định dạng giá`,
+      `Cấu hình Bố cục Trang cấp 2 (product_detail_blocks:${prodSlug})`,
+    ];
+    const cmsCleaned: string[] = [];
+
+    // 1. Quét và dọn dẹp liên kết trong categories (Trang Cấp 1)
+    try {
+      const allCategories = await this.getCategories({ includeInactive: true });
+      for (const cat of allCategories) {
+        if (!Array.isArray(cat.blocks) || cat.blocks.length === 0) continue;
+        let catMutated = false;
+        let removedCardsCount = 0;
+
+        const updatedBlocks = cat.blocks.map((block: any) => {
+          if (block.type === 'category_section' && block.config) {
+            const cfg = block.config;
+            if (Array.isArray(cfg.items) && cfg.items.length > 0) {
+              const beforeCount = cfg.items.length;
+              const filteredItems = cfg.items.filter((it: any) => {
+                const isMatchId =
+                  it.product_id === prodId ||
+                  it.id === prodId ||
+                  it.id === prodSlug ||
+                  it.id === `card_${prodId}` ||
+                  it.id === `card_${prodSlug}`;
+                const target = String(it.target_url || '').toLowerCase();
+                const isMatchTarget =
+                  (catSlug && target.includes(`/${catSlug}/${prodSlug}`)) ||
+                  target.endsWith(`/${prodSlug}`) ||
+                  target === `/${prodSlug}`;
+                return !(isMatchId || isMatchTarget);
+              });
+              if (filteredItems.length < beforeCount) {
+                catMutated = true;
+                removedCardsCount += beforeCount - filteredItems.length;
+                return { ...block, config: { ...cfg, items: filteredItems } };
+              }
+            }
+          }
+          return block;
+        });
+
+        if (catMutated) {
+          cat.blocks = updatedBlocks;
+          // Lưu vào Supabase và site_configs
+          if (isSupabaseConfigured && supabaseAdmin) {
+            await supabaseAdmin
+              .from('categories')
+              .update({ blocks: updatedBlocks })
+              .eq('slug', cat.slug);
+
+            await supabaseAdmin.from('site_configs').upsert(
+              {
+                key: `category_blocks:${cat.slug}`,
+                value: updatedBlocks,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'key' }
+            );
+          }
+          // Cập nhật local DB
+          const db = loadLocalDb();
+          const dbCatIdx = db.categories.findIndex((c) => c.slug === cat.slug);
+          if (dbCatIdx >= 0) {
+            db.categories[dbCatIdx].blocks = updatedBlocks;
+            saveLocalDb(db);
+          }
+          cmsCleaned.push(
+            `Đã tự động gỡ ${removedCardsCount} thẻ tài liệu khỏi Trang cấp 1 (Danh mục "${cat.name}")`
+          );
+        }
+      }
+    } catch (catCleanErr) {
+      console.error('[dbService] Error cleaning category blocks:', catCleanErr);
+    }
+
+    // 2. Quét và dọn dẹp liên kết trong combo_page_blocks (Trang Combo THPT)
+    try {
+      const siteConfigs = await this.getSiteConfigs();
+      const comboBlocks = siteConfigs?.combo_page_blocks;
+      if (Array.isArray(comboBlocks) && comboBlocks.length > 0) {
+        let comboMutated = false;
+        let removedFromPackages = 0;
+        let removedFromSections = 0;
+
+        const updatedComboBlocks = comboBlocks.map((block: any) => {
+          if (block.type === 'combo_packages' && block.config && Array.isArray(block.config.packages)) {
+            const updatedPackages = block.config.packages.map((pkg: any) => {
+              if (Array.isArray(pkg.product_ids) && (pkg.product_ids.includes(prodId) || pkg.product_ids.includes(prodSlug))) {
+                comboMutated = true;
+                removedFromPackages++;
+                return {
+                  ...pkg,
+                  product_ids: pkg.product_ids.filter((id: string) => id !== prodId && id !== prodSlug),
+                };
+              }
+              return pkg;
+            });
+            return { ...block, config: { ...block.config, packages: updatedPackages } };
+          }
+
+          if (block.type === 'combo_sections' && block.config && Array.isArray(block.config.groups)) {
+            const updatedGroups = block.config.groups.map((group: any) => {
+              if (Array.isArray(group.product_ids) && (group.product_ids.includes(prodId) || group.product_ids.includes(prodSlug))) {
+                comboMutated = true;
+                removedFromSections++;
+                return {
+                  ...group,
+                  product_ids: group.product_ids.filter((id: string) => id !== prodId && id !== prodSlug),
+                };
+              }
+              return group;
+            });
+            return { ...block, config: { ...block.config, groups: updatedGroups } };
+          }
+
+          return block;
+        });
+
+        if (comboMutated) {
+          await this.updateSiteConfig('combo_page_blocks', updatedComboBlocks);
+          cmsCleaned.push(
+            `Đã loại bỏ ID tài liệu khỏi ${removedFromPackages} Thẻ gói Combo và ${removedFromSections} Nhóm sách trên Trang Combo THPT`
+          );
+        }
+      }
+    } catch (comboCleanErr) {
+      console.error('[dbService] Error cleaning combo blocks:', comboCleanErr);
+    }
+
+    // 3. Quét và dọn dẹp liên kết trong homepage_blocks (Trang chủ)
+    try {
+      const siteConfigs = await this.getSiteConfigs();
+      const homeBlocks = siteConfigs?.homepage_blocks;
+      if (Array.isArray(homeBlocks) && homeBlocks.length > 0) {
+        let homeMutated = false;
+        const updatedHomeBlocks = homeBlocks.map((block: any) => {
+          if (block.type === 'homepage_sections' && block.config && Array.isArray(block.config.sections)) {
+            const updatedSections = block.config.sections.map((sec: any) => {
+              if (Array.isArray(sec.product_ids) && (sec.product_ids.includes(prodId) || sec.product_ids.includes(prodSlug))) {
+                homeMutated = true;
+                return {
+                  ...sec,
+                  product_ids: sec.product_ids.filter((id: string) => id !== prodId && id !== prodSlug),
+                };
+              }
+              return sec;
+            });
+            return { ...block, config: { ...block.config, sections: updatedSections } };
+          }
+          return block;
+        });
+
+        if (homeMutated) {
+          await this.updateSiteConfig('homepage_blocks', updatedHomeBlocks);
+          cmsCleaned.push('Đã dọn dẹp liên kết sản phẩm trên Trang chủ (Homepage CMS)');
+        }
+      }
+    } catch (homeCleanErr) {
+      console.error('[dbService] Error cleaning homepage blocks:', homeCleanErr);
+    }
+
+    // 4. Thống kê orders & user_library liên quan
+    let ordersCount = 0;
+    let libraryCount = 0;
+
+    try {
+      if (isSupabaseConfigured && supabaseAdmin) {
+        const { data: matchedOrders } = await supabaseAdmin
+          .from('orders')
+          .select('id, items');
+        if (Array.isArray(matchedOrders)) {
+          ordersCount = matchedOrders.filter((ord: any) =>
+            Array.isArray(ord.items) &&
+            ord.items.some(
+              (it: any) => it.productId === prodId || it.productId === prodSlug || it.slug === prodSlug
+            )
+          ).length;
+        }
+
+        const { count: libCount } = await supabaseAdmin
+          .from('user_library')
+          .select('id', { count: 'exact', head: true })
+          .or(`product_slug.eq.${prodSlug},product_id.eq.${prodId}`);
+        libraryCount = libCount || 0;
+      } else {
+        const db = loadLocalDb();
+        ordersCount = (db.orders || []).filter((ord) =>
+          (ord.items || []).some(
+            (it: any) => it.productId === prodId || it.productId === prodSlug || it.slug === prodSlug
+          )
+        ).length;
+        libraryCount = (db.user_library || []).filter(
+          (lib) => lib.product_slug === prodSlug || (lib as any).product_id === prodId
+        ).length;
+      }
+    } catch (statsErr) {
+      console.warn('[dbService] Error counting orders/library stats:', statsErr);
+    }
+
+    // 5. Thực hiện xóa bản ghi sản phẩm trong Database
+    await this.deleteProduct(prodSlug);
+
+    return {
+      deletedProduct: {
+        id: prodId,
+        slug: prodSlug,
+        title: prod.title,
+        category_slug: catSlug,
+      },
+      autoDeleted: {
+        database: autoDeletedDb,
+        cmsCleaned,
+        r2FilesDeleted: r2DeletedUrls,
+        r2TotalFiles: r2DeletedUrls.length,
+      },
+      manualAttention: {
+        ordersCount,
+        ordersNotice:
+          ordersCount > 0
+            ? `Có ${ordersCount} đơn hàng lịch sử chứa tài liệu này (vẫn được lưu trữ an toàn trong Database để phục vụ kế toán, đối soát SePay và Google Sheets).`
+            : 'Không có đơn hàng nào trong lịch sử chứa tài liệu này.',
+        libraryCount,
+        libraryNotice:
+          libraryCount > 0
+            ? `Có ${libraryCount} học viên đang sở hữu tài liệu này trong Tủ sách cá nhân (quyền sở hữu của người học được bảo lưu an toàn).`
+            : 'Chưa có học viên nào sở hữu tài liệu này trong Tủ sách.',
+        marketingNotice:
+          'Vui lòng tự rà soát và gỡ các liên kết tiếp thị trên mạng xã hội (Facebook Fanpage, Zalo, TikTok, video...) nếu có dẫn về đường dẫn cũ của tài liệu này.',
+      },
+    };
   },
 
   async upsertCategory(payload: Partial<SeedCategory>): Promise<SeedCategory> {

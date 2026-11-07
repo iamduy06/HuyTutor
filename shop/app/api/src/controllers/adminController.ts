@@ -93,53 +93,78 @@ export const adminController = {
   /**
    * DELETE /api/admin/products/:slug
    * Xóa sản phẩm và tự động dọn dẹp toàn bộ ảnh/PDF liên quan trên Cloudflare R2
+   * Kèm Cascade Cleanup gỡ liên kết tại Trang Cấp 1, Trang Combo THPT, Trang chủ và thống kê báo cáo
    */
   async deleteProduct(req: Request, res: Response): Promise<void> {
     try {
       const slug = String(req.params.slug || '');
       const existing = await dbService.getProductBySlugOrId(slug);
-      if (existing) {
-        const r2Urls = new Set<string>();
-        if (existing.thumbnail_url) r2Urls.add(existing.thumbnail_url);
-        if (existing.sample_pdf_url) r2Urls.add(existing.sample_pdf_url);
-        if (Array.isArray(existing.preview_images)) {
-          existing.preview_images.forEach((u) => {
-            if (u) r2Urls.add(u);
-          });
-        }
-        if (Array.isArray(existing.detail_blocks)) {
-          for (const block of existing.detail_blocks) {
-            const cfg = block?.config || {};
-            if (cfg.image_url) r2Urls.add(cfg.image_url);
-            if (cfg.pdf_url) r2Urls.add(cfg.pdf_url);
-            if (Array.isArray(cfg.groups)) {
-              for (const g of cfg.groups) {
-                if (g?.pdf_url) r2Urls.add(g.pdf_url);
-                if (Array.isArray(g?.images)) {
-                  g.images.forEach((img: string) => {
-                    if (img) r2Urls.add(img);
-                  });
-                }
-              }
-            }
-            if (Array.isArray(cfg.items)) {
-              for (const it of cfg.items) {
-                if (it?.image_url) r2Urls.add(it.image_url);
+      if (!existing) {
+        res.status(404).json({
+          ok: false,
+          error: `Không tìm thấy tài liệu "${slug}".`,
+        });
+        return;
+      }
+
+      const r2Urls = new Set<string>();
+      if (existing.thumbnail_url) r2Urls.add(existing.thumbnail_url);
+      if (existing.sample_pdf_url) r2Urls.add(existing.sample_pdf_url);
+      if (Array.isArray(existing.preview_images)) {
+        existing.preview_images.forEach((u) => {
+          if (u) r2Urls.add(u);
+        });
+      }
+      if (Array.isArray(existing.detail_blocks)) {
+        for (const block of existing.detail_blocks) {
+          const cfg = block?.config || {};
+          if (cfg.image_url) r2Urls.add(cfg.image_url);
+          if (cfg.pdf_url) r2Urls.add(cfg.pdf_url);
+          if (Array.isArray(cfg.groups)) {
+            for (const g of cfg.groups) {
+              if (g?.pdf_url) r2Urls.add(g.pdf_url);
+              if (Array.isArray(g?.images)) {
+                g.images.forEach((img: string) => {
+                  if (img) r2Urls.add(img);
+                });
               }
             }
           }
+          if (Array.isArray(cfg.items)) {
+            for (const it of cfg.items) {
+              if (it?.image_url) r2Urls.add(it.image_url);
+            }
+          }
         }
-        await Promise.all(
-          Array.from(r2Urls).map((url) => deleteR2Object(url).catch(() => {}))
-        );
       }
-      const deleted = await dbService.deleteProduct(slug);
+
+      // Xóa vật lý file trên Cloudflare R2
+      const deletedR2Urls: string[] = [];
+      await Promise.all(
+        Array.from(r2Urls).map(async (url) => {
+          try {
+            const resDel = await deleteR2Object(url);
+            if (resDel.deleted) {
+              deletedR2Urls.push(url);
+            }
+          } catch {
+            // Bỏ qua lỗi file lẻ
+          }
+        })
+      );
+
+      // Thực hiện Cascade Cleanup toàn diện
+      const report = await dbService.cascadeDeleteProduct(slug, deletedR2Urls);
+
       res.json({
         ok: true,
-        deleted,
-        message: deleted
-          ? `Đã xóa tài liệu "${slug}" và dọn dẹp file R2 thành công.`
-          : `Không tìm thấy tài liệu "${slug}".`,
+        message: `Đã xóa tài liệu "${existing.title}" và hoàn tất cascade cleanup toàn hệ thống.`,
+        deletedProduct: report?.deletedProduct || {
+          id: existing.id,
+          slug: existing.slug,
+          title: existing.title,
+        },
+        report,
       });
     } catch (err: any) {
       res.status(500).json({
