@@ -26,9 +26,11 @@ interface UserDeviceItem { id: string; device_id: string; device_name?: string; 
 interface UserDeckItem { deck_id: string; expired_at: string | null; progress_percent: number; learned_count: number; deck?: { title: string } }
 interface GroupMember {
   id: string; email: string; role: string; created_at: string; max_devices?: number;
-  is_group_subadmin: boolean;
+  is_subadmin?: boolean;
+  is_group_subadmin?: boolean;
   device_count: number;
-  deck_count: number;
+  deck_count?: number;
+  personal_deck_count?: number;
   user_devices: UserDeviceItem[];
   user_decks: UserDeckItem[];
   decks: { id: string, title: string }[];
@@ -340,8 +342,18 @@ export default function AdminSubAdminsPage() {
                      </span>
                      <span className="bg-white px-2 py-0.5 rounded border">
                        Flashcard nhóm: <strong className="text-blue-600">{group.group_decks.length}</strong>
-                     </span>
-                   </div>
+                      </span>
+                      {(() => {
+                        const subadmins = (group.group_users || []).filter(u => u.is_subadmin || u.is_group_subadmin || u.role === "SUBADMIN");
+                        if (subadmins.length === 0) return null;
+                        return (
+                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold flex items-center gap-1 shadow-xs">
+                            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                            SubAdmin: <strong className="text-blue-800">{subadmins.map(s => s.email).join(", ")}</strong>
+                          </span>
+                        );
+                      })()}
+                    </div>
                 </div>
               </div>
 
@@ -388,7 +400,10 @@ export default function AdminSubAdminsPage() {
                          </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-50">
-                         {group.group_users.map(u => (
+                         {group.group_users.map(u => {
+                            const isGroupSubadmin = Boolean(u.is_subadmin ?? u.is_group_subadmin ?? u.role === "SUBADMIN");
+                            const deckCount = u.deck_count ?? u.personal_deck_count ?? 0;
+                            return (
                            <tr key={u.id} className="hover:bg-brand-light/10 transition-colors">
                              <td className="px-4 py-3">
                                <div className="font-semibold text-[#1a1a2e] mb-1">{u.email}</div>
@@ -397,7 +412,7 @@ export default function AdminSubAdminsPage() {
                                    u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : 
                                    u.role === "SUBADMIN" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"
                                  }`}>{u.role}</span>
-                                 {u.is_group_subadmin && (
+                                 {isGroupSubadmin && (
                                    <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold border border-blue-200">
                                      <ShieldCheck className="w-3 h-3" /> QUẢN LÝ NHÓM NÀY
                                    </span>
@@ -415,11 +430,11 @@ export default function AdminSubAdminsPage() {
                                )}
                              </td>
                              <td className="px-4 py-3 text-center">
-                               {u.deck_count === 0 ? (
+                               {deckCount === 0 ? (
                                  <Button variant="ghost" size="sm" className="h-6 text-xs text-gray-500 bg-gray-100 px-2" onClick={() => setShowingUserDecks(u)}>+ Giao lẻ</Button>
                                ) : (
                                  <Button variant="ghost" size="sm" className="h-6 text-xs text-brand font-bold bg-brand-light/50 hover:bg-brand-light px-2" onClick={() => { setManageDecksIds(new Set()); setShowingUserDecks(u); }}>
-                                   QL ({u.deck_count})
+                                   QL ({deckCount})
                                  </Button>
                                )}
                              </td>
@@ -427,12 +442,12 @@ export default function AdminSubAdminsPage() {
                                <div className="flex gap-1.5 justify-center">
                                  <Button size="icon" variant="ghost" 
                                    className={`h-8 w-8 transition-colors ${
-                                     u.is_group_subadmin 
+                                      isGroupSubadmin 
                                        ? "bg-red-100 text-red-600 hover:bg-red-200" 
                                        : "bg-green-100 text-green-600 hover:bg-green-200"
                                    }`}
-                                   title={u.is_group_subadmin ? "Huỷ quyền SubAdmin cho Group" : "Gán quyền SubAdmin cho Group"}
-                                   onClick={() => groupAction.mutate({ groupId: group.id, action: "toggle_subadmin", payload: { user_id: u.id, is_subadmin: !u.is_group_subadmin } })}>
+                                   title={isGroupSubadmin ? "Huỷ quyền SubAdmin cho Group" : "Gán quyền SubAdmin cho Group"}
+                                   onClick={() => groupAction.mutate({ groupId: group.id, action: "toggle_subadmin", payload: { user_id: u.id, is_subadmin: !isGroupSubadmin } })}>
                                    <Shield className="w-4 h-4" />
                                  </Button>
                                  <Button size="icon" variant="ghost" className="h-8 w-8 bg-orange-50 text-orange-600 hover:bg-orange-100" title="Sửa thông tin cá nhân (Role/Max Devices)"
@@ -451,8 +466,9 @@ export default function AdminSubAdminsPage() {
                                </div>
                              </td>
                            </tr>
-                         ))}
-                       </tbody>
+                            );
+                          })}
+                        </tbody>
                      </table>
                    </div>
                  )}
