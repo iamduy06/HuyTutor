@@ -1293,7 +1293,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
                   type="text"
                   value={group.pdf_url || ''}
                   onChange={(e) => handleUpdateGroup(groupIdx, { pdf_url: e.target.value })}
-                  placeholder="https://drive.google.com/file/d/.../preview hoặc https://media.huytutor.edu.vn/..."
+                  placeholder="https://drive.google.com/file/d/.../preview hoặc URL đọc thử R2..."
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white"
                 />
               </div>

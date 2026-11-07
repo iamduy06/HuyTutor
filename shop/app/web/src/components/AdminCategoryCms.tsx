@@ -97,7 +97,6 @@ export const AdminCategoryCms: React.FC = () => {
   });
 
   const [saving, setSaving] = useState(false);
-  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [showLivePreview, setShowLivePreview] = useState<boolean>(false);
 
   // Đồng bộ category khi chọn từ danh sách
@@ -335,31 +334,6 @@ export const AdminCategoryCms: React.FC = () => {
     setEditingCategory((prev) => ({ ...prev, blocks: next }));
   };
 
-  const handleSingleUploadR2 = async (
-    file: File,
-    folder: string,
-    keyId: string,
-    oldUrl: string | undefined,
-    onSuccess: (url: string) => void
-  ) => {
-    setUploadingKey(keyId);
-    try {
-      const res = await apiClient.uploadFile(file, {
-        folder,
-        pageLevel1: editingCategory.slug || 'danh-muc',
-        pageLevel2: 'card',
-      });
-      if (oldUrl && oldUrl !== res.url) {
-        apiClient.deleteR2File(oldUrl).catch(() => {});
-      }
-      onSuccess(res.url);
-      showToast('Đã tải ảnh lên Cloudflare R2 thành công!');
-    } catch (err: any) {
-      showToast(err?.message || 'Lỗi tải ảnh lên R2.');
-    } finally {
-      setUploadingKey(null);
-    }
-  };
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();

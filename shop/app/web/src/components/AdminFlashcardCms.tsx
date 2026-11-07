@@ -76,7 +76,6 @@ export const AdminFlashcardCms: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Sắp xếp khối lên / xuống
   const handleMoveBlock = (index: number, direction: 'up' | 'down') => {
@@ -282,24 +281,6 @@ export const AdminFlashcardCms: React.FC = () => {
     }
   };
 
-  // Upload ảnh lên R2
-  const handleUploadR2 = async (file: File, folder = 'flashcards'): Promise<string> => {
-    setUploadingImage(true);
-    try {
-      const res = await apiClient.uploadFile(file, {
-        folder,
-        pageLevel1: 'flashcard',
-        pageLevel2: 'cms',
-      });
-      showToast('Đã tải ảnh lên Cloudflare R2 thành công!');
-      return res.url;
-    } catch (err: any) {
-      showToast(err?.message || 'Lỗi tải ảnh lên R2.');
-      throw err;
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
   // Lưu toàn bộ cấu hình trang Flashcard vào site_configs
   const handleSaveBlocks = async () => {
@@ -400,8 +381,6 @@ export const AdminFlashcardCms: React.FC = () => {
               <HeroBlockEditor
                 config={block.config as FlashcardHeroBlockConfig}
                 onUpdate={onUpdate}
-                onUploadR2={handleUploadR2}
-                uploading={uploadingImage}
               />
             );
           }
@@ -410,8 +389,6 @@ export const AdminFlashcardCms: React.FC = () => {
               <FeaturesBlockEditor
                 config={block.config as FlashcardFeaturesBlockConfig}
                 onUpdate={onUpdate}
-                onUploadR2={handleUploadR2}
-                uploading={uploadingImage}
               />
             );
           }
@@ -428,8 +405,6 @@ export const AdminFlashcardCms: React.FC = () => {
               <PricingBlockEditor
                 config={block.config as FlashcardPricingBlockConfig}
                 onUpdate={onUpdate}
-                onUploadR2={handleUploadR2}
-                uploading={uploadingImage}
               />
             );
           }
@@ -454,8 +429,6 @@ export const AdminFlashcardCms: React.FC = () => {
               <BannerBlockEditor
                 config={block.config as FlashcardBannerBlockConfig}
                 onUpdate={onUpdate}
-                onUploadR2={handleUploadR2}
-                uploading={uploadingImage}
               />
             );
           }
@@ -474,9 +447,7 @@ export const AdminFlashcardCms: React.FC = () => {
 const HeroBlockEditor: React.FC<{
   config: FlashcardHeroBlockConfig;
   onUpdate: (cfg: FlashcardHeroBlockConfig) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   const ytId = extractYoutubeId(config.youtube_url_or_id);
 
   return (
@@ -571,34 +542,18 @@ const HeroBlockEditor: React.FC<{
       )}
 
       <div>
-        <label className="block text-[11px] font-bold text-gray-700 mb-1">
-          Ảnh bìa Video tùy chỉnh (Tùy chọn)
-        </label>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={config.cover_image_url || ''}
-            onChange={(e) => onUpdate({ ...config, cover_image_url: e.target.value })}
-            className="flex-1 text-xs border border-gray-200 rounded px-2.5 py-1.5 focus:border-[#e60049] outline-none"
-            placeholder="URL ảnh bìa trên Cloudflare R2"
-          />
-          <label className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded cursor-pointer transition">
-            {uploading ? 'Đang tải...' : 'Tải ảnh R2'}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploading}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  const url = await onUploadR2(f);
-                  onUpdate({ ...config, cover_image_url: url });
-                }
-              }}
-            />
-          </label>
-        </div>
+        <R2ImageUploader
+          label="Ảnh bìa Video tùy chỉnh (Cloudflare R2)"
+          helperText="Ảnh bìa xem trước cho video intro flashcard (tỉ lệ 16:9 khuyên dùng)."
+          imageUrl={config.cover_image_url || ''}
+          onUrlChange={(url) => onUpdate({ ...config, cover_image_url: url })}
+          folder="flashcards"
+          pageLevel1="landing"
+          pageLevel2="hero"
+          fitMode="contain"
+          maxPreviewHeight="max-h-32"
+          aspectRatioHint="16:9"
+        />
       </div>
     </div>
   );
@@ -608,9 +563,7 @@ const HeroBlockEditor: React.FC<{
 const FeaturesBlockEditor: React.FC<{
   config: FlashcardFeaturesBlockConfig;
   onUpdate: (cfg: FlashcardFeaturesBlockConfig) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   const { demo_card, cta_button, features } = config;
   const [newFeatureText, setNewFeatureText] = useState('');
 
@@ -707,42 +660,22 @@ const FeaturesBlockEditor: React.FC<{
         </div>
 
         <div>
-          <label className="text-[10px] text-gray-500 font-bold block mb-0.5">
-            Hoặc tải ảnh chụp màn hình App Flashcard thay thế (R2)
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={demo_card.image_url || ''}
-              onChange={(e) =>
-                onUpdate({
-                  ...config,
-                  demo_card: { ...demo_card, image_url: e.target.value },
-                })
-              }
-              className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 outline-none"
-              placeholder="URL ảnh chụp ứng dụng"
-            />
-            <label className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-[11px] font-bold rounded cursor-pointer">
-              {uploading ? '...' : 'Tải R2'}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploading}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    const url = await onUploadR2(f);
-                    onUpdate({
-                      ...config,
-                      demo_card: { ...demo_card, image_url: url },
-                    });
-                  }
-                }}
-              />
-            </label>
-          </div>
+          <R2ImageUploader
+            label="Ảnh chụp màn hình App Flashcard thay thế (Cloudflare R2)"
+            helperText="Ảnh chụp minh họa giao diện hoặc tính năng học flashcard."
+            imageUrl={demo_card.image_url || ''}
+            onUrlChange={(url) =>
+              onUpdate({
+                ...config,
+                demo_card: { ...demo_card, image_url: url },
+              })
+            }
+            folder="flashcards"
+            pageLevel1="landing"
+            pageLevel2="features"
+            fitMode="contain"
+            maxPreviewHeight="max-h-32"
+          />
         </div>
       </div>
 
@@ -949,9 +882,7 @@ const FreeTierBlockEditor: React.FC<{
 const PricingBlockEditor: React.FC<{
   config: FlashcardPricingBlockConfig;
   onUpdate: (cfg: FlashcardPricingBlockConfig) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   const handleAddPackage = () => {
     const newPkg: FlashcardIndividualPackageItem = {
       id: `pkg-${Date.now()}`,
@@ -1256,40 +1187,22 @@ const ContactNoticeBlockEditor: React.FC<{
 const BannerBlockEditor: React.FC<{
   config: FlashcardBannerBlockConfig;
   onUpdate: (cfg: FlashcardBannerBlockConfig) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-[11px] font-bold text-gray-700 mb-1">
-          URL Ảnh Banner (Cloudflare R2)
-        </label>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={config.banner_url || ''}
-            onChange={(e) => onUpdate({ ...config, banner_url: e.target.value })}
-            className="flex-1 text-xs border border-gray-200 rounded px-2.5 py-1.5 focus:border-[#e60049] outline-none"
-            placeholder="URL ảnh banner"
-          />
-          <label className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded cursor-pointer transition">
-            {uploading ? 'Đang tải...' : 'Tải ảnh lên R2'}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploading}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  const url = await onUploadR2(f);
-                  onUpdate({ ...config, banner_url: url });
-                }
-              }}
-            />
-          </label>
-        </div>
+        <R2ImageUploader
+          label="Ảnh Banner Flashcard (Cloudflare R2)"
+          helperText="Banner quảng bá phân hệ flashcard (khuyên dùng tỉ lệ ngang 1200x300 hoặc 1920x450 px)."
+          imageUrl={config.banner_url || ''}
+          onUrlChange={(url) => onUpdate({ ...config, banner_url: url })}
+          folder="flashcards"
+          pageLevel1="landing"
+          pageLevel2="banner"
+          fitMode="contain"
+          maxPreviewHeight="max-h-32"
+          aspectRatioHint="1200x300 hoặc 1920x450 px"
+        />
       </div>
 
       <div>

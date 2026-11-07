@@ -1422,7 +1422,7 @@ export const AdminPage: React.FC = () => {
                       KHỐI 2
                     </span>
                     <h3 className="text-xs font-black text-gray-900 uppercase">
-                      Ảnh Bìa Thumbnail (Cloudflare R2 - media.huytutor.edu.vn)
+                      Ảnh Bìa Thumbnail (Cloudflare R2)
                     </h3>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-1">
@@ -1643,7 +1643,7 @@ export const AdminPage: React.FC = () => {
                           sample_pdf_url: e.target.value,
                         }))
                       }
-                      placeholder="https://media.huytutor.edu.vn/samples/de-doc-thu-watermarked.pdf"
+                      placeholder="URL file PDF đọc thử trên Cloudflare R2..."
                       className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs bg-white"
                     />
                   </div>
@@ -1675,7 +1675,7 @@ export const AdminPage: React.FC = () => {
                           type="text"
                           value={newPreviewImageUrl}
                           onChange={(e) => setNewPreviewImageUrl(e.target.value)}
-                          placeholder="https://media.huytutor.edu.vn/samples/pages/123456789012.png"
+                          placeholder="URL ảnh đọc thử trên Cloudflare R2..."
                           className="flex-1 border border-gray-300 rounded-sm px-3 py-1.5 text-xs bg-white"
                         />
                         <button

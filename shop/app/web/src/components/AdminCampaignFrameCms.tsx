@@ -38,7 +38,6 @@ export const AdminCampaignFrameCms: React.FC = () => {
     products[0]?.id || ''
   );
   const [customTestImgUrl, setCustomTestImgUrl] = useState<string>('');
-  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Đồng bộ khi siteConfigs từ database tải về
@@ -56,49 +55,6 @@ export const AdminCampaignFrameCms: React.FC = () => {
     setConfig((prev) => ({ ...prev, [field]: val }));
   };
 
-  // Upload file PNG khung đè riêng lên Cloudflare R2 (Đặt tên ngẫu nhiên 12 số)
-  const handleUploadCustomFrame = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.includes('png')) {
-      showToast('Khung đè chiến dịch nên dùng file PNG trong suốt (Transparent PNG)');
-    }
-
-    try {
-      setIsUploading(true);
-      const oldUrl = config.custom_frame_url;
-      const res = await apiClient.uploadFile(file, { folder: 'campaign' });
-      if (res && res.url) {
-        updateField('custom_frame_url', res.url);
-        updateField('frame_type', 'custom');
-        showToast('Đã tải lên khung đè với tên 12 số ngẫu nhiên lên R2 thành công!');
-        if (oldUrl && oldUrl !== res.url) {
-          apiClient.deleteR2File(oldUrl).catch(() => {});
-        }
-      } else {
-        showToast('Lỗi tải ảnh lên Cloudflare R2');
-      }
-    } catch (err: any) {
-      showToast('Lỗi kết nối khi tải ảnh: ' + err.message);
-    } finally {
-      setIsUploading(false);
-      e.target.value = '';
-    }
-  };
-
-  // Xóa vĩnh viễn file khung đè khỏi Cloudflare R2 (không chỉ là bỏ link)
-  const handleDeleteCustomFrame = async () => {
-    if (!config.custom_frame_url) return;
-    const oldUrl = config.custom_frame_url;
-    try {
-      await apiClient.deleteR2File(oldUrl);
-      updateField('custom_frame_url', '');
-      showToast('Đã xóa vĩnh viễn file khung đè khỏi Cloudflare R2!');
-    } catch (err: any) {
-      showToast('Lỗi xóa file trên R2: ' + err.message);
-    }
-  };
 
   // Lưu cấu hình
   const handleSave = async () => {
@@ -259,55 +215,22 @@ export const AdminCampaignFrameCms: React.FC = () => {
                 ))}
               </div>
             ) : (
-              /* Custom Upload PNG */
-              <div className="space-y-3 pt-2">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <label className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold px-4 py-2 rounded-lg border border-gray-300 cursor-pointer transition flex items-center gap-2">
-                    <span>📤 Tải file PNG khung đè</span>
-                    <input
-                      type="file"
-                      accept="image/png"
-                      onChange={handleUploadCustomFrame}
-                      className="hidden"
-                      disabled={isUploading}
-                    />
-                  </label>
-                  {isUploading && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1.5">
-                      <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full" />
-                      Đang tải file lên Cloudflare R2...
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[11px] font-semibold text-gray-600">
-                      URL file PNG khung đè (Cloudflare R2 - 12 chữ số):
-                    </label>
-                    {config.custom_frame_url && (
-                      <button
-                        type="button"
-                        onClick={handleDeleteCustomFrame}
-                        className="text-[10px] text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
-                      >
-                        🗑️ Xóa vĩnh viễn file khỏi R2
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={config.custom_frame_url || ''}
-                    onChange={(e) => updateField('custom_frame_url', e.target.value)}
-                    placeholder="https://media.huytutor.edu.vn/campaign/123456789012.png"
-                    className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#e60049]"
-                  />
-                </div>
-
-                <p className="text-[11px] text-gray-500 italic">
-                  💡 <strong>Gợi ý thiết kế:</strong> Tạo khung PNG trong suốt 600x800 px (hoặc cùng tỉ lệ với ảnh sản phẩm).
-                  Chỉ vẽ họa tiết ở 4 cạnh viền ngoài, để rỗng 100% vùng giữa để nhìn thấy sách bên dưới.
-                </p>
+              /* Custom Upload PNG qua R2ImageUploader */
+              <div className="pt-2">
+                <R2ImageUploader
+                  label="Khung viền PNG tùy chỉnh (Cloudflare R2)"
+                  helperText="Tạo khung PNG trong suốt 600x800 px (hoặc cùng tỉ lệ với ảnh sản phẩm). Họa tiết ở 4 cạnh viền ngoài, để rỗng 100% vùng giữa để nhìn thấy ảnh sản phẩm bên dưới."
+                  imageUrl={config.custom_frame_url || ''}
+                  onUrlChange={(url) => {
+                    updateField('custom_frame_url', url);
+                    if (url) updateField('frame_type', 'custom');
+                  }}
+                  folder="campaign"
+                  pageLevel1="frame"
+                  fitMode="contain"
+                  maxPreviewHeight="max-h-36"
+                  aspectRatioHint="Khuyên dùng 600x800 px hoặc 3:4"
+                />
               </div>
             )}
           </div>

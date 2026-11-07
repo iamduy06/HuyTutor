@@ -83,7 +83,6 @@ export const AdminComboCms: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [showUniversalPicker, setShowUniversalPicker] = useState(false);
 
   useEffect(() => {
@@ -277,24 +276,6 @@ export const AdminComboCms: React.FC = () => {
     );
   };
 
-  // Upload ảnh lên R2
-  const handleUploadR2 = async (file: File, folder = 'combos'): Promise<string> => {
-    setUploadingImage(true);
-    try {
-      const res = await apiClient.uploadFile(file, {
-        folder,
-        pageLevel1: 'combo-thpt',
-        pageLevel2: 'banner',
-      });
-      showToast('Đã tải ảnh lên Cloudflare R2 thành công!');
-      return res.url;
-    } catch (err: any) {
-      showToast(err?.message || 'Lỗi tải ảnh lên R2.');
-      throw err;
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -443,8 +424,6 @@ export const AdminComboCms: React.FC = () => {
                     <EditComboHeroConfig
                       config={block.config as ComboHeroBlockConfig}
                       onUpdate={(cfg) => handleUpdateBlockConfig(block.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
                     />
                   )}
 
@@ -479,8 +458,6 @@ export const AdminComboCms: React.FC = () => {
                     <EditComboBannerConfig
                       config={block.config as ComboBannerBlockConfig}
                       onUpdate={(cfg) => handleUpdateBlockConfig(block.id, cfg)}
-                      onUploadR2={handleUploadR2}
-                      uploading={uploadingImage}
                     />
                   )}
 
@@ -562,9 +539,7 @@ export const AdminComboCms: React.FC = () => {
 export const EditComboHeroConfig: React.FC<{
   config: ComboHeroBlockConfig;
   onUpdate: (cfg: Partial<ComboHeroBlockConfig>) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -612,39 +587,19 @@ export const EditComboHeroConfig: React.FC<{
         </div>
 
         {config.mode === 'image_banner' ? (
-          <div className="space-y-2 bg-pink-50/50 p-3 rounded border border-pink-200">
-            <label className="block font-bold text-gray-700">Ảnh Banner Cloudflare R2</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={config.banner_image_url || ''}
-                onChange={(e) => onUpdate({ banner_image_url: e.target.value })}
-                placeholder="https://media.huytutor.edu.vn/..."
-                className="flex-1 border border-gray-300 rounded px-2.5 py-1.5 bg-white"
-              />
-              <label className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold px-3 py-1.5 rounded cursor-pointer shrink-0">
-                {uploading ? 'Đang tải...' : 'Tải ảnh lên R2'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const url = await onUploadR2(f);
-                      onUpdate({ banner_image_url: url });
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            {config.banner_image_url && (
-              <img
-                src={config.banner_image_url}
-                alt="Banner preview"
-                className="h-24 w-auto rounded border object-cover mt-2"
-              />
-            )}
+          <div className="p-3.5 bg-pink-50/30 rounded border border-pink-200">
+            <R2ImageUploader
+              label="Ảnh Banner lớn (Cloudflare R2)"
+              helperText="Tải ảnh banner lớn thiết kế hoàn chỉnh. Khuyên dùng tỉ lệ ngang 16:9 hoặc 1200x500 px."
+              imageUrl={config.banner_image_url || ''}
+              onUrlChange={(url) => onUpdate({ banner_image_url: url })}
+              folder="combos"
+              pageLevel1="combo_thpt"
+              pageLevel2="hero"
+              fitMode="contain"
+              maxPreviewHeight="max-h-36"
+              aspectRatioHint="16:9 hoặc 1200x500 px"
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-50 p-3 rounded border border-gray-200">
@@ -1165,37 +1120,22 @@ export const EditComboBottomCtaConfig: React.FC<{
 export const EditComboBannerConfig: React.FC<{
   config: ComboBannerBlockConfig;
   onUpdate: (cfg: Partial<ComboBannerBlockConfig>) => void;
-  onUploadR2: (file: File) => Promise<string>;
-  uploading: boolean;
-}> = ({ config, onUpdate, onUploadR2, uploading }) => {
+}> = ({ config, onUpdate }) => {
   return (
     <div className="space-y-3">
       <div>
-        <label className="block font-bold text-gray-700 mb-1">URL Ảnh Banner R2</label>
-        <div className="flex items-center gap-3">
-          <input
-            type="text"
-            value={config.banner_url || ''}
-            onChange={(e) => onUpdate({ banner_url: e.target.value })}
-            placeholder="https://media.huytutor.edu.vn/..."
-            className="flex-1 border border-gray-300 rounded px-2.5 py-1.5"
-          />
-          <label className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold px-3 py-1.5 rounded cursor-pointer shrink-0">
-            {uploading ? 'Đang tải...' : 'Tải ảnh lên R2'}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  const url = await onUploadR2(f);
-                  onUpdate({ banner_url: url });
-                }
-              }}
-            />
-          </label>
-        </div>
+        <R2ImageUploader
+          label="Ảnh Banner Ngang (Cloudflare R2)"
+          helperText="Tải ảnh banner ưu đãi combo. Khuyên dùng tỉ lệ ngang 1200x300 hoặc 1920x450 px."
+          imageUrl={config.banner_url || ''}
+          onUrlChange={(url) => onUpdate({ banner_url: url })}
+          folder="combos"
+          pageLevel1="combo_thpt"
+          pageLevel2="banner"
+          fitMode="contain"
+          maxPreviewHeight="max-h-32"
+          aspectRatioHint="1200x300 hoặc 1920x450 px"
+        />
       </div>
       <div>
         <label className="block font-bold text-gray-700 mb-1">Đường dẫn đích khi click (tùy chọn)</label>
