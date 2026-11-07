@@ -222,16 +222,33 @@ export async function getHistoricalPaidAmount(
         );
       });
       const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPrice;
+
+      const actualOrderPaid =
+        typeof matchedOrder.final_amount === 'number'
+          ? matchedOrder.final_amount
+          : typeof matchedOrder.total_amount === 'number'
+          ? matchedOrder.total_amount
+          : -1;
+
+      // Nếu đơn hàng chỉ có duy nhất 1 sản phẩm, lấy trực tiếp số tiền thực tế khách đã trả (loại bỏ hoàn toàn sai số làm tròn %)
+      if (matchedOrder.items.length === 1 && actualOrderPaid >= 0) {
+        return actualOrderPaid;
+      }
+
       let discountRate = 0;
-      if (typeof matchedOrder.discount_percent === 'number' && matchedOrder.discount_percent > 0) {
-        discountRate = matchedOrder.discount_percent / 100;
-      } else if (
+      // Ưu tiên tính từ discount_amount / subtotal_amount để đảm bảo độ chính xác toán học tuyệt đối
+      if (
         typeof matchedOrder.discount_amount === 'number' &&
         matchedOrder.discount_amount > 0 &&
         typeof matchedOrder.subtotal_amount === 'number' &&
         matchedOrder.subtotal_amount > 0
       ) {
         discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
+      } else if (
+        typeof matchedOrder.discount_percent === 'number' &&
+        matchedOrder.discount_percent > 0
+      ) {
+        discountRate = matchedOrder.discount_percent / 100;
       }
       return Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
     }

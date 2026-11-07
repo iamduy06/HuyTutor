@@ -126,6 +126,7 @@ export interface SeedOrder {
   discount_percent: number;
   discount_amount: number;
   total_amount: number;
+  final_amount?: number;
   payment_method: 'sepay' | 'paypal';
   payment_status: 'pending' | 'paid' | 'failed';
   payment_ref_id?: string;
