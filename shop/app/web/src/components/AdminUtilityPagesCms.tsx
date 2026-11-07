@@ -1364,11 +1364,11 @@ export const AdminUtilityPagesCms: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                          URL Slug (Đường dẫn: /p/&lt;slug&gt;)
+                          URL Slug (Đường dẫn: /&lt;slug&gt;)
                         </label>
                         <div className="flex items-center border border-gray-300 rounded-xs overflow-hidden focus-within:border-[#e60049]">
-                          <span className="bg-gray-100 px-2 py-1.5 text-xs text-gray-500 font-mono">
-                            /p/
+                          <span className="bg-gray-100 px-2.5 py-1.5 text-xs text-gray-500 font-mono font-bold">
+                            /
                           </span>
                           <input
                             type="text"
@@ -1376,6 +1376,7 @@ export const AdminUtilityPagesCms: React.FC = () => {
                             onChange={(e) => {
                               const safeSlug = e.target.value
                                 .toLowerCase()
+                                .replace(/^\/+/, '')
                                 .replace(/[^a-z0-9-_]/g, '-');
                               const updatedPages = [...customPagesConfig.pages];
                               updatedPages[selectedPageIndex] = {
@@ -1425,7 +1426,7 @@ export const AdminUtilityPagesCms: React.FC = () => {
                         className="w-4 h-4 accent-[#e60049] rounded-xs"
                       />
                       <label htmlFor="page_is_active" className="text-xs font-bold text-gray-700 cursor-pointer">
-                        Công khai trang này trên website (/p/{selectedCustomPage.slug})
+                        Công khai trang này trên website (/{selectedCustomPage.slug})
                       </label>
                     </div>
                   </div>

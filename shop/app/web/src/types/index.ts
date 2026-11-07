@@ -790,7 +790,9 @@ export interface PolicyPageConfig {
   title: string;
   description: string;
   last_updated?: string;
+  render_mode?: 'legacy' | 'blocks';
   sections: PolicySectionItem[];
+  blocks?: CustomPageBlock[];
 }
 
 export interface TermsSectionItem {
@@ -802,7 +804,9 @@ export interface TermsSectionItem {
 export interface TermsPageConfig {
   title: string;
   description: string;
+  render_mode?: 'legacy' | 'blocks';
   sections: TermsSectionItem[];
+  blocks?: CustomPageBlock[];
 }
 
 export type CustomBlockType =

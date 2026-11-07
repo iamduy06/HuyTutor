@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, Navigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import {
   DonatePageConfig,
@@ -184,6 +184,8 @@ export const TermsPage: React.FC = () => {
         title: config.title,
         description: config.description,
         sections: config.sections,
+        render_mode: config.render_mode,
+        blocks: config.blocks,
       }}
     />
   );
@@ -374,6 +376,22 @@ export const PolicyPageRenderer: React.FC<{ config: PolicyPageConfig }> = ({ con
   const { siteConfigs } = useStore();
   const biz = siteConfigs?.business_info;
   const hasBiz = Boolean(biz && (biz.company_name || biz.address || biz.phone || biz.email));
+
+  // Hỗ trợ chế độ Khối (blocks): Tùy biến linh hoạt giao diện chính sách
+  if (config.render_mode === 'blocks' && Array.isArray(config.blocks) && config.blocks.length > 0) {
+    return (
+      <CustomPageRenderer
+        page={{
+          id: 'policy_block_page',
+          title: config.title,
+          slug: '',
+          meta_description: config.description,
+          is_active: true,
+          blocks: config.blocks,
+        }}
+      />
+    );
+  }
 
   return (
     <main className="max-w-[800px] mx-auto px-4 py-10 space-y-8">
@@ -753,43 +771,13 @@ export const CustomPageRenderer: React.FC<{ page: CustomPageItem }> = ({ page })
 
 /**
  * ============================================================================
- * 11. VIEW TRANG TÙY BIẾN CHO ROUTE PUBLIC (/p/:slug)
+ * 11. ĐIỀU HƯỚNG TƯƠNG THÍCH NGƯỢC (/p/:slug -> /:slug tại root)
  * ============================================================================
  */
 export const CustomDynamicPageView: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { siteConfigs } = useStore();
-
-  const activePage = useMemo(() => {
-    if (!slug || !siteConfigs?.custom_pages_config?.pages) return null;
-    return siteConfigs.custom_pages_config.pages.find(
-      (p) => p.slug.toLowerCase() === slug.toLowerCase() && p.is_active
-    );
-  }, [slug, siteConfigs?.custom_pages_config]);
-
-  if (!activePage) {
-    return (
-      <main className="max-w-[600px] mx-auto px-4 py-16 text-center space-y-4">
-        <div className="w-12 h-12 mx-auto bg-pink-100 text-[#e60049] rounded-full flex items-center justify-center font-black text-lg">
-          !
-        </div>
-        <h1 className="text-base font-extrabold text-gray-900 uppercase">
-          Trang không tồn tại hoặc đã tạm dừng hoạt động
-        </h1>
-        <p className="text-xs text-gray-500">
-          Đường dẫn URL "/p/{slug}" không tồn tại hoặc đã bị ẩn bởi quản trị viên.
-        </p>
-        <div className="pt-2">
-          <Link
-            to="/"
-            className="inline-block bg-[#e60049] hover:bg-[#cc0041] text-white text-xs font-bold px-5 py-2 rounded-xs shadow-sm transition"
-          >
-            Quay về Trang chủ
-          </Link>
-        </div>
-      </main>
-    );
+  if (slug) {
+    return <Navigate to={`/${slug}`} replace />;
   }
-
-  return <CustomPageRenderer page={activePage} />;
+  return <Navigate to="/" replace />;
 };
