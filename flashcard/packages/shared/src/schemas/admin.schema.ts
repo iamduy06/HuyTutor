@@ -7,6 +7,7 @@ export const adminCreateUserSchema = z.object({
   max_devices: z.union([z.number(), z.string()]).optional(),
   group_id: z.string().optional(),
   auto_assign_group_decks: z.boolean().optional(),
+  auto_assign_group_decks_expiry: z.string().optional().nullable(),
 });
 
 export const adminUpdateUserSchema = z.object({
@@ -19,15 +20,19 @@ export const adminUpdateUserSchema = z.object({
     "revoke_deck",
     "remove_device",
     "reset_devices",
+    "update_deck_progress",
   ]),
   role: z.enum(["USER", "SUBADMIN", "ADMIN"]).optional(),
   max_devices: z.union([z.number(), z.string(), z.null()]).optional(),
-  group_id: z.string().optional(),
+  group_id: z.string().optional().nullable(),
   revoke_old_decks: z.boolean().optional(),
   assign_new_decks: z.boolean().optional(),
+  assign_new_decks_expiry: z.string().optional().nullable(),
   deck_id: z.string().optional(),
   expired_at: z.string().nullable().optional(),
   device_id: z.string().optional(),
+  progress_percent: z.coerce.number().optional(),
+  learned_count: z.coerce.number().optional(),
 });
 
 export const adminCreateSubadminGroupSchema = z.object({
@@ -53,6 +58,8 @@ export const adminSubadminGroupActionSchema = z.object({
     "revoke_user_deck",
     "move_user",
     "remove_user",
+    "move_member",
+    "add_member",
   ]),
   user_id: z.string().optional(),
   is_subadmin: z.boolean().optional(),
@@ -61,6 +68,7 @@ export const adminSubadminGroupActionSchema = z.object({
   expired_at: z.string().nullable().optional(),
   assign_all_users: z.boolean().optional(),
   target_group_id: z.string().optional(),
+  clear_decks: z.boolean().optional(),
 });
 
 export const adminCreateGroupSchema = z.object({
@@ -115,12 +123,12 @@ export const adminDeleteDevicesSchema = z.object({
 });
 
 export const adminImportUserItemSchema = z.object({
-  email: z.string().email("Email không đúng định dạng"),
-  password: z.string().optional(),
-  group_id: z.string().optional(),
-  role: z.enum(["USER", "SUBADMIN", "ADMIN"]).optional(),
-  deck: z.union([z.string(), z.array(z.string())]).optional(),
-  expire_at: z.string().optional(),
+  email: z.string().optional().nullable(),
+  password: z.string().optional().nullable(),
+  group_id: z.string().optional().nullable(),
+  role: z.string().optional().nullable(),
+  deck: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+  expire_at: z.string().optional().nullable(),
 });
 
 export const adminImportUsersSchema = z.union([
@@ -129,10 +137,9 @@ export const adminImportUsersSchema = z.union([
 ]);
 
 export const adminImportDeckItemSchema = z.object({
-  title: z.string().min(1, "Tên bộ đề không được để trống"),
-  description: z.string().optional().nullable(),
-  level: z.string().optional().nullable(),
-  access_level: z.record(z.any()).optional(),
+  id: z.string().optional().nullable(),
+  user: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+  expire_at: z.string().optional().nullable(),
 });
 
 export const adminImportDecksSchema = z.union([
@@ -141,10 +148,11 @@ export const adminImportDecksSchema = z.union([
 ]);
 
 export const adminImportGroupItemSchema = z.object({
-  group_name: z.string().min(1, "Tên nhóm không được để trống"),
-  user_email_or_id: z.string().optional(),
-  deck_name_or_id: z.string().optional(),
-  deck_expire_at: z.string().optional(),
+  id: z.string().optional().nullable(),
+  users: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+  decks: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+  expire_at: z.string().optional().nullable(),
+  assign_all: z.union([z.boolean(), z.string()]).optional().nullable(),
 });
 
 export const adminImportGroupsSchema = z.union([
@@ -170,4 +178,3 @@ export type AdminUpdateDeckGroupInput = z.infer<typeof adminUpdateDeckGroupSchem
 export type AdminAppSettingsInput = z.infer<typeof adminAppSettingsSchema>;
 export type AdminExportQueryInput = z.infer<typeof adminExportQuerySchema>;
 export type AdminAssignUserDeckInput = z.infer<typeof adminAssignUserDeckSchema>;
-
