@@ -546,6 +546,7 @@ export interface ComboPackageItem {
   format_badge: string;
   tag_text: string;
   product_ids: string[];
+  thumbnail_url?: string;
   format_pricings?: ComboFormatPricing[];
   custom_cover_urls?: string[];
   action_type: 'open_checkout' | 'add_to_cart';

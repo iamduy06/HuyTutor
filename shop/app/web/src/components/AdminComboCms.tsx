@@ -699,6 +699,7 @@ export const EditComboPackagesConfig: React.FC<{
       discount_badge: '',
       format_badge: 'File Word',
       tag_text: 'Combo',
+      thumbnail_url: '',
       product_ids: [],
       format_pricings: UI_FORMATS.map((fmt) => ({
         format_code: fmt,
@@ -823,6 +824,22 @@ export const EditComboPackagesConfig: React.FC<{
                       Nếu để trống, hệ thống tự hiển thị theo % thực tế.
                     </span>
                   </div>
+                </div>
+
+                {/* Ảnh Thumbnail gói Combo (Cloudflare R2) */}
+                <div className="border border-gray-200 rounded p-2.5 bg-white">
+                  <R2ImageUploader
+                    label="Ảnh Thumbnail Thẻ Gói Combo (Cloudflare R2)"
+                    helperText="Tải ảnh thumbnail đại diện cho gói combo này (khuyên dùng tỉ lệ 16:9, 3:2 hoặc hình chữ nhật ngang). Nếu để trống, hệ thống tự hiển thị các bìa sách mini thuộc gói."
+                    imageUrl={pkg.thumbnail_url || ''}
+                    onUrlChange={(url) => handleUpdatePackage(idx, { thumbnail_url: url })}
+                    folder="combos"
+                    pageLevel1="combo_thpt"
+                    pageLevel2={pkg.id}
+                    aspectRatioHint="16:9, 3:2 hoặc ngang"
+                    maxPreviewHeight="max-h-32"
+                    fitMode="contain"
+                  />
                 </div>
 
                 {/* Chọn tài liệu thuộc gói */}

@@ -305,8 +305,16 @@ export const ComboPackagesBlock: React.FC<{
                 </div>
               </div>
 
-              {/* Hàng ảnh sách mini trong gói */}
-              {coverImages.length > 0 && (
+              {/* Ảnh Thumbnail gói Combo (ưu tiên) hoặc Hàng ảnh sách mini (fallback) */}
+              {pkg.thumbnail_url?.trim() ? (
+                <div className="my-2.5 overflow-hidden rounded-xs border border-gray-200/80 bg-white shadow-2xs flex items-center justify-center h-28 sm:h-32">
+                  <img
+                    src={pkg.thumbnail_url.trim()}
+                    alt={pkg.title}
+                    className="w-full h-full object-contain p-1"
+                  />
+                </div>
+              ) : coverImages.length > 0 ? (
                 <div className="flex items-center justify-center gap-1.5 my-2 overflow-hidden">
                   {coverImages.slice(0, 5).map((img, i) => (
                     <img
@@ -317,7 +325,7 @@ export const ComboPackagesBlock: React.FC<{
                     />
                   ))}
                 </div>
-              )}
+              ) : null}
 
               {/* Tên gói và Bảng giá niêm yết chuẩn mực (không hiển thị khấu trừ cá nhân hóa) */}
               <div className="space-y-1 pt-1.5 border-t border-gray-200">
