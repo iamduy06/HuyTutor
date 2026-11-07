@@ -4,6 +4,7 @@ import { AuthModal } from './components/AuthModal';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { ProductFormatSelectionModal } from './components/ProductFormatSelectionModal';
+import { ComboFormatSelectionModal } from './components/ComboFormatSelectionModal';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
             <CartDrawer />
             <CheckoutModal />
             <ProductFormatSelectionModal />
+            <ComboFormatSelectionModal />
             <SearchModal />
             <SampleModal />
             <AuthModal />

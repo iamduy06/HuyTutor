@@ -200,6 +200,7 @@ export const ComboPackagesBlock: React.FC<{
   allProducts: Product[];
   onSelectPackage: (pkg: ComboPackageItem, selectedFormat: UiFormatCode) => void;
 }> = ({ config, allProducts, onSelectPackage }) => {
+  const { openComboFormatModal, addComboToCart } = useStore();
   const [selectedFormatMap, setSelectedFormatMap] = useState<Record<string, UiFormatCode>>({});
 
   if (!config || !Array.isArray(config.packages) || config.packages.length === 0) return null;
@@ -255,7 +256,14 @@ export const ComboPackagesBlock: React.FC<{
           return (
             <div
               key={pkg.id}
-              onClick={() => onSelectPackage(pkg, currentFormat)}
+              onClick={() => {
+                if (enabledFormats.length <= 1) {
+                  const targetFormat = enabledFormats[0]?.format_code || currentFormat;
+                  onSelectPackage(pkg, targetFormat);
+                } else {
+                  openComboFormatModal(pkg, 'buy_now', currentFormat);
+                }
+              }}
               className="bg-[#f8f9fa] border border-gray-200 rounded-md p-3.5 relative shadow-sm hover:border-[#e60049] transition cursor-pointer flex flex-col justify-between min-h-[190px]"
             >
               {/* Thanh trên cùng: Lựa chọn định dạng & Huy hiệu */}
@@ -305,17 +313,17 @@ export const ComboPackagesBlock: React.FC<{
                 </div>
               </div>
 
-              {/* Ảnh Thumbnail gói Combo (ưu tiên) hoặc Hàng ảnh sách mini (fallback) */}
+              {/* Ảnh Thumbnail gói Combo (hiển thị trọn vẹn hình ảnh, không bọc khung trắng viền vuông) */}
               {pkg.thumbnail_url?.trim() ? (
-                <div className="my-2.5 overflow-hidden rounded-xs border border-gray-200/80 bg-white shadow-2xs flex items-center justify-center h-28 sm:h-32">
+                <div className="my-2.5 overflow-hidden rounded-md flex items-center justify-center">
                   <img
                     src={pkg.thumbnail_url.trim()}
                     alt={pkg.title}
-                    className="w-full h-full object-contain p-1"
+                    className="w-full h-auto max-h-52 object-contain rounded-md"
                   />
                 </div>
               ) : coverImages.length > 0 ? (
-                <div className="flex items-center justify-center gap-1.5 my-2 overflow-hidden">
+                <div className="flex items-center justify-center gap-1.5 my-2.5 overflow-hidden">
                   {coverImages.slice(0, 5).map((img, i) => (
                     <img
                       key={i}
@@ -351,17 +359,40 @@ export const ComboPackagesBlock: React.FC<{
                 </div>
               </div>
 
-              {/* Nút bấm hành động */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectPackage(pkg, currentFormat);
-                }}
-                className="w-full mt-2.5 bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[10px] py-1.5 rounded-xs transition cursor-pointer"
+              {/* Cụm 2 nút hành động (50/50: Mua ngay bên trái, Thêm vào giỏ bên phải) */}
+              <div
+                className="grid grid-cols-2 gap-2 mt-2.5 pt-1"
+                onClick={(e) => e.stopPropagation()}
               >
-                Thêm gói combo vào giỏ ({typeof currentComboPrice === 'number' && currentComboPrice > 0 ? formatVnd(currentComboPrice) : formatVnd(totalOriginalPrice)})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (enabledFormats.length <= 1) {
+                      const targetFormat = enabledFormats[0]?.format_code || currentFormat;
+                      addComboToCart(pkg, targetFormat, 'open_checkout');
+                    } else {
+                      openComboFormatModal(pkg, 'buy_now', currentFormat);
+                    }
+                  }}
+                  className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-extrabold text-[11px] py-2 px-1 rounded-xs transition shadow-2xs cursor-pointer flex items-center justify-center text-center leading-none"
+                >
+                  Mua ngay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (enabledFormats.length <= 1) {
+                      const targetFormat = enabledFormats[0]?.format_code || currentFormat;
+                      addComboToCart(pkg, targetFormat, 'add_to_cart');
+                    } else {
+                      openComboFormatModal(pkg, 'add_to_cart', currentFormat);
+                    }
+                  }}
+                  className="w-full bg-white hover:bg-pink-50/50 text-[#e60049] border border-[#e60049] font-bold text-[11px] py-2 px-1 rounded-xs transition shadow-2xs cursor-pointer flex items-center justify-center text-center leading-none"
+                >
+                  Thêm vào giỏ
+                </button>
+              </div>
             </div>
           );
         })}

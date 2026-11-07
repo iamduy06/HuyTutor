@@ -85,6 +85,17 @@ interface StoreContextValue {
     initialFormat?: UiFormatCode
   ) => void;
   closeFormatModal: () => void;
+
+  // Combo Format Modal
+  comboModalPackage: ComboPackageItem | null;
+  comboModalAction: 'add_to_cart' | 'buy_now';
+  comboModalInitialFormat?: UiFormatCode;
+  openComboFormatModal: (
+    pkg: ComboPackageItem,
+    action?: 'add_to_cart' | 'buy_now',
+    initialFormat?: UiFormatCode
+  ) => void;
+  closeComboFormatModal: () => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
 }
@@ -146,6 +157,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const closeFormatModal = () => {
     setFormatModalProduct(null);
     setFormatModalInitialFormat(undefined);
+  };
+
+  // Combo Format Modal State
+  const [comboModalPackage, setComboModalPackage] = useState<ComboPackageItem | null>(null);
+  const [comboModalAction, setComboModalAction] = useState<'add_to_cart' | 'buy_now'>('buy_now');
+  const [comboModalInitialFormat, setComboModalInitialFormat] = useState<UiFormatCode | undefined>(undefined);
+
+  const openComboFormatModal = (
+    pkg: ComboPackageItem,
+    action: 'add_to_cart' | 'buy_now' = 'buy_now',
+    initialFormat?: UiFormatCode
+  ) => {
+    setComboModalPackage(pkg);
+    setComboModalAction(action);
+    setComboModalInitialFormat(initialFormat);
+  };
+
+  const closeComboFormatModal = () => {
+    setComboModalPackage(null);
+    setComboModalInitialFormat(undefined);
   };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -892,6 +923,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         formatModalDefaultAction,
         openFormatModal,
         closeFormatModal,
+        comboModalPackage,
+        comboModalAction,
+        comboModalInitialFormat,
+        openComboFormatModal,
+        closeComboFormatModal,
         toastMessage,
         showToast,
       }}
