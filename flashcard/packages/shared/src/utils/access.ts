@@ -33,7 +33,7 @@ export function getDeckAccess(
   deck: { access_level?: Record<string, any> | null },
   userDeck: { expired_at: string | null } | null
 ): DeckAccess {
-  if (user?.role === "ADMIN") {
+  if ((user?.role || '').toUpperCase() === "ADMIN") {
     return { canView: true, canLearnFull: true, isPreview: false, previewLimit: null };
   }
 
