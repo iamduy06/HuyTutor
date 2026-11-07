@@ -130,20 +130,41 @@ export async function calculateUpgradeForUser(
 
       const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPdfPrice;
 
-      // Tính tỷ lệ chiết khấu của đơn hàng đó (nếu là Combo hoặc đơn giảm giá)
-      let discountRate = 0;
-      if (typeof matchedOrder.discount_percent === 'number' && matchedOrder.discount_percent > 0) {
-        discountRate = matchedOrder.discount_percent / 100;
-      } else if (
-        typeof matchedOrder.discount_amount === 'number' &&
-        matchedOrder.discount_amount > 0 &&
-        typeof matchedOrder.subtotal_amount === 'number' &&
-        matchedOrder.subtotal_amount > 0
-      ) {
-        discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
-      }
+      const actualOrderPaid =
+        typeof matchedOrder.final_amount === 'number'
+          ? matchedOrder.final_amount
+          : typeof matchedOrder.total_amount === 'number'
+          ? matchedOrder.total_amount
+          : -1;
 
-      paidForPdf = Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
+      // Nếu đơn hàng chỉ có duy nhất 1 sản phẩm, lấy trực tiếp số tiền thực tế khách đã trả (loại bỏ hoàn toàn sai số làm tròn %)
+      if (matchedOrder.items.length === 1 && actualOrderPaid >= 0) {
+        paidForPdf = actualOrderPaid;
+      } else {
+        // Đơn hàng nhiều sản phẩm hoặc Combo: Tính tỷ lệ chiết khấu thực tế bằng con số thực VND
+        let discountRate = 0;
+        const subtotal = Number(matchedOrder.subtotal_amount || 0);
+        const totalPaid = actualOrderPaid >= 0 ? actualOrderPaid : Number(matchedOrder.total_amount || 0);
+        const discountAmt =
+          typeof matchedOrder.discount_amount === 'number' && matchedOrder.discount_amount > 0
+            ? matchedOrder.discount_amount
+            : subtotal > totalPaid && totalPaid > 0
+            ? subtotal - totalPaid
+            : 0;
+
+        // Ưu tiên tính từ discount_amount / subtotal_amount để đảm bảo độ chính xác toán học tuyệt đối
+        if (discountAmt > 0 && subtotal > 0) {
+          discountRate = discountAmt / subtotal;
+        } else if (
+          typeof matchedOrder.discount_percent === 'number' &&
+          matchedOrder.discount_percent > 0
+        ) {
+          // Dự phòng duy nhất cho đơn cũ legacy chưa có discount_amount
+          discountRate = matchedOrder.discount_percent / 100;
+        }
+
+        paidForPdf = Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
+      }
     } else {
       paidForPdf = fallbackPdfPrice;
     }
@@ -236,14 +257,18 @@ export async function getHistoricalPaidAmount(
       }
 
       let discountRate = 0;
+      const subtotal = Number(matchedOrder.subtotal_amount || 0);
+      const totalPaid = actualOrderPaid >= 0 ? actualOrderPaid : Number(matchedOrder.total_amount || 0);
+      const discountAmt =
+        typeof matchedOrder.discount_amount === 'number' && matchedOrder.discount_amount > 0
+          ? matchedOrder.discount_amount
+          : subtotal > totalPaid && totalPaid > 0
+          ? subtotal - totalPaid
+          : 0;
+
       // Ưu tiên tính từ discount_amount / subtotal_amount để đảm bảo độ chính xác toán học tuyệt đối
-      if (
-        typeof matchedOrder.discount_amount === 'number' &&
-        matchedOrder.discount_amount > 0 &&
-        typeof matchedOrder.subtotal_amount === 'number' &&
-        matchedOrder.subtotal_amount > 0
-      ) {
-        discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
+      if (discountAmt > 0 && subtotal > 0) {
+        discountRate = discountAmt / subtotal;
       } else if (
         typeof matchedOrder.discount_percent === 'number' &&
         matchedOrder.discount_percent > 0

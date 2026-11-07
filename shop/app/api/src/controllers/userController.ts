@@ -73,14 +73,18 @@ export const userController = {
             paidAmount = actualOrderPaid;
           } else {
             let discountRate = 0;
+            const subtotal = Number(matchedOrder.subtotal_amount || 0);
+            const totalPaid = actualOrderPaid >= 0 ? actualOrderPaid : Number(matchedOrder.total_amount || 0);
+            const discountAmt =
+              typeof matchedOrder.discount_amount === 'number' && matchedOrder.discount_amount > 0
+                ? matchedOrder.discount_amount
+                : subtotal > totalPaid && totalPaid > 0
+                ? subtotal - totalPaid
+                : 0;
+
             // Ưu tiên tính từ discount_amount / subtotal_amount để đảm bảo độ chính xác toán học tuyệt đối
-            if (
-              typeof matchedOrder.discount_amount === 'number' &&
-              matchedOrder.discount_amount > 0 &&
-              typeof matchedOrder.subtotal_amount === 'number' &&
-              matchedOrder.subtotal_amount > 0
-            ) {
-              discountRate = matchedOrder.discount_amount / matchedOrder.subtotal_amount;
+            if (discountAmt > 0 && subtotal > 0) {
+              discountRate = discountAmt / subtotal;
             } else if (
               typeof matchedOrder.discount_percent === 'number' &&
               matchedOrder.discount_percent > 0
