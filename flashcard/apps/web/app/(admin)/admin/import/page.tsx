@@ -151,7 +151,14 @@ export default function ImportPage() {
             let errorMsg = `Lỗi máy chủ (${res.status})`;
             try {
               const errJson = await res.json();
-              errorMsg = errJson.error || errJson.message || errorMsg;
+              const rawErr = errJson.error;
+              if (typeof rawErr === "string") {
+                errorMsg = rawErr;
+              } else if (rawErr && typeof rawErr === "object") {
+                errorMsg = rawErr.message || (rawErr.details ? JSON.stringify(rawErr.details) : JSON.stringify(rawErr));
+              } else if (errJson.message && typeof errJson.message === "string") {
+                errorMsg = errJson.message;
+              }
             } catch {
               if (res.status === 504) errorMsg = "Máy chủ phản hồi quá hạn (504 Timeout)";
               else if (res.status === 500) errorMsg = "Lỗi máy chủ nội bộ (500)";
@@ -169,11 +176,12 @@ export default function ImportPage() {
           }
 
           const batchResult = await res.json();
-          if (Array.isArray(batchResult)) {
-            allResults.push(...batchResult);
-          } else {
-            allResults.push(batchResult);
-          }
+          const items = Array.isArray(batchResult)
+            ? batchResult
+            : Array.isArray(batchResult?.results)
+            ? batchResult.results
+            : [batchResult];
+          allResults.push(...items);
         } catch (batchErr: any) {
           const failedItems = batch.map((item: any) => ({
             id: item.id || item.email || "N/A",
@@ -605,7 +613,19 @@ export default function ImportPage() {
                                 <span className="inline-flex items-center gap-2 text-red-700 font-black text-[9px] bg-red-50 px-4 py-1.5 rounded-full border border-red-100 shadow-sm"><XCircle className="w-3.5 h-3.5" /> FAILED</span>
                               )}
                            </td>
-                           <td className="p-6"><span className="text-[11px] font-bold text-muted-foreground/80 block max-w-md">{r.message || r.error || "Xử lý thành công vào hệ thống"}</span></td>
+                           <td className="p-6">
+                               <span className="text-[11px] font-bold text-muted-foreground/80 block max-w-md">
+                                 {(() => {
+                                   const msg = r.message || r.error;
+                                   if (!msg) return "Xử lý thành công vào hệ thống";
+                                   if (typeof msg === "string") return msg;
+                                   if (typeof msg === "object") {
+                                     return msg.message || (msg.details ? JSON.stringify(msg.details) : JSON.stringify(msg));
+                                   }
+                                   return String(msg);
+                                 })()}
+                               </span>
+                            </td>
                         </tr>
                       ))}
                    </tbody>
