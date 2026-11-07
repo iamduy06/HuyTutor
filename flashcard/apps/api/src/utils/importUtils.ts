@@ -43,24 +43,44 @@ export function parseStringArray(val: any): string[] {
 }
 
 /**
- * Simple CSV to Object array parser.
+ * Robust CSV to Object array parser handling commas inside quotes, escaped quotes, and empty fields.
  */
 export function csvToObjects(csv: string): any[] {
   const lines = csv.split(/\r?\n/).filter(line => line.trim() !== '');
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+  function parseLine(line: string): string[] {
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        fields.push(current.trim().replace(/^["']|["']$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    fields.push(current.trim().replace(/^["']|["']$/g, ''));
+    return fields;
+  }
+
+  const headers = parseLine(lines[0]);
   const results: any[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const row = lines[i];
-    const values = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-    const finalValues = values.length === headers.length ? values : row.split(',');
-
+    const values = parseLine(lines[i]);
     const obj: any = {};
     headers.forEach((header, index) => {
-      const val = (finalValues[index] || '').trim().replace(/^["']|["']$/g, '');
-      obj[header] = val;
+      obj[header] = (values[index] ?? '').trim().replace(/^["']|["']$/g, '');
     });
     results.push(obj);
   }
