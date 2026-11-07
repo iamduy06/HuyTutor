@@ -1025,58 +1025,43 @@ export const RelatedProductsBlock: React.FC<{
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         {cards.map((item) => (
-          <div key={item.id} className="flex flex-col">
-            {/* Hộp trên: Ảnh bìa sách bên trái + Badge & Mô tả bên phải */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[155px] flex items-center justify-center gap-4 shadow-2xs hover:border-gray-300 transition">
-              <SmartLink
-                to={item.target_url}
-                className="h-full flex items-center justify-center shrink-0"
-              >
-                {item.image_url && item.image_url.trim() ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.display_title}
-                    className="max-h-[130px] w-auto max-w-full object-contain drop-shadow-md hover:scale-105 transition-transform duration-200 block"
-                  />
-                ) : (
-                  <div className="w-20 h-28 bg-gray-100 rounded border border-dashed flex items-center justify-center text-gray-400 font-bold text-[11px]">
-                    Tài liệu
-                  </div>
-                )}
-              </SmartLink>
-
-              {(item.badge_text || item.tag_text) && (
-                <div className="flex flex-col justify-start items-start space-y-1.5 flex-1 min-w-0">
-                  {item.badge_text && (
-                    <span className="bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-xs tracking-wide">
-                      {item.badge_text}
-                    </span>
-                  )}
-                  {item.tag_text && (
-                    <span className="text-[12px] font-medium text-gray-800 leading-snug line-clamp-3 whitespace-pre-line">
-                      {item.tag_text}
-                    </span>
-                  )}
+          <div key={item.id} className="flex flex-col group">
+            {/* Hình ảnh sản phẩm (nguyên bản, bỏ khung bao trắng 3:4 rườm rà chuẩn theo category_section) */}
+            <SmartLink to={item.target_url} className="block w-full">
+              {item.image_url && item.image_url.trim() ? (
+                <img
+                  src={item.image_url}
+                  alt={item.display_title}
+                  className="w-full h-auto object-contain rounded-lg hover:scale-[1.01] transition-transform duration-200 block"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full aspect-[16/10] bg-gray-100 rounded-lg border border-dashed flex items-center justify-center text-gray-400 font-bold text-xs">
+                  Chưa có ảnh bìa
                 </div>
               )}
-            </div>
+            </SmartLink>
 
             {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
-            <SmartLink
-              to={item.target_url}
-              className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
-            >
-              {item.button_text?.trim() || 'Đọc thử'}
-            </SmartLink>
+            <div className="pt-2">
+              <SmartLink
+                to={item.target_url}
+                className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs py-2 rounded-xs text-center transition block shadow-2xs cursor-pointer"
+              >
+                {item.button_text?.trim() || 'Đọc thử'}
+              </SmartLink>
+            </div>
 
             {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
             {item.display_title && (
-              <SmartLink
-                to={item.target_url}
-                className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
-              >
-                {item.display_title}
-              </SmartLink>
+              <div className="pt-1.5 text-center">
+                <SmartLink
+                  to={item.target_url}
+                  className="text-xs font-bold text-gray-900 hover:text-[#e60049] transition line-clamp-2 leading-relaxed"
+                >
+                  {item.display_title}
+                </SmartLink>
+              </div>
             )}
           </div>
         ))}

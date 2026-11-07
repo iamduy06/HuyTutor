@@ -440,41 +440,44 @@ export const ComboSectionsBlock: React.FC<{
               const targetUrl = buildProductUrl(prod.category_slug, prod.slug);
 
               return (
-                <div
-                  key={prod.id}
-                  className="flex flex-col items-center justify-between space-y-2.5"
-                >
+                <div key={prod.id} className="flex flex-col group">
+                  {/* Hình ảnh sản phẩm (nguyên bản, bỏ khung bao trắng 3:4 rườm rà chuẩn theo category_section) */}
                   <SmartLink to={targetUrl} className="block w-full">
-                    <ProductImageFrame
-                      src={prod.thumbnail_url}
-                      alt={prod.title}
-                      ratioMode="preset"
-                      presetRatio="3:4"
-                      objectFit="contain"
-                      rounded="2xl"
-                      showBorder={true}
-                      showShadow={true}
-                      hoverEffect={true}
-                      productId={prod.id}
-                      customCampaignFrameUrl={prod.custom_campaign_frame_url}
-                      disableCampaignFrame={prod.disable_campaign_frame}
-                      fallbackText={prod.title}
-                    />
+                    {prod.thumbnail_url ? (
+                      <img
+                        src={prod.thumbnail_url}
+                        alt={prod.title}
+                        className="w-full h-auto object-contain rounded-lg hover:scale-[1.01] transition-transform duration-200 block"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full aspect-[16/10] bg-gray-100 rounded-lg border border-dashed flex items-center justify-center text-gray-400 font-bold text-xs">
+                        Chưa có ảnh bìa
+                      </div>
+                    )}
                   </SmartLink>
 
-                  <SmartLink
-                    to={targetUrl}
-                    className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs py-2 rounded-sm text-center transition shadow-sm block"
-                  >
-                    Đọc thử
-                  </SmartLink>
+                  {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
+                  <div className="pt-2">
+                    <SmartLink
+                      to={targetUrl}
+                      className="w-full bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs py-2 rounded-xs text-center transition block shadow-2xs cursor-pointer"
+                    >
+                      Đọc thử
+                    </SmartLink>
+                  </div>
 
-                  <SmartLink
-                    to={targetUrl}
-                    className="text-xs font-bold text-gray-900 text-center hover:text-[#e60049] transition leading-snug line-clamp-2"
-                  >
-                    {prod.title}
-                  </SmartLink>
+                  {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
+                  {prod.title && (
+                    <div className="pt-1.5 text-center">
+                      <SmartLink
+                        to={targetUrl}
+                        className="text-xs font-bold text-gray-900 hover:text-[#e60049] transition line-clamp-2 leading-relaxed"
+                      >
+                        {prod.title}
+                      </SmartLink>
+                    </div>
+                  )}
                 </div>
               );
             })}
