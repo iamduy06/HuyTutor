@@ -262,7 +262,7 @@ router.delete('/admin/decks/:id/cards/:cardId', async (req: Request, res: Respon
 });
 
 // POST /admin/decks/:id/tabs - Add single tab or bulk import tabs (SEC-010 validated)
-router.post('/admin/decks/:id/tabs', validate({ body: bulkTabsInputSchema }), async (req: Request, res: Response) => {
+router.post('/admin/decks/:id/tabs', validate({ params: idParamSchema, body: bulkTabsInputSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
@@ -314,7 +314,7 @@ router.post('/admin/decks/:id/tabs', validate({ body: bulkTabsInputSchema }), as
 });
 
 // PATCH /admin/decks/:id/tabs/:tabIndex (SEC-010 validated)
-router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ body: patchTabSchema }), async (req: Request, res: Response) => {
+router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema, body: patchTabSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const body = req.body;
@@ -344,7 +344,7 @@ router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ body: patchTabSchema 
 });
 
 // DELETE /admin/decks/:id/tabs/:tabIndex
-router.delete('/admin/decks/:id/tabs/:tabIndex', async (req: Request, res: Response) => {
+router.delete('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const supabase = getAdminClient();
@@ -361,7 +361,7 @@ router.delete('/admin/decks/:id/tabs/:tabIndex', async (req: Request, res: Respo
 });
 
 // POST /admin/decks/:id/tabs/:tabIndex/words - Add word (SEC-010 validated)
-router.post('/admin/decks/:id/tabs/:tabIndex/words', validate({ body: vocabItemSchema }), async (req: Request, res: Response) => {
+router.post('/admin/decks/:id/tabs/:tabIndex/words', validate({ params: idParamSchema, body: vocabItemSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const word: VocabItem = req.body;
@@ -381,7 +381,7 @@ router.post('/admin/decks/:id/tabs/:tabIndex/words', validate({ body: vocabItemS
 });
 
 // PATCH /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Update word (SEC-010 validated)
-router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ body: vocabItemSchema.partial() }), async (req: Request, res: Response) => {
+router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema, body: vocabItemSchema.partial() }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const wordIndex = parseInt(req.params.wordIndex as string, 10);
@@ -407,7 +407,7 @@ router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ body
 });
 
 // DELETE /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Delete word
-router.delete('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', async (req: Request, res: Response) => {
+router.delete('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const wordIndex = parseInt(req.params.wordIndex as string, 10);
@@ -432,7 +432,7 @@ router.delete('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', async (req: Re
 });
 
 // POST /admin/decks/:id/tabs/:tabIndex/words/bulk - Bulk add words (SEC-010 validated)
-router.post('/admin/decks/:id/tabs/:tabIndex/words/bulk', validate({ body: bulkWordsInputSchema }), async (req: Request, res: Response) => {
+router.post('/admin/decks/:id/tabs/:tabIndex/words/bulk', validate({ params: idParamSchema, body: bulkWordsInputSchema }), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const { words } = req.body;

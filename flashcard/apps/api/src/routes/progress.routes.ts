@@ -43,7 +43,7 @@ router.post(
       admin.from('decks').select('access_level').eq('id', deck_id).single(),
       admin
         .from('user_decks')
-        .select('streak, last_studied_at, learned_count, expired_at')
+        .select('streak, last_studied_at, learned_count, progress_percent, expired_at')
         .eq('user_id', user.id)
         .eq('deck_id', deck_id)
         .maybeSingle(),
@@ -74,19 +74,38 @@ router.post(
     const lastStudied = existing?.last_studied_at ? new Date(existing.last_studied_at) : null;
     let streak = existing?.streak ?? 0;
 
-    if (lastStudied) {
-      const todayDay = new Date(now.toDateString()).getTime();
-      const lastDay = new Date(lastStudied.toDateString()).getTime();
-      const diffDays = (todayDay - lastDay) / (1000 * 60 * 60 * 24);
+    const clientTz = (req.headers['x-timezone'] as string) || 'Asia/Ho_Chi_Minh';
+    function getLocalDateString(d: Date, timeZone: string): string {
+      try {
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(d);
+      } catch {
+        return d.toISOString().slice(0, 10);
+      }
+    }
+
+    const todayStr = getLocalDateString(now, clientTz);
+    const lastStr = lastStudied ? getLocalDateString(lastStudied, clientTz) : null;
+
+    if (lastStr) {
+      const diffDays = Math.round((new Date(todayStr).getTime() - new Date(lastStr).getTime()) / (86400 * 1000));
 
       if (diffDays === 0) {
-        // Same day: keep streak
+        // Same day: keep and ensure minimum 1 streak when studying
+        streak = Math.max(1, streak);
       } else if (diffDays === 1) {
         // Yesterday: increment streak
-        streak += 1;
-      } else {
+        streak = Math.max(1, streak) + 1;
+      } else if (diffDays > 1) {
         // Missed day: reset streak to 1
         streak = 1;
+      } else {
+        // diffDays < 0 (out-of-order request): keep streak
+        streak = Math.max(1, streak);
       }
     } else {
       streak = 1;
@@ -97,7 +116,7 @@ router.post(
         user_id: user.id,
         deck_id,
         learned_count: Math.max(learned_count ?? 0, existing?.learned_count ?? 0),
-        progress_percent: progress_percent ?? 0,
+        progress_percent: Math.max(progress_percent ?? 0, existing?.progress_percent ?? 0),
         streak,
         last_studied_at: now.toISOString(),
       },
@@ -105,7 +124,13 @@ router.post(
     );
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+        },
+      });
     }
 
     return res.status(200).json({ success: true, streak });

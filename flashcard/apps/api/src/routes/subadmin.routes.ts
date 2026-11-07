@@ -127,11 +127,17 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
 
   const isPaginated = page !== undefined || limit !== undefined;
   const selectOpts = isPaginated ? { count: 'exact' as const } : undefined;
+  const rawLimit = Number(limit);
+  const limitNum = [10, 20, 30, 50, 100].includes(rawLimit) ? rawLimit : 20;
+  const totalMax = (managedGroups ?? []).reduce(
+    (acc: number, g: any) => acc + (g.groups?.max_users ?? 0),
+    0
+  );
 
   let userQuery = admin
     .from('users')
     .select(
-      'id, email, role, created_at, max_devices, user_decks(id, deck_id, expired_at, learned_count, progress_percent, streak, deck:decks(title))',
+      'id, email, role, created_at, max_devices, user_devices(id, device_id, device_name, ip_address, last_seen), user_decks(id, deck_id, expired_at, learned_count, progress_percent, streak, deck:decks(title))',
       selectOpts
     )
     .order('created_at', { ascending: false });
@@ -143,6 +149,31 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
       .in('group_id', groupIds);
 
     const memberIds = Array.from(new Set((groupMemberIds ?? []).map((m: any) => m.user_id)));
+    if (memberIds.length === 0) {
+      return res.status(200).json({
+        users: [],
+        managed_groups: managedGroups ?? [],
+        me: {
+          id: me.id,
+          email: me.email,
+          role: me.role,
+          max_managed_users: totalMax,
+          current_managed: 0,
+        },
+        ...(isPaginated
+          ? {
+              pagination: {
+                page: 1,
+                limit: limitNum,
+                totalItems: 0,
+                totalPages: 1,
+                hasNextPage: false,
+                hasPrevPage: false,
+              },
+            }
+          : {}),
+      });
+    }
     userQuery = userQuery.in('id', memberIds);
   }
 
@@ -153,12 +184,9 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
   let users: any[] | null = null;
   let totalCount = 0;
   let pageNum = 1;
-  let limitNum = 20;
 
   if (isPaginated) {
     pageNum = Math.max(1, parseInt((page as string) || '1', 10));
-    const rawLimit = Number(limit);
-    limitNum = [10, 20, 30, 50, 100].includes(rawLimit) ? rawLimit : 20;
     const from = (pageNum - 1) * limitNum;
     const to = from + limitNum - 1;
 
@@ -172,11 +200,6 @@ router.get('/subadmin/users', async (req: Request, res: Response) => {
     users = data;
     totalCount = users?.length || 0;
   }
-
-  const totalMax = (managedGroups ?? []).reduce(
-    (acc: number, g: any) => acc + (g.groups?.max_users ?? 0),
-    0
-  );
 
   const totalPages = Math.ceil(totalCount / limitNum) || 1;
 
@@ -302,6 +325,21 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
       user_id: userId,
       is_subadmin: false,
     });
+
+    // Race condition post-verification for max_users
+    if (me.role !== 'ADMIN') {
+      const { data: grp } = await admin.from('groups').select('max_users').eq('id', targetGroupId).single();
+      const { count: finalCount } = await admin
+        .from('group_users')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', targetGroupId);
+
+      if (grp && finalCount !== null && finalCount > grp.max_users) {
+        await admin.from('group_users').delete().eq('group_id', targetGroupId).eq('user_id', userId);
+        await admin.from('users').delete().eq('id', userId);
+        return res.status(403).json({ error: 'Nhóm đã đạt giới hạn thành viên tối đa' });
+      }
+    }
   }
 
   // 4. Tự động gán bộ đề của nhóm nếu yêu cầu
@@ -457,6 +495,15 @@ router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: suba
   }
 
   if (body.action === 'remove_device') {
+    if (me.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Chỉ Super Admin mới có quyền xóa thiết bị phần cứng của người dùng.',
+        },
+      });
+    }
     const { error } = await admin
       .from('user_devices')
       .delete()
@@ -464,15 +511,19 @@ router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: suba
       .eq('device_id', body.device_id);
 
     if (error) return res.status(400).json({ error: error.message });
+    await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id).eq('device_id', body.device_id);
     memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ success: true });
   }
 
   if (body.action === 'reset_devices') {
-    const { error } = await admin.from('user_devices').delete().eq('user_id', id);
-    if (error) return res.status(400).json({ error: error.message });
+    if (me.role === 'ADMIN') {
+      const { error } = await admin.from('user_devices').delete().eq('user_id', id);
+      if (error) return res.status(400).json({ error: error.message });
+    }
+    await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
     memoryCache.invalidateUserTokens(id);
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, message: 'Đã thu hồi phiên đăng nhập thiết bị của học viên' });
   }
 
   if (body.action === 'change_max_devices') {
@@ -522,8 +573,35 @@ router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async 
   }
 
   const admin = getAdminClient();
-  const { error } = await admin.from('users').delete().eq('id', id);
-  if (error) return res.status(400).json({ error: error.message });
+  const { data: meGroups } = await admin
+    .from('group_users')
+    .select('group_id')
+    .eq('user_id', me.id)
+    .eq('is_subadmin', true);
+
+  const myGroupIds = (meGroups ?? []).map((g: any) => g.group_id);
+
+  // Xóa liên kết khỏi group_users của các nhóm do Subadmin quản lý
+  const { error: guErr } = await admin
+    .from('group_users')
+    .delete()
+    .eq('user_id', id)
+    .in('group_id', myGroupIds);
+
+  if (guErr) return res.status(400).json({ error: guErr.message });
+
+  // Thu hồi các bộ đề gán theo nhóm đó
+  const { data: groupDecks } = await admin
+    .from('group_decks')
+    .select('deck_id')
+    .in('group_id', myGroupIds);
+
+  if (groupDecks && groupDecks.length > 0) {
+    const deckIds = groupDecks.map((gd: any) => gd.deck_id);
+    await admin.from('user_decks').delete().eq('user_id', id).in('deck_id', deckIds);
+  }
+
+  // Thu hồi phiên làm việc của user
   await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
   memoryCache.invalidateUserTokens(id);
 

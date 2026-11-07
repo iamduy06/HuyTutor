@@ -26,7 +26,13 @@ router.get('/decks', async (_req: Request, res: Response) => {
     .order('created_at', { ascending: true });
 
   if (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      },
+    });
   }
 
   const wordCountMap = await getWordCountMap();
@@ -119,16 +125,20 @@ router.get('/decks/demo', validate({ query: getDeckDemoQuerySchema }), async (re
     extractTabs((r as unknown as FlashcardRow).content)
   );
 
+  const demoLimit = typeof levels.preview_word_limit === 'number' && levels.preview_word_limit >= 0
+    ? levels.preview_word_limit
+    : 5;
+
   let seen = 0;
   const demoTabs = allTabs
     .map(tab => {
-      const remaining = DEMO_LIMIT - seen;
+      const remaining = demoLimit - seen;
       if (remaining <= 0) return null;
       const vocab = (tab.vocabulary ?? []).slice(0, remaining);
       seen += vocab.length;
       return { ...tab, vocabulary: vocab };
     })
-    .filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
+    .filter((t): t is Tab => t !== null && Array.isArray(t.vocabulary) && t.vocabulary.length > 0);
 
   return res.status(200).json({ deck, tabs: demoTabs, isDemo: true });
 });
@@ -182,7 +192,7 @@ router.get('/decks/:id/content', validate({ params: deckIdParamSchema }), option
   let isDemo = false;
 
   if (!access.canLearnFull && access.isPreview) {
-    const limit = access.previewLimit || 10;
+    const limit = typeof access.previewLimit === 'number' && access.previewLimit >= 0 ? access.previewLimit : 10;
     let seen = 0;
     finalTabs = allTabs
       .map(tab => {
@@ -192,7 +202,7 @@ router.get('/decks/:id/content', validate({ params: deckIdParamSchema }), option
         seen += vocab.length;
         return { ...tab, vocabulary: vocab };
       })
-      .filter((t): t is Tab => t !== null && t.vocabulary.length > 0);
+      .filter((t): t is Tab => t !== null && Array.isArray(t.vocabulary) && t.vocabulary.length > 0);
     isDemo = true;
   }
 
@@ -205,7 +215,7 @@ router.get('/decks/:id/content', validate({ params: deckIdParamSchema }), option
     tabs: finalTabs,
     isDemo,
     previewLimit: access.previewLimit,
-    totalWords: allTabs.reduce((s, t) => s + t.vocabulary.length, 0),
+    totalWords: allTabs.reduce((s, t) => s + (Array.isArray(t?.vocabulary) ? t.vocabulary.length : 0), 0),
   });
 });
 
@@ -229,7 +239,9 @@ router.get('/decks/:id/preview', validate({ params: deckIdParamSchema }), async 
     return res.status(403).json({ error: 'Bộ đề này không hỗ trợ chế độ xem thử công khai' });
   }
 
-  const limit = levels.preview_word_limit || 10;
+  const limit = typeof levels.preview_word_limit === 'number' && levels.preview_word_limit >= 0
+    ? levels.preview_word_limit
+    : 10;
 
   const { data: rows } = await admin
     .from('flashcards')
@@ -247,7 +259,7 @@ router.get('/decks/:id/preview', validate({ params: deckIdParamSchema }), async 
   for (const tab of allTabs) {
     if (count >= limit) break;
     const remaining = limit - count;
-    const items = tab.vocabulary.slice(0, remaining);
+    const items = (tab.vocabulary ?? []).slice(0, remaining);
     slicedTabs.push({ ...tab, vocabulary: items });
     count += items.length;
   }
@@ -256,7 +268,7 @@ router.get('/decks/:id/preview', validate({ params: deckIdParamSchema }), async 
     tabs: slicedTabs,
     isFull: false,
     previewLimit: limit,
-    totalActualWords: allTabs.reduce((s, t) => s + t.vocabulary.length, 0),
+    totalActualWords: allTabs.reduce((s, t) => s + (Array.isArray(t?.vocabulary) ? t.vocabulary.length : 0), 0),
   });
 });
 

@@ -4,26 +4,26 @@ import { env } from '../config/env.js';
 // Strict regex identifying command-line and automated testing tools
 const CLI_TOOL_REGEX = /^(curl|wget|python|httpie|postmanruntime|insomnia|aiohttp|urllib|requests)/i;
 
-const allowedOriginsList = env.CORS_ORIGIN.split(',').map((o) => o.trim().replace(/\/+$/, ''));
+const allowedOriginsList = env.CORS_ORIGIN
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 export function isOriginAllowed(origin: string): boolean {
   if (!origin) return false;
   const clean = origin.trim().replace(/\/+$/, '');
 
-  // 1. Local development
-  if (
-    clean.startsWith('http://localhost') ||
-    clean.startsWith('http://127.0.0.1')
-  ) {
-    return true;
+  // 1. Dynamic subdomains derived from COOKIE_DOMAIN environment variable (No fallback operator)
+  const rawCookieDomain = process.env.COOKIE_DOMAIN;
+  if (rawCookieDomain) {
+    const escapedDomain = rawCookieDomain.replace(/^\./, '').replace(/\./g, '\\.');
+    const domainRegex = new RegExp(`^https:\\/\\/([a-zA-Z0-9_\\-\\.]+\\.)?${escapedDomain}$`);
+    if (domainRegex.test(clean)) {
+      return true;
+    }
   }
 
-  // 2. Official production & staging subdomains of huytutor.edu.vn
-  if (/^https:\/\/([a-zA-Z0-9_\-\.]+\.)?huytutor\.edu\.vn$/.test(clean)) {
-    return true;
-  }
-
-  // 4. Origins configured in environment
+  // 2. Origins explicitly configured in environment (CORS_ORIGIN, supports wildcards)
   return allowedOriginsList.some((allowed) => {
     if (allowed.includes('*')) {
       const reg = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
@@ -36,7 +36,7 @@ export function isOriginAllowed(origin: string): boolean {
 /**
  * Strict Security Guard Middleware for Flashcard API:
  * - Blocks CLI tools (curl, wget, python, postman) from direct invocation
- * - Enforces Origin & Referer domain whitelist (huytutor.edu.vn, vercel.app, localhost)
+ * - Enforces Origin & Referer domain whitelist from environment configuration
  * - Sets strict CORS response headers
  */
 export function corsSecurityMiddleware(req: Request, res: Response, next: NextFunction): void {

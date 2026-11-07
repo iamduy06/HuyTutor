@@ -109,14 +109,28 @@ router.get('/admin/subadmins/:id/managed', async (req: Request, res: Response) =
   const { id } = req.params;
   const db = getAdminClient();
 
-  const { data, error } = await db
-    .from('users')
-    .select('id, email, role, created_at')
-    .eq('created_by', id)
-    .order('created_at', { ascending: false });
+  const { data: subGroups, error: sgErr } = await db
+    .from('group_users')
+    .select('group_id')
+    .eq('user_id', id)
+    .eq('is_subadmin', true);
 
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ users: data ?? [] });
+  if (sgErr) return res.status(500).json({ error: sgErr.message });
+  const groupIds = (subGroups ?? []).map((g: any) => g.group_id);
+  if (groupIds.length === 0) return res.status(200).json({ users: [] });
+
+  const { data: memberRows, error: mErr } = await db
+    .from('group_users')
+    .select('user:users(id, email, role, created_at)')
+    .in('group_id', groupIds);
+
+  if (mErr) return res.status(500).json({ error: mErr.message });
+
+  const users = Array.from(
+    new Map((memberRows ?? []).map((m: any) => [m.user?.id, m.user])).values()
+  ).filter(Boolean);
+
+  return res.status(200).json({ users });
 });
 
 // PATCH /admin/subadmins/groups/:id - Update group basic limits

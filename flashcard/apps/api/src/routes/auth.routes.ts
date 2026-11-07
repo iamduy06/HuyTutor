@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { env } from '../config/env.js';
 import type { Request, Response } from 'express';
-import { requireAuth } from '../middlewares/auth.js';
+import { requireAuth, getUserDeviceQuota } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
 import { 
   registerDeviceSchema, 
@@ -53,7 +53,7 @@ router.post(
           max_devices: dbUser.max_devices ?? null,
           full_name: dbUser.full_name ?? '',
         };
-        const secret = env.JWT_SECRET || 'secret';
+        const secret = env.JWT_SECRET;
         const now = Math.floor(Date.now() / 1000);
         const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
         const payload = Buffer.from(JSON.stringify({
@@ -104,17 +104,29 @@ router.post(
       });
     }
 
+    // Persist session to public.user_sessions
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || '';
+    const userAgent = (req.headers['user-agent'] as string) || '';
+    try {
+      await admin.from('user_sessions').insert({
+        user_id: user.id,
+        session_token: sessionToken,
+        app_source: 'flashcard',
+        device_id: device_id || '',
+        device_name: device_name || '',
+        ip_address: clientIp,
+        user_agent: userAgent.substring(0, 255),
+        expires_at: new Date(sessionExpiresAt * 1000).toISOString(),
+        is_revoked: false,
+      });
+    } catch {}
+
     const role = user.role;
+    const contactUrl = process.env.SUPPORT_URL ? process.env.SUPPORT_URL : (process.env.SSO_URL ? `${process.env.SSO_URL.replace(/\/+$/, '')}/devices` : '/devices');
 
     // 3. Atomic Device Limit Enforcement (Admins bypass limit)
     if (role !== 'ADMIN') {
-      const { data: setting } = await admin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'global_max_devices')
-        .single();
-
-      const maxDevices = user.max_devices ?? parseInt(setting?.value ?? '3', 10);
+      const maxDevices = await getUserDeviceQuota(admin, user.id, user.max_devices);
 
       const { data: existing } = await admin
         .from('user_devices')
@@ -135,7 +147,7 @@ router.post(
             error: {
               code: 'DEVICE_LIMIT_EXCEEDED',
               message: `Tài khoản của bạn đã đạt giới hạn tối đa ${maxDevices} thiết bị.`,
-              contactUrl: 'https://web.facebook.com/huytutor',
+              contactUrl,
               currentCount: count,
               maxDevices,
             },
@@ -163,7 +175,7 @@ router.post(
           error: {
             code: 'DEVICE_LIMIT_EXCEEDED',
             message: `Tài khoản của bạn đã đạt giới hạn tối đa ${maxDevices} thiết bị.`,
-            contactUrl: 'https://web.facebook.com/huytutor',
+            contactUrl,
             currentCount: finalCount ? finalCount - 1 : maxDevices,
             maxDevices,
           },
@@ -376,15 +388,10 @@ router.post(
       .from('users')
       .select('max_devices')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    const { data: setting } = await admin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'global_max_devices')
-      .single();
-
-    const maxDevices = profile?.max_devices ?? parseInt(setting?.value ?? '3', 10);
+    const maxDevices = await getUserDeviceQuota(admin, user.id, profile?.max_devices);
+    const contactUrl = process.env.SUPPORT_URL ? process.env.SUPPORT_URL : (process.env.SSO_URL ? `${process.env.SSO_URL.replace(/\/+$/, '')}/devices` : '/devices');
 
     const { data: existing } = await admin
       .from('user_devices')
@@ -407,7 +414,7 @@ router.post(
       return res.status(200).json({
         allowed: false,
         message: `Tài khoản đã đạt giới hạn ${maxDevices} thiết bị.`,
-        contactUrl: 'https://web.facebook.com/huytutor',
+        contactUrl,
         currentCount: count,
         maxDevices,
       });
@@ -430,7 +437,7 @@ router.post(
       return res.status(200).json({
         allowed: false,
         message: `Tài khoản đã đạt giới hạn ${maxDevices} thiết bị.`,
-        contactUrl: 'https://web.facebook.com/huytutor',
+        contactUrl,
         currentCount: finalCount ? finalCount - 1 : maxDevices,
         maxDevices,
       });

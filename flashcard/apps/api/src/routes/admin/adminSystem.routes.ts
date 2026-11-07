@@ -9,6 +9,7 @@ import { parseDateToISO, parseStringArray } from '../../utils/importUtils.js';
 import * as XLSX from 'xlsx';
 import { validate } from '../../middlewares/validate.js';
 import { exportLimiter } from '../../middlewares/rateLimiter.js';
+import { memoryCache } from '../../services/cacheService.js';
 import {
   adminExportQuerySchema,
   adminAppSettingsSchema,
@@ -163,11 +164,19 @@ router.delete('/admin/devices', validate({ body: adminDeleteDevicesSchema }), as
       .delete()
       .eq('device_id', body.device_id)
       .eq('user_id', body.user_id);
+    await supabase
+      .from('user_sessions')
+      .update({ is_revoked: true })
+      .eq('device_id', body.device_id)
+      .eq('user_id', body.user_id);
+    memoryCache.invalidateUserTokens(body.user_id);
     return res.status(200).json({ success: true });
   }
 
   if (body.user_id && !body.device_id) {
     await supabase.from('user_devices').delete().eq('user_id', body.user_id);
+    await supabase.from('user_sessions').update({ is_revoked: true }).eq('user_id', body.user_id);
+    memoryCache.invalidateUserTokens(body.user_id);
     return res.status(200).json({ success: true });
   }
 
@@ -259,7 +268,8 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
     if (!existingUser) {
       // User mới: băm mật khẩu từ file (nếu trống dùng mặc định 'goidangkyflashcard')
       userId = crypto.randomUUID();
-      const initialPassword = (typeof row.password === 'string' ? row.password.trim() : '') || 'goidangkyflashcard';
+      const rawPw = row.password !== undefined && row.password !== null ? String(row.password).trim() : '';
+      const initialPassword = rawPw || 'goidangkyflashcard';
       const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
       const { error: insertErr } = await supabase.from('users').insert({
@@ -287,7 +297,8 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
       const updatePayload: any = { role, is_active: true };
 
       if (!existingUser.password_hash) {
-        const pwdToHash = (typeof row.password === 'string' ? row.password.trim() : '') || 'goidangkyflashcard';
+        const rawPw = row.password !== undefined && row.password !== null ? String(row.password).trim() : '';
+        const pwdToHash = rawPw || 'goidangkyflashcard';
         updatePayload.password_hash = await bcrypt.hash(pwdToHash, 10);
       }
 

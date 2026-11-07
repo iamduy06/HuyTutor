@@ -32,7 +32,13 @@ router.get(
     .eq('user_id', user.id);
 
   if (udErr) {
-    return res.status(500).json({ error: udErr.message });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      },
+    });
   }
 
   // 2. Filter accessible decks
@@ -72,7 +78,13 @@ router.get(
     .in('deck_id', targetDeckIds);
 
   if (fcErr) {
-    return res.status(500).json({ error: fcErr.message });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      },
+    });
   }
 
   // 5. Extract & filter vocab
@@ -104,7 +116,13 @@ router.get('/game/decks', requireAuth, async (req: Request, res: Response) => {
     .eq('user_id', user.id);
 
   if (udErr) {
-    return res.status(500).json({ error: udErr.message });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      },
+    });
   }
 
   const accessible = (userDecks ?? []).filter((ud: any) => {
@@ -129,7 +147,13 @@ router.get('/game/decks', requireAuth, async (req: Request, res: Response) => {
     .in('deck_id', deckIds);
 
   if (fcErr) {
-    return res.status(500).json({ error: fcErr.message });
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+      },
+    });
   }
 
   const wordCountMap: Record<string, number> = {};

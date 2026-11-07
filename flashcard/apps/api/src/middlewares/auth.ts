@@ -30,7 +30,11 @@ function verifySsoJwt(token: string, secret: string): any {
       .createHmac('sha256', secret)
       .update(`${headerB64}.${payloadB64}`)
       .digest('base64url');
-    if (sigB64 !== expectedSig) return null;
+    const sigBuf = Buffer.from(sigB64);
+    const expectedBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return null;
+    }
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
     if (payload.exp && payload.exp * 1000 < Date.now()) return null;
     return payload;
@@ -43,7 +47,7 @@ function verifySsoJwt(token: string, secret: string): any {
  * Tính toán hạn mức thiết bị tối đa cho người dùng theo phân cấp:
  * users.max_devices > groups.max_device_per_user > app_settings.global_max_devices > 3
  */
-async function getUserDeviceQuota(admin: any, userId: string, profileMaxDevices?: number | null): Promise<number> {
+export async function getUserDeviceQuota(admin: any, userId: string, profileMaxDevices?: number | null): Promise<number> {
   if (typeof profileMaxDevices === 'number') {
     return profileMaxDevices;
   }
@@ -268,6 +272,34 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
           ip_address: clientIp,
           last_seen: new Date().toISOString(),
         });
+
+        // Race condition post-verification
+        const { count: finalCount } = await admin
+          .from('user_devices')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', authUser.id);
+
+        if ((finalCount ?? 0) > maxDevices) {
+          await admin
+            .from('user_devices')
+            .delete()
+            .eq('user_id', authUser.id)
+            .eq('device_id', deviceId);
+
+          const ssoBase = process.env.SSO_URL ? process.env.SSO_URL.replace(/\/+$/, '') : '';
+          const ssoDevicesUrl = ssoBase ? `${ssoBase}/devices` : '/devices';
+
+          return res.status(403).json({
+            success: false,
+            error: {
+              code: 'DEVICE_LIMIT_EXCEEDED',
+              message: `Tài khoản của bạn đã đạt giới hạn tối đa ${maxDevices} thiết bị học Flashcard.`,
+              maxDevices,
+              currentCount: finalCount ? finalCount - 1 : maxDevices,
+              ssoUrl: ssoDevicesUrl,
+            },
+          });
+        }
       }
     }
   }

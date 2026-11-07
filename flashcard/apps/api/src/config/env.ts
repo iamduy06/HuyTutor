@@ -11,7 +11,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   CORS_ORIGIN: z.string().min(1),
-  JWT_SECRET: z.string().optional(),
+  JWT_SECRET: z.string().min(1, 'Missing required env: JWT_SECRET'),
   SSO_URL: z.string().optional(),
   ADMIN_API_SECRET: z.string().optional(),
 });

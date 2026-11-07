@@ -43,6 +43,17 @@ app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
 // Global Error Handler for Express 5 native async error handling
+// 404 Handler - Luôn trả về định dạng JSON, tuyệt đối không trả về HTML gây lỗi "Unexpected token '<'"
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: `Đường dẫn API ${req.method} ${req.originalUrl} không tồn tại trên hệ thống.`,
+    },
+  });
+});
+
 app.use(errorHandler);
 
 app.listen(port, () => {

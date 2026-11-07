@@ -44,17 +44,26 @@ router.get('/me/profile', requireAuth, async (req: Request, res: Response) => {
   const user = req.user!;
   const admin = getAdminClient();
 
-  const { data: groupSub } = await admin
-    .from('group_users')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_subadmin', true)
-    .limit(1)
-    .maybeSingle();
+  const [{ data: groupSub }, { data: dbUser }] = await Promise.all([
+    admin
+      .from('group_users')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_subadmin', true)
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from('users')
+      .select('full_name, created_at')
+      .eq('id', user.id)
+      .maybeSingle(),
+  ]);
 
   return res.status(200).json({
     user: {
       ...user,
+      full_name: dbUser?.full_name ?? '',
+      created_at: dbUser?.created_at ?? null,
       is_subadmin: !!groupSub,
     },
   });
