@@ -365,6 +365,28 @@ export interface ProductFormat {
   drive_url?: string;
 }
 
+export interface CascadeDeleteProductReport {
+  deletedProduct: {
+    id: string;
+    slug: string;
+    title: string;
+    category_slug: string;
+  };
+  autoDeleted: {
+    database: string[];
+    cmsCleaned: string[];
+    r2FilesDeleted: string[];
+    r2TotalFiles: number;
+  };
+  manualAttention: {
+    ordersCount: number;
+    ordersNotice: string;
+    libraryCount: number;
+    libraryNotice: string;
+    marketingNotice: string;
+  };
+}
+
 export interface ProductSpec {
   label: string;
   val: string;

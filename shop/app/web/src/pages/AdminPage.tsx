@@ -13,8 +13,10 @@ import { R2ImageUploader } from '../components/R2ImageUploader';
 import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
+import { ProductDeleteReportModal } from '../components/ProductDeleteReportModal';
 import {
   AdminUserRecord,
+  CascadeDeleteProductReport,
   CategoryItem,
   FooterPolicyLink,
   FooterSocialLink,
@@ -129,6 +131,11 @@ export const AdminPage: React.FC = () => {
   const [selectedDetailProductSlug, setSelectedDetailProductSlug] = useState<string>('');
   const [currentDetailProduct, setCurrentDetailProduct] = useState<Partial<Product> | null>(null);
   const [savingDetailBlocks, setSavingDetailBlocks] = useState(false);
+
+  // State cho Cascade Product Delete Modal & Report
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleteReport, setDeleteReport] = useState<CascadeDeleteProductReport | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
   useEffect(() => {
     if (products.length > 0) {
@@ -615,14 +622,29 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (slug: string) => {
+  const handleOpenDeleteModal = (prod: Product) => {
+    setProductToDelete(prod);
+    setDeleteReport(null);
+  };
+
+  const handleConfirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeletingProduct(true);
     try {
-      const res = await apiClient.deleteProduct(slug);
-      showToast(res.message);
+      const res = await apiClient.deleteProduct(productToDelete.slug);
+      if (res.report) {
+        setDeleteReport(res.report);
+      } else {
+        showToast(res.message);
+        setProductToDelete(null);
+      }
       await loadOverview();
       await refreshCatalog();
     } catch (err: any) {
       showToast(err?.message || 'Lỗi xóa sản phẩm.');
+      setProductToDelete(null);
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
@@ -1247,8 +1269,8 @@ export const AdminPage: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteProduct(prod.slug)}
-                          className="px-2 py-1 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-[#e60049] text-[10px] font-bold rounded-sm"
+                          onClick={() => handleOpenDeleteModal(prod)}
+                          className="px-2 py-1 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-[#e60049] text-[10px] font-bold rounded-sm cursor-pointer"
                         >
                           Xóa
                         </button>
@@ -2977,6 +2999,19 @@ export const AdminPage: React.FC = () => {
           </main>
         </div>
       </div>
+
+      {/* Modal Xác nhận Xóa & Báo cáo Cascade Cleanup */}
+      <ProductDeleteReportModal
+        isOpen={Boolean(productToDelete)}
+        onClose={() => {
+          setProductToDelete(null);
+          setDeleteReport(null);
+        }}
+        product={productToDelete}
+        onConfirmDelete={handleConfirmDeleteProduct}
+        report={deleteReport}
+        isDeleting={isDeletingProduct}
+      />
     </div>
   );
 };

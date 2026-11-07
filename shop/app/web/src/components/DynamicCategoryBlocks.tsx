@@ -260,6 +260,24 @@ export const CategorySectionBlock: React.FC<{
     };
   });
 
+  // Bộ lọc phòng vệ (Filter Guard): Loại bỏ hoàn toàn các thẻ mồ côi (orphaned ghost cards)
+  // Nếu thẻ được gắn với 1 product_id nhưng sản phẩm không còn tồn tại trong allCategoryProducts
+  // VÀ không có image_url tự nhập -> TUYỆT ĐỐI KHÔNG HIỂN THỊ THẺ MA
+  cards = cards.filter((it) => {
+    const rawProdId = (it as any).product_id;
+    const isLinkedToProduct = Boolean(rawProdId) || Boolean(it.id && it.id.startsWith('card_'));
+    if (isLinkedToProduct) {
+      const exists = allCategoryProducts.some(
+        (p) => p.id === rawProdId || p.id === it.id || p.slug === it.id || `card_${p.id}` === it.id
+      );
+      if (!exists && !it.image_url?.trim()) {
+        return false;
+      }
+    }
+    const hasValidContent = Boolean(it.display_title?.trim()) || Boolean(it.image_url?.trim()) || allCategoryProducts.some(p => p.id === rawProdId || p.id === it.id);
+    return hasValidContent;
+  });
+
   if (cards.length === 0) return null;
 
   const anchorId =

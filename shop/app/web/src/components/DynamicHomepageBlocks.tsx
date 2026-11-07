@@ -258,7 +258,9 @@ export const SectionGroupsBlock: React.FC<{
   return (
     <div className="space-y-12">
       {activeSections.map((sec) => {
-        const activeItems = (sec.items || []).filter((it) => it.is_active !== false);
+        const activeItems = (sec.items || []).filter(
+          (it) => it.is_active !== false && (Boolean(it.image_url?.trim()) || Boolean(it.display_title?.trim()))
+        );
         if (activeItems.length === 0) return null;
 
         return (

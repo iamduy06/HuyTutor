@@ -398,8 +398,14 @@ export const apiClient = {
 
   async deleteProduct(slug: string): Promise<{
     ok: boolean;
-    deleted: boolean;
+    deleted?: boolean;
     message: string;
+    deletedProduct?: {
+      id: string;
+      slug: string;
+      title: string;
+    };
+    report?: import('../types').CascadeDeleteProductReport;
   }> {
     return requestJson(`/api/admin/products/${encodeURIComponent(slug)}`, {
       method: 'DELETE',
