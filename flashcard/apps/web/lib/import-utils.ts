@@ -1,27 +1,30 @@
 /**
- * Normalizes date strings (dd/mm/yyyy or dd-mm-yyyy or yyyy-mm-dd) to ISO 8601 at 23:59:59.
+ * Normalizes date strings (dd/mm/yyyy or dd-mm-yyyy or yyyy-mm-dd or ISO) to ISO 8601 at UTC 23:59:59.
  * Returns null if invalid format.
  */
 export function parseDateToISO(dateStr: any): string | null {
-  if (!dateStr || typeof dateStr !== "string") return null;
-  const parts = dateStr.split(/[/-]/);
-  if (parts.length !== 3) return null;
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
 
-  // Handle yyyy-mm-dd format
-  if (parts[0].length === 4) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    const date = new Date(year, month, day, 23, 59, 59);
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch;
+    const date = new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), 23, 59, 59));
     return isNaN(date.getTime()) ? null : date.toISOString();
   }
 
-  // Handle dd/mm/yyyy format
-  const day = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1;
-  const year = parseInt(parts[2], 10);
+  // YYYY-MM-DD or YYYY/MM/DD
+  const ymdMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    const date = new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), 23, 59, 59));
+    return isNaN(date.getTime()) ? null : date.toISOString();
+  }
 
-  const date = new Date(year, month, day, 23, 59, 59);
+  // Fallback for valid ISO or RFC strings
+  const date = new Date(trimmed);
   return isNaN(date.getTime()) ? null : date.toISOString();
 }
 
