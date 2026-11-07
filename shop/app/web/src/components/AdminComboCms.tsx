@@ -32,6 +32,7 @@ import { UniversalBlockPickerModal } from './UniversalBlockPickerModal';
 import { UniversalBlockRenderer } from './UniversalBlockRenderer';
 import { UniversalBlockItemEditor } from './UniversalBlockItemEditor';
 import { UNIVERSAL_BLOCK_CATALOG } from './universalCatalog';
+import { ReorderableProductSelector } from './ReorderableProductSelector';
 
 const COMBO_BLOCK_META: Record<
   ComboBlockType,
@@ -785,33 +786,14 @@ export const EditComboPackagesConfig: React.FC<{
                   />
                 </div>
 
-                {/* Chọn tài liệu thuộc gói */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Chọn các tài liệu trong gói ({totalCount} sách đã chọn):
-                  </label>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 bg-white grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {allProducts.map((p) => {
-                      const isChecked = (pkg.product_ids || []).includes(p.id);
-                      return (
-                        <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              const current = pkg.product_ids || [];
-                              const updated = e.target.checked
-                                ? [...current, p.id]
-                                : current.filter((id) => id !== p.id);
-                              handleUpdatePackage(idx, { product_ids: updated });
-                            }}
-                          />
-                          <span className="text-[11px] text-gray-800 line-clamp-1">{p.title}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* Chọn tài liệu thuộc gói kèm sắp xếp thứ tự */}
+                <ReorderableProductSelector
+                  label={`Chọn & Sắp xếp thứ tự tài liệu trong gói (${totalCount} sách đã chọn)`}
+                  selectedIds={pkg.product_ids || []}
+                  allProducts={allProducts}
+                  onChange={(updated) => handleUpdatePackage(idx, { product_ids: updated })}
+                  helpText="Thứ tự từ trên xuống dưới tương ứng với thứ tự sách hiển thị trong chi tiết gói Combo."
+                />
 
                 {/* BẢNG CẤU HÌNH 5 ĐỊNH DẠNG & GIÁ COMBO (Khởi tạo rỗng, tính động 100%) */}
                 <div className="border border-pink-100 rounded-md bg-white p-3 space-y-2.5">
@@ -1022,32 +1004,14 @@ export const EditComboSectionsConfig: React.FC<{
                 />
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                  Chọn các tài liệu trong nhóm ({group.product_ids?.length || 0} sách đã chọn):
-                </label>
-                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 bg-white grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {allProducts.map((p) => {
-                    const isChecked = (group.product_ids || []).includes(p.id);
-                    return (
-                      <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const current = group.product_ids || [];
-                            const updated = e.target.checked
-                              ? [...current, p.id]
-                              : current.filter((id) => id !== p.id);
-                            handleUpdateGroup(idx, { product_ids: updated });
-                          }}
-                        />
-                        <span className="text-[11px] text-gray-800 line-clamp-1">{p.title}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Chọn tài liệu trong nhóm kèm sắp xếp thứ tự */}
+              <ReorderableProductSelector
+                label={`Chọn & Sắp xếp thứ tự tài liệu trong nhóm (${group.product_ids?.length || 0} sách đã chọn)`}
+                selectedIds={group.product_ids || []}
+                allProducts={allProducts}
+                onChange={(updated) => handleUpdateGroup(idx, { product_ids: updated })}
+                helpText="Thứ tự từ trên xuống dưới tương ứng từ trái qua phải trên lưới 3 cột ngoài web."
+              />
             </div>
           ))}
         </div>

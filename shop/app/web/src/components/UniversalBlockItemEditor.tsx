@@ -1,6 +1,7 @@
 import { buildProductUrl } from '../utils/urlHelper';
 import React from 'react';
 import { apiClient } from '../api/client';
+import { ReorderableProductSelector } from './ReorderableProductSelector';
 import {
   BottomCtaBlockConfig,
   CategoryBannerBlockConfig,
@@ -710,6 +711,10 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   // ==========================================
   if (block.type === 'category_section' || block.type === 'combo_sections') {
     const secCfg = cfg as CategorySectionBlockConfig;
+    const currentSelectedIds: string[] = Array.isArray(secCfg.items)
+      ? secCfg.items.map((it: any) => it.product_id || it.id?.replace(/^card_/, '') || it.id)
+      : (cfg as any).groups?.[0]?.product_ids || [];
+
     return (
       <div className="space-y-4">
         <div>
@@ -723,56 +728,26 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
           />
         </div>
 
-        <div className="bg-gray-50 border border-gray-200 rounded p-3">
-          <label className="block font-bold text-gray-800 mb-1">
-            Chọn tài liệu hiển thị trong nhóm (Lưới 3 cột chuẩn)
-          </label>
-          <div className="max-h-48 overflow-y-auto border border-gray-200 rounded bg-white p-2 space-y-1">
-            {allProducts.map((prod) => {
-              const selectedIds: string[] = Array.isArray(secCfg.items)
-                ? secCfg.items.map((it: any) => it.product_id || it.id)
-                : (cfg as any).groups?.[0]?.product_ids || [];
-              const isSelected = selectedIds.includes(prod.id);
-
-              return (
-                <label
-                  key={prod.id}
-                  className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer ${
-                    isSelected ? 'bg-pink-50 text-[#e60049] font-bold' : 'hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={(e) => {
-                      let nextIds: string[];
-                      if (e.target.checked) {
-                        nextIds = [...selectedIds, prod.id];
-                      } else {
-                        nextIds = selectedIds.filter((id) => id !== prod.id);
-                      }
-                      const newItems = nextIds.map((id) => {
-                        const found = allProducts.find((p) => p.id === id);
-                        return {
-                          id: `card_${id}`,
-                          product_id: id,
-                          title: found?.title || 'Tài liệu',
-                          image_url: found?.thumbnail_url || '',
-                          badge_tag: found?.cover_tag || 'MỚI',
-                          target_url: buildProductUrl(found?.category_slug, found?.slug),
-                        };
-                      });
-                      onUpdateConfig({ items: newItems, product_ids: nextIds });
-                    }}
-                    className="rounded text-[#e60049] focus:ring-[#e60049]"
-                  />
-                  <span>{prod.title}</span>
-                  <span className="text-[10px] text-gray-400">({prod.category_slug})</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        <ReorderableProductSelector
+          label="Chọn & Sắp xếp thứ tự tài liệu trong nhóm (Lưới 3 cột chuẩn)"
+          selectedIds={currentSelectedIds}
+          allProducts={allProducts}
+          onChange={(newOrderedIds) => {
+            const newItems = newOrderedIds.map((id) => {
+              const found = allProducts.find((p) => p.id === id || p.slug === id);
+              return {
+                id: `card_${id}`,
+                product_id: id,
+                title: found?.title || 'Tài liệu',
+                image_url: found?.thumbnail_url || '',
+                badge_tag: found?.cover_tag || 'MỚI',
+                target_url: found ? buildProductUrl(found.category_slug, found.slug) : '#',
+              };
+            });
+            onUpdateConfig({ items: newItems, product_ids: newOrderedIds });
+          }}
+          helpText="Thứ tự từ trên xuống dưới tương ứng từ trái qua phải ngoài trang web. Dùng [▲] [▼] hoặc gõ số để đảo thứ tự."
+        />
       </div>
     );
   }
@@ -1696,6 +1671,10 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   if (block.type === 'related_products') {
     const relCfg = cfg as RelatedProductsBlockConfig;
     const mode = relCfg.mode || 'auto';
+    const manualIds =
+      (relCfg as any).product_ids ||
+      (relCfg.items || []).map((it: any) => it.product_id || it.id) ||
+      [];
 
     return (
       <div className="space-y-4">
@@ -1718,7 +1697,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
               className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
             >
               <option value="auto">Tự động (Lấy các sản phẩm cùng chuyên mục)</option>
-              <option value="manual">Thủ công (Chỉ định danh sách)</option>
+              <option value="manual">Thủ công (Chỉ định danh sách & thứ tự)</option>
             </select>
           </div>
         </div>
@@ -1734,6 +1713,29 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
             className="w-32 border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
           />
         </div>
+
+        {mode === 'manual' && (
+          <ReorderableProductSelector
+            label="Chọn & Sắp xếp tài liệu liên quan thủ công"
+            selectedIds={manualIds}
+            allProducts={allProducts}
+            onChange={(newOrderedIds) => {
+              const newItems = newOrderedIds.map((id) => {
+                const found = allProducts.find((p) => p.id === id || p.slug === id);
+                return {
+                  id,
+                  product_id: id,
+                  title: found?.title || 'Tài liệu',
+                  image_url: found?.thumbnail_url || '',
+                  badge_tag: found?.cover_tag || '',
+                  target_url: found ? buildProductUrl(found.category_slug, found.slug) : '#',
+                };
+              });
+              onUpdateConfig({ items: newItems, product_ids: newOrderedIds });
+            }}
+            helpText="Thứ tự hiển thị trên lưới tài liệu liên quan."
+          />
+        )}
       </div>
     );
   }
@@ -1758,34 +1760,13 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
           />
         </div>
 
-        <div>
-          <label className="block font-bold text-gray-700 mb-1">
-            Chọn các sản phẩm bán kèm ({selectedIds.length} đã chọn):
-          </label>
-          <div className="border border-gray-200 rounded-md p-3 bg-gray-50 max-h-56 overflow-y-auto space-y-1.5">
-            {allProducts.map((p) => {
-              const isChecked = selectedIds.includes(p.id);
-              return (
-                <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onUpdateConfig({ product_ids: [...selectedIds, p.id] });
-                      } else {
-                        onUpdateConfig({ product_ids: selectedIds.filter((id) => id !== p.id) });
-                      }
-                    }}
-                    className="accent-[#e60049]"
-                  />
-                  <span className="text-xs text-gray-800 font-medium">{p.title}</span>
-                  <span className="text-[10px] text-gray-400">({p.code})</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        <ReorderableProductSelector
+          label={`Chọn & Sắp xếp các sản phẩm bán kèm (${selectedIds.length} đã chọn)`}
+          selectedIds={selectedIds}
+          allProducts={allProducts}
+          onChange={(newOrderedIds) => onUpdateConfig({ product_ids: newOrderedIds })}
+          helpText="Thứ tự từ trên xuống dưới tương ứng từ trái qua phải trên khối bán kèm."
+        />
       </div>
     );
   }
