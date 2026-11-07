@@ -107,22 +107,30 @@ export async function login(req: Request, res: Response): Promise<void> {
       device_id
     });
 
-    // 5. Lưu phiên vào public.user_sessions có thời hạn 3 NGÀY
-    await createSession({
-      userId: user.id,
-      sessionToken: token,
-      deviceId: device_id,
-      deviceName: device_name,
-      appName: app || 'sso',
-      ipAddress: clientIp,
-      userAgent
-    });
+    // 5. Lưu phiên vào public.user_sessions có thời hạn 3 NGÀY (bọc try-catch an toàn để không chặn luồng đăng nhập)
+    try {
+      await createSession({
+        userId: user.id,
+        sessionToken: token,
+        deviceId: device_id,
+        deviceName: device_name,
+        appName: app || 'sso',
+        ipAddress: clientIp,
+        userAgent
+      });
+    } catch (sessErr) {
+      console.warn('[SSO_LOGIN_SESSION_WARN] Không thể lưu user_sessions:', sessErr);
+    }
 
-    // Cập nhật last_login_at
-    await supabaseRest(`users?id=eq.${user.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ last_login_at: new Date().toISOString() })
-    });
+    // Cập nhật last_login_at (bọc try-catch an toàn)
+    try {
+      await supabaseRest(`users?id=eq.${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ last_login_at: new Date().toISOString() })
+      });
+    } catch (patchErr) {
+      console.warn('[SSO_LOGIN_PATCH_WARN] Không thể cập nhật last_login_at:', patchErr);
+    }
 
     // 6. Cấp Master Cookie ht_sso_token (3 ngày)
     const isProd = process.env.NODE_ENV === 'production';

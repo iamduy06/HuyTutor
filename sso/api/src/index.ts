@@ -48,7 +48,7 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'Huy Tutor Centralized SSO API Server',
-    version: '2.0.0',
+    version: '2.0.1',
     tokenTtl: '3 days (259,200s)',
     timestamp: new Date().toISOString()
   });

@@ -16,20 +16,29 @@ export interface CreateSessionParams {
 export async function createSession(params: CreateSessionParams): Promise<void> {
   const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
-  await supabaseRest('user_sessions', {
-    method: 'POST',
-    body: JSON.stringify({
-      user_id: params.userId,
-      session_token: params.sessionToken,
-      device_id: params.deviceId || null,
-      device_name: params.deviceName || null,
-      app_source: params.appName || 'sso',
-      ip_address: params.ipAddress || null,
-      user_agent: params.userAgent || null,
-      expires_at: expiresAt,
-      is_revoked: false
-    })
-  });
+  try {
+    const res = await supabaseRest('user_sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: params.userId,
+        session_token: params.sessionToken,
+        device_id: params.deviceId || null,
+        device_name: params.deviceName || null,
+        app_source: params.appName || 'sso',
+        ip_address: params.ipAddress || null,
+        user_agent: params.userAgent || null,
+        expires_at: expiresAt,
+        is_revoked: false
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.warn(`[createSession] Không thể lưu session_token vào DB (HTTP ${res.status}): ${errText}`);
+    }
+  } catch (err) {
+    console.warn('[createSession] Ngoại lệ khi lưu session vào DB:', err);
+  }
 }
 
 /**

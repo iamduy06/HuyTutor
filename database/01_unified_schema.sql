@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
 CREATE TABLE IF NOT EXISTS public.user_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  session_token VARCHAR(255) NOT NULL UNIQUE,      -- JWT hoặc Session ID
+  session_token TEXT NOT NULL UNIQUE,              -- JWT hoặc Session ID (độ dài linh hoạt cho JWT HS256)
   app_source VARCHAR(50) DEFAULT 'shop',           -- 'shop' | 'flashcard' | 'sso'
   device_id TEXT DEFAULT '',
   device_name TEXT DEFAULT '',
