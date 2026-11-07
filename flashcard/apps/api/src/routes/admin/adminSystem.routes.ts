@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
@@ -158,23 +160,23 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
   const results = [];
 
   for (const row of rows) {
-    const email = typeof row.email === 'string' ? row.email.trim() : row.email || '';
-    const password = row.password?.trim() || 'goidangkyflashcard';
-    const rawGroupId = typeof row.group_id === 'string' ? row.group_id.trim() : row.group_id;
+    const rawEmail = typeof row.email === 'string' ? row.email.trim() : (row.email ? String(row.email).trim() : '');
+    const cleanEmail = rawEmail.toLowerCase();
+    const rawGroupId = typeof row.group_id === 'string' ? row.group_id.trim() : (row.group_id ? String(row.group_id).trim() : '');
     const groupId = rawGroupId || DEFAULT_GROUP_ID;
-    const role = (row.role || 'USER').toUpperCase();
+    const role = (row.role ? String(row.role).trim().toUpperCase() : 'USER');
     const deckList = parseStringArray(row.deck);
     const expireAt = parseDateToISO(row.expire_at);
 
-    if (!email || !email.includes('@')) {
-      results.push({ email: email || 'N/A', status: 'error', error: 'Email không hợp lệ' });
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      results.push({ email: rawEmail || 'N/A', status: 'error', error: 'Email không hợp lệ' });
       continue;
     }
 
     if (role === 'SUBADMIN') {
       if (RESTRICTED_GROUPS.includes(groupId)) {
         results.push({
-          email,
+          email: cleanEmail,
           status: 'error',
           error: 'SUBADMIN không được thuộc nhóm hệ thống mặc định',
         });
@@ -189,58 +191,145 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
 
       if (!group || group.is_system) {
         results.push({
-          email,
+          email: cleanEmail,
           status: 'error',
           error: 'SUBADMIN phải thuộc nhóm người dùng (is_system=false)',
         });
         continue;
       }
-    }
+    } else {
+      const { data: groupEx } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('id', groupId)
+        .maybeSingle();
 
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { role, skip_system_group: true },
-    });
-
-    let userId = authData?.user?.id;
-
-    if (authError) {
-      if (authError.message.includes('already been registered') || (authError as any).status === 422) {
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-        userId = existingUser?.id;
-      } else {
-        results.push({ email, status: 'error', error: authError.message });
+      if (!groupEx) {
+        results.push({
+          email: cleanEmail,
+          status: 'error',
+          error: 'Group ID không tồn tại',
+        });
         continue;
       }
     }
 
-    if (!userId) {
-      results.push({ email, status: 'error', error: 'Không thể định danh tài khoản' });
-      continue;
+    // 1. Kiểm tra tài khoản đã tồn tại trong public.users
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email, password_hash, role')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    let userId: string;
+
+    if (!existingUser) {
+      // User mới: băm mật khẩu từ file (nếu trống dùng mặc định 'goidangkyflashcard')
+      userId = crypto.randomUUID();
+      const initialPassword = (typeof row.password === 'string' ? row.password.trim() : '') || 'goidangkyflashcard';
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+      const { error: insertErr } = await supabase.from('users').insert({
+        id: userId,
+        email: cleanEmail,
+        password_hash: hashedPassword,
+        role,
+        full_name: cleanEmail.split('@')[0],
+        is_active: true,
+      });
+
+      if (insertErr) {
+        results.push({
+          email: cleanEmail,
+          status: 'error',
+          error: `Lỗi tạo tài khoản: ${insertErr.message}`,
+        });
+        continue;
+      }
+    } else {
+      // User đã tồn tại:
+      // Quy tắc: Nếu cột password hash đã có giá trị thì giữ nguyên cột password_hash trên db, không chỉnh sửa!
+      // Chỉ khi cột password_hash chưa có giá trị mới ghi mới.
+      userId = existingUser.id;
+      const updatePayload: any = { role, is_active: true };
+
+      if (!existingUser.password_hash) {
+        const pwdToHash = (typeof row.password === 'string' ? row.password.trim() : '') || 'goidangkyflashcard';
+        updatePayload.password_hash = await bcrypt.hash(pwdToHash, 10);
+      }
+
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update(updatePayload)
+        .eq('id', userId);
+
+      if (updateErr) {
+        results.push({
+          email: cleanEmail,
+          status: 'error',
+          error: `Lỗi cập nhật tài khoản: ${updateErr.message}`,
+        });
+        continue;
+      }
     }
 
-    await supabase.from('users').upsert({ id: userId, email, role });
-    await supabase.from('group_users').upsert(
+    // 2. Gán nhóm vào group_users
+    const { error: guErr } = await supabase.from('group_users').upsert(
       { group_id: groupId, user_id: userId, is_subadmin: role === 'SUBADMIN' },
       { onConflict: 'group_id,user_id' }
     );
 
-    if (deckList.length > 0) {
-      const userDeckRows = deckList.map(deckId => ({
-        user_id: userId,
-        deck_id: deckId,
-        expired_at: expireAt,
-      }));
-      await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
+    if (guErr) {
+      results.push({
+        email: cleanEmail,
+        status: 'error',
+        error: `Lỗi gán nhóm: ${guErr.message}`,
+      });
+      continue;
     }
 
-    results.push({ email, status: 'success', user_id: userId });
+    // 3. Gán bộ đề vào user_decks (nếu có danh sách đề)
+    const resolvedDeckIds: string[] = [];
+    const deckErrors: string[] = [];
+
+    if (deckList.length > 0) {
+      for (const dItem of deckList) {
+        const cleanDeck = String(dItem).trim().replace(/["'\\]/g, '');
+        if (!cleanDeck) continue;
+        const { data: dData } = await supabase
+          .from('decks')
+          .select('id')
+          .or(`id.eq.${cleanDeck},title.eq.${cleanDeck}`)
+          .maybeSingle();
+
+        if (dData) {
+          resolvedDeckIds.push(dData.id);
+        } else {
+          deckErrors.push(cleanDeck);
+        }
+      }
+
+      if (resolvedDeckIds.length > 0) {
+        const userDeckRows = resolvedDeckIds.map(deckId => ({
+          user_id: userId,
+          deck_id: deckId,
+          expired_at: expireAt,
+          progress_percent: 0,
+          learned_count: 0,
+          streak: 0,
+        }));
+        await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
+      }
+    }
+
+    results.push({
+      email: cleanEmail,
+      status: 'success',
+      user_id: userId,
+      message: deckErrors.length > 0
+        ? `Thành công (nhưng không tìm thấy bộ đề: ${deckErrors.join(', ')})`
+        : (existingUser ? 'Cập nhật tài khoản thành công' : 'Tạo mới tài khoản thành công'),
+    });
   }
 
   return res.status(200).json({ results });
@@ -254,11 +343,11 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
   const results = [];
 
   for (const row of rows) {
-    const deckId = row.id;
+    const rawDeckId = typeof row.id === 'string' ? row.id.trim() : (row.id ? String(row.id).trim() : '');
     const userList = parseStringArray(row.user);
     const expireAt = parseDateToISO(row.expire_at);
 
-    if (!deckId) {
+    if (!rawDeckId) {
       results.push({ id: 'N/A', status: 'error', error: 'Thiếu Deck ID' });
       continue;
     }
@@ -266,20 +355,21 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
     const { data: deck } = await supabase
       .from('decks')
       .select('id')
-      .eq('id', deckId)
+      .or(`id.eq.${rawDeckId},title.eq.${rawDeckId}`)
       .maybeSingle();
 
     if (!deck) {
-      results.push({ id: deckId, status: 'error', error: 'Bộ đề không tồn tại' });
+      results.push({ id: rawDeckId, status: 'error', error: 'Bộ đề không tồn tại' });
       continue;
     }
 
     const resolvedUserIds: string[] = [];
-    const userErrors = [];
+    const userErrors: string[] = [];
     for (const uItem of userList) {
       const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      if (!cleanItem) continue;
       const query = cleanItem.includes('@')
-        ? supabase.from('users').select('id').eq('email', cleanItem).maybeSingle()
+        ? supabase.from('users').select('id').eq('email', cleanItem.toLowerCase()).maybeSingle()
         : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
       const { data: uData } = await query;
       if (uData) resolvedUserIds.push(uData.id);
@@ -288,9 +378,9 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
 
     if (userErrors.length > 0) {
       results.push({
-        id: deckId,
+        id: rawDeckId,
         status: 'error',
-        error: `User ko tìm thấy: ${userErrors.join(', ')}`,
+        error: `User không tìm thấy: ${userErrors.join(', ')}`,
       });
       continue;
     }
@@ -298,13 +388,21 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
     if (resolvedUserIds.length > 0) {
       const userDeckRows = resolvedUserIds.map(userId => ({
         user_id: userId,
-        deck_id: deckId,
+        deck_id: deck.id,
         expired_at: expireAt,
+        progress_percent: 0,
+        learned_count: 0,
+        streak: 0,
       }));
       await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
     }
 
-    results.push({ id: deckId, status: 'success', users_count: resolvedUserIds.length });
+    results.push({
+      id: rawDeckId,
+      status: 'success',
+      users_count: resolvedUserIds.length,
+      message: `Đã gán ${resolvedUserIds.length} người dùng vào bộ đề`,
+    });
   }
 
   return res.status(200).json({ results });
@@ -318,13 +416,13 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
   const results = [];
 
   for (const row of rows) {
-    const groupId = row.id;
+    const rawGroupId = typeof row.id === 'string' ? row.id.trim() : (row.id ? String(row.id).trim() : '');
     const userList = parseStringArray(row.users);
     const deckList = parseStringArray(row.decks);
     const expireAt = parseDateToISO(row.expire_at);
     const assignAll = String(row.assign_all).toLowerCase() === 'true';
 
-    if (!groupId) {
+    if (!rawGroupId) {
       results.push({ id: 'N/A', status: 'error', error: 'Thiếu Group ID' });
       continue;
     }
@@ -332,39 +430,53 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
     const { data: group, error: gErr } = await supabase
       .from('groups')
       .select('id')
-      .eq('id', groupId)
+      .eq('id', rawGroupId)
       .maybeSingle();
 
     if (gErr || !group) {
-      results.push({ id: groupId, status: 'error', error: 'Nhóm không tồn tại' });
+      results.push({ id: rawGroupId, status: 'error', error: 'Nhóm không tồn tại' });
       continue;
     }
 
     const resolvedUserIds: string[] = [];
+    const userErrors: string[] = [];
     for (const uItem of userList) {
       const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      if (!cleanItem) continue;
       const query = cleanItem.includes('@')
-        ? supabase.from('users').select('id').eq('email', cleanItem).maybeSingle()
+        ? supabase.from('users').select('id').eq('email', cleanItem.toLowerCase()).maybeSingle()
         : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
       const { data: uData } = await query;
       if (uData) resolvedUserIds.push(uData.id);
+      else userErrors.push(uItem);
     }
 
     const resolvedDeckIds: string[] = [];
+    const deckErrors: string[] = [];
     for (const dItem of deckList) {
       const cleanDeck = String(dItem).trim().replace(/["'\\]/g, '');
+      if (!cleanDeck) continue;
       const byId = await supabase.from('decks').select('id').eq('id', cleanDeck).maybeSingle();
       if (byId.data) {
         resolvedDeckIds.push(byId.data.id);
       } else {
         const byTitle = await supabase.from('decks').select('id').eq('title', cleanDeck).maybeSingle();
         if (byTitle.data) resolvedDeckIds.push(byTitle.data.id);
+        else deckErrors.push(dItem);
       }
+    }
+
+    if (userErrors.length > 0 || deckErrors.length > 0) {
+      const errParts = [];
+      if (userErrors.length > 0) errParts.push(`User không tìm thấy: ${userErrors.join(', ')}`);
+      if (deckErrors.length > 0) errParts.push(`Bộ đề không tìm thấy: ${deckErrors.join(', ')}`);
+      results.push({ id: rawGroupId, status: 'error', error: errParts.join(' | ') });
+      continue;
     }
 
     if (resolvedUserIds.length > 0) {
       const groupUserRows = resolvedUserIds.map(uId => ({
-        group_id: groupId,
+        group_id: rawGroupId,
         user_id: uId,
       }));
       await supabase.from('group_users').upsert(groupUserRows, { onConflict: 'group_id,user_id' });
@@ -372,7 +484,7 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
 
     if (resolvedDeckIds.length > 0) {
       const groupDeckRows = resolvedDeckIds.map(dId => ({
-        group_id: groupId,
+        group_id: rawGroupId,
         deck_id: dId,
         expired_at: expireAt,
       }));
@@ -387,6 +499,9 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
             user_id: uId,
             deck_id: dId,
             expired_at: expireAt,
+            progress_percent: 0,
+            learned_count: 0,
+            streak: 0,
           });
         });
       });
@@ -394,10 +509,11 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
     }
 
     results.push({
-      id: groupId,
+      id: rawGroupId,
       status: 'success',
       users_count: resolvedUserIds.length,
       decks_count: resolvedDeckIds.length,
+      message: `Đã cập nhật ${resolvedUserIds.length} users và ${resolvedDeckIds.length} decks`,
     });
   }
 

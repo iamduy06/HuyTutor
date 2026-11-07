@@ -82,39 +82,41 @@ router.get('/admin/users', async (req: Request, res: Response) => {
 // POST /admin/users
 router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (req: Request, res: Response) => {
   const body = req.body;
-  const { email, role = 'USER', max_devices, group_id, auto_assign_group_decks } = body;
+  const { email, role = 'USER', max_devices, group_id, auto_assign_group_decks, auto_assign_group_decks_expiry } = body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const password = body.password?.trim() || 'goidangkyflashcard';
+  const cleanEmail = email.trim().toLowerCase();
   const supabase = getAdminClient();
 
+  // 1. Kiểm tra tài khoản đã tồn tại hay chưa
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', cleanEmail)
+    .maybeSingle();
+
+  if (existingUser) {
+    return res.status(400).json({ error: 'Email này đã tồn tại trên hệ thống' });
+  }
+
+  const password = body.password?.trim() || 'goidangkyflashcard';
   const hashedPassword = await bcrypt.hash(password, 10);
-  const cleanEmail = email.trim().toLowerCase();
+  const userId = crypto.randomUUID();
 
-  // Optionally create in Supabase Auth GoTrue for backward-compat
-  const { data: authUser } = await supabase.auth.admin.createUser({
-    email: cleanEmail,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      role,
-      created_by_admin: true,
-      skip_system_group: !!(group_id && group_id !== 'none'),
-    },
-  }).catch(() => ({ data: null }));
-
-  const userId = authUser?.user?.id || crypto.randomUUID();
-
-  const { data: insertedUser, error: insertErr } = await supabase.from('users').upsert({
+  // 2. Thêm mới vào public.users với password_hash tự chủ
+  const { data: insertedUser, error: insertErr } = await supabase.from('users').insert({
     id: userId,
     email: cleanEmail,
     password_hash: hashedPassword,
     role,
+    full_name: cleanEmail.split('@')[0],
+    is_active: true,
     max_devices: max_devices !== undefined && max_devices !== null && max_devices !== '' ? Number(max_devices) : null,
   }).select().single();
 
   if (insertErr) return res.status(400).json({ error: insertErr.message });
 
+  // 3. Gán nhóm và bộ đề nếu có
   if (group_id && group_id !== 'none') {
     await supabase.from('group_users').insert({
       group_id,
@@ -129,17 +131,18 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
         .eq('group_id', group_id);
 
       if (groupDecks && groupDecks.length > 0) {
+        const finalExpiry = auto_assign_group_decks_expiry || null;
         const userDeckRows = groupDecks.map((gd: any) => ({
           user_id: userId,
           deck_id: gd.deck_id,
-          expired_at: gd.expired_at || null,
+          expired_at: finalExpiry || gd.expired_at || null,
         }));
         await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
       }
     }
   }
 
-  return res.status(200).json({ user: authUser?.user ?? insertedUser, tempPassword: password });
+  return res.status(200).json({ user: insertedUser, tempPassword: password });
 });
 
 // PATCH /admin/users/:id
@@ -154,7 +157,8 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
     const newPassword = generatePassword(8);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', id);
-    await supabase.auth.admin.updateUserById(id, { password: newPassword }).catch(() => {});
+    // Thu hồi các phiên đăng nhập cũ
+    await supabase.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
     memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ tempPassword: newPassword });
   }
@@ -182,7 +186,7 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
 
   // Assign Group
   if (body.action === 'assign_group') {
-    const { group_id, revoke_old_decks, assign_new_decks } = body;
+    const { group_id, revoke_old_decks, assign_new_decks, assign_new_decks_expiry } = body;
 
     let oldGroupId = null;
     if (revoke_old_decks) {
@@ -224,10 +228,11 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
         .eq('group_id', group_id);
 
       if (newDecks && newDecks.length > 0) {
+        const finalExpiry = assign_new_decks_expiry || null;
         const userDeckRows = newDecks.map((gd: any) => ({
           user_id: id,
           deck_id: gd.deck_id,
-          expired_at: gd.expired_at || null,
+          expired_at: finalExpiry || gd.expired_at || null,
         }));
         await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
       }
@@ -272,6 +277,24 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
     return res.status(200).json({ success: true });
   }
 
+  // Update Deck Progress
+  if (body.action === 'update_deck_progress') {
+    const { deck_id, progress_percent, learned_count, expired_at } = body;
+    const updateFields: any = {};
+    if (progress_percent !== undefined) updateFields.progress_percent = progress_percent;
+    if (learned_count !== undefined) updateFields.learned_count = learned_count;
+    if (expired_at !== undefined) updateFields.expired_at = expired_at;
+
+    const { error } = await supabase
+      .from('user_decks')
+      .update(updateFields)
+      .eq('user_id', id)
+      .eq('deck_id', deck_id);
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  }
+
   // Remove Device
   if (body.action === 'remove_device') {
     const { error } = await supabase
@@ -306,7 +329,7 @@ router.delete('/admin/users/:id', validate({ params: idParamSchema }), async (re
 
   const supabase = getAdminClient();
   await supabase.from('users').delete().eq('id', id);
-  await supabase.auth.admin.deleteUser(id).catch(() => {});
+  await supabase.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
   memoryCache.invalidateUserTokens(id);
   return res.status(200).json({ success: true });
 });

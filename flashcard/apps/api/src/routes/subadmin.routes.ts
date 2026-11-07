@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
@@ -54,6 +56,7 @@ async function canManage(me: any, targetId: string) {
 
   return !!targetInGroup;
 }
+
 // GET /subadmin/overview - Subadmin dashboard stats
 router.get('/subadmin/overview', async (req: Request, res: Response) => {
   const me = req.user!;
@@ -255,32 +258,53 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
     }
   }
 
-  const password = customPw?.trim() || 'goidangkyflashcard';
+  const cleanEmail = email.trim().toLowerCase();
 
-  // CRITICAL SECURITY FIX (SEC-002): Subadmins can NEVER create accounts with ADMIN or SUBADMIN role
-  const targetRole = me.role === 'ADMIN' ? role : 'USER';
+  // 1. Kiểm tra tài khoản đã tồn tại hay chưa
+  const { data: existingUser } = await admin
+    .from('users')
+    .select('id')
+    .eq('email', cleanEmail)
+    .maybeSingle();
 
-  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      role: targetRole,
-      skip_system_group: true,
-    },
-  });
-
-  if (authError) {
-    return res.status(400).json({ error: authError.message });
+  if (existingUser) {
+    return res.status(400).json({ error: 'Email này đã tồn tại trên hệ thống' });
   }
 
-  const userId = authUser.user.id;
+  const password = customPw?.trim() || 'goidangkyflashcard';
+  // CRITICAL SECURITY FIX (SEC-002): Subadmins can NEVER create accounts with ADMIN or SUBADMIN role
+  const targetRole = me.role === 'ADMIN' ? role : 'USER';
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const userId = crypto.randomUUID();
 
-  await Promise.all([
-    admin.from('users').upsert({ id: userId, email, role: targetRole }, { onConflict: 'id' }),
-    admin.from('group_users').insert({ group_id: targetGroupId, user_id: userId, is_subadmin: false }),
-  ]);
+  // 2. Tạo tài khoản trong public.users với password_hash tự chủ
+  const { data: newUser, error: insertErr } = await admin
+    .from('users')
+    .insert({
+      id: userId,
+      email: cleanEmail,
+      password_hash: hashedPassword,
+      role: targetRole,
+      full_name: cleanEmail.split('@')[0],
+      is_active: true,
+    })
+    .select()
+    .single();
 
+  if (insertErr) {
+    return res.status(400).json({ error: insertErr.message });
+  }
+
+  // 3. Gán thành viên vào nhóm
+  if (targetGroupId) {
+    await admin.from('group_users').insert({
+      group_id: targetGroupId,
+      user_id: userId,
+      is_subadmin: false,
+    });
+  }
+
+  // 4. Tự động gán bộ đề của nhóm nếu yêu cầu
   if (assign_all_decks && targetGroupId) {
     const { data: groupDecks } = await admin
       .from('group_decks')
@@ -312,7 +336,7 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
     }
   }
 
-  return res.status(200).json({ user: authUser.user, tempPassword: password });
+  return res.status(200).json({ user: newUser, tempPassword: password });
 });
 
 // PATCH /subadmin/users/:id
@@ -330,8 +354,10 @@ router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: suba
 
   if (body.action === 'reset_password') {
     const pw = generatePassword(8);
-    const { error } = await admin.auth.admin.updateUserById(id, { password: pw });
+    const hashedPassword = await bcrypt.hash(pw, 10);
+    const { error } = await admin.from('users').update({ password_hash: hashedPassword }).eq('id', id);
     if (error) return res.status(400).json({ error: error.message });
+    await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
     memoryCache.invalidateUserTokens(id);
     return res.status(200).json({ tempPassword: pw });
   }
@@ -496,8 +522,9 @@ router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async 
   }
 
   const admin = getAdminClient();
-  const { error } = await admin.auth.admin.deleteUser(id);
+  const { error } = await admin.from('users').delete().eq('id', id);
   if (error) return res.status(400).json({ error: error.message });
+  await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
   memoryCache.invalidateUserTokens(id);
 
   return res.status(200).json({ success: true });
@@ -639,7 +666,7 @@ router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), a
     .eq('id', group_id);
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ success: true });
+  return res.status(200).json({ success: true, branding: safeBranding });
 });
 
 export default router;
