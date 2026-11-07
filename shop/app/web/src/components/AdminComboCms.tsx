@@ -635,10 +635,44 @@ export const EditComboPackagesConfig: React.FC<{
   onUpdate: (cfg: Partial<ComboPackagesBlockConfig>) => void;
 }> = ({ config, allProducts, onUpdate }) => {
   const packages = config.packages || [];
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedMap((prev) => {
+      const current = prev[id] !== undefined ? prev[id] : packages.length === 1;
+      return { ...prev, [id]: !current };
+    });
+  };
+
+  const handleCollapseAll = () => {
+    const next: Record<string, boolean> = {};
+    packages.forEach((p) => {
+      next[p.id] = false;
+    });
+    setExpandedMap(next);
+  };
+
+  const handleExpandAll = () => {
+    const next: Record<string, boolean> = {};
+    packages.forEach((p) => {
+      next[p.id] = true;
+    });
+    setExpandedMap(next);
+  };
+
+  const handleMovePackage = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= packages.length) return;
+    const list = [...packages];
+    const [moved] = list.splice(index, 1);
+    list.splice(targetIdx, 0, moved);
+    onUpdate({ packages: list });
+  };
 
   const handleAddPackage = () => {
+    const newId = `pkg_${Date.now()}`;
     const newPkg: ComboPackageItem = {
-      id: `pkg_${Date.now()}`,
+      id: newId,
       title: 'TÊN GÓI COMBO MỚI',
       discount_badge: '',
       format_badge: 'File Word',
@@ -652,6 +686,7 @@ export const EditComboPackagesConfig: React.FC<{
       })),
       action_type: 'add_to_cart',
     };
+    setExpandedMap((prev) => ({ ...prev, [newId]: true }));
     onUpdate({ packages: [...packages, newPkg] });
   };
 
@@ -662,6 +697,9 @@ export const EditComboPackagesConfig: React.FC<{
   };
 
   const handleDeletePackage = (index: number) => {
+    const target = packages[index];
+    const targetTitle = target?.title?.trim() || `Gói #${index + 1}`;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa "${targetTitle}" khỏi danh sách?`)) return;
     const list = [...packages];
     list.splice(index, 1);
     onUpdate({ packages: list });
@@ -705,15 +743,35 @@ export const EditComboPackagesConfig: React.FC<{
       </div>
 
       <div className="border-t border-gray-100 pt-3 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="font-bold text-gray-800">Danh sách các Thẻ Gói Combo ({packages.length})</span>
-          <button
-            type="button"
-            onClick={handleAddPackage}
-            className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041] transition cursor-pointer"
-          >
-            + Thêm Thẻ Gói Mới
-          </button>
+          <div className="flex items-center gap-2">
+            {packages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCollapseAll}
+                  className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold px-2 py-1 rounded cursor-pointer transition"
+                >
+                  Thu gọn tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExpandAll}
+                  className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold px-2 py-1 rounded cursor-pointer transition"
+                >
+                  Mở rộng tất cả
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleAddPackage}
+              className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041] transition cursor-pointer"
+            >
+              + Thêm Thẻ Gói Mới
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -724,25 +782,85 @@ export const EditComboPackagesConfig: React.FC<{
             );
             const totalCount = selectedProds.length;
 
+            const isExpanded =
+              expandedMap[pkg.id] !== undefined ? expandedMap[pkg.id] : packages.length === 1;
+            const pkgTitle = pkg.title?.trim() || 'Chưa đặt tên gói';
+
             return (
               <div key={pkg.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3.5 shadow-xs">
+                {/* Header thanh công cụ của thẻ gói: Chevron + [▲][▼] + Tiêu đề dạng #1 - Tên gói (X tài liệu) + Xóa */}
                 <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-[#e60049] text-xs">Gói #{idx + 1}</span>
-                    <span className="text-[11px] text-gray-500 font-medium">
-                      ({totalCount} tài liệu được chọn)
-                    </span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {/* Nút mũi tên Chevron Thu gọn / Mở rộng */}
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(pkg.id)}
+                      className="p-1 text-gray-500 hover:text-[#e60049] hover:bg-white border border-transparent hover:border-gray-200 rounded cursor-pointer transition shrink-0"
+                      title={isExpanded ? 'Thu gọn thẻ gói này' : 'Mở rộng thẻ gói này'}
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? '' : '-rotate-90'}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Cụm nút di chuyển thứ tự [▲ Lên] và [▼ Xuống] */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMovePackage(idx, 'up')}
+                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Di chuyển Gói này lên trước"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === packages.length - 1}
+                        onClick={() => handleMovePackage(idx, 'down')}
+                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Di chuyển Gói này xuống sau"
+                      >
+                        ▼
+                      </button>
+                    </div>
+
+                    {/* Tiêu đề dạng #1 - [Tên gói tài liệu] (X tài liệu được chọn) */}
+                    <div
+                      onClick={() => toggleExpand(pkg.id)}
+                      className="flex items-center gap-1.5 cursor-pointer select-none truncate ml-0.5"
+                    >
+                      <span className="font-extrabold text-[#e60049] text-xs shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
+                      <span className="text-xs font-bold text-gray-900 truncate" title={pkg.title}>
+                        {pkgTitle}
+                      </span>
+                      <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
+                        ({totalCount} tài liệu được chọn)
+                      </span>
+                    </div>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => handleDeletePackage(idx)}
-                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer"
+                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer shrink-0 ml-2"
                   >
                     Xóa thẻ này
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Nội dung chi tiết thẻ gói (Ẩn khi thu gọn) */}
+                {isExpanded && (
+                  <div className="space-y-3.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div className="sm:col-span-2">
                     <label className="block text-[11px] font-bold text-gray-700 mb-1">Tên gói tài liệu *</label>
                     <textarea
@@ -917,6 +1035,8 @@ export const EditComboPackagesConfig: React.FC<{
                     })}
                   </div>
                 </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -932,13 +1052,48 @@ export const EditComboSectionsConfig: React.FC<{
   onUpdate: (cfg: Partial<ComboSectionsBlockConfig>) => void;
 }> = ({ config, allProducts, onUpdate }) => {
   const groups = config.groups || [];
+  const [expandedGroupMap, setExpandedGroupMap] = useState<Record<string, boolean>>({});
+
+  const toggleGroupExpand = (id: string) => {
+    setExpandedGroupMap((prev) => {
+      const current = prev[id] !== undefined ? prev[id] : groups.length === 1;
+      return { ...prev, [id]: !current };
+    });
+  };
+
+  const handleCollapseAllGroups = () => {
+    const next: Record<string, boolean> = {};
+    groups.forEach((g) => {
+      next[g.id] = false;
+    });
+    setExpandedGroupMap(next);
+  };
+
+  const handleExpandAllGroups = () => {
+    const next: Record<string, boolean> = {};
+    groups.forEach((g) => {
+      next[g.id] = true;
+    });
+    setExpandedGroupMap(next);
+  };
+
+  const handleMoveGroup = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= groups.length) return;
+    const list = [...groups];
+    const [moved] = list.splice(index, 1);
+    list.splice(targetIdx, 0, moved);
+    onUpdate({ groups: list });
+  };
 
   const handleAddGroup = () => {
+    const newId = `sec_${Date.now()}`;
     const newGroup: ComboSectionGroupItem = {
-      id: `sec_${Date.now()}`,
+      id: newId,
       title: 'TIÊU ĐỀ PHÂN NHÓM TÀI LIỆU MỚI',
       product_ids: [],
     };
+    setExpandedGroupMap((prev) => ({ ...prev, [newId]: true }));
     onUpdate({ groups: [...groups, newGroup] });
   };
 
@@ -949,6 +1104,9 @@ export const EditComboSectionsConfig: React.FC<{
   };
 
   const handleDeleteGroup = (index: number) => {
+    const target = groups[index];
+    const targetTitle = target?.title?.trim() || `Nhóm #${index + 1}`;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa "${targetTitle}" khỏi danh sách?`)) return;
     const list = [...groups];
     list.splice(index, 1);
     onUpdate({ groups: list });
@@ -963,57 +1121,149 @@ export const EditComboSectionsConfig: React.FC<{
           value={config.group_header || ''}
           onChange={(e) => onUpdate({ group_header: e.target.value })}
           placeholder="Xem chi tiết từng bộ tài liệu"
-          className="w-full border border-gray-300 rounded px-2.5 py-1.5"
+          className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs"
         />
       </div>
 
       <div className="border-t border-gray-100 pt-3 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="font-bold text-gray-800">Danh sách các Nhóm tài liệu ({groups.length})</span>
-          <button
-            type="button"
-            onClick={handleAddGroup}
-            className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041]"
-          >
-            + Thêm Nhóm Mới
-          </button>
+          <div className="flex items-center gap-2">
+            {groups.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCollapseAllGroups}
+                  className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold px-2 py-1 rounded cursor-pointer transition"
+                >
+                  Thu gọn tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExpandAllGroups}
+                  className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold px-2 py-1 rounded cursor-pointer transition"
+                >
+                  Mở rộng tất cả
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleAddGroup}
+              className="bg-[#e60049] text-white font-bold px-3 py-1 rounded text-xs hover:bg-[#cc0041] transition cursor-pointer"
+            >
+              + Thêm Nhóm Mới
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
-          {groups.map((group, idx) => (
-            <div key={group.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3">
-              <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                <span className="font-extrabold text-[#e60049]">Nhóm #{idx + 1}</span>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteGroup(idx)}
-                  className="text-red-600 hover:underline font-bold text-[11px]"
-                >
-                  Xóa nhóm này
-                </button>
-              </div>
+          {groups.map((group, idx) => {
+            const isExpanded =
+              expandedGroupMap[group.id] !== undefined
+                ? expandedGroupMap[group.id]
+                : groups.length === 1;
+            const groupTitle = group.title?.trim() || 'Chưa đặt tiêu đề nhóm';
+            const totalCount = group.product_ids?.length || 0;
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Tiêu đề nhóm (Đỏ đậm)</label>
-                <input
-                  type="text"
-                  value={group.title}
-                  onChange={(e) => handleUpdateGroup(idx, { title: e.target.value })}
-                  placeholder="3 bộ đề mới nhất..."
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white font-bold text-[#e60049]"
-                />
-              </div>
+            return (
+              <div key={group.id} className="border border-gray-200 rounded p-3.5 bg-gray-50/70 space-y-3 shadow-xs">
+                {/* Header thanh công cụ của nhóm: Chevron + [▲][▼] + Tiêu đề dạng #1 - Tên nhóm (X tài liệu) + Xóa */}
+                <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {/* Nút mũi tên Chevron Thu gọn / Mở rộng */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupExpand(group.id)}
+                      className="p-1 text-gray-500 hover:text-[#e60049] hover:bg-white border border-transparent hover:border-gray-200 rounded cursor-pointer transition shrink-0"
+                      title={isExpanded ? 'Thu gọn nhóm này' : 'Mở rộng nhóm này'}
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? '' : '-rotate-90'}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
 
-              {/* Chọn tài liệu trong nhóm kèm sắp xếp thứ tự */}
-              <ReorderableProductSelector
-                label={`Chọn & Sắp xếp thứ tự tài liệu trong nhóm (${group.product_ids?.length || 0} sách đã chọn)`}
-                selectedIds={group.product_ids || []}
-                allProducts={allProducts}
-                onChange={(updated) => handleUpdateGroup(idx, { product_ids: updated })}
-                helpText="Thứ tự từ trên xuống dưới tương ứng từ trái qua phải trên lưới 3 cột ngoài web."
-              />
-            </div>
-          ))}
+                    {/* Cụm nút di chuyển thứ tự [▲ Lên] và [▼ Xuống] */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveGroup(idx, 'up')}
+                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Di chuyển Nhóm này lên trước"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === groups.length - 1}
+                        onClick={() => handleMoveGroup(idx, 'down')}
+                        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Di chuyển Nhóm này xuống sau"
+                      >
+                        ▼
+                      </button>
+                    </div>
+
+                    {/* Tiêu đề dạng #1 - [Tiêu đề nhóm] (X tài liệu được chọn) */}
+                    <div
+                      onClick={() => toggleGroupExpand(group.id)}
+                      className="flex items-center gap-1.5 cursor-pointer select-none truncate ml-0.5"
+                    >
+                      <span className="font-extrabold text-[#e60049] text-xs shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
+                      <span className="text-xs font-bold text-gray-900 truncate" title={group.title}>
+                        {groupTitle}
+                      </span>
+                      <span className="text-[11px] text-gray-500 font-medium shrink-0 ml-1">
+                        ({totalCount} tài liệu được chọn)
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteGroup(idx)}
+                    className="text-red-600 hover:underline font-bold text-[11px] cursor-pointer shrink-0 ml-2"
+                  >
+                    Xóa nhóm này
+                  </button>
+                </div>
+
+                {/* Nội dung chi tiết nhóm (Ẩn khi thu gọn) */}
+                {isExpanded && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">Tiêu đề nhóm (Đỏ đậm)</label>
+                      <input
+                        type="text"
+                        value={group.title}
+                        onChange={(e) => handleUpdateGroup(idx, { title: e.target.value })}
+                        placeholder="3 bộ đề mới nhất..."
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white font-bold text-[#e60049] text-xs"
+                      />
+                    </div>
+
+                    {/* Chọn tài liệu trong nhóm kèm sắp xếp thứ tự */}
+                    <ReorderableProductSelector
+                      label={`Chọn & Sắp xếp thứ tự tài liệu trong nhóm (${totalCount} sách đã chọn)`}
+                      selectedIds={group.product_ids || []}
+                      allProducts={allProducts}
+                      onChange={(updated) => handleUpdateGroup(idx, { product_ids: updated })}
+                      helpText="Thứ tự từ trên xuống dưới tương ứng từ trái qua phải trên lưới 3 cột ngoài web."
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
