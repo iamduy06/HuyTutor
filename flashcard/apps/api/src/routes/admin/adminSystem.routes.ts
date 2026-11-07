@@ -28,6 +28,47 @@ const RESTRICTED_GROUPS = [
   '00ba87df-2e06-454d-96db-e0039680b7c3',
   '159b18f1-f6de-4567-b83a-6cffcc287438',
 ];
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+function isUUID(str: string): boolean {
+  return UUID_REGEX.test(str);
+}
+
+async function findDeckByIdOrTitle(supabase: any, identifier: string): Promise<{ id: string; title?: string } | null> {
+  const clean = identifier.trim().replace(/^["']|["']$/g, '');
+  if (!clean) return null;
+  if (isUUID(clean)) {
+    const { data } = await supabase.from('decks').select('id, title').eq('id', clean).maybeSingle();
+    if (data) return data;
+  }
+  const { data } = await supabase.from('decks').select('id, title').eq('title', clean).maybeSingle();
+  return data || null;
+}
+
+async function findGroupByIdOrName(supabase: any, identifier: string): Promise<{ id: string; name?: string; is_system?: boolean } | null> {
+  const clean = identifier.trim().replace(/^["']|["']$/g, '');
+  if (!clean) return null;
+  if (isUUID(clean)) {
+    const { data } = await supabase.from('groups').select('id, name, is_system').eq('id', clean).maybeSingle();
+    if (data) return data;
+  }
+  const { data } = await supabase.from('groups').select('id, name, is_system').eq('name', clean).maybeSingle();
+  return data || null;
+}
+
+async function findUserByIdOrEmail(supabase: any, identifier: string): Promise<{ id: string; email?: string } | null> {
+  const clean = identifier.trim().replace(/^["']|["']$/g, '');
+  if (!clean) return null;
+  if (clean.includes('@')) {
+    const { data } = await supabase.from('users').select('id, email').eq('email', clean.toLowerCase()).maybeSingle();
+    if (data) return data;
+  }
+  if (isUUID(clean)) {
+    const { data } = await supabase.from('users').select('id, email').eq('id', clean).maybeSingle();
+    if (data) return data;
+  }
+  return null;
+}
+
 
 function sanitizeCsvField(val: unknown): string {
   if (val === null || val === undefined) return '';
@@ -173,8 +214,21 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
       continue;
     }
 
+    // 1. Kiểm tra nhóm tồn tại (an toàn cả UUID lẫn tên nhóm)
+    const targetGroup = await findGroupByIdOrName(supabase, groupId);
+    if (!targetGroup) {
+      results.push({
+        email: cleanEmail,
+        status: 'error',
+        error: 'Group ID hoặc Tên nhóm không tồn tại',
+      });
+      continue;
+    }
+
+    const actualGroupId = targetGroup.id;
+
     if (role === 'SUBADMIN') {
-      if (RESTRICTED_GROUPS.includes(groupId)) {
+      if (RESTRICTED_GROUPS.includes(actualGroupId)) {
         results.push({
           email: cleanEmail,
           status: 'error',
@@ -183,13 +237,7 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
         continue;
       }
 
-      const { data: group } = await supabase
-        .from('groups')
-        .select('is_system')
-        .eq('id', groupId)
-        .maybeSingle();
-
-      if (!group || group.is_system) {
+      if (targetGroup.is_system) {
         results.push({
           email: cleanEmail,
           status: 'error',
@@ -197,24 +245,9 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
         });
         continue;
       }
-    } else {
-      const { data: groupEx } = await supabase
-        .from('groups')
-        .select('id')
-        .eq('id', groupId)
-        .maybeSingle();
-
-      if (!groupEx) {
-        results.push({
-          email: cleanEmail,
-          status: 'error',
-          error: 'Group ID không tồn tại',
-        });
-        continue;
-      }
     }
 
-    // 1. Kiểm tra tài khoản đã tồn tại trong public.users
+    // 2. Kiểm tra tài khoản đã tồn tại trong public.users
     const { data: existingUser } = await supabase
       .from('users')
       .select('id, email, password_hash, role')
@@ -273,9 +306,9 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
       }
     }
 
-    // 2. Gán nhóm vào group_users
+    // 3. Gán nhóm vào group_users
     const { error: guErr } = await supabase.from('group_users').upsert(
-      { group_id: groupId, user_id: userId, is_subadmin: role === 'SUBADMIN' },
+      { group_id: actualGroupId, user_id: userId, is_subadmin: role === 'SUBADMIN' },
       { onConflict: 'group_id,user_id' }
     );
 
@@ -288,22 +321,18 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
       continue;
     }
 
-    // 3. Gán bộ đề vào user_decks (nếu có danh sách đề)
+    // 4. Gán bộ đề vào user_decks (nếu có danh sách đề)
     const resolvedDeckIds: string[] = [];
     const deckErrors: string[] = [];
 
     if (deckList.length > 0) {
       for (const dItem of deckList) {
-        const cleanDeck = String(dItem).trim().replace(/["'\\]/g, '');
+        const cleanDeck = String(dItem).trim().replace(/^["']|["']$/g, '');
         if (!cleanDeck) continue;
-        const { data: dData } = await supabase
-          .from('decks')
-          .select('id')
-          .or(`id.eq.${cleanDeck},title.eq.${cleanDeck}`)
-          .maybeSingle();
+        const deckData = await findDeckByIdOrTitle(supabase, cleanDeck);
 
-        if (dData) {
-          resolvedDeckIds.push(dData.id);
+        if (deckData) {
+          resolvedDeckIds.push(deckData.id);
         } else {
           deckErrors.push(cleanDeck);
         }
@@ -314,9 +343,6 @@ router.post('/admin/import/users', validate({ body: adminImportUsersSchema }), a
           user_id: userId,
           deck_id: deckId,
           expired_at: expireAt,
-          progress_percent: 0,
-          learned_count: 0,
-          streak: 0,
         }));
         await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
       }
@@ -352,11 +378,7 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
       continue;
     }
 
-    const { data: deck } = await supabase
-      .from('decks')
-      .select('id')
-      .or(`id.eq.${rawDeckId},title.eq.${rawDeckId}`)
-      .maybeSingle();
+    const deck = await findDeckByIdOrTitle(supabase, rawDeckId);
 
     if (!deck) {
       results.push({ id: rawDeckId, status: 'error', error: 'Bộ đề không tồn tại' });
@@ -366,12 +388,9 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
     const resolvedUserIds: string[] = [];
     const userErrors: string[] = [];
     for (const uItem of userList) {
-      const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      const cleanItem = String(uItem).trim().replace(/^["']|["']$/g, '');
       if (!cleanItem) continue;
-      const query = cleanItem.includes('@')
-        ? supabase.from('users').select('id').eq('email', cleanItem.toLowerCase()).maybeSingle()
-        : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
-      const { data: uData } = await query;
+      const uData = await findUserByIdOrEmail(supabase, cleanItem);
       if (uData) resolvedUserIds.push(uData.id);
       else userErrors.push(uItem);
     }
@@ -390,9 +409,6 @@ router.post('/admin/import/decks', validate({ body: adminImportDecksSchema }), a
         user_id: userId,
         deck_id: deck.id,
         expired_at: expireAt,
-        progress_percent: 0,
-        learned_count: 0,
-        streak: 0,
       }));
       await supabase.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
     }
@@ -427,26 +443,21 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
       continue;
     }
 
-    const { data: group, error: gErr } = await supabase
-      .from('groups')
-      .select('id')
-      .eq('id', rawGroupId)
-      .maybeSingle();
+    const group = await findGroupByIdOrName(supabase, rawGroupId);
 
-    if (gErr || !group) {
+    if (!group) {
       results.push({ id: rawGroupId, status: 'error', error: 'Nhóm không tồn tại' });
       continue;
     }
 
+    const actualGroupId = group.id;
+
     const resolvedUserIds: string[] = [];
     const userErrors: string[] = [];
     for (const uItem of userList) {
-      const cleanItem = String(uItem).trim().replace(/["'\\]/g, '');
+      const cleanItem = String(uItem).trim().replace(/^["']|["']$/g, '');
       if (!cleanItem) continue;
-      const query = cleanItem.includes('@')
-        ? supabase.from('users').select('id').eq('email', cleanItem.toLowerCase()).maybeSingle()
-        : supabase.from('users').select('id').eq('id', cleanItem).maybeSingle();
-      const { data: uData } = await query;
+      const uData = await findUserByIdOrEmail(supabase, cleanItem);
       if (uData) resolvedUserIds.push(uData.id);
       else userErrors.push(uItem);
     }
@@ -454,16 +465,11 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
     const resolvedDeckIds: string[] = [];
     const deckErrors: string[] = [];
     for (const dItem of deckList) {
-      const cleanDeck = String(dItem).trim().replace(/["'\\]/g, '');
+      const cleanDeck = String(dItem).trim().replace(/^["']|["']$/g, '');
       if (!cleanDeck) continue;
-      const byId = await supabase.from('decks').select('id').eq('id', cleanDeck).maybeSingle();
-      if (byId.data) {
-        resolvedDeckIds.push(byId.data.id);
-      } else {
-        const byTitle = await supabase.from('decks').select('id').eq('title', cleanDeck).maybeSingle();
-        if (byTitle.data) resolvedDeckIds.push(byTitle.data.id);
-        else deckErrors.push(dItem);
-      }
+      const dData = await findDeckByIdOrTitle(supabase, cleanDeck);
+      if (dData) resolvedDeckIds.push(dData.id);
+      else deckErrors.push(dItem);
     }
 
     if (userErrors.length > 0 || deckErrors.length > 0) {
@@ -476,7 +482,7 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
 
     if (resolvedUserIds.length > 0) {
       const groupUserRows = resolvedUserIds.map(uId => ({
-        group_id: rawGroupId,
+        group_id: actualGroupId,
         user_id: uId,
       }));
       await supabase.from('group_users').upsert(groupUserRows, { onConflict: 'group_id,user_id' });
@@ -484,7 +490,7 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
 
     if (resolvedDeckIds.length > 0) {
       const groupDeckRows = resolvedDeckIds.map(dId => ({
-        group_id: rawGroupId,
+        group_id: actualGroupId,
         deck_id: dId,
         expired_at: expireAt,
       }));
@@ -499,9 +505,6 @@ router.post('/admin/import/groups', validate({ body: adminImportGroupsSchema }),
             user_id: uId,
             deck_id: dId,
             expired_at: expireAt,
-            progress_percent: 0,
-            learned_count: 0,
-            streak: 0,
           });
         });
       });
