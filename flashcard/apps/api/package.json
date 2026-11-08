@@ -6,7 +6,9 @@
     "prebuild": "npm run build --prefix ../../packages/shared",
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "test": "node ../../scripts/test-flashcard-full-matrix.mjs",
+    "test:deletion": "node ../../scripts/test-subadmin-deletion.mjs"
   },
   "dependencies": {
     "@huytutor/shared": "*",

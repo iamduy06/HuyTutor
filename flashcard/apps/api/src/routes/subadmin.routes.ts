@@ -20,7 +20,7 @@ const router = Router();
 // Middleware: must be SUBADMIN or ADMIN
 router.use('/subadmin', requireAuth, requireRole('SUBADMIN', 'ADMIN'));
 
-async function canManage(me: any, targetId: string) {
+export async function canManage(me: any, targetId: string) {
   if (me.role === 'ADMIN') return true;
   if (targetId === me.id) return false;
 
@@ -55,6 +55,148 @@ async function canManage(me: any, targetId: string) {
     .maybeSingle();
 
   return !!targetInGroup;
+}
+
+export interface SubadminDeleteAuthResult {
+  allowed: boolean;
+  status?: number;
+  code?: 'NOT_FOUND' | 'FORBIDDEN';
+  message?: string;
+}
+
+/**
+ * Strict tenant boundary verification for member deletion:
+ * 1. Target existence check (404 Not Found if missing).
+ * 2. Prevent self-deletion (targetId === me.id => 403 Forbidden).
+ * 3. Role immunity: Target must not be ADMIN or SUBADMIN in public.users (403 Forbidden).
+ * 4. Group Subadmin immunity: Target must not have is_subadmin === true in any group_users record (403 Forbidden).
+ * 5. Caller's managed groups: Caller must manage at least one group (403 Forbidden if not).
+ * 6. Group jurisdiction: Target must belong to caller's managed groups (403 Forbidden if not).
+ * 7. Cross-tenant guard: Target must NOT belong to any groups outside caller's managed groups (403 Forbidden if so).
+ */
+export async function canSubadminDeleteUser(
+  me: any,
+  targetId: string
+): Promise<SubadminDeleteAuthResult> {
+  // Prevent self-deletion
+  if (targetId === me.id) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Không thể tự xóa tài khoản của chính mình',
+    };
+  }
+
+  const admin = getAdminClient();
+
+  // 1. Fetch target user existence & role
+  const { data: targetUser } = await admin
+    .from('users')
+    .select('id, role')
+    .eq('id', targetId)
+    .maybeSingle();
+
+  if (!targetUser) {
+    return {
+      allowed: false,
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'Không tìm thấy người dùng',
+    };
+  }
+
+  // 2. Role immunity: Subadmin cannot delete ADMIN or SUBADMIN accounts
+  const targetRole = String(targetUser.role || '').toUpperCase();
+  if (targetRole === 'ADMIN' || targetRole === 'SUBADMIN') {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Không thể xóa tài khoản Quản trị viên hoặc Subadmin',
+    };
+  }
+
+  // 3. Group Subadmin immunity: Cannot delete any user who has is_subadmin = true in any group
+  const { data: subadminCheck } = await admin
+    .from('group_users')
+    .select('id')
+    .eq('user_id', targetId)
+    .eq('is_subadmin', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (subadminCheck) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Không thể xóa tài khoản có quyền Subadmin nhóm',
+    };
+  }
+
+  // 4. Super Admin bypasses group membership checks
+  const callerRole = String(me.role || '').toUpperCase();
+  if (callerRole === 'ADMIN') {
+    return { allowed: true };
+  }
+
+  // 5. Verify caller's managed groups
+  const { data: meGroups } = await admin
+    .from('group_users')
+    .select('group_id')
+    .eq('user_id', me.id)
+    .eq('is_subadmin', true);
+
+  const myGroupIds = (meGroups ?? []).map((g: any) => g.group_id);
+  if (myGroupIds.length === 0) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Bạn không quản lý nhóm nào',
+    };
+  }
+
+  // 6. Verify target user's group memberships
+  const { data: targetGroups } = await admin
+    .from('group_users')
+    .select('group_id')
+    .eq('user_id', targetId);
+
+  const targetGroupIds = (targetGroups ?? []).map((g: any) => g.group_id);
+  if (targetGroupIds.length === 0) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Người dùng không thuộc nhóm do bạn quản lý',
+    };
+  }
+
+  // Target must belong to at least one group managed by caller
+  const belongsToMyGroup = targetGroupIds.some((gid: string) => myGroupIds.includes(gid));
+  if (!belongsToMyGroup) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Người dùng không thuộc nhóm do bạn quản lý',
+    };
+  }
+
+  // Cross-tenant guard: Target must NOT belong to any foreign groups outside caller's managed groups
+  const hasForeignGroup = targetGroupIds.some((gid: string) => !myGroupIds.includes(gid));
+  if (hasForeignGroup) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'FORBIDDEN',
+      message: 'Người dùng thuộc nhóm khác ngoài phạm vi quản lý của bạn',
+    };
+  }
+
+  return { allowed: true };
 }
 
 // GET /subadmin/overview - Subadmin dashboard stats
@@ -567,45 +709,85 @@ router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async 
   const me = req.user!;
   const id = req.params.id as string;
 
-  const allowed = await canManage(me, id);
-  if (!allowed) {
-    return res.status(403).json({ error: 'Forbidden: Bạn không quản lý người dùng này' });
+  try {
+    const authCheck = await canSubadminDeleteUser(me, id);
+    if (!authCheck.allowed) {
+      return res.status(authCheck.status || 403).json({
+        success: false,
+        error: {
+          code: authCheck.code || 'FORBIDDEN',
+          message: authCheck.message || 'Bạn không có quyền xóa người dùng này',
+        },
+      });
+    }
+
+    const admin = getAdminClient();
+
+    // 1. Cascade all learning records and deck progress in user_decks
+    const { error: udErr } = await admin.from('user_decks').delete().eq('user_id', id);
+    if (udErr) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: 'Đã có lỗi xảy ra trong quá trình xử lý',
+        },
+      });
+    }
+
+    // 2. Cascade group membership records in group_users
+    const { error: guErr } = await admin.from('group_users').delete().eq('user_id', id);
+    if (guErr) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: 'Đã có lỗi xảy ra trong quá trình xử lý',
+        },
+      });
+    }
+
+    // 3. Cascade/revoke user sessions in user_sessions
+    const { error: usErr } = await admin.from('user_sessions').delete().eq('user_id', id);
+    if (usErr) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: 'Đã có lỗi xảy ra trong quá trình xử lý',
+        },
+      });
+    }
+
+    // 4. Invalidate RAM cache tokens
+    memoryCache.invalidateUserTokens(id);
+
+    // 5. Permanent deletion: remove target record from public.users
+    // Device Guard hardware preservation: STRICTLY DO NOT issue any delete queries against public.user_devices!
+    const { error: userErr } = await admin.from('users').delete().eq('id', id);
+    if (userErr) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: 'Đã có lỗi xảy ra trong quá trình xử lý',
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã xóa tài khoản thành viên vĩnh viễn',
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Đã có lỗi xảy ra trong quá trình xử lý',
+      },
+    });
   }
-
-  const admin = getAdminClient();
-  const { data: meGroups } = await admin
-    .from('group_users')
-    .select('group_id')
-    .eq('user_id', me.id)
-    .eq('is_subadmin', true);
-
-  const myGroupIds = (meGroups ?? []).map((g: any) => g.group_id);
-
-  // Xóa liên kết khỏi group_users của các nhóm do Subadmin quản lý
-  const { error: guErr } = await admin
-    .from('group_users')
-    .delete()
-    .eq('user_id', id)
-    .in('group_id', myGroupIds);
-
-  if (guErr) return res.status(400).json({ error: guErr.message });
-
-  // Thu hồi các bộ đề gán theo nhóm đó
-  const { data: groupDecks } = await admin
-    .from('group_decks')
-    .select('deck_id')
-    .in('group_id', myGroupIds);
-
-  if (groupDecks && groupDecks.length > 0) {
-    const deckIds = groupDecks.map((gd: any) => gd.deck_id);
-    await admin.from('user_decks').delete().eq('user_id', id).in('deck_id', deckIds);
-  }
-
-  // Thu hồi phiên làm việc của user
-  await admin.from('user_sessions').update({ is_revoked: true }).eq('user_id', id);
-  memoryCache.invalidateUserTokens(id);
-
-  return res.status(200).json({ success: true });
 });
 
 // GET /subadmin/decks
