@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 
 interface GroupBranding {
   allow_custom_branding: boolean;
@@ -69,10 +70,10 @@ export default function SubAdminBrandingClient() {
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Lưu thất bại");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Lưu cài đặt Branding thất bại"));
       }
-      return res.json();
+      return res.json().catch(() => ({}));
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["subadmin-branding"] });
@@ -83,7 +84,7 @@ export default function SubAdminBrandingClient() {
       });
       toast({ title: "Đã lưu cài đặt Branding thành công" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Lưu cài đặt Branding thất bại"), variant: "destructive" }),
   });
 
   if (isLoading) {

@@ -182,8 +182,8 @@ export default function AdminUsersPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description: "" }),
       });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(parseApiErrorMessage(d, "Tạo nhóm mới thất bại"));
       return d.group;
     },
     onSuccess: (newGroup) => {
@@ -194,7 +194,7 @@ export default function AdminUsersPage() {
       if (activeDialog === "GROUP") setEditGroupId(newGroup.id);
       toast({ title: "Đã tạo nhóm mới!" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Tạo nhóm mới thất bại"), variant: "destructive" }),
   });
 
   const createUser = useMutation({
@@ -213,8 +213,8 @@ export default function AdminUsersPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(parseApiErrorMessage(d, "Tạo người dùng thất bại"));
       return d;
     },
     onSuccess: d => {
@@ -222,19 +222,22 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Tạo người dùng thành công!" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Tạo người dùng thất bại"), variant: "destructive" }),
   });
 
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
       const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Xoá người dùng thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã xóa người dùng" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xoá người dùng thất bại"), variant: "destructive" }),
   });
 
   // Action Mutations
@@ -262,14 +265,17 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_password" }),
       });
-      if (!res.ok) throw new Error("Failed");
-      const d = await res.json();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Đặt lại mật khẩu thất bại"));
+      }
+      const d = await res.json().catch(() => ({}));
       return { pw: d.tempPassword as string, email };
     },
     onSuccess: ({ pw, email }) => {
       setResetResult({ pw, email });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Đặt lại mật khẩu thất bại"), variant: "destructive" }),
   });
 
   const assignGroup = useMutation({
@@ -282,14 +288,17 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Cập nhật nhóm thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã cập nhật nhóm" });
       closeDialogs();
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật nhóm thất bại"), variant: "destructive" }),
   });
 
   const assignDeck = useMutation({
@@ -299,7 +308,10 @@ export default function AdminUsersPage() {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
         });
-        if (!res.ok) throw new Error("Failed");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiErrorMessage(data, "Giao Flashcard thất bại"));
+        }
       }
     },
     onSuccess: (_, vars) => {
@@ -307,7 +319,7 @@ export default function AdminUsersPage() {
       setAssignDeckIds(new Set()); setAssignExpiry("");
       toast({ title: `Giao ${vars.deckIds.length} Flashcard thành công!` });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Giao Flashcard thất bại"), variant: "destructive" }),
   });
 
   const updateDeckProgress = useMutation({
@@ -316,13 +328,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update_deck_progress", deck_id: args.deckId, progress_percent: args.progress_percent, learned_count: args.learned_count, expired_at: args.expiredAt })
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Cập nhật bản ghi thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã cập nhật bản ghi" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật bản ghi thất bại"), variant: "destructive" }),
   });
 
   const revokeDeck = useMutation({
@@ -331,13 +346,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "revoke_deck", deck_id: deckId }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thu hồi Flashcard thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã thu hồi Flashcard" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thu hồi Flashcard thất bại"), variant: "destructive" }),
   });
 
   const removeDevice = useMutation({
@@ -346,13 +364,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "remove_device", device_id })
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xoá thiết bị thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã xoá thiết bị (Người dùng sẽ bị văng ra)" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xoá thiết bị thất bại"), variant: "destructive" }),
   });
 
   const resetDevices = useMutation({
@@ -361,13 +382,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_devices" })
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Reset thiết bị thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã reset toàn bộ thiết bị và đăng xuất" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Reset thiết bị thất bại"), variant: "destructive" }),
   });
   const bulkUpdateExpiry = useMutation({
     mutationFn: async ({ userId, expiredAt }: { userId: string; expiredAt: string }) => {
@@ -375,13 +399,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "bulk_update_expiry", expired_at: expiredAt || null }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Cập nhật hạn dùng thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã cập nhật hạn dùng cho tất cả Flashcards" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật hạn dùng thất bại"), variant: "destructive" }),
   });
 
   const [bulkExp, setBulkExp] = useState("");

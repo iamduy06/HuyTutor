@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import { PaginationControls } from "@/components/common/PaginationControls";
 import type { PaginationMeta } from "@huytutor/shared";
 import {
@@ -101,14 +102,17 @@ export default function AdminDevicesPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ global_max_devices: val }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Đặt giới hạn toàn cục thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-devices-settings"] });
       toast({ title: `✅ Đã đặt giới hạn toàn cục: ${globalLimitVal} thiết bị` });
       setGlobalLimitVal("");
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Đặt giới hạn toàn cục thất bại"), variant: "destructive" }),
   });
 
   const setUserLimit = useMutation({
@@ -117,14 +121,17 @@ export default function AdminDevicesPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, max_devices: limit }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Cập nhật giới hạn thiết bị thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-device-users"] });
       toast({ title: "✅ Đã cập nhật giới hạn thiết bị" });
       setShowLimitDlg(false);
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật giới hạn thiết bị thất bại"), variant: "destructive" }),
   });
 
   const deleteDevice = useMutation({
@@ -133,13 +140,16 @@ export default function AdminDevicesPage() {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ device_id: deviceId }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Xoá thiết bị thất bại"));
+      }
     },
     onSuccess: () => {
       refetchDevices();
       toast({ title: "✅ Đã xóa thiết bị" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xoá thiết bị thất bại"), variant: "destructive" }),
   });
 
   const deleteAllDevices = useMutation({
@@ -148,13 +158,16 @@ export default function AdminDevicesPage() {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Xoá tất cả thiết bị thất bại"));
+      }
     },
     onSuccess: () => {
       refetchDevices();
       toast({ title: "✅ Đã xóa tất cả thiết bị" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xoá tất cả thiết bị thất bại"), variant: "destructive" }),
   });
 
   const filtered = users.filter(u =>

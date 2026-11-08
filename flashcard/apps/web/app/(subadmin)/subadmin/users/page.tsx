@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
-import { getClientErrorMessage } from "@/lib/errorHandler";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
@@ -147,8 +147,8 @@ export default function SubAdminUsersPage() {
           expired_at: expiredAt ? expiredAt + "T23:59:59Z" : ""
         }),
       });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(parseApiErrorMessage(d, "Không thể tạo người dùng. Vui lòng thử lại."));
       return d;
     },
     onSuccess: d => {
@@ -156,7 +156,7 @@ export default function SubAdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
       toast({ title: "Tạo người dùng thành công!" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Không thể tạo người dùng. Vui lòng thử lại."), variant: "destructive" }),
   });
 
   const resetPw = useMutation({
@@ -165,15 +165,15 @@ export default function SubAdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_password" }),
       });
-      if (!res.ok) throw new Error("Failed");
-      const d = await res.json();
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(parseApiErrorMessage(d, "Không thể đặt lại mật khẩu."));
       return { pw: d.tempPassword, email };
     },
     onSuccess: ({ pw, email }) => {
       setResetResult({ pw, email });
       setShowResetDlg(true);
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Không thể đặt lại mật khẩu."), variant: "destructive" }),
   });
 
   const changeRole = useMutation({
@@ -182,13 +182,14 @@ export default function SubAdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "change_role", role }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(parseApiErrorMessage(d, "Không thể cập nhật quyền."));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
       toast({ title: "Đã cập nhật quyền" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Không thể cập nhật quyền."), variant: "destructive" }),
   });
 
   const deleteUser = useMutation({
@@ -229,7 +230,10 @@ export default function SubAdminUsersPage() {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "assign_deck", deck_id: deckId, expired_at: expiredAt || null }),
         });
-        if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+        if (!res.ok) { 
+          const d = await res.json().catch(() => ({})); 
+          throw new Error(parseApiErrorMessage(d, "Giao Flashcard thất bại.")); 
+        }
       }
     },
     onSuccess: (_, vars) => {
@@ -237,7 +241,7 @@ export default function SubAdminUsersPage() {
       setShowAssign(null); setAssignDeckIds(new Set()); setAssignExpiry("");
       toast({ title: `Giao ${vars.deckIds.length} Flashcard thành công!` });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Giao Flashcard thất bại."), variant: "destructive" }),
   });
 
   const revokeDeck = useMutation({
@@ -246,13 +250,16 @@ export default function SubAdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "revoke_deck", deck_id: deckId }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(d, "Thu hồi Flashcard thất bại."));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
       toast({ title: "Đã thu hồi Flashcard" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thu hồi Flashcard thất bại."), variant: "destructive" }),
   });
 
   const updateDeviceInfo = useMutation({
@@ -261,7 +268,10 @@ export default function SubAdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, device_id: deviceId, max_devices: maxDevices })
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+      if (!res.ok) { 
+        const d = await res.json().catch(() => ({})); 
+        throw new Error(parseApiErrorMessage(d, "Thao tác thiết bị thất bại.")); 
+      }
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
@@ -271,7 +281,7 @@ export default function SubAdminUsersPage() {
         toast({ title: "Thao tác thành công" });
       }
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thiết bị thất bại."), variant: "destructive" }),
   });
 
   // ── Derived ───────────────────────────────────────────────────────────────
