@@ -146,7 +146,7 @@ router.post('/admin/users', validate({ body: adminCreateUserSchema }), async (re
 });
 
 // PATCH /admin/users/:id
-router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUpdateUserSchema }), async (req: Request, res: Response) => {
+const adminUpdateUserHandler = async (req: Request, res: Response) => {
   const admin = req.user!;
   const id = req.params.id as string;
   const body = req.body;
@@ -323,7 +323,9 @@ router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUp
   }
 
   return res.status(400).json({ error: 'Unknown action' });
-});
+};
+router.patch('/admin/users/:id', validate({ params: idParamSchema, body: adminUpdateUserSchema }), adminUpdateUserHandler);
+router.put('/admin/users/:id', validate({ params: idParamSchema, body: adminUpdateUserSchema }), adminUpdateUserHandler);
 
 // DELETE /admin/users/:id
 router.delete('/admin/users/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {

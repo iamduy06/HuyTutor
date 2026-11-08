@@ -134,7 +134,7 @@ router.get('/admin/subadmins/:id/managed', async (req: Request, res: Response) =
 });
 
 // PATCH /admin/subadmins/groups/:id - Update group basic limits
-router.patch('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadminGroupSchema }), async (req: Request, res: Response) => {
+const adminUpdateSubadminGroupHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, max_users, max_device_per_user } = req.body;
 
@@ -164,7 +164,9 @@ router.patch('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadmin
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ success: true });
-});
+};
+router.patch('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadminGroupSchema }), adminUpdateSubadminGroupHandler);
+router.put('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadminGroupSchema }), adminUpdateSubadminGroupHandler);
 
 // DELETE /admin/subadmins/groups/:id - Delete group
 router.delete('/admin/subadmins/groups/:id', async (req: Request, res: Response) => {
@@ -369,5 +371,6 @@ const updateBrandingHandler = async (req: Request, res: Response) => {
 
 router.post('/admin/subadmins/groups/:id/branding', updateBrandingHandler);
 router.patch('/admin/subadmins/groups/:id/branding', updateBrandingHandler);
+router.put('/admin/subadmins/groups/:id/branding', updateBrandingHandler);
 
 export default router;

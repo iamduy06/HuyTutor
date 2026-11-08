@@ -130,7 +130,7 @@ router.get('/admin/devices', async (req: Request, res: Response) => {
 });
 
 // PATCH /admin/devices
-router.patch('/admin/devices', validate({ body: adminPatchDevicesSchema }), async (req: Request, res: Response) => {
+const adminPatchDevicesHandler = async (req: Request, res: Response) => {
   const body = req.body;
   const supabase = getAdminClient();
 
@@ -151,7 +151,9 @@ router.patch('/admin/devices', validate({ body: adminPatchDevicesSchema }), asyn
   }
 
   return res.status(400).json({ error: 'Invalid body' });
-});
+};
+router.patch('/admin/devices', validate({ body: adminPatchDevicesSchema }), adminPatchDevicesHandler);
+router.put('/admin/devices', validate({ body: adminPatchDevicesSchema }), adminPatchDevicesHandler);
 
 // DELETE /admin/devices
 router.delete('/admin/devices', validate({ body: adminDeleteDevicesSchema }), async (req: Request, res: Response) => {
@@ -796,7 +798,7 @@ router.get('/admin/app-settings', async (_req: Request, res: Response) => {
 });
 
 // PATCH /admin/app-settings
-router.patch('/admin/app-settings', validate({ body: adminAppSettingsSchema }), async (req: Request, res: Response) => {
+const adminPatchAppSettingsHandler = async (req: Request, res: Response) => {
   const { global_max_devices } = req.body;
   if (!global_max_devices) {
     return res.status(400).json({ error: 'Missing value' });
@@ -813,6 +815,8 @@ router.patch('/admin/app-settings', validate({ body: adminAppSettingsSchema }), 
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ success: true });
-});
+};
+router.patch('/admin/app-settings', validate({ body: adminAppSettingsSchema }), adminPatchAppSettingsHandler);
+router.put('/admin/app-settings', validate({ body: adminAppSettingsSchema }), adminPatchAppSettingsHandler);
 
 export default router;

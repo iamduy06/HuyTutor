@@ -520,7 +520,7 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
 });
 
 // PATCH /subadmin/users/:id
-router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: subadminUpdateUserSchema }), async (req: Request, res: Response) => {
+const subadminUpdateUserHandler = async (req: Request, res: Response) => {
   const me = req.user!;
   const id = req.params.id as string;
 
@@ -702,7 +702,9 @@ router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: suba
   }
 
   return res.status(400).json({ error: 'Unknown action' });
-});
+};
+router.patch('/subadmin/users/:id', validate({ params: idParamSchema, body: subadminUpdateUserSchema }), subadminUpdateUserHandler);
+router.put('/subadmin/users/:id', validate({ params: idParamSchema, body: subadminUpdateUserSchema }), subadminUpdateUserHandler);
 
 // DELETE /subadmin/users/:id
 router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
@@ -881,7 +883,7 @@ router.get('/subadmin/branding', async (req: Request, res: Response) => {
 });
 
 // PATCH /subadmin/branding
-router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), async (req: Request, res: Response) => {
+const subadminUpdateBrandingHandler = async (req: Request, res: Response) => {
   const me = req.user!;
   const admin = getAdminClient();
   const { group_id } = req.body;
@@ -927,6 +929,8 @@ router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), a
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ success: true, branding: safeBranding });
-});
+};
+router.patch('/subadmin/branding', validate({ body: subadminBrandingSchema }), subadminUpdateBrandingHandler);
+router.put('/subadmin/branding', validate({ body: subadminBrandingSchema }), subadminUpdateBrandingHandler);
 
 export default router;
