@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
+import { getClientErrorMessage } from "@/lib/errorHandler";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
@@ -92,6 +93,9 @@ export default function SubAdminUsersPage() {
   const [showResetDlg, setShowResetDlg] = useState(false);
   const [resetResult, setResetResult] = useState<{ email: string; pw: string } | null>(null);
   const [resetCopied, setResetCopied] = useState(false);
+
+  // User deletion state
+  const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
 
   // Progress & Flashcard Expansion State
   const [expandedProgress, setExpandedProgress] = useState<Set<string>>(new Set());
@@ -190,13 +194,23 @@ export default function SubAdminUsersPage() {
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
       const res = await fetch(`/api/subadmin/users/${userId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error?.message || data?.error || data?.message || "Failed");
+      }
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subadmin-data"] });
-      toast({ title: "Đã xóa tài khoản vĩnh viễn" });
+      setUserToDelete(null);
+      toast({ title: "Đã xóa vĩnh viễn tài khoản học viên" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (err: any) => {
+      toast({
+        title: getClientErrorMessage(err, "Không thể xóa học viên. Vui lòng thử lại sau."),
+        variant: "destructive",
+      });
+    },
   });
 
   const assignDeck = useMutation({
@@ -475,7 +489,7 @@ export default function SubAdminUsersPage() {
                         </Button>
                         {/* Delete */}
                         <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-red-500 hover:text-red-600" title="Xóa người dùng"
-                          onClick={() => { if (confirm(`Xóa tài khoản ${u.email}?`)) deleteUser.mutate(u.id); }}>
+                          onClick={() => setUserToDelete(u)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -740,6 +754,69 @@ export default function SubAdminUsersPage() {
             <Button className="w-full" variant="brand"
               onClick={() => { setShowResetDlg(false); setResetResult(null); }}>Đóng</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ Dialog: Confirm Permanent Deletion ════ */}
+      <Dialog
+        open={!!userToDelete}
+        onOpenChange={open => {
+          if (!open && !deleteUser.isPending) setUserToDelete(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5 text-red-500" />
+              Xác nhận xóa tài khoản học viên
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Hành động này sẽ xóa vĩnh viễn tài khoản người dùng khỏi hệ thống.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm text-[#1a1a2e]">
+            <p>
+              Bạn có chắc chắn muốn xóa tài khoản{" "}
+              <strong className="font-bold text-red-600">{userToDelete?.email}</strong>{" "}
+              khỏi hệ thống?
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-1.5 text-xs text-red-900">
+              <p className="font-bold flex items-center gap-1.5 text-red-700">
+                ⚠️ Cảnh báo: Hành động không thể hoàn tác!
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-red-800">
+                <li>
+                  Tài khoản sẽ bị <strong>xóa vĩnh viễn</strong> khỏi cơ sở dữ liệu người dùng (`public.users`).
+                </li>
+                <li>
+                  Toàn bộ tiến độ học tập, lịch sử streak và liên kết bộ đề sẽ bị hủy bỏ hoàn toàn.
+                </li>
+                <li>
+                  Bản ghi thiết bị phần cứng được{" "}
+                  <strong>bảo toàn trong hệ thống (Device Guard)</strong> để quản lý hạn mức thiết bị.
+                </li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setUserToDelete(null)}
+              disabled={deleteUser.isPending}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteUser.isPending}
+              onClick={() => {
+                if (userToDelete) deleteUser.mutate(userToDelete.id);
+              }}
+            >
+              {deleteUser.isPending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+              Xác nhận xóa vĩnh viễn
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
