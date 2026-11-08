@@ -170,8 +170,8 @@ router.get('/admin/decks/:id', validate({ params: idParamSchema }), async (req: 
   return res.status(200).json({ deck });
 });
 
-// PATCH /admin/decks/:id
-router.patch('/admin/decks/:id', validate({ params: idParamSchema, body: updateDeckSchema }), async (req: Request, res: Response) => {
+// PATCH & PUT /admin/decks/:id
+const updateDeckHandler = async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
@@ -186,7 +186,9 @@ router.patch('/admin/decks/:id', validate({ params: idParamSchema, body: updateD
   if (error) return res.status(500).json({ error: error.message });
   invalidateWordCountCache();
   return res.status(200).json({ deck: data });
-});
+};
+router.patch('/admin/decks/:id', validate({ params: idParamSchema, body: updateDeckSchema }), updateDeckHandler);
+router.put('/admin/decks/:id', validate({ params: idParamSchema, body: updateDeckSchema }), updateDeckHandler);
 
 // DELETE /admin/decks/:id
 router.delete('/admin/decks/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
@@ -314,7 +316,7 @@ router.post('/admin/decks/:id/tabs', validate({ params: idParamSchema, body: bul
 });
 
 // PATCH /admin/decks/:id/tabs/:tabIndex (SEC-010 validated)
-router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema, body: patchTabSchema }), async (req: Request, res: Response) => {
+const patchTabHandler = async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const body = req.body;
@@ -341,7 +343,9 @@ router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema
 
   await persistTabs(supabase, id, rowId, tabs, extraIds);
   return res.status(200).json({ success: true, tab: tabs[tabIndex] });
-});
+};
+router.patch('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema, body: patchTabSchema }), patchTabHandler);
+router.put('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema, body: patchTabSchema }), patchTabHandler);
 
 // DELETE /admin/decks/:id/tabs/:tabIndex
 router.delete('/admin/decks/:id/tabs/:tabIndex', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
@@ -381,7 +385,7 @@ router.post('/admin/decks/:id/tabs/:tabIndex/words', validate({ params: idParamS
 });
 
 // PATCH /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Update word (SEC-010 validated)
-router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema, body: vocabItemSchema.partial() }), async (req: Request, res: Response) => {
+const patchWordHandler = async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const tabIndex = parseInt(req.params.tabIndex as string, 10);
   const wordIndex = parseInt(req.params.wordIndex as string, 10);
@@ -404,7 +408,9 @@ router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ para
 
   await persistTabs(supabase, id, rowId, tabs, extraIds);
   return res.status(200).json({ success: true, word: vocab[wordIndex] });
-});
+};
+router.patch('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema, body: vocabItemSchema.partial() }), patchWordHandler);
+router.put('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema, body: vocabItemSchema.partial() }), patchWordHandler);
 
 // DELETE /admin/decks/:id/tabs/:tabIndex/words/:wordIndex - Delete word
 router.delete('/admin/decks/:id/tabs/:tabIndex/words/:wordIndex', validate({ params: idParamSchema }), async (req: Request, res: Response) => {

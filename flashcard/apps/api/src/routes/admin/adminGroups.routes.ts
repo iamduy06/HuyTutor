@@ -46,8 +46,8 @@ router.post('/admin/deck-groups', validate({ body: adminCreateDeckGroupSchema })
   return res.status(200).json({ group: data });
 });
 
-// PATCH /admin/deck-groups/:id
-router.patch('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSchema }), async (req: Request, res: Response) => {
+// PATCH & PUT /admin/deck-groups/:id
+const updateDeckGroupHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, description, order_index } = req.body;
 
@@ -61,7 +61,9 @@ router.patch('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSche
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ group: data });
-});
+};
+router.patch('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSchema }), updateDeckGroupHandler);
+router.put('/admin/deck-groups/:id', validate({ body: adminUpdateDeckGroupSchema }), updateDeckGroupHandler);
 
 // DELETE /admin/deck-groups/:id
 router.delete('/admin/deck-groups/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
@@ -139,8 +141,8 @@ router.post('/admin/groups', validate({ body: adminCreateGroupSchema }), async (
   return res.status(200).json({ group: newGroup });
 });
 
-// PATCH /admin/groups/:id
-router.patch('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), async (req: Request, res: Response) => {
+// PATCH & PUT /admin/groups/:id
+const updateStdGroupHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
 
@@ -154,7 +156,9 @@ router.patch('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), as
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ group: data });
-});
+};
+router.patch('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), updateStdGroupHandler);
+router.put('/admin/groups/:id', validate({ body: adminUpdateGroupSchema }), updateStdGroupHandler);
 
 // DELETE /admin/groups/:id
 router.delete('/admin/groups/:id', validate({ params: idParamSchema }), async (req: Request, res: Response) => {
