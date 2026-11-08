@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import { DECK_LEVELS } from "@/lib/constants";
 import { PaginationControls } from "@/components/common/PaginationControls";
 import type { PaginationMeta } from "@huytutor/shared";
@@ -147,35 +148,41 @@ export default function AdminDecksPage() {
   const saveDeck = useMutation({
     mutationFn: async () => {
       const url    = editingDeck ? `/api/admin/decks/${editingDeck.id}` : "/api/admin/decks";
-      const method = editingDeck ? "PUT" : "POST";
+      const method = editingDeck ? "PATCH" : "POST";
       const payload = {
         title: deckForm.title,
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
         access_level: deckForm.access_level,
-        preview_word_limit: deckForm.access_level.preview ? deckForm.access_level.preview_word_limit : null,
         group_id: deckForm.group_id || null,
       };
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, editingDeck ? "Cập nhật Flashcard thất bại" : "Tạo Flashcard thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       setShowDeckDlg(false); setEditingDeck(null);
       toast({ title: editingDeck ? "Cập nhật Flashcard thành công" : "Tạo Flashcard thành công" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Lưu Flashcard thất bại"), variant: "destructive" }),
   });
 
   const deleteDeck = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/decks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xóa Flashcard thất bại"));
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-decks"] }); toast({ title: "Đã xóa Flashcard" }); },
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xóa Flashcard thất bại"), variant: "destructive" }),
   });
 
   // ── Tab CRUD ──────────────────────────────────────────────────────────────
@@ -184,39 +191,48 @@ export default function AdminDecksPage() {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(tabForm),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thêm tab mới thất bại"));
+      }
     },
     onSuccess: (_: unknown, deckId: string) => {
       loadDetail(deckId); setShowTabDlg(null);
       toast({ title: "Đã thêm tab mới" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thêm tab mới thất bại"), variant: "destructive" }),
   });
 
   const saveTabEdit = useMutation({
     mutationFn: async ({ deckId, tabIndex }: { deckId: string; tabIndex: number }) => {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editTabForm),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Cập nhật tab thất bại"));
+      }
     },
     onSuccess: (_: unknown, { deckId }) => {
       loadDetail(deckId); setShowEditTabDlg(null);
       toast({ title: "Đã cập nhật tab" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật tab thất bại"), variant: "destructive" }),
   });
 
   const deleteTab = useMutation({
     mutationFn: async ({ deckId, tabIndex }: { deckId: string; tabIndex: number }) => {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xóa tab thất bại"));
+      }
     },
     onSuccess: (_: unknown, { deckId }) => {
       loadDetail(deckId); toast({ title: "Đã xóa tab" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xóa tab thất bại"), variant: "destructive" }),
   });
 
   // ── Word CRUD ─────────────────────────────────────────────────────────────
@@ -230,28 +246,34 @@ export default function AdminDecksPage() {
       const url    = wordIndex !== undefined
         ? `/api/admin/decks/${deckId}/tabs/${tabIndex}/words/${wordIndex}`
         : `/api/admin/decks/${deckId}/tabs/${tabIndex}/words`;
-      const method = wordIndex !== undefined ? "PUT" : "POST";
+      const method = wordIndex !== undefined ? "PATCH" : "POST";
       const res    = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(vocabItem),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Lưu từ vựng thất bại"));
+      }
     },
     onSuccess: (_: unknown, { deckId }) => {
       loadDetail(deckId); setShowWordDlg(null); setEditingWord(null);
       toast({ title: "Đã lưu từ vựng" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Lưu từ vựng thất bại"), variant: "destructive" }),
   });
 
   const deleteWord = useMutation({
     mutationFn: async ({ deckId, tabIndex, wordIndex }: { deckId: string; tabIndex: number; wordIndex: number }) => {
       const res = await fetch(`/api/admin/decks/${deckId}/tabs/${tabIndex}/words/${wordIndex}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xóa từ vựng thất bại"));
+      }
     },
     onSuccess: (_: unknown, { deckId }) => {
       loadDetail(deckId); toast({ title: "Đã xóa từ vựng" });
     },
-    onError: () => toast({ title: "Thất bại", variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xóa từ vựng thất bại"), variant: "destructive" }),
   });
 
   // ── Import words vào 1 tab (JSON array) ──────────────────────────────────
@@ -271,7 +293,7 @@ export default function AdminDecksPage() {
       toast({ title: `✅ Import ${words.length} từ thành công!` });
       loadDetail(deckId); setWordJsonFile(null); setWordJsonTarget(null);
     } else {
-      toast({ title: data.error ?? "Import thất bại", variant: "destructive" });
+      toast({ title: parseApiErrorMessage(data, "Import thất bại"), variant: "destructive" });
     }
   }
 
@@ -303,7 +325,7 @@ export default function AdminDecksPage() {
       setShowBulkTabsDlg(null);
       setBulkTabsText(""); setBulkTabsFile(null);
     } else {
-      toast({ title: data.error ?? "Import thất bại", variant: "destructive" });
+      toast({ title: parseApiErrorMessage(data, "Import thất bại"), variant: "destructive" });
     }
   }
 

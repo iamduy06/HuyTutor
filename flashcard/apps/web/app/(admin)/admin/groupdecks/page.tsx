@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import { PaginationControls } from "@/components/common/PaginationControls";
 import type { Deck, DeckGroup } from "@/types";
 
@@ -95,77 +96,94 @@ export default function GroupDecksPage() {
       const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(groupForm),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, editingGroup ? "Cập nhật Nhóm thất bại" : "Tạo Nhóm thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-deck-groups"] });
       setShowGroupDlg(false); setEditingGroup(null);
       toast({ title: editingGroup ? "Cập nhật Nhóm thành công" : "Tạo Nhóm thành công" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Lưu Nhóm thất bại"), variant: "destructive" }),
   });
 
   const deleteGroup = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/deck-groups/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xóa Nhóm thất bại"));
+      }
     },
     onSuccess: () => { 
       qc.invalidateQueries({ queryKey: ["admin-deck-groups"] });
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       toast({ title: "Đã xóa Nhóm" }); 
     },
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xóa Nhóm thất bại"), variant: "destructive" }),
   });
 
   // ── Deck Group Assignment ──────────────────────────────────────────────────
   const moveDeck = useMutation({
     mutationFn: async ({ deckId, groupId }: { deckId: string; groupId: string | null }) => {
       const res = await fetch(`/api/admin/decks/${deckId}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ group_id: groupId }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Chuyển bộ đề thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       setShowMoveDlg(null);
       toast({ title: "Đã chuyển bộ đề" });
     },
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Chuyển bộ đề thất bại"), variant: "destructive" }),
   });
 
   const saveDeck = useMutation({
     mutationFn: async () => {
       const url = editingDeck ? `/api/admin/decks/${editingDeck.id}` : "/api/admin/decks";
-      const method = editingDeck ? "PUT" : "POST";
+      const method = editingDeck ? "PATCH" : "POST";
       const payload = {
         title: deckForm.title,
         description: deckForm.description,
         level_min: deckForm.level_min || null,
         level_max: deckForm.level_max || null,
         access_level: deckForm.access_level,
-        preview_word_limit: (deckForm.access_level as any).preview ? (deckForm.access_level as any).preview_word_limit : null,
         group_id: deckForm.group_id || null,
       };
       const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, editingDeck ? "Cập nhật Flashcard thất bại" : "Tạo Flashcard thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       setShowDeckDlg(false); setEditingDeck(null);
       toast({ title: editingDeck ? "Cập nhật Flashcard thành công" : "Tạo Flashcard thành công" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Lưu Flashcard thất bại"), variant: "destructive" }),
   });
 
   const deleteDeck = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/decks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Xóa Flashcard thất bại"));
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-decks"] }); toast({ title: "Đã xóa Flashcard" }); },
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Xóa Flashcard thất bại"), variant: "destructive" }),
   });
 
   async function handleBulkTabsImport(deckId: string) {
@@ -190,7 +208,7 @@ export default function GroupDecksPage() {
       qc.invalidateQueries({ queryKey: ["admin-decks"] });
       setShowBulkTabsDlg(null);
     } else {
-      toast({ title: data.error ?? "Import thất bại", variant: "destructive" });
+      toast({ title: parseApiErrorMessage(data, "Import thất bại"), variant: "destructive" });
     }
   }
 

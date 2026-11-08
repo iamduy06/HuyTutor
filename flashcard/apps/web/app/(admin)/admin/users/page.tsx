@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import { generatePassword } from "@/lib/utils";
 import { PaginationControls } from "@/components/common/PaginationControls";
 import type { PaginationMeta } from "@huytutor/shared";
@@ -243,13 +244,16 @@ export default function AdminUsersPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "change_info", role, max_devices })
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Cập nhật thông tin thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Đã cập nhật thông tin" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Cập nhật thông tin thất bại"), variant: "destructive" }),
   });
 
   const resetPw = useMutation({

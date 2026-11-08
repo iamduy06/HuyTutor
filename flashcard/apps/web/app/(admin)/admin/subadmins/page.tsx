@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getClientErrorMessage, parseApiErrorMessage } from "@/lib/errorHandler";
 import { PaginationControls } from "@/components/common/PaginationControls";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -119,10 +120,13 @@ export default function AdminSubAdminsPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, max_users, max_device_per_user }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thao tác thất bại"));
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); setEditGroup(null); toast({ title: "Đã cập nhật cấu hình nhóm" }); },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const groupAction = useMutation({
@@ -131,7 +135,10 @@ export default function AdminSubAdminsPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...payload }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thao tác thất bại"));
+      }
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] });
@@ -144,7 +151,7 @@ export default function AdminSubAdminsPage() {
       }
       toast({ title: "Thành công" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const moveMember = useMutation({
@@ -153,7 +160,10 @@ export default function AdminSubAdminsPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "move_member", user_id: userId, target_group_id: targetGroupId, clear_decks: clearDecks }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Lỗi di chuyển");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Lỗi di chuyển"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] });
@@ -162,16 +172,19 @@ export default function AdminSubAdminsPage() {
       setClearDecksOnMove(false);
       toast({ title: "Đã di chuyển thành viên sang nhóm mới" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const deleteGroup = useMutation({
     mutationFn: async (id: string) => {
        const res = await fetch(`/api/admin/subadmins/groups/${id}`, { method: "DELETE" });
-       if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
+       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thao tác thất bại"));
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); setShowDeleteGroup(null); toast({ title: "Đã xoá nhóm" }); },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const updateBranding = useMutation({
@@ -180,10 +193,13 @@ export default function AdminSubAdminsPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ branding }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Fail");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thao tác thất bại"));
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] }); toast({ title: "Đã cập nhật cài đặt Branding" }); },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const deleteUser = useMutation({
@@ -200,14 +216,17 @@ export default function AdminSubAdminsPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "change_info", role, max_devices })
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiErrorMessage(data, "Thao tác thất bại"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-group-dashboard"] });
       setEditingMember(null);
       toast({ title: "Đã cập nhật thông tin cá nhân user" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: getClientErrorMessage(e, "Thao tác thất bại"), variant: "destructive" }),
   });
 
   const assignUserDeck = useMutation({
