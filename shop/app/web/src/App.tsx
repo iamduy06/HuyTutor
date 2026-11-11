@@ -88,17 +88,22 @@ export const App: React.FC = () => {
                 <Route path="/combo-thpt" element={<ComboPage />} />
                 <Route path="/soan-tai-lieu" element={<SoanTaiLieuPage />} />
                 <Route path="/faq" element={<FaqPage />} />
+                <Route path="/cau-hoi-thuong-gap" element={<FaqPage />} />
                 <Route path="/terms-of-service" element={<TermsPage />} />
+                <Route path="/dieu-khoan-su-dung" element={<TermsPage />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                 <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicyPage />} />
                 <Route path="/payment-delivery-policy" element={<PaymentDeliveryPolicyPage />} />
                 <Route path="/chinh-sach-thanh-toan-giao-hang" element={<PaymentDeliveryPolicyPage />} />
+                <Route path="/thanh-toan-va-giao-hang" element={<PaymentDeliveryPolicyPage />} />
                 <Route path="/refund-policy" element={<RefundPolicyPage />} />
                 <Route path="/chinh-sach-hoan-tien" element={<RefundPolicyPage />} />
                 <Route path="/copyright-policy" element={<CopyrightPolicyPage />} />
                 <Route path="/chinh-sach-ban-quyen" element={<CopyrightPolicyPage />} />
+                <Route path="/ban-quyen-va-so-huu" element={<CopyrightPolicyPage />} />
                 <Route path="/hc-rewards" element={<HcRewardsPage />} />
                 <Route path="/donate" element={<DonatePage />} />
+                <Route path="/ung-ho-tac-gia" element={<DonatePage />} />
                 <Route path="/header-footer" element={<HeaderFooterDemoPage />} />
 
                 {/* 3.1. Tuyến đường trang tuỳ biến theo khối */}

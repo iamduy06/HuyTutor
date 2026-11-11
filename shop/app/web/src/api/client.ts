@@ -11,7 +11,29 @@ import { AdminUserRecord,
   UpgradeQuote,
   UserLibraryItem,
   UserProfile,
-  UserSessionItem, ClientRegion } from '../types';
+  UserSessionItem,
+  ClientRegion,
+  MediaItem,
+  MediaFolder,
+  MediaPagination,
+  ListMediaParams,
+  ListMediaResult,
+  MediaUsage,
+  CheckMediaUsageResult,
+  DeleteMediaResult,
+  UploadMediaResult } from '../types';
+
+export type {
+  MediaItem,
+  MediaFolder,
+  MediaPagination,
+  ListMediaParams,
+  ListMediaResult,
+  MediaUsage,
+  CheckMediaUsageResult,
+  DeleteMediaResult,
+  UploadMediaResult,
+};
 
 const rawApiBase = import.meta.env.API_BASE_URL;
 const API_BASE_URL = rawApiBase ? (rawApiBase as string).replace(/\/$/, '') : '';
@@ -569,6 +591,95 @@ export const apiClient = {
   }> {
     return requestJson(`/api/admin/users/${encodeURIComponent(userId)}/sessions`, {
       method: 'DELETE',
+    });
+  },
+
+  // ====================================================================
+  // Quản lý Media Cloudflare R2 Tập trung (Milestone 2)
+  // ====================================================================
+
+  /**
+   * GET /api/admin/media
+   * Tải danh sách tệp tin R2 kèm phân trang, lọc thư mục động, loại tệp, tìm kiếm và sắp xếp.
+   */
+  async listMedia(params?: ListMediaParams): Promise<ListMediaResult> {
+    const q = new URLSearchParams();
+    if (params?.folder && params.folder !== 'all') {
+      q.set('folder', params.folder);
+    }
+    if (params?.fileType && params.fileType !== 'all') {
+      q.set('fileType', params.fileType);
+    }
+    if (params?.search && params.search.trim()) {
+      q.set('search', params.search.trim());
+    }
+    if (params?.sortBy) {
+      q.set('sortBy', params.sortBy);
+    }
+    if (params?.sortOrder) {
+      q.set('sortOrder', params.sortOrder);
+    }
+    if (params?.page) {
+      q.set('page', String(params.page));
+    }
+    if (params?.limit) {
+      q.set('limit', String(params.limit));
+    }
+    const query = q.toString() ? `?${q.toString()}` : '';
+    return requestJson<ListMediaResult>(`/api/admin/media${query}`);
+  },
+
+  /**
+   * POST /api/admin/media/upload
+   * Tải lên một hoặc nhiều tệp tin vào thư mục media-library/ hoặc media-library/<subfolder>.
+   * Tên trường Multer bắt buộc là 'files'.
+   */
+  async uploadMediaFiles(
+    files: File[],
+    subfolder?: string
+  ): Promise<UploadMediaResult> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    if (subfolder && subfolder.trim()) {
+      formData.append('subfolder', subfolder.trim());
+    }
+
+    const response = await fetch(buildApiUrl('/api/admin/media/upload'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders(),
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || 'Lỗi tải tệp tin lên kho Media R2.');
+    }
+    return data as UploadMediaResult;
+  },
+
+  /**
+   * POST /api/admin/media/check-usage
+   * Quét sâu tham chiếu của danh sách keys/URLs trong Supabase DB và Local JSON fallback
+   * (products, categories, menus, site_configs và chuỗi custom_html).
+   */
+  async checkMediaUsage(keys: string[]): Promise<CheckMediaUsageResult> {
+    return requestJson<CheckMediaUsageResult>('/api/admin/media/check-usage', {
+      method: 'POST',
+      body: JSON.stringify({ keys }),
+    });
+  },
+
+  /**
+   * POST /api/admin/media/delete
+   * Xóa vật lý vĩnh viễn danh sách object keys trên Cloudflare R2 bucket.
+   */
+  async deleteMediaFiles(keys: string[]): Promise<DeleteMediaResult> {
+    return requestJson<DeleteMediaResult>('/api/admin/media/delete', {
+      method: 'POST',
+      body: JSON.stringify({ keys }),
     });
   },
 };

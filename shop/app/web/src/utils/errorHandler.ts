@@ -8,10 +8,21 @@
 
 export function getClientErrorMessage(
   rawError: any,
-  fallbackMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.'
+  fallbackOrIsAdmin: string | boolean = 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+  isAdminRouteParam?: boolean
 ): string {
-  const isAdminRoute =
+  let fallbackMessage = 'Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
+  let isAdminRoute =
     typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+  if (typeof fallbackOrIsAdmin === 'boolean') {
+    isAdminRoute = fallbackOrIsAdmin;
+  } else if (typeof fallbackOrIsAdmin === 'string') {
+    fallbackMessage = fallbackOrIsAdmin;
+    if (typeof isAdminRouteParam === 'boolean') {
+      isAdminRoute = isAdminRouteParam;
+    }
+  }
 
   const rawMsg = String(
     rawError?.response?.data?.error ||

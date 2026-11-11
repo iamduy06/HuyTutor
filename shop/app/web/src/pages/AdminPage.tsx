@@ -9,6 +9,7 @@ import { AdminComboCms } from '../components/AdminComboCms';
 import { AdminFlashcardCms } from '../components/AdminFlashcardCms';
 import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminCampaignFrameCms } from '../components/AdminCampaignFrameCms';
+import { AdminMediaManager } from '../components/AdminMediaManager';
 import { R2ImageUploader } from '../components/R2ImageUploader';
 import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
@@ -57,7 +58,8 @@ export type AdminTab =
   | 'campaign_cms'
   | 'orders'
   | 'mapping'
-  | 'users';
+  | 'users'
+  | 'media';
 
 export const AdminPage: React.FC = () => {
   const {
@@ -87,6 +89,7 @@ export const AdminPage: React.FC = () => {
           'orders',
           'mapping',
           'users',
+          'media',
         ].includes(tabParam)
       ) {
         return tabParam;
@@ -1005,6 +1008,26 @@ export const AdminPage: React.FC = () => {
                   }`}
                 >
                   {adminUsers.length}
+                </span>
+              </button>
+
+              {/* 13. QUẢN LÝ MEDIA R2 */}
+              <button
+                type="button"
+                onClick={() => switchTab('media')}
+                className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-sm text-xs transition ${
+                  activeTab === 'media'
+                    ? 'bg-[#e60049] text-white font-bold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 font-medium'
+                }`}
+              >
+                <span>13. Quản lý Media R2</span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                    activeTab === 'media' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Cloudflare R2
                 </span>
               </button>
             </nav>
@@ -2996,6 +3019,9 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* TAB 13: QUẢN LÝ MEDIA R2 */}
+        {activeTab === 'media' && <AdminMediaManager />}
           </main>
         </div>
       </div>

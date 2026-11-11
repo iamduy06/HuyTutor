@@ -180,7 +180,8 @@ export type HomepageBlockType =
   | 'categories_grid'
   | 'section_groups'
   | 'notice_text'
-  | 'bottom_banner';
+  | 'bottom_banner'
+  | 'custom_html';
 
 export interface HomepageBlockItem {
   id: string;
@@ -289,7 +290,8 @@ export type CategoryBlockType =
   | 'category_notice'
   | 'gift_hero_anchors'
   | 'gift_form_embed'
-  | 'gift_donate_cta';
+  | 'gift_donate_cta'
+  | 'custom_html';
 
 export interface CategoryBlockItem {
   id: string;
@@ -518,7 +520,8 @@ export type ProductDetailBlockType =
   | 'related_products'
   | 'gift_preview_download'
   | 'gift_cross_sell'
-  | 'gift_donate_cta';
+  | 'gift_donate_cta'
+  | 'custom_html';
 
 export interface ProductDetailBlockItem {
   id: string;
@@ -541,7 +544,8 @@ export type ComboBlockType =
   | 'combo_sections'
   | 'combo_bottom_cta'
   | 'combo_banner'
-  | 'combo_notice';
+  | 'combo_notice'
+  | 'custom_html';
 
 export interface ComboHeroBlockConfig {
   top_slogan: string;
@@ -640,7 +644,8 @@ export type FlashcardBlockType =
   | 'flashcard_pricing_packages'
   | 'flashcard_group_pricing'
   | 'flashcard_contact_notice'
-  | 'flashcard_banner';
+  | 'flashcard_banner'
+  | 'custom_html';
 
 export interface FlashcardHeroBlockConfig {
   title: string;
@@ -786,11 +791,14 @@ export interface PolicySectionItem {
   content: string;
 }
 
+export type UtilityPageRenderMode = 'legacy' | 'hybrid' | 'blocks';
+export type RenderMode = UtilityPageRenderMode;
+
 export interface PolicyPageConfig {
   title: string;
   description: string;
   last_updated?: string;
-  render_mode?: 'legacy' | 'blocks';
+  render_mode?: UtilityPageRenderMode;
   sections: PolicySectionItem[];
   blocks?: CustomPageBlock[];
 }
@@ -804,7 +812,7 @@ export interface TermsSectionItem {
 export interface TermsPageConfig {
   title: string;
   description: string;
-  render_mode?: 'legacy' | 'blocks';
+  render_mode?: UtilityPageRenderMode;
   sections: TermsSectionItem[];
   blocks?: CustomPageBlock[];
 }
@@ -815,7 +823,15 @@ export type CustomBlockType =
   | 'accordion_faq'
   | 'cards_grid'
   | 'cta_box'
-  | 'image_only';
+  | 'image_only'
+  | 'custom_html';
+
+export interface CustomHtmlBlockConfig {
+  html_content?: string;
+  container_mode?: 'boxed' | 'full_width';
+  no_padding?: boolean;
+  admin_label?: string;
+}
 
 export interface CustomPageBlockItem {
   id: string;
@@ -836,6 +852,10 @@ export interface CustomPageBlock {
   caption?: string;
   items?: CustomPageBlockItem[];
   is_active?: boolean;
+  html_content?: string;
+  container_mode?: 'boxed' | 'full_width';
+  no_padding?: boolean;
+  admin_label?: string;
 }
 
 export interface CustomPageItem {
@@ -862,7 +882,9 @@ export interface FaqItem {
 export interface FaqPageConfig {
   title: string;
   description: string;
+  render_mode?: UtilityPageRenderMode;
   faqs: FaqItem[];
+  blocks?: CustomPageBlock[];
 }
 
 export interface HcRewardBenefitItem {
@@ -876,6 +898,8 @@ export interface HcRewardsPageConfig {
   description: string;
   benefits: HcRewardBenefitItem[];
   lookup_title?: string;
+  render_mode?: UtilityPageRenderMode;
+  blocks?: CustomPageBlock[];
 }
 
 export interface SoanTaiLieuCommitmentItem {
@@ -889,6 +913,8 @@ export interface SoanTaiLieuPageConfig {
   description: string;
   commitments: SoanTaiLieuCommitmentItem[];
   form_title?: string;
+  render_mode?: UtilityPageRenderMode;
+  blocks?: CustomPageBlock[];
 }
 
 export interface DonatePageConfig {
@@ -898,6 +924,8 @@ export interface DonatePageConfig {
   account_number: string;
   account_holder: string;
   default_amount?: number;
+  render_mode?: UtilityPageRenderMode;
+  blocks?: CustomPageBlock[];
 }
 
 export interface Product {
@@ -1135,3 +1163,87 @@ export interface ClientRegion {
   usdExchangeRate: number;
   usdLiveRate?: number;
 }
+
+// ==========================================
+// Media Management Types & API Interfaces (Milestone 2)
+// ==========================================
+
+export interface MediaItem {
+  key: string;
+  name: string;
+  folder: string;
+  size: number;
+  uploadedAt: string;
+  modifiedAt: string;
+  uploadTimeSource: 'filename' | 'r2_fallback';
+  publicUrl: string;
+  fileType: 'image' | 'pdf' | 'other';
+}
+
+export interface MediaPagination {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface MediaFolder {
+  name: string;
+  count: number;
+}
+
+export interface ListMediaParams {
+  folder?: string;
+  fileType?: 'all' | 'image' | 'pdf' | 'other';
+  search?: string;
+  sortBy?: 'name' | 'uploadedAt' | 'modifiedAt' | 'size';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export interface ListMediaResult {
+  ok: boolean;
+  items: MediaItem[];
+  pagination: MediaPagination;
+  folders: MediaFolder[];
+  error?: string;
+  details?: string;
+}
+
+export interface MediaUsage {
+  key: string;
+  location: string;
+  details: string;
+}
+
+export interface CheckMediaUsageResult {
+  ok: boolean;
+  inUse: boolean;
+  usages: MediaUsage[];
+  error?: string;
+  details?: string;
+}
+
+export interface MediaDeleteError {
+  key: string;
+  error: string;
+}
+
+export interface DeleteMediaResult {
+  ok: boolean;
+  deletedKeys: string[];
+  errors: MediaDeleteError[];
+  message?: string;
+  error?: string;
+  details?: string;
+}
+
+export interface UploadMediaResult {
+  ok: boolean;
+  uploaded: MediaItem[];
+  message?: string;
+  error?: string;
+  details?: string;
+}
+
