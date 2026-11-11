@@ -17,6 +17,7 @@ import {
   CustomPageBlock,
   CustomPageBlockItem,
   CustomBlockType,
+  UtilityPageRenderMode,
 } from '../types';
 import {
   PolicyPageRenderer,
@@ -27,6 +28,719 @@ import {
   DEFAULT_COPYRIGHT_POLICY_CONFIG,
 } from '../pages/UtilityPages';
 import { R2ImageUploader } from './R2ImageUploader';
+import { CustomHtmlBlockEditor } from './CustomHtmlBlockEditor';
+
+// ============================================================================
+// COMPONENT: BỘ CHỌN CHẾ ĐỘ HIỂN THỊ (RENDER MODE SELECTOR) - GEMINI.MD RULE 5
+// ============================================================================
+interface RenderModeSelectorProps {
+  value?: UtilityPageRenderMode;
+  onChange: (mode: UtilityPageRenderMode) => void;
+  pageName: string;
+}
+
+const RenderModeSelector: React.FC<RenderModeSelectorProps> = ({
+  value = 'legacy',
+  onChange,
+  pageName,
+}) => {
+  const currentMode = value || 'legacy';
+
+  const modes: { mode: UtilityPageRenderMode; label: string; tag: string; desc: string; icon: string }[] = [
+    {
+      mode: 'legacy',
+      label: 'Kế thừa',
+      tag: 'Legacy',
+      desc: 'Hiển thị bố cục biểu mẫu tiêu chuẩn mặc định của hệ thống',
+      icon: '🏛️',
+    },
+    {
+      mode: 'hybrid',
+      label: 'Lai kết hợp',
+      tag: 'Hybrid',
+      desc: 'Giữ nguyên nội dung tiêu chuẩn + chèn thêm các khối động tùy biến',
+      icon: '🔀',
+    },
+    {
+      mode: 'blocks',
+      label: 'Toàn khối',
+      tag: 'Blocks',
+      desc: 'Dựng toàn bộ trang bằng các khối động (Banner, HTML, Văn bản...)',
+      icon: '🧱',
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-gray-200 p-3.5 rounded-xs shadow-xs space-y-2">
+      <div className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+        [CHẾ ĐỘ HIỂN THỊ] - Lựa chọn phong cách hiển thị trang (Kế thừa / Lai kết hợp / Toàn khối)
+      </div>
+      <div className="text-[11px] text-gray-500">
+        Phương thức dựng trang cho {pageName}. Mặc định Kế thừa bảo đảm 100% tương thích dữ liệu hiện hành.
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+        {modes.map((m) => {
+          const isSelected = currentMode === m.mode;
+          return (
+            <button
+              key={m.mode}
+              type="button"
+              onClick={() => onChange(m.mode)}
+              className={`text-left p-3 rounded-xs border transition flex flex-col justify-between ${
+                isSelected
+                  ? 'border-[#e60049] bg-pink-50/50 shadow-2xs ring-1 ring-[#e60049]'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <span>{m.icon}</span>
+                  <span>{m.label}</span>
+                </span>
+                <span
+                  className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-xs ${
+                    isSelected ? 'bg-[#e60049] text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {m.tag}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-600 leading-relaxed">{m.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// COMPONENT: QUẢN LÝ KHỐI ĐỘNG TÙY BIẾN (CUSTOM PAGE BLOCKS MANAGER)
+// ============================================================================
+interface CustomPageBlocksManagerProps {
+  blocks: CustomPageBlock[];
+  onChange: (blocks: CustomPageBlock[]) => void;
+  label?: string;
+  folder?: string;
+}
+
+const CustomPageBlocksManager: React.FC<CustomPageBlocksManagerProps> = ({
+  blocks,
+  onChange,
+  label = 'Danh sách các khối nội dung',
+  folder = 'custom_pages',
+}) => {
+  const { showToast } = useStore();
+
+  const handleAddBlock = (type: CustomBlockType) => {
+    const newBlock: CustomPageBlock = {
+      id: 'blk_' + Date.now(),
+      type,
+      title:
+        type === 'image_only'
+          ? 'Hình ảnh minh họa'
+          : type === 'banner_hero'
+          ? 'Banner nổi bật'
+          : type === 'rich_text'
+          ? 'Đoạn văn bản'
+          : type === 'cards_grid'
+          ? 'Lưới tính năng'
+          : type === 'accordion_faq'
+          ? 'Câu hỏi thường gặp'
+          : type === 'custom_html'
+          ? 'Mã HTML Tùy Biến'
+          : 'Kêu gọi hành động',
+      subtitle: '',
+      content: '',
+      image_url: '',
+      link_url: '',
+      caption: '',
+      items:
+        type === 'cards_grid' || type === 'accordion_faq'
+          ? [
+              {
+                id: 'item_1',
+                title: type === 'accordion_faq' ? 'Câu hỏi mới?' : 'Mục 1',
+                desc: type === 'accordion_faq' ? 'Câu trả lời chi tiết' : 'Mô tả chi tiết mục 1',
+                icon: '★',
+                link: '',
+              },
+            ]
+          : undefined,
+      is_active: true,
+      html_content:
+        type === 'custom_html'
+          ? '<div style="padding: 16px; text-align: center;">\n  <h3>Nội dung HTML tùy biến</h3>\n</div>'
+          : undefined,
+      container_mode: type === 'custom_html' ? 'boxed' : undefined,
+      no_padding: type === 'custom_html' ? false : undefined,
+      admin_label: type === 'custom_html' ? 'Khối HTML tùy biến' : undefined,
+    };
+
+    onChange([...blocks, newBlock]);
+    showToast(`Đã thêm khối [${type}] thành công!`);
+  };
+
+  const handleUpdateBlockField = (index: number, field: keyof CustomPageBlock, value: any) => {
+    const updated = [...blocks];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange(updated);
+  };
+
+  const handleUpdateBlockFull = (index: number, updatedBlock: CustomPageBlock) => {
+    const updated = [...blocks];
+    updated[index] = updatedBlock;
+    onChange(updated);
+  };
+
+  const handleRemoveBlock = (index: number) => {
+    const updated = blocks.filter((_, i) => i !== index);
+    onChange(updated);
+    showToast('Đã xóa khối.');
+  };
+
+  const handleMoveBlock = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= blocks.length) return;
+    const updated = [...blocks];
+    const temp = updated[index];
+    updated[index] = updated[newIndex];
+    updated[newIndex] = temp;
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* THANH CÔNG CỤ THÊM KHỐI MỚI (7 LOẠI KHỐI) */}
+      <div className="bg-gray-50 border border-gray-200 p-3 rounded-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-black text-gray-700 uppercase block">
+            + Thêm khối nội dung mới:
+          </span>
+          <span className="text-[10px] text-gray-500 font-bold">
+            ({blocks.length} khối đã tạo)
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleAddBlock('image_only')}
+            className="px-2.5 py-1 bg-white hover:bg-pink-50 border border-[#e60049] text-[#e60049] text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            🖼️ + Khối Chỉ tải ảnh (image_only)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('banner_hero')}
+            className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            🚩 + Khối Banner Hero
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('rich_text')}
+            className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            📝 + Khối Văn bản
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('cards_grid')}
+            className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            🗂️ + Khối Lưới thẻ
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('accordion_faq')}
+            className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            ❓ + Khối FAQ Accordion
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('cta_box')}
+            className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            📣 + Khối Kêu gọi CTA
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddBlock('custom_html')}
+            className="px-2.5 py-1 bg-white hover:bg-pink-50 border border-[#e60049] text-[#e60049] text-[11px] font-bold rounded-xs transition shadow-2xs"
+          >
+            💻 + Khối HTML Tùy Biến (custom_html)
+          </button>
+        </div>
+      </div>
+
+      {/* DANH SÁCH CÁC KHỐI ĐÃ TẠO */}
+      {blocks.length === 0 ? (
+        <div className="py-8 text-center text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xs">
+          Chưa có khối tùy biến nào. Chọn một loại khối bên trên để thêm vào trang.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {blocks.map((block, bIdx) => (
+            <div
+              key={block.id || bIdx}
+              className="bg-white border border-gray-200 p-3.5 rounded-xs shadow-xs space-y-3"
+            >
+              {/* TIÊU ĐỀ KHỐI VÀ THAO TÁC */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-xs ${
+                      block.type === 'custom_html'
+                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                        : 'bg-pink-100 text-[#e60049]'
+                    }`}
+                  >
+                    {block.type}
+                  </span>
+                  <span className="text-xs font-bold text-gray-800">
+                    Khối #{bIdx + 1}: {block.admin_label || block.title || 'Chưa đặt tiêu đề'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 cursor-pointer text-[10px] text-gray-600 font-bold">
+                    <input
+                      type="checkbox"
+                      checked={block.is_active !== false}
+                      onChange={(e) => handleUpdateBlockField(bIdx, 'is_active', e.target.checked)}
+                      className="w-3.5 h-3.5 accent-[#e60049] rounded-xs"
+                    />
+                    <span>Kích hoạt</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveBlock(bIdx, 'up')}
+                      disabled={bIdx === 0}
+                      className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded-xs"
+                      title="Di chuyển lên"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveBlock(bIdx, 'down')}
+                      disabled={bIdx === blocks.length - 1}
+                      className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded-xs"
+                      title="Di chuyển xuống"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBlock(bIdx)}
+                      className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. KHỐI CHỈ HÌNH ẢNH (IMAGE_ONLY) */}
+              {block.type === 'image_only' && (
+                <div className="space-y-3">
+                  <div className="text-[11px] font-bold text-[#e60049]">
+                    [KHỐI CHỈ HÌNH ẢNH] - Tải ảnh lên Cloudflare R2 với chú thích và liên kết tùy chọn
+                  </div>
+                  <R2ImageUploader
+                    label="Hình ảnh hiển thị (Cloudflare R2)"
+                    helperText="Định dạng PNG, JPG, WEBP. Tên file 12 số định dạng YYMMDDHHmmss. Nút ✕ màu đỏ hỗ trợ xóa vĩnh viễn trên R2."
+                    imageUrl={block.image_url}
+                    onUrlChange={(url) => handleUpdateBlockField(bIdx, 'image_url', url)}
+                    folder={folder}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
+                        Chú thích hình ảnh (Caption)
+                      </label>
+                      <input
+                        type="text"
+                        value={block.caption || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'caption', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        placeholder="Ví dụ: Quy trình 3 bước nhận tài liệu"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
+                        Liên kết khi bấm vào ảnh (tùy chọn)
+                      </label>
+                      <input
+                        type="text"
+                        value={block.link_url || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'link_url', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        placeholder="/soan-tai-lieu hoặc /combo-thpt"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. KHỐI BANNER HERO (BANNER_HERO) */}
+              {block.type === 'banner_hero' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề Banner</label>
+                      <input
+                        type="text"
+                        value={block.title || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'title', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Liên kết nút bấm</label>
+                      <input
+                        type="text"
+                        value={block.link_url || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'link_url', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        placeholder="/high-school"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Mô tả phụ</label>
+                    <textarea
+                      rows={2}
+                      value={block.subtitle || ''}
+                      onChange={(e) => handleUpdateBlockField(bIdx, 'subtitle', e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                  <R2ImageUploader
+                    label="Ảnh nền Banner (tùy chọn)"
+                    helperText="Tải ảnh lên R2 làm banner phụ"
+                    imageUrl={block.image_url}
+                    onUrlChange={(url) => handleUpdateBlockField(bIdx, 'image_url', url)}
+                    folder={folder}
+                  />
+                </div>
+              )}
+
+              {/* 3. KHỐI VĂN BẢN (RICH_TEXT) */}
+              {block.type === 'rich_text' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề khối</label>
+                      <input
+                        type="text"
+                        value={block.title || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'title', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề phụ</label>
+                      <input
+                        type="text"
+                        value={block.subtitle || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'subtitle', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Nội dung văn bản</label>
+                    <textarea
+                      rows={4}
+                      value={block.content || ''}
+                      onChange={(e) => handleUpdateBlockField(bIdx, 'content', e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      placeholder="Nhập nội dung văn bản..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 4. KHỐI LƯỚI THẺ (CARDS_GRID) */}
+              {block.type === 'cards_grid' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề lưới thẻ</label>
+                      <input
+                        type="text"
+                        value={block.title || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'title', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Mô tả phụ</label>
+                      <input
+                        type="text"
+                        value={block.subtitle || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'subtitle', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">
+                        Danh sách thẻ ({(block.items || []).length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItem: CustomPageBlockItem = {
+                            id: 'item_' + Date.now(),
+                            title: 'Thẻ mới',
+                            desc: 'Mô tả ngắn gọn',
+                            icon: '★',
+                            link: '',
+                          };
+                          handleUpdateBlockField(bIdx, 'items', [...(block.items || []), newItem]);
+                        }}
+                        className="px-2 py-0.5 text-[10px] bg-[#e60049] text-white font-bold rounded-xs"
+                      >
+                        + Thêm thẻ
+                      </button>
+                    </div>
+
+                    {(block.items || []).map((item, itIdx) => (
+                      <div
+                        key={item.id || itIdx}
+                        className="bg-gray-50 border border-gray-200 p-2.5 rounded-xs space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-gray-700">Thẻ #{itIdx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedItems = (block.items || []).filter((_, i) => i !== itIdx);
+                              handleUpdateBlockField(bIdx, 'items', updatedItems);
+                            }}
+                            className="text-[9px] text-red-600 font-bold hover:underline"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Icon (★, ⚡)"
+                            value={item.icon || ''}
+                            onChange={(e) => {
+                              const updated = [...(block.items || [])];
+                              updated[itIdx] = { ...updated[itIdx], icon: e.target.value };
+                              handleUpdateBlockField(bIdx, 'items', updated);
+                            }}
+                            className="text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none text-center"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Tiêu đề thẻ"
+                            value={item.title}
+                            onChange={(e) => {
+                              const updated = [...(block.items || [])];
+                              updated[itIdx] = { ...updated[itIdx], title: e.target.value };
+                              handleUpdateBlockField(bIdx, 'items', updated);
+                            }}
+                            className="col-span-3 text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
+                          />
+                        </div>
+                        <textarea
+                          rows={2}
+                          placeholder="Mô tả thẻ"
+                          value={item.desc || ''}
+                          onChange={(e) => {
+                            const updated = [...(block.items || [])];
+                            updated[itIdx] = { ...updated[itIdx], desc: e.target.value };
+                            handleUpdateBlockField(bIdx, 'items', updated);
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Đường dẫn liên kết (tùy chọn)"
+                          value={item.link || ''}
+                          onChange={(e) => {
+                            const updated = [...(block.items || [])];
+                            updated[itIdx] = { ...updated[itIdx], link: e.target.value };
+                            handleUpdateBlockField(bIdx, 'items', updated);
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. KHỐI FAQ ACCORDION (ACCORDION_FAQ) */}
+              {block.type === 'accordion_faq' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề khối FAQ</label>
+                      <input
+                        type="text"
+                        value={block.title || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'title', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Mô tả phụ</label>
+                      <input
+                        type="text"
+                        value={block.subtitle || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'subtitle', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">
+                        Danh sách câu hỏi ({(block.items || []).length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItem: CustomPageBlockItem = {
+                            id: 'faq_' + Date.now(),
+                            title: 'Câu hỏi mới?',
+                            desc: 'Câu trả lời chi tiết',
+                          };
+                          handleUpdateBlockField(bIdx, 'items', [...(block.items || []), newItem]);
+                        }}
+                        className="px-2 py-0.5 text-[10px] bg-[#e60049] text-white font-bold rounded-xs"
+                      >
+                        + Thêm câu hỏi
+                      </button>
+                    </div>
+
+                    {(block.items || []).map((item, itIdx) => (
+                      <div
+                        key={item.id || itIdx}
+                        className="bg-gray-50 border border-gray-200 p-2.5 rounded-xs space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-gray-700">Mục #{itIdx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedItems = (block.items || []).filter((_, i) => i !== itIdx);
+                              handleUpdateBlockField(bIdx, 'items', updatedItems);
+                            }}
+                            className="text-[9px] text-red-600 font-bold hover:underline"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Câu hỏi?"
+                          value={item.title}
+                          onChange={(e) => {
+                            const updated = [...(block.items || [])];
+                            updated[itIdx] = { ...updated[itIdx], title: e.target.value };
+                            handleUpdateBlockField(bIdx, 'items', updated);
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
+                        />
+                        <textarea
+                          rows={2}
+                          placeholder="Câu trả lời"
+                          value={item.desc || ''}
+                          onChange={(e) => {
+                            const updated = [...(block.items || [])];
+                            updated[itIdx] = { ...updated[itIdx], desc: e.target.value };
+                            handleUpdateBlockField(bIdx, 'items', updated);
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. KHỐI KÊU GỌI CTA (CTA_BOX) */}
+              {block.type === 'cta_box' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiêu đề CTA</label>
+                      <input
+                        type="text"
+                        value={block.title || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'title', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Liên kết nút hành động</label>
+                      <input
+                        type="text"
+                        value={block.link_url || ''}
+                        onChange={(e) => handleUpdateBlockField(bIdx, 'link_url', e.target.value)}
+                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        placeholder="/soan-tai-lieu hoặc /combo-thpt"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Thông điệp phụ</label>
+                    <textarea
+                      rows={2}
+                      value={block.subtitle || ''}
+                      onChange={(e) => handleUpdateBlockField(bIdx, 'subtitle', e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 7. KHỐI HTML TÙY BIẾN (CUSTOM_HTML) */}
+              {block.type === 'custom_html' && (
+                <div className="space-y-3">
+                  <div className="text-[11px] font-bold text-[#e60049]">
+                    [KHỐI HTML TÙY BIẾN] - Soạn thảo HTML/CSS cô lập an toàn trong Shadow DOM, hỗ trợ chèn ảnh R2
+                  </div>
+                  <CustomHtmlBlockEditor
+                    config={{
+                      html_content: block.html_content || '',
+                      container_mode: block.container_mode || 'boxed',
+                      no_padding: block.no_padding,
+                      admin_label: block.admin_label || block.title,
+                    }}
+                    onChange={(newCfg) => {
+                      handleUpdateBlockFull(bIdx, {
+                        ...block,
+                        html_content: newCfg.html_content,
+                        container_mode: newCfg.container_mode,
+                        no_padding: newCfg.no_padding,
+                        admin_label: newCfg.admin_label,
+                        title: newCfg.admin_label || block.title,
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const AdminUtilityPagesCms: React.FC = () => {
   const { siteConfigs, updateSiteConfig, showToast } = useStore();
@@ -366,6 +1080,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
     blockTitle: string,
     blockDesc: string
   ) => {
+    const renderMode: UtilityPageRenderMode = config.render_mode || 'legacy';
+
     const addSection = () => {
       const newSec: PolicySectionItem = {
         id: 'sec_' + Date.now(),
@@ -398,15 +1114,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
       setConfig({ ...config, sections: updated });
     };
 
-    return (
-      <div className="space-y-4">
-        {/* TIÊU ĐỀ KHỐI CHUẨN GEMINI.MD RULE 5 */}
-        <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
-          <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
-            [{blockTitle}] - {blockDesc}
-          </div>
-        </div>
-
+    const standardPolicyForm = (
+      <>
         {/* THÔNG TIN CHUNG */}
         <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
           <div>
@@ -522,6 +1231,65 @@ export const AdminUtilityPagesCms: React.FC = () => {
             </div>
           ))}
         </div>
+      </>
+    );
+
+    return (
+      <div className="space-y-4">
+        {/* TIÊU ĐỀ KHỐI CHUẨN GEMINI.MD RULE 5 */}
+        <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
+          <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
+            [{blockTitle}] - {blockDesc}
+          </div>
+        </div>
+
+        {/* 1. CHỌN CHẾ ĐỘ HIỂN THỊ */}
+        <RenderModeSelector
+          value={renderMode}
+          onChange={(newMode) => setConfig({ ...config, render_mode: newMode })}
+          pageName={blockTitle}
+        />
+
+        {/* 2. CHẾ ĐỘ KẾ THỪA: FORM TIÊU CHUẨN */}
+        {renderMode === 'legacy' && standardPolicyForm}
+
+        {/* 3. CHẾ ĐỘ LAI KẾT HỢP: FORM TIÊU CHUẨN + KHỐI BỔ SUNG BÊN DƯỚI */}
+        {renderMode === 'hybrid' && (
+          <>
+            {standardPolicyForm}
+            <div className="pt-2">
+              <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs mb-3">
+                <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                  [KHỐI TÙY BIẾN BỔ SUNG] - Quản lý các khối động hiển thị bên dưới nội dung chính sách
+                </span>
+              </div>
+              <CustomPageBlocksManager
+                blocks={config.blocks || []}
+                onChange={(newBlocks) => setConfig({ ...config, blocks: newBlocks })}
+                label={`Khối bổ sung cho ${blockTitle}`}
+              />
+            </div>
+          </>
+        )}
+
+        {/* 4. CHẾ ĐỘ TOÀN KHỐI: KHỐI TÙY BIẾN LÀ TRỌNG TÂM, NỘI DUNG TIÊU CHUẨN THU GỌN */}
+        {renderMode === 'blocks' && (
+          <>
+            <CustomPageBlocksManager
+              blocks={config.blocks || []}
+              onChange={(newBlocks) => setConfig({ ...config, blocks: newBlocks })}
+              label={`Khối nội dung độc lập cho ${blockTitle}`}
+            />
+            <details className="border border-gray-200 bg-white p-3 rounded-xs text-xs space-y-3">
+              <summary className="font-bold cursor-pointer text-gray-700 hover:text-[#e60049]">
+                ⚙️ [CẤU HÌNH TIÊU CHUẨN] - Nhấn để mở rộng cấu hình tiêu đề và điều khoản (ẩn trong chế độ Toàn khối)
+              </summary>
+              <div className="pt-3 border-t border-gray-100 space-y-3">
+                {standardPolicyForm}
+              </div>
+            </details>
+          </>
+        )}
       </div>
     );
   };
@@ -565,80 +1333,6 @@ export const AdminUtilityPagesCms: React.FC = () => {
     showToast('Đã xóa trang tùy biến.');
   };
 
-  const handleAddBlock = (type: CustomBlockType) => {
-    if (!selectedCustomPage) return;
-    const newBlock: CustomPageBlock = {
-      id: 'blk_' + Date.now(),
-      type,
-      title:
-        type === 'image_only'
-          ? 'Hình ảnh minh họa'
-          : type === 'banner_hero'
-          ? 'Banner nổi bật'
-          : type === 'rich_text'
-          ? 'Đoạn văn bản'
-          : type === 'cards_grid'
-          ? 'Lưới tính năng'
-          : type === 'accordion_faq'
-          ? 'Câu hỏi thường gặp'
-          : 'Kêu gọi hành động',
-      subtitle: '',
-      content: '',
-      image_url: '',
-      link_url: '',
-      caption: '',
-      items:
-        type === 'cards_grid' || type === 'accordion_faq'
-          ? [
-              {
-                id: 'item_1',
-                title: 'Mục 1',
-                desc: 'Mô tả chi tiết mục 1',
-                icon: '★',
-                link: '',
-              },
-            ]
-          : undefined,
-      is_active: true,
-    };
-
-    const updatedPages = [...customPagesConfig.pages];
-    const target = { ...selectedCustomPage, blocks: [...selectedCustomPage.blocks, newBlock] };
-    updatedPages[selectedPageIndex] = target;
-    setCustomPagesConfig({ pages: updatedPages });
-    showToast(`Đã thêm khối [${type}] thành công!`);
-  };
-
-  const handleUpdateBlock = (blockIndex: number, field: keyof CustomPageBlock, value: any) => {
-    if (!selectedCustomPage) return;
-    const updatedBlocks = [...selectedCustomPage.blocks];
-    updatedBlocks[blockIndex] = { ...updatedBlocks[blockIndex], [field]: value };
-    const updatedPages = [...customPagesConfig.pages];
-    updatedPages[selectedPageIndex] = { ...selectedCustomPage, blocks: updatedBlocks };
-    setCustomPagesConfig({ pages: updatedPages });
-  };
-
-  const handleRemoveBlock = (blockIndex: number) => {
-    if (!selectedCustomPage) return;
-    const updatedBlocks = selectedCustomPage.blocks.filter((_, i) => i !== blockIndex);
-    const updatedPages = [...customPagesConfig.pages];
-    updatedPages[selectedPageIndex] = { ...selectedCustomPage, blocks: updatedBlocks };
-    setCustomPagesConfig({ pages: updatedPages });
-  };
-
-  const handleMoveBlock = (blockIndex: number, direction: 'up' | 'down') => {
-    if (!selectedCustomPage) return;
-    const newIndex = direction === 'up' ? blockIndex - 1 : blockIndex + 1;
-    if (newIndex < 0 || newIndex >= selectedCustomPage.blocks.length) return;
-    const updatedBlocks = [...selectedCustomPage.blocks];
-    const temp = updatedBlocks[blockIndex];
-    updatedBlocks[blockIndex] = updatedBlocks[newIndex];
-    updatedBlocks[newIndex] = temp;
-    const updatedPages = [...customPagesConfig.pages];
-    updatedPages[selectedPageIndex] = { ...selectedCustomPage, blocks: updatedBlocks };
-    setCustomPagesConfig({ pages: updatedPages });
-  };
-
   // Helper render Preview theo active tab
   const renderLivePreviewContent = () => {
     switch (activeSubTab) {
@@ -657,10 +1351,26 @@ export const AdminUtilityPagesCms: React.FC = () => {
               title: termsConfig.title,
               description: termsConfig.description,
               sections: termsConfig.sections,
+              render_mode: termsConfig.render_mode,
+              blocks: termsConfig.blocks,
             }}
           />
         );
       case 'faq':
+        if (faqConfig.render_mode === 'blocks') {
+          return (
+            <CustomPageRenderer
+              page={{
+                id: 'preview_faq',
+                title: faqConfig.title || 'Câu hỏi thường gặp',
+                slug: 'faq',
+                meta_description: faqConfig.description,
+                is_active: true,
+                blocks: faqConfig.blocks || [],
+              }}
+            />
+          );
+        }
         return (
           <div className="max-w-[760px] mx-auto px-4 py-8 space-y-6">
             <div>
@@ -697,9 +1407,31 @@ export const AdminUtilityPagesCms: React.FC = () => {
                 );
               })}
             </div>
+            {faqConfig.render_mode === 'hybrid' && Array.isArray(faqConfig.blocks) && faqConfig.blocks.length > 0 && (
+              <div className="pt-6 border-t border-gray-200">
+                <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-pink-100 text-[#e60049] rounded-xs inline-block mb-4">
+                  Khối tùy biến bổ sung (Chế độ Hybrid)
+                </div>
+                <CustomPageRenderer blocks={faqConfig.blocks} showHeader={false} />
+              </div>
+            )}
           </div>
         );
       case 'rewards':
+        if (rewardsConfig.render_mode === 'blocks') {
+          return (
+            <CustomPageRenderer
+              page={{
+                id: 'preview_rewards',
+                title: rewardsConfig.title || 'HC Rewards',
+                slug: 'hc-rewards',
+                meta_description: rewardsConfig.description,
+                is_active: true,
+                blocks: rewardsConfig.blocks || [],
+              }}
+            />
+          );
+        }
         return (
           <div className="max-w-[760px] mx-auto px-4 py-8 space-y-6">
             <div>
@@ -714,9 +1446,31 @@ export const AdminUtilityPagesCms: React.FC = () => {
                 </div>
               ))}
             </div>
+            {rewardsConfig.render_mode === 'hybrid' && Array.isArray(rewardsConfig.blocks) && rewardsConfig.blocks.length > 0 && (
+              <div className="pt-6 border-t border-gray-200">
+                <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-pink-100 text-[#e60049] rounded-xs inline-block mb-4">
+                  Khối tùy biến bổ sung (Chế độ Hybrid)
+                </div>
+                <CustomPageRenderer blocks={rewardsConfig.blocks} showHeader={false} />
+              </div>
+            )}
           </div>
         );
       case 'soan':
+        if (soanConfig.render_mode === 'blocks') {
+          return (
+            <CustomPageRenderer
+              page={{
+                id: 'preview_soan',
+                title: soanConfig.title || 'Soạn tài liệu theo yêu cầu',
+                slug: 'soan-tai-lieu',
+                meta_description: soanConfig.description,
+                is_active: true,
+                blocks: soanConfig.blocks || [],
+              }}
+            />
+          );
+        }
         return (
           <div className="max-w-[760px] mx-auto px-4 py-8 space-y-6">
             <div>
@@ -731,9 +1485,31 @@ export const AdminUtilityPagesCms: React.FC = () => {
                 </div>
               ))}
             </div>
+            {soanConfig.render_mode === 'hybrid' && Array.isArray(soanConfig.blocks) && soanConfig.blocks.length > 0 && (
+              <div className="pt-6 border-t border-gray-200">
+                <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-pink-100 text-[#e60049] rounded-xs inline-block mb-4">
+                  Khối tùy biến bổ sung (Chế độ Hybrid)
+                </div>
+                <CustomPageRenderer blocks={soanConfig.blocks} showHeader={false} />
+              </div>
+            )}
           </div>
         );
       case 'donate':
+        if (donateConfig.render_mode === 'blocks') {
+          return (
+            <CustomPageRenderer
+              page={{
+                id: 'preview_donate',
+                title: donateConfig.title || 'Ủng hộ tác giả',
+                slug: 'donate',
+                meta_description: donateConfig.message,
+                is_active: true,
+                blocks: donateConfig.blocks || [],
+              }}
+            />
+          );
+        }
         const bank = encodeURIComponent(donateConfig.bank_name || 'MBBank');
         const acc = encodeURIComponent(donateConfig.account_number || '0358999147');
         const amount = donateConfig.default_amount || 50000;
@@ -751,6 +1527,14 @@ export const AdminUtilityPagesCms: React.FC = () => {
                 <p>Chủ TK: <strong>{donateConfig.account_holder}</strong></p>
               </div>
             </div>
+            {donateConfig.render_mode === 'hybrid' && Array.isArray(donateConfig.blocks) && donateConfig.blocks.length > 0 && (
+              <div className="pt-6 border-t border-gray-200 text-left">
+                <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-pink-100 text-[#e60049] rounded-xs inline-block mb-4">
+                  Khối tùy biến bổ sung (Chế độ Hybrid)
+                </div>
+                <CustomPageRenderer blocks={donateConfig.blocks} showHeader={false} />
+              </div>
+            )}
           </div>
         );
       case 'custom_pages':
@@ -901,329 +1685,477 @@ export const AdminUtilityPagesCms: React.FC = () => {
             )}
 
           {/* TAB 6: FAQ */}
-          {activeSubTab === 'faq' && (
-            <div className="space-y-4">
-              <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
-                <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
-                  [CÂU HỎI THƯỜNG GẶP] - Danh sách câu hỏi và câu trả lời giải đáp thắc mắc của khách hàng (/faq)
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Tiêu đề trang FAQ (H1)
-                  </label>
-                  <input
-                    type="text"
-                    value={faqConfig.title}
-                    onChange={(e) => setFaqConfig({ ...faqConfig, title: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Mô tả tóm tắt
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={faqConfig.description}
-                    onChange={(e) => setFaqConfig({ ...faqConfig, description: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                    Danh sách câu hỏi FAQ ({faqConfig.faqs.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newFaq: FaqItem = {
-                        id: 'faq_' + Date.now(),
-                        question: 'Câu hỏi mới?',
-                        answer: '',
-                      };
-                      setFaqConfig({ ...faqConfig, faqs: [...faqConfig.faqs, newFaq] });
-                    }}
-                    className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
-                  >
-                    + Thêm câu hỏi
-                  </button>
-                </div>
-
-                {faqConfig.faqs.map((faq, idx) => (
-                  <div
-                    key={faq.id || idx}
-                    className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2"
-                  >
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                      <span className="text-[11px] font-bold text-[#e60049]">Câu hỏi #{idx + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFaqConfig({
-                            ...faqConfig,
-                            faqs: faqConfig.faqs.filter((_, i) => i !== idx),
-                          })
-                        }
-                        className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Câu hỏi</label>
-                      <input
-                        type="text"
-                        value={faq.question}
-                        onChange={(e) => {
-                          const updated = [...faqConfig.faqs];
-                          updated[idx] = { ...updated[idx], question: e.target.value };
-                          setFaqConfig({ ...faqConfig, faqs: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Câu trả lời</label>
-                      <textarea
-                        rows={2}
-                        value={faq.answer}
-                        onChange={(e) => {
-                          const updated = [...faqConfig.faqs];
-                          updated[idx] = { ...updated[idx], answer: e.target.value };
-                          setFaqConfig({ ...faqConfig, faqs: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
+          {activeSubTab === 'faq' && (() => {
+            const renderMode: UtilityPageRenderMode = faqConfig.render_mode || 'legacy';
+            const standardFaqForm = (
+              <>
+                <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Tiêu đề trang FAQ (H1)
+                    </label>
+                    <input
+                      type="text"
+                      value={faqConfig.title}
+                      onChange={(e) => setFaqConfig({ ...faqConfig, title: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Mô tả tóm tắt
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={faqConfig.description}
+                      onChange={(e) => setFaqConfig({ ...faqConfig, description: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                      Danh sách câu hỏi FAQ ({faqConfig.faqs.length})
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newFaq: FaqItem = {
+                          id: 'faq_' + Date.now(),
+                          question: 'Câu hỏi mới?',
+                          answer: '',
+                        };
+                        setFaqConfig({ ...faqConfig, faqs: [...faqConfig.faqs, newFaq] });
+                      }}
+                      className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
+                    >
+                      + Thêm câu hỏi
+                    </button>
+                  </div>
+
+                  {faqConfig.faqs.map((faq, idx) => (
+                    <div
+                      key={faq.id || idx}
+                      className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <span className="text-[11px] font-bold text-[#e60049]">Câu hỏi #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFaqConfig({
+                              ...faqConfig,
+                              faqs: faqConfig.faqs.filter((_, i) => i !== idx),
+                            })
+                          }
+                          className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Câu hỏi</label>
+                        <input
+                          type="text"
+                          value={faq.question}
+                          onChange={(e) => {
+                            const updated = [...faqConfig.faqs];
+                            updated[idx] = { ...updated[idx], question: e.target.value };
+                            setFaqConfig({ ...faqConfig, faqs: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Câu trả lời</label>
+                        <textarea
+                          rows={2}
+                          value={faq.answer}
+                          onChange={(e) => {
+                            const updated = [...faqConfig.faqs];
+                            updated[idx] = { ...updated[idx], answer: e.target.value };
+                            setFaqConfig({ ...faqConfig, faqs: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+
+            return (
+              <div className="space-y-4">
+                <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
+                  <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
+                    [CÂU HỎI THƯỜNG GẶP] - Danh sách câu hỏi và câu trả lời giải đáp thắc mắc của khách hàng (/faq)
+                  </div>
+                </div>
+
+                <RenderModeSelector
+                  value={renderMode}
+                  onChange={(newMode) => setFaqConfig({ ...faqConfig, render_mode: newMode })}
+                  pageName="Câu hỏi thường gặp"
+                />
+
+                {renderMode === 'legacy' && standardFaqForm}
+
+                {renderMode === 'hybrid' && (
+                  <>
+                    {standardFaqForm}
+                    <div className="pt-2">
+                      <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs mb-3">
+                        <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                          [KHỐI TÙY BIẾN BỔ SUNG] - Quản lý các khối động hiển thị bên dưới nội dung FAQ
+                        </span>
+                      </div>
+                      <CustomPageBlocksManager
+                        blocks={faqConfig.blocks || []}
+                        onChange={(newBlocks) => setFaqConfig({ ...faqConfig, blocks: newBlocks })}
+                        label="Khối bổ sung cho FAQ"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {renderMode === 'blocks' && (
+                  <>
+                    <CustomPageBlocksManager
+                      blocks={faqConfig.blocks || []}
+                      onChange={(newBlocks) => setFaqConfig({ ...faqConfig, blocks: newBlocks })}
+                      label="Khối nội dung độc lập cho FAQ"
+                    />
+                    <details className="border border-gray-200 bg-white p-3 rounded-xs text-xs space-y-3">
+                      <summary className="font-bold cursor-pointer text-gray-700 hover:text-[#e60049]">
+                        ⚙️ [CẤU HÌNH TIÊU CHUẨN] - Nhấn để mở rộng cấu hình tiêu đề và câu hỏi FAQ (ẩn trong chế độ Toàn khối)
+                      </summary>
+                      <div className="pt-3 border-t border-gray-100 space-y-3">
+                        {standardFaqForm}
+                      </div>
+                    </details>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 7: HC REWARDS */}
-          {activeSubTab === 'rewards' && (
-            <div className="space-y-4">
-              <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
-                <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
-                  [TÍCH ĐIỂM HC REWARDS] - Cấu hình quyền lợi, ưu đãi và chương trình thành viên thân thiết (/hc-rewards)
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Tiêu đề trang HC Rewards (H1)
-                  </label>
-                  <input
-                    type="text"
-                    value={rewardsConfig.title}
-                    onChange={(e) => setRewardsConfig({ ...rewardsConfig, title: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Mô tả tóm tắt
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={rewardsConfig.description}
-                    onChange={(e) => setRewardsConfig({ ...rewardsConfig, description: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                    Danh sách quyền lợi ({rewardsConfig.benefits.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newB: HcRewardBenefitItem = {
-                        id: 'b_' + Date.now(),
-                        title: 'Quyền lợi mới',
-                        desc: '',
-                      };
-                      setRewardsConfig({ ...rewardsConfig, benefits: [...rewardsConfig.benefits, newB] });
-                    }}
-                    className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
-                  >
-                    + Thêm quyền lợi
-                  </button>
-                </div>
-
-                {rewardsConfig.benefits.map((b, idx) => (
-                  <div key={b.id || idx} className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                      <span className="text-[11px] font-bold text-[#e60049]">Quyền lợi #{idx + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setRewardsConfig({
-                            ...rewardsConfig,
-                            benefits: rewardsConfig.benefits.filter((_, i) => i !== idx),
-                          })
-                        }
-                        className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Tiêu đề quyền lợi</label>
-                      <input
-                        type="text"
-                        value={b.title}
-                        onChange={(e) => {
-                          const updated = [...rewardsConfig.benefits];
-                          updated[idx] = { ...updated[idx], title: e.target.value };
-                          setRewardsConfig({ ...rewardsConfig, benefits: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Mô tả quyền lợi</label>
-                      <textarea
-                        rows={2}
-                        value={b.desc}
-                        onChange={(e) => {
-                          const updated = [...rewardsConfig.benefits];
-                          updated[idx] = { ...updated[idx], desc: e.target.value };
-                          setRewardsConfig({ ...rewardsConfig, benefits: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
+          {activeSubTab === 'rewards' && (() => {
+            const renderMode: UtilityPageRenderMode = rewardsConfig.render_mode || 'legacy';
+            const standardRewardsForm = (
+              <>
+                <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Tiêu đề trang HC Rewards (H1)
+                    </label>
+                    <input
+                      type="text"
+                      value={rewardsConfig.title}
+                      onChange={(e) => setRewardsConfig({ ...rewardsConfig, title: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Mô tả tóm tắt
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={rewardsConfig.description}
+                      onChange={(e) => setRewardsConfig({ ...rewardsConfig, description: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                      Danh sách quyền lợi ({rewardsConfig.benefits.length})
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newB: HcRewardBenefitItem = {
+                          id: 'b_' + Date.now(),
+                          title: 'Quyền lợi mới',
+                          desc: '',
+                        };
+                        setRewardsConfig({ ...rewardsConfig, benefits: [...rewardsConfig.benefits, newB] });
+                      }}
+                      className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
+                    >
+                      + Thêm quyền lợi
+                    </button>
+                  </div>
+
+                  {rewardsConfig.benefits.map((b, idx) => (
+                    <div key={b.id || idx} className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <span className="text-[11px] font-bold text-[#e60049]">Quyền lợi #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRewardsConfig({
+                              ...rewardsConfig,
+                              benefits: rewardsConfig.benefits.filter((_, i) => i !== idx),
+                            })
+                          }
+                          className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Tiêu đề quyền lợi</label>
+                        <input
+                          type="text"
+                          value={b.title}
+                          onChange={(e) => {
+                            const updated = [...rewardsConfig.benefits];
+                            updated[idx] = { ...updated[idx], title: e.target.value };
+                            setRewardsConfig({ ...rewardsConfig, benefits: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Mô tả quyền lợi</label>
+                        <textarea
+                          rows={2}
+                          value={b.desc}
+                          onChange={(e) => {
+                            const updated = [...rewardsConfig.benefits];
+                            updated[idx] = { ...updated[idx], desc: e.target.value };
+                            setRewardsConfig({ ...rewardsConfig, benefits: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+
+            return (
+              <div className="space-y-4">
+                <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
+                  <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
+                    [TÍCH ĐIỂM HC REWARDS] - Cấu hình quyền lợi, ưu đãi và chương trình thành viên thân thiết (/hc-rewards)
+                  </div>
+                </div>
+
+                <RenderModeSelector
+                  value={renderMode}
+                  onChange={(newMode) => setRewardsConfig({ ...rewardsConfig, render_mode: newMode })}
+                  pageName="Tích điểm HC Rewards"
+                />
+
+                {renderMode === 'legacy' && standardRewardsForm}
+
+                {renderMode === 'hybrid' && (
+                  <>
+                    {standardRewardsForm}
+                    <div className="pt-2">
+                      <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs mb-3">
+                        <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                          [KHỐI TÙY BIẾN BỔ SUNG] - Quản lý các khối động hiển thị bên dưới nội dung HC Rewards
+                        </span>
+                      </div>
+                      <CustomPageBlocksManager
+                        blocks={rewardsConfig.blocks || []}
+                        onChange={(newBlocks) => setRewardsConfig({ ...rewardsConfig, blocks: newBlocks })}
+                        label="Khối bổ sung cho HC Rewards"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {renderMode === 'blocks' && (
+                  <>
+                    <CustomPageBlocksManager
+                      blocks={rewardsConfig.blocks || []}
+                      onChange={(newBlocks) => setRewardsConfig({ ...rewardsConfig, blocks: newBlocks })}
+                      label="Khối nội dung độc lập cho HC Rewards"
+                    />
+                    <details className="border border-gray-200 bg-white p-3 rounded-xs text-xs space-y-3">
+                      <summary className="font-bold cursor-pointer text-gray-700 hover:text-[#e60049]">
+                        ⚙️ [CẤU HÌNH TIÊU CHUẨN] - Nhấn để mở rộng cấu hình tiêu đề và quyền lợi (ẩn trong chế độ Toàn khối)
+                      </summary>
+                      <div className="pt-3 border-t border-gray-100 space-y-3">
+                        {standardRewardsForm}
+                      </div>
+                    </details>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 8: SOẠN TÀI LIỆU */}
-          {activeSubTab === 'soan' && (
-            <div className="space-y-4">
-              <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
-                <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
-                  [SOẠN TÀI LIỆU THEO YÊU CẦU] - Quản lý dịch vụ biên soạn đề thi, cam kết chất lượng và biểu mẫu liên hệ (/soan-tai-lieu)
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Tiêu đề trang (H1)
-                  </label>
-                  <input
-                    type="text"
-                    value={soanConfig.title}
-                    onChange={(e) => setSoanConfig({ ...soanConfig, title: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Mô tả tóm tắt
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={soanConfig.description}
-                    onChange={(e) => setSoanConfig({ ...soanConfig, description: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                    Danh sách cam kết chất lượng ({soanConfig.commitments.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newC: SoanTaiLieuCommitmentItem = {
-                        id: 'c_' + Date.now(),
-                        title: 'Cam kết mới',
-                        desc: '',
-                      };
-                      setSoanConfig({ ...soanConfig, commitments: [...soanConfig.commitments, newC] });
-                    }}
-                    className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
-                  >
-                    + Thêm cam kết
-                  </button>
-                </div>
-
-                {soanConfig.commitments.map((c, idx) => (
-                  <div key={c.id || idx} className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                      <span className="text-[11px] font-bold text-[#e60049]">Cam kết #{idx + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSoanConfig({
-                            ...soanConfig,
-                            commitments: soanConfig.commitments.filter((_, i) => i !== idx),
-                          })
-                        }
-                        className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Tiêu đề cam kết</label>
-                      <input
-                        type="text"
-                        value={c.title}
-                        onChange={(e) => {
-                          const updated = [...soanConfig.commitments];
-                          updated[idx] = { ...updated[idx], title: e.target.value };
-                          setSoanConfig({ ...soanConfig, commitments: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Mô tả cam kết</label>
-                      <textarea
-                        rows={2}
-                        value={c.desc}
-                        onChange={(e) => {
-                          const updated = [...soanConfig.commitments];
-                          updated[idx] = { ...updated[idx], desc: e.target.value };
-                          setSoanConfig({ ...soanConfig, commitments: updated });
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                      />
-                    </div>
+          {activeSubTab === 'soan' && (() => {
+            const renderMode: UtilityPageRenderMode = soanConfig.render_mode || 'legacy';
+            const standardSoanForm = (
+              <>
+                <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Tiêu đề trang (H1)
+                    </label>
+                    <input
+                      type="text"
+                      value={soanConfig.title}
+                      onChange={(e) => setSoanConfig({ ...soanConfig, title: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Mô tả tóm tắt
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={soanConfig.description}
+                      onChange={(e) => setSoanConfig({ ...soanConfig, description: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-xs px-3 py-2 outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                      Danh sách cam kết chất lượng ({soanConfig.commitments.length})
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newC: SoanTaiLieuCommitmentItem = {
+                          id: 'c_' + Date.now(),
+                          title: 'Cam kết mới',
+                          desc: '',
+                        };
+                        setSoanConfig({ ...soanConfig, commitments: [...soanConfig.commitments, newC] });
+                      }}
+                      className="px-3 py-1 bg-[#e60049] hover:bg-[#cc0041] text-white text-[11px] font-bold rounded-xs transition shadow-xs"
+                    >
+                      + Thêm cam kết
+                    </button>
+                  </div>
+
+                  {soanConfig.commitments.map((c, idx) => (
+                    <div key={c.id || idx} className="bg-white border border-gray-200 p-3 rounded-xs shadow-xs space-y-2">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <span className="text-[11px] font-bold text-[#e60049]">Cam kết #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSoanConfig({
+                              ...soanConfig,
+                              commitments: soanConfig.commitments.filter((_, i) => i !== idx),
+                            })
+                          }
+                          className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Tiêu đề cam kết</label>
+                        <input
+                          type="text"
+                          value={c.title}
+                          onChange={(e) => {
+                            const updated = [...soanConfig.commitments];
+                            updated[idx] = { ...updated[idx], title: e.target.value };
+                            setSoanConfig({ ...soanConfig, commitments: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Mô tả cam kết</label>
+                        <textarea
+                          rows={2}
+                          value={c.desc}
+                          onChange={(e) => {
+                            const updated = [...soanConfig.commitments];
+                            updated[idx] = { ...updated[idx], desc: e.target.value };
+                            setSoanConfig({ ...soanConfig, commitments: updated });
+                          }}
+                          className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+
+            return (
+              <div className="space-y-4">
+                <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
+                  <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
+                    [SOẠN TÀI LIỆU THEO YÊU CẦU] - Quản lý dịch vụ biên soạn đề thi, cam kết chất lượng và biểu mẫu liên hệ (/soan-tai-lieu)
+                  </div>
+                </div>
+
+                <RenderModeSelector
+                  value={renderMode}
+                  onChange={(newMode) => setSoanConfig({ ...soanConfig, render_mode: newMode })}
+                  pageName="Soạn tài liệu theo yêu cầu"
+                />
+
+                {renderMode === 'legacy' && standardSoanForm}
+
+                {renderMode === 'hybrid' && (
+                  <>
+                    {standardSoanForm}
+                    <div className="pt-2">
+                      <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs mb-3">
+                        <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                          [KHỐI TÙY BIẾN BỔ SUNG] - Quản lý các khối động hiển thị bên dưới nội dung Soạn tài liệu
+                        </span>
+                      </div>
+                      <CustomPageBlocksManager
+                        blocks={soanConfig.blocks || []}
+                        onChange={(newBlocks) => setSoanConfig({ ...soanConfig, blocks: newBlocks })}
+                        label="Khối bổ sung cho Soạn tài liệu"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {renderMode === 'blocks' && (
+                  <>
+                    <CustomPageBlocksManager
+                      blocks={soanConfig.blocks || []}
+                      onChange={(newBlocks) => setSoanConfig({ ...soanConfig, blocks: newBlocks })}
+                      label="Khối nội dung độc lập cho Soạn tài liệu"
+                    />
+                    <details className="border border-gray-200 bg-white p-3 rounded-xs text-xs space-y-3">
+                      <summary className="font-bold cursor-pointer text-gray-700 hover:text-[#e60049]">
+                        ⚙️ [CẤU HÌNH TIÊU CHUẨN] - Nhấn để mở rộng cấu hình tiêu đề và cam kết (ẩn trong chế độ Toàn khối)
+                      </summary>
+                      <div className="pt-3 border-t border-gray-100 space-y-3">
+                        {standardSoanForm}
+                      </div>
+                    </details>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 9: ỦNG HỘ TÁC GIẢ (DONATE) */}
-          {activeSubTab === 'donate' && (
-            <div className="space-y-4">
-              <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
-                <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
-                  [ỦNG HỘ TÁC GIẢ] - Cấu hình thông tin tài khoản ngân hàng, thông điệp tri ân và mã VietQR (/donate)
-                </div>
-              </div>
-
+          {activeSubTab === 'donate' && (() => {
+            const renderMode: UtilityPageRenderMode = donateConfig.render_mode || 'legacy';
+            const standardDonateForm = (
               <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-3">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 mb-1">Tiêu đề trang (H1)</label>
@@ -1274,8 +2206,62 @@ export const AdminUtilityPagesCms: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+
+            return (
+              <div className="space-y-4">
+                <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-3 rounded-xs">
+                  <div className="text-xs font-black text-[#e60049] uppercase tracking-wide">
+                    [ỦNG HỘ TÁC GIẢ] - Cấu hình thông tin tài khoản ngân hàng, thông điệp tri ân và mã VietQR (/donate)
+                  </div>
+                </div>
+
+                <RenderModeSelector
+                  value={renderMode}
+                  onChange={(newMode) => setDonateConfig({ ...donateConfig, render_mode: newMode })}
+                  pageName="Ủng hộ tác giả"
+                />
+
+                {renderMode === 'legacy' && standardDonateForm}
+
+                {renderMode === 'hybrid' && (
+                  <>
+                    {standardDonateForm}
+                    <div className="pt-2">
+                      <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs mb-3">
+                        <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                          [KHỐI TÙY BIẾN BỔ SUNG] - Quản lý các khối động hiển thị bên dưới thông tin Ủng hộ
+                        </span>
+                      </div>
+                      <CustomPageBlocksManager
+                        blocks={donateConfig.blocks || []}
+                        onChange={(newBlocks) => setDonateConfig({ ...donateConfig, blocks: newBlocks })}
+                        label="Khối bổ sung cho Ủng hộ tác giả"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {renderMode === 'blocks' && (
+                  <>
+                    <CustomPageBlocksManager
+                      blocks={donateConfig.blocks || []}
+                      onChange={(newBlocks) => setDonateConfig({ ...donateConfig, blocks: newBlocks })}
+                      label="Khối nội dung độc lập cho Ủng hộ tác giả"
+                    />
+                    <details className="border border-gray-200 bg-white p-3 rounded-xs text-xs space-y-3">
+                      <summary className="font-bold cursor-pointer text-gray-700 hover:text-[#e60049]">
+                        ⚙️ [CẤU HÌNH TIÊU CHUẨN] - Nhấn để mở rộng cấu hình tiêu đề và tài khoản (ẩn trong chế độ Toàn khối)
+                      </summary>
+                      <div className="pt-3 border-t border-gray-100 space-y-3">
+                        {standardDonateForm}
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* TAB 10: TRANG TÙY BIẾN THEO KHỐI (CUSTOM PAGES BUILDER) */}
           {activeSubTab === 'custom_pages' && (
@@ -1431,487 +2417,25 @@ export const AdminUtilityPagesCms: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* THANH CÔNG CỤ THÊM KHỐI MỚI (BAO GỒM KHỐI CHỈ ẢNH IMAGE_ONLY) */}
-                  <div className="bg-gray-50 border border-gray-200 p-3 rounded-xs space-y-2">
-                    <span className="text-[11px] font-black text-gray-700 uppercase block">
-                      + Thêm khối nội dung mới cho trang này:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('image_only')}
-                        className="px-2.5 py-1 bg-white hover:bg-pink-50 border border-[#e60049] text-[#e60049] text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        🖼️ + Khối Chỉ tải ảnh (image_only)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('banner_hero')}
-                        className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        🚩 + Khối Banner Hero
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('rich_text')}
-                        className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        📝 + Khối Văn bản
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('cards_grid')}
-                        className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        🗂️ + Khối Lưới thẻ
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('accordion_faq')}
-                        className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        ❓ + Khối FAQ Accordion
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBlock('cta_box')}
-                        className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 text-[11px] font-bold rounded-xs transition shadow-2xs"
-                      >
-                        📣 + Khối Kêu gọi CTA
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* DANH SÁCH CÁC KHỐI ĐÃ TẠO */}
+                  {/* QUẢN LÝ CÁC KHỐI NỘI DUNG (CUSTOM PAGE BLOCKS MANAGER) */}
                   <div className="space-y-3">
-                    {selectedCustomPage.blocks.map((block, bIdx) => (
-                      <div
-                        key={block.id || bIdx}
-                        className="bg-white border border-gray-200 p-3.5 rounded-xs shadow-xs space-y-3"
-                      >
-                        {/* TIÊU ĐỀ KHỐI VÀ THAO TÁC */}
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-pink-100 text-[#e60049] rounded-xs">
-                              {block.type}
-                            </span>
-                            <span className="text-xs font-bold text-gray-800">
-                              Khối #{bIdx + 1}: {block.title || 'Chưa đặt tiêu đề'}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleMoveBlock(bIdx, 'up')}
-                              disabled={bIdx === 0}
-                              className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded-xs"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMoveBlock(bIdx, 'down')}
-                              disabled={bIdx === selectedCustomPage.blocks.length - 1}
-                              className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded-xs"
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveBlock(bIdx)}
-                              className="px-2 py-0.5 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 rounded-xs font-bold"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* NỘI DUNG FORM RIÊNG CHO TỪNG LOẠI KHỐI */}
-
-                        {/* 1. KHỐI CHỈ HÌNH ẢNH (IMAGE_ONLY) THEO ĐÚNG YÊU CẦU */}
-                        {block.type === 'image_only' && (
-                          <div className="space-y-3">
-                            <div className="text-[11px] font-bold text-[#e60049]">
-                              [KHỐI CHỈ HÌNH ẢNH] - Tải ảnh lên Cloudflare R2 với chú thích và liên kết tùy chọn
-                            </div>
-
-                            <R2ImageUploader
-                              label="Hình ảnh hiển thị (Cloudflare R2)"
-                              helperText="Định dạng PNG, JPG, WEBP. Tên file 12 số ngẫu nhiên. Nút ✕ màu đỏ hỗ trợ xóa vĩnh viễn trên R2."
-                              imageUrl={block.image_url}
-                              onUrlChange={(url) => handleUpdateBlock(bIdx, 'image_url', url)}
-                              folder="custom_pages"
-                            />
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Chú thích hình ảnh (Caption)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.caption || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'caption', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                  placeholder="Ví dụ: Sơ đồ ma trận kiến thức trọng tâm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Liên kết khi nhấp vào ảnh (Tùy chọn)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.link_url || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'link_url', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                  placeholder="Ví dụ: /combo-thpt hoặc https://..."
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. KHỐI BANNER HERO */}
-                        {block.type === 'banner_hero' && (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Tiêu đề Banner
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.title || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'title', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Liên kết nút CTA (Tùy chọn)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.link_url || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'link_url', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                  placeholder="/high-school"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                Mô tả phụ Banner
-                              </label>
-                              <textarea
-                                rows={2}
-                                value={block.subtitle || ''}
-                                onChange={(e) => handleUpdateBlock(bIdx, 'subtitle', e.target.value)}
-                                className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                              />
-                            </div>
-
-                            <R2ImageUploader
-                              label="Ảnh nền Banner (Cloudflare R2 - Tùy chọn)"
-                              imageUrl={block.image_url}
-                              onUrlChange={(url) => handleUpdateBlock(bIdx, 'image_url', url)}
-                              folder="custom_pages"
-                            />
-                          </div>
-                        )}
-
-                        {/* 3. KHỐI VĂN BẢN (RICH_TEXT) */}
-                        {block.type === 'rich_text' && (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Tiêu đề khối
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.title || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'title', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Phụ đề (Subtitle)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.subtitle || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'subtitle', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                Nội dung văn bản chi tiết
-                              </label>
-                              <textarea
-                                rows={4}
-                                value={block.content || ''}
-                                onChange={(e) => handleUpdateBlock(bIdx, 'content', e.target.value)}
-                                className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 4. KHỐI LƯỚI THẺ (CARDS_GRID) */}
-                        {block.type === 'cards_grid' && (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Tiêu đề Lưới thẻ
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.title || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'title', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Mô tả phụ
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.subtitle || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'subtitle', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">
-                                  Danh sách thẻ ({(block.items || []).length})
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newItem: CustomPageBlockItem = {
-                                      id: 'item_' + Date.now(),
-                                      title: 'Thẻ mới',
-                                      desc: '',
-                                      icon: '★',
-                                      link: '',
-                                    };
-                                    handleUpdateBlock(bIdx, 'items', [...(block.items || []), newItem]);
-                                  }}
-                                  className="px-2 py-0.5 text-[10px] bg-[#e60049] text-white font-bold rounded-xs"
-                                >
-                                  + Thêm thẻ
-                                </button>
-                              </div>
-
-                              {(block.items || []).map((item, itIdx) => (
-                                <div
-                                  key={item.id || itIdx}
-                                  className="bg-gray-50 border border-gray-200 p-2.5 rounded-xs space-y-1.5"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-gray-700">Thẻ #{itIdx + 1}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updatedItems = (block.items || []).filter((_, i) => i !== itIdx);
-                                        handleUpdateBlock(bIdx, 'items', updatedItems);
-                                      }}
-                                      className="text-[9px] text-red-600 font-bold hover:underline"
-                                    >
-                                      Xóa thẻ
-                                    </button>
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    <input
-                                      type="text"
-                                      placeholder="Icon (★, 🚀...)"
-                                      value={item.icon || ''}
-                                      onChange={(e) => {
-                                        const updated = [...(block.items || [])];
-                                        updated[itIdx] = { ...updated[itIdx], icon: e.target.value };
-                                        handleUpdateBlock(bIdx, 'items', updated);
-                                      }}
-                                      className="text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
-                                    />
-                                    <input
-                                      type="text"
-                                      placeholder="Tiêu đề thẻ"
-                                      value={item.title}
-                                      onChange={(e) => {
-                                        const updated = [...(block.items || [])];
-                                        updated[itIdx] = { ...updated[itIdx], title: e.target.value };
-                                        handleUpdateBlock(bIdx, 'items', updated);
-                                      }}
-                                      className="col-span-2 text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
-                                    />
-                                  </div>
-                                  <textarea
-                                    rows={2}
-                                    placeholder="Mô tả nội dung thẻ"
-                                    value={item.desc || ''}
-                                    onChange={(e) => {
-                                      const updated = [...(block.items || [])];
-                                      updated[itIdx] = { ...updated[itIdx], desc: e.target.value };
-                                      handleUpdateBlock(bIdx, 'items', updated);
-                                    }}
-                                    className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 5. KHỐI FAQ ACCORDION */}
-                        {block.type === 'accordion_faq' && (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Tiêu đề khối FAQ
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.title || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'title', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Phụ đề
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.subtitle || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'subtitle', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">
-                                  Danh sách câu hỏi ({(block.items || []).length})
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newItem: CustomPageBlockItem = {
-                                      id: 'faq_' + Date.now(),
-                                      title: 'Câu hỏi mới?',
-                                      desc: 'Câu trả lời chi tiết',
-                                    };
-                                    handleUpdateBlock(bIdx, 'items', [...(block.items || []), newItem]);
-                                  }}
-                                  className="px-2 py-0.5 text-[10px] bg-[#e60049] text-white font-bold rounded-xs"
-                                >
-                                  + Thêm câu hỏi
-                                </button>
-                              </div>
-
-                              {(block.items || []).map((item, itIdx) => (
-                                <div
-                                  key={item.id || itIdx}
-                                  className="bg-gray-50 border border-gray-200 p-2.5 rounded-xs space-y-1.5"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-gray-700">Mục #{itIdx + 1}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updatedItems = (block.items || []).filter((_, i) => i !== itIdx);
-                                        handleUpdateBlock(bIdx, 'items', updatedItems);
-                                      }}
-                                      className="text-[9px] text-red-600 font-bold hover:underline"
-                                    >
-                                      Xóa
-                                    </button>
-                                  </div>
-                                  <input
-                                    type="text"
-                                    placeholder="Câu hỏi?"
-                                    value={item.title}
-                                    onChange={(e) => {
-                                      const updated = [...(block.items || [])];
-                                      updated[itIdx] = { ...updated[itIdx], title: e.target.value };
-                                      handleUpdateBlock(bIdx, 'items', updated);
-                                    }}
-                                    className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
-                                  />
-                                  <textarea
-                                    rows={2}
-                                    placeholder="Câu trả lời"
-                                    value={item.desc || ''}
-                                    onChange={(e) => {
-                                      const updated = [...(block.items || [])];
-                                      updated[itIdx] = { ...updated[itIdx], desc: e.target.value };
-                                      handleUpdateBlock(bIdx, 'items', updated);
-                                    }}
-                                    className="w-full text-xs border border-gray-300 rounded-xs px-2 py-1 outline-none"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 6. KHỐI KÊU GỌI CTA (CTA_BOX) */}
-                        {block.type === 'cta_box' && (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Tiêu đề CTA
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.title || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'title', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                  Liên kết nút hành động
-                                </label>
-                                <input
-                                  type="text"
-                                  value={block.link_url || ''}
-                                  onChange={(e) => handleUpdateBlock(bIdx, 'link_url', e.target.value)}
-                                  className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                                  placeholder="/soan-tai-lieu hoặc /combo-thpt"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
-                                Thông điệp phụ
-                              </label>
-                              <textarea
-                                rows={2}
-                                value={block.subtitle || ''}
-                                onChange={(e) => handleUpdateBlock(bIdx, 'subtitle', e.target.value)}
-                                className="w-full text-xs border border-gray-300 rounded-xs px-2.5 py-1.5 outline-none focus:border-[#e60049]"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    <div className="bg-[#fdf2f4] border-l-4 border-[#e60049] p-2.5 rounded-xs">
+                      <span className="text-[11px] font-black text-[#e60049] uppercase tracking-wide">
+                        [QUẢN LÝ KHỐI NỘI DUNG] - Tùy chỉnh danh sách các khối hiển thị cho trang này (Hỗ trợ 7 loại khối: Chỉ tải ảnh, Banner Hero, Văn bản, Lưới thẻ, FAQ Accordion, CTA Box, và Khối HTML Tùy biến)
+                      </span>
+                    </div>
+                    <CustomPageBlocksManager
+                      blocks={selectedCustomPage.blocks || []}
+                      onChange={(newBlocks) => {
+                        const updatedPages = [...customPagesConfig.pages];
+                        updatedPages[selectedPageIndex] = {
+                          ...selectedCustomPage,
+                          blocks: newBlocks,
+                        };
+                        setCustomPagesConfig({ pages: updatedPages });
+                      }}
+                      label={`Khối nội dung trang: ${selectedCustomPage.title}`}
+                    />
                   </div>
                 </div>
               )}

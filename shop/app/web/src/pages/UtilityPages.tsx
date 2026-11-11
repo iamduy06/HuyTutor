@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { IsolatedHtmlBlock } from '../components/IsolatedHtmlBlock';
 import {
   DonatePageConfig,
   FaqPageConfig,
@@ -30,11 +31,29 @@ export const SoanTaiLieuPage: React.FC = () => {
     );
   }, [siteConfigs?.soan_tai_lieu_page_config]);
 
+  // 1. Chế độ Khối (blocks): Render hoàn toàn bằng CustomPageRenderer
+  if (config.render_mode === 'blocks') {
+    return (
+      <CustomPageRenderer
+        page={{
+          id: 'soan_tai_lieu_page',
+          title: config.title || 'Soạn tài liệu theo yêu cầu',
+          slug: 'soan-tai-lieu',
+          meta_description: config.description,
+          is_active: true,
+          blocks: config.blocks || [],
+        }}
+      />
+    );
+  }
+
   const commitments = config.commitments || [];
+  const hasBlocks = Array.isArray(config.blocks) && config.blocks.length > 0;
   const hasContent =
     Boolean(config.title?.trim()) ||
     Boolean(config.description?.trim()) ||
-    commitments.length > 0;
+    commitments.length > 0 ||
+    hasBlocks;
 
   if (!hasContent) {
     return (
@@ -72,6 +91,13 @@ export const SoanTaiLieuPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Chế độ Hybrid: Khối tuỳ biến bổ sung bên dưới nội dung tiêu chuẩn */}
+      {config.render_mode === 'hybrid' && hasBlocks && (
+        <div className="pt-6 border-t border-gray-200">
+          <CustomPageRenderer blocks={config.blocks} showHeader={false} />
+        </div>
+      )}
     </main>
   );
 };
@@ -95,11 +121,29 @@ export const FaqPage: React.FC = () => {
     );
   }, [siteConfigs?.faq_page_config]);
 
+  // 1. Chế độ Khối (blocks): Render hoàn toàn bằng CustomPageRenderer
+  if (config.render_mode === 'blocks') {
+    return (
+      <CustomPageRenderer
+        page={{
+          id: 'faq_page',
+          title: config.title || 'Câu hỏi thường gặp',
+          slug: 'faq',
+          meta_description: config.description,
+          is_active: true,
+          blocks: config.blocks || [],
+        }}
+      />
+    );
+  }
+
   const faqs = config.faqs || [];
+  const hasBlocks = Array.isArray(config.blocks) && config.blocks.length > 0;
   const hasContent =
     Boolean(config.title?.trim()) ||
     Boolean(config.description?.trim()) ||
-    faqs.length > 0;
+    faqs.length > 0 ||
+    hasBlocks;
 
   if (!hasContent) {
     return (
@@ -157,6 +201,13 @@ export const FaqPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Chế độ Hybrid: Khối tuỳ biến bổ sung bên dưới nội dung tiêu chuẩn */}
+      {config.render_mode === 'hybrid' && hasBlocks && (
+        <div className="pt-6 border-t border-gray-200">
+          <CustomPageRenderer blocks={config.blocks} showHeader={false} />
+        </div>
+      )}
     </main>
   );
 };
@@ -208,11 +259,29 @@ export const HcRewardsPage: React.FC = () => {
     );
   }, [siteConfigs?.hc_rewards_page_config]);
 
+  // 1. Chế độ Khối (blocks): Render hoàn toàn bằng CustomPageRenderer
+  if (config.render_mode === 'blocks') {
+    return (
+      <CustomPageRenderer
+        page={{
+          id: 'hc_rewards_page',
+          title: config.title || 'HC Rewards',
+          slug: 'hc-rewards',
+          meta_description: config.description,
+          is_active: true,
+          blocks: config.blocks || [],
+        }}
+      />
+    );
+  }
+
   const benefits = config.benefits || [];
+  const hasBlocks = Array.isArray(config.blocks) && config.blocks.length > 0;
   const hasContent =
     Boolean(config.title?.trim()) ||
     Boolean(config.description?.trim()) ||
-    benefits.length > 0;
+    benefits.length > 0 ||
+    hasBlocks;
 
   if (!hasContent) {
     return (
@@ -250,6 +319,13 @@ export const HcRewardsPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Chế độ Hybrid: Khối tuỳ biến bổ sung bên dưới nội dung tiêu chuẩn */}
+      {config.render_mode === 'hybrid' && hasBlocks && (
+        <div className="pt-6 border-t border-gray-200">
+          <CustomPageRenderer blocks={config.blocks} showHeader={false} />
+        </div>
+      )}
     </main>
   );
 };
@@ -274,11 +350,29 @@ export const DonatePage: React.FC = () => {
     );
   }, [siteConfigs?.donate_page_config]);
 
+  // 1. Chế độ Khối (blocks): Render hoàn toàn bằng CustomPageRenderer
+  if (config.render_mode === 'blocks') {
+    return (
+      <CustomPageRenderer
+        page={{
+          id: 'donate_page',
+          title: config.title || 'Ủng hộ tác giả',
+          slug: 'donate',
+          meta_description: config.message,
+          is_active: true,
+          blocks: config.blocks || [],
+        }}
+      />
+    );
+  }
+
   const hasBankInfo = Boolean(config.bank_name?.trim() && config.account_number?.trim());
+  const hasBlocks = Array.isArray(config.blocks) && config.blocks.length > 0;
   const hasContent =
     Boolean(config.title?.trim()) ||
     Boolean(config.message?.trim()) ||
-    hasBankInfo;
+    hasBankInfo ||
+    hasBlocks;
 
   const dynamicQrUrl = useMemo(() => {
     if (!config.bank_name?.trim() || !config.account_number?.trim()) return '';
@@ -298,7 +392,7 @@ export const DonatePage: React.FC = () => {
   }
 
   return (
-    <main className="max-w-[500px] mx-auto px-4 py-8 space-y-4 text-center">
+    <main className="max-w-[760px] mx-auto px-4 py-8 space-y-6 text-center">
       {config.title?.trim() && (
         <h1 className="text-xl font-extrabold text-[#e60049]">{config.title}</h1>
       )}
@@ -307,7 +401,7 @@ export const DonatePage: React.FC = () => {
       )}
 
       {hasBankInfo && (
-        <div className="bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-2">
+        <div className="max-w-[500px] mx-auto bg-white border border-gray-200 p-4 rounded-xs shadow-xs space-y-2">
           {dynamicQrUrl && (
             <img
               src={dynamicQrUrl}
@@ -328,6 +422,13 @@ export const DonatePage: React.FC = () => {
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Chế độ Hybrid: Khối tuỳ biến bổ sung bên dưới thông tin ngân hàng */}
+      {config.render_mode === 'hybrid' && hasBlocks && (
+        <div className="pt-6 border-t border-gray-200 text-left">
+          <CustomPageRenderer blocks={config.blocks} showHeader={false} />
         </div>
       )}
     </main>
@@ -377,8 +478,8 @@ export const PolicyPageRenderer: React.FC<{ config: PolicyPageConfig }> = ({ con
   const biz = siteConfigs?.business_info;
   const hasBiz = Boolean(biz && (biz.company_name || biz.address || biz.phone || biz.email));
 
-  // Hỗ trợ chế độ Khối (blocks): Tùy biến linh hoạt giao diện chính sách
-  if (config.render_mode === 'blocks' && Array.isArray(config.blocks) && config.blocks.length > 0) {
+  // 1. Chế độ Khối (blocks): Render hoàn toàn bằng CustomPageRenderer
+  if (config.render_mode === 'blocks') {
     return (
       <CustomPageRenderer
         page={{
@@ -387,7 +488,7 @@ export const PolicyPageRenderer: React.FC<{ config: PolicyPageConfig }> = ({ con
           slug: '',
           meta_description: config.description,
           is_active: true,
-          blocks: config.blocks,
+          blocks: config.blocks || [],
         }}
       />
     );
@@ -433,6 +534,13 @@ export const PolicyPageRenderer: React.FC<{ config: PolicyPageConfig }> = ({ con
           </article>
         ))}
       </div>
+
+      {/* HYBRID MODE: CÁC KHỐI TUỲ BIẾN BỔ SUNG NẰM DƯỚI NỘI DUNG TIÊU CHUẨN */}
+      {config.render_mode === 'hybrid' && Array.isArray(config.blocks) && config.blocks.length > 0 && (
+        <div className="pt-6 border-t border-gray-200">
+          <CustomPageRenderer blocks={config.blocks} showHeader={false} />
+        </div>
+      )}
 
       {/* FOOTER HỖ TRỢ CHUNG CỦA CHÍNH SÁCH (Động từ siteConfigs.business_info) */}
       {hasBiz && (
@@ -515,30 +623,69 @@ export const CopyrightPolicyPage: React.FC = () => {
  * 10. COMPONENT RENDERER TRANG TÙY BIẾN THEO KHỐI (CUSTOM DYNAMIC PAGE RENDERER)
  * ============================================================================
  */
-export const CustomPageRenderer: React.FC<{ page: CustomPageItem }> = ({ page }) => {
+export interface CustomPageRendererProps {
+  page?: CustomPageItem;
+  blocks?: CustomPageBlock[];
+  title?: string;
+  meta_description?: string;
+  showHeader?: boolean;
+}
+
+export const CustomPageRenderer: React.FC<CustomPageRendererProps> = ({
+  page,
+  blocks,
+  title,
+  meta_description,
+  showHeader,
+}) => {
   const [openAccordion, setOpenAccordion] = useState<Record<string, boolean>>({});
 
   const toggleAccordion = (id: string) => {
     setOpenAccordion((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const effectiveBlocks = useMemo(() => {
+    return blocks || page?.blocks || [];
+  }, [blocks, page?.blocks]);
+
+  const effectiveTitle = title !== undefined ? title : page?.title;
+  const effectiveDescription =
+    meta_description !== undefined ? meta_description : page?.meta_description;
+
+  const shouldShowHeader =
+    showHeader !== undefined
+      ? showHeader
+      : Boolean(effectiveTitle?.trim() || effectiveDescription?.trim());
+
+  const WrapperTag = shouldShowHeader ? 'main' : 'div';
+
   return (
-    <main className="max-w-[860px] mx-auto px-4 py-10 space-y-8">
+    <WrapperTag className={shouldShowHeader ? "max-w-[860px] mx-auto px-4 py-10 space-y-8" : "space-y-8"}>
       {/* HEADER TRANG */}
-      <div className="border-b border-gray-200 pb-5">
-        <h1 className="text-xl sm:text-2xl font-black text-[#e60049] uppercase tracking-wide mb-2">
-          {page.title}
-        </h1>
-        {page.meta_description && (
-          <p className="text-xs text-gray-600 leading-relaxed max-w-2xl">
-            {page.meta_description}
-          </p>
-        )}
-      </div>
+      {shouldShowHeader && (
+        <div className="border-b border-gray-200 pb-5">
+          {effectiveTitle && (
+            <h1 className="text-xl sm:text-2xl font-black text-[#e60049] uppercase tracking-wide mb-2">
+              {effectiveTitle}
+            </h1>
+          )}
+          {effectiveDescription && (
+            <p className="text-xs text-gray-600 leading-relaxed max-w-2xl">
+              {effectiveDescription}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* DANH SÁCH CÁC KHỐI ĐỘNG */}
+      {effectiveBlocks.length === 0 && shouldShowHeader && (
+        <div className="py-12 text-center text-xs text-gray-500 bg-gray-50 rounded-xs border border-dashed border-gray-300">
+          Nội dung đang được quản trị viên cập nhật.
+        </div>
+      )}
+
       <div className="space-y-8">
-        {(page.blocks || [])
+        {effectiveBlocks
           .filter((block) => block.is_active !== false)
           .map((block) => {
             switch (block.type) {
@@ -760,12 +907,22 @@ export const CustomPageRenderer: React.FC<{ page: CustomPageItem }> = ({ page })
                   </div>
                 );
 
+              case 'custom_html':
+                return (
+                  <IsolatedHtmlBlock
+                    key={block.id}
+                    htmlContent={block.html_content}
+                    containerMode={block.container_mode || 'boxed'}
+                    noPadding={block.no_padding}
+                  />
+                );
+
               default:
                 return null;
             }
           })}
       </div>
-    </main>
+    </WrapperTag>
   );
 };
 
