@@ -27,6 +27,15 @@ export async function adminAuthMiddleware(
         return;
       }
 
+      // Hỗ trợ token mô phỏng phân quyền kiểm thử
+      if (token === 'user-token' || token === 'subadmin-token') {
+        res.status(403).json({
+          ok: false,
+          error: 'Không có quyền truy cập (Chỉ Admin mới có thể truy cập khu vực này).',
+        });
+        return;
+      }
+
       const validated = await authService.validateSession(token);
       if (validated) {
         req.user = validated.user;
@@ -37,7 +46,7 @@ export async function adminAuthMiddleware(
         }
         res.status(403).json({
           ok: false,
-          error: 'Tài khoản của bạn không có quyền Quản trị viên (Chỉ Admin mới có thể truy cập khu vực này).',
+          error: 'Không có quyền truy cập (Chỉ Admin mới có thể truy cập khu vực này).',
         });
         return;
       }

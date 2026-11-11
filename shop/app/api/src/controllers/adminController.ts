@@ -6,10 +6,112 @@ import { toPublicUserProfile } from '../services/authService';
 import {
   createR2PresignedUploadUrl,
   deleteR2Object,
+  deleteR2Objects,
+  listR2Objects,
+  parseUploadDateFromR2Key,
+  sanitizeR2Folder,
   stampPdfBufferWithWatermark,
   uploadBufferToR2,
 } from '../services/r2Service';
 import { submitOrderToGoogleForm } from '../services/googleFormService';
+import { isSupabaseConfigured, supabaseAdmin } from '../config/supabase';
+
+export interface MediaUsage {
+  key: string;
+  location: string;
+  details: string;
+}
+
+let mockUsagesForTesting: MediaUsage[] = [];
+
+export function __setMockUsagesForTesting(usages: MediaUsage[]): void {
+  mockUsagesForTesting = [...usages];
+}
+
+export function __clearMockUsagesForTesting(): void {
+  mockUsagesForTesting = [];
+}
+
+interface MatcherTarget {
+  key: string;
+  patterns: string[];
+}
+
+function buildMatcherTargets(keys: string[], r2Domain: string): MatcherTarget[] {
+  const cleanDomain = r2Domain ? r2Domain.replace(/\/$/, '') : '';
+  return keys.map((rawKey) => {
+    const key = rawKey.trim().replace(/^\/+/, '');
+    const filename = path.basename(key);
+    const patterns = new Set<string>();
+
+    patterns.add(key);
+    patterns.add(encodeURI(key));
+
+    if (cleanDomain) {
+      patterns.add(`${cleanDomain}/${key}`);
+      patterns.add(`${cleanDomain}/${encodeURI(key)}`);
+    }
+
+    // Khớp tên file nếu đủ đặc trưng (12 chữ số mốc thời gian)
+    if (filename.length >= 10 && /^\d{12}/.test(filename)) {
+      patterns.add(filename);
+    }
+
+    return {
+      key: rawKey,
+      patterns: Array.from(patterns),
+    };
+  });
+}
+
+function deepScanValue(
+  value: any,
+  targets: MatcherTarget[],
+  location: string,
+  pathPrefix: string,
+  usages: MediaUsage[]
+): void {
+  if (value === null || value === undefined) return;
+
+  if (typeof value === 'string') {
+    for (const target of targets) {
+      for (const pattern of target.patterns) {
+        if (value.includes(pattern)) {
+          let details = `Tham chiếu tại trường "${pathPrefix || 'nội dung'}".`;
+          if (value.length > pattern.length) {
+            const idx = value.indexOf(pattern);
+            const start = Math.max(0, idx - 25);
+            const end = Math.min(value.length, idx + pattern.length + 25);
+            const snippet = value.substring(start, end).replace(/\s+/g, ' ').trim();
+            details += ` Đoạn trích: "...${snippet}..."`;
+          }
+
+          usages.push({
+            key: target.key,
+            location,
+            details,
+          });
+          break;
+        }
+      }
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      deepScanValue(item, targets, location, `${pathPrefix}[${index}]`, usages);
+    });
+    return;
+  }
+
+  if (typeof value === 'object') {
+    for (const [k, val] of Object.entries(value)) {
+      if (k === 'password_hash' || k === 'session_token' || k === 'rawBody') continue;
+      deepScanValue(val, targets, location, pathPrefix ? `${pathPrefix}.${k}` : k, usages);
+    }
+  }
+}
 
 export const adminController = {
   /**
@@ -386,6 +488,383 @@ export const adminController = {
     }
   },
 
+  // ==========================================
+  // Luồng Quản lý Media R2 Tập trung
+  // ==========================================
+
+  /**
+   * GET /api/admin/media
+   * Duyệt toàn bộ object trong bucket qua vòng lặp ContinuationToken,
+   * hỗ trợ filter folder, fileType, search, sortBy, sortOrder, page, limit.
+   */
+  async listMedia(req: Request, res: Response): Promise<void> {
+    try {
+      const folder =
+        typeof req.query.folder === 'string' && req.query.folder !== 'all'
+          ? req.query.folder.trim()
+          : undefined;
+
+      const rawFileType = String(req.query.fileType || 'all').toLowerCase();
+      const fileType = (['all', 'image', 'pdf', 'other'].includes(rawFileType)
+        ? rawFileType
+        : 'all') as 'all' | 'image' | 'pdf' | 'other';
+
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+
+      const rawSortBy = String(req.query.sortBy || 'uploadedAt');
+      const sortBy = (['name', 'uploadedAt', 'modifiedAt', 'size'].includes(rawSortBy)
+        ? rawSortBy
+        : 'uploadedAt') as 'name' | 'uploadedAt' | 'modifiedAt' | 'size';
+
+      const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24));
+
+      const result = await listR2Objects({
+        folder,
+        fileType,
+        search,
+        sortBy,
+        sortOrder,
+        page,
+        limit,
+      });
+
+      res.json({
+        ok: true,
+        items: result.items,
+        pagination: result.pagination,
+        folders: result.folders,
+      });
+    } catch (err: any) {
+      console.error('[adminController.listMedia] Error:', err);
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi khi tải danh sách tệp tin Media R2.',
+        details: err?.stack || String(err),
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/media/upload
+   * Nhận multipart files[] (tối đa 50MB/file) + subfolder tùy chọn;
+   * ép thư mục đích luôn nằm trong media-library hoặc media-library/<subfolder>.
+   */
+  async uploadMediaFiles(req: Request, res: Response): Promise<void> {
+    try {
+      const rawFiles = (req as any).files;
+      let files: Express.Multer.File[] = [];
+      if (Array.isArray(rawFiles)) {
+        files = rawFiles;
+      } else if (rawFiles && typeof rawFiles === 'object') {
+        const dict = rawFiles as Record<string, Express.Multer.File[]>;
+        files = [...(dict['files'] || []), ...(dict['files[]'] || [])];
+      }
+
+      if (!files || files.length === 0) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng chọn ít nhất 1 tệp tin hợp lệ để tải lên.',
+        });
+        return;
+      }
+
+      // Kiểm tra dung lượng tối đa 50MB/file
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
+      for (const f of files) {
+        if (f.size > MAX_FILE_SIZE) {
+          res.status(400).json({
+            ok: false,
+            error: `Tệp "${f.originalname}" vượt quá dung lượng tối đa cho phép (50MB).`,
+          });
+          return;
+        }
+      }
+
+      // Ép thư mục đích nghiêm ngặt nằm trong media-library/ hoặc media-library/<subfolder>
+      let rawSubfolder = String(req.body.subfolder || req.body.folder || '').trim();
+      rawSubfolder = rawSubfolder.replace(/^\/+|\/+$/g, '');
+      if (rawSubfolder.startsWith('media-library/')) {
+        rawSubfolder = rawSubfolder.substring('media-library/'.length);
+      } else if (rawSubfolder === 'media-library') {
+        rawSubfolder = '';
+      }
+
+      const safeSubfolder = sanitizeR2Folder(rawSubfolder)
+        .replace(/^homepage$/, '')
+        .replace(/\.\./g, '')
+        .replace(/^\/+|\/+$/g, '');
+
+      const destFolder = safeSubfolder ? `media-library/${safeSubfolder}` : 'media-library';
+
+      const uploaded: any[] = [];
+      for (const file of files) {
+        const result = await uploadBufferToR2({
+          folder: destFolder,
+          fileName: file.originalname,
+          buffer: file.buffer,
+          contentType: file.mimetype || 'application/octet-stream',
+        });
+
+        const ext = path.extname(result.objectKey).toLowerCase();
+        let fileType: 'image' | 'pdf' | 'other' = 'other';
+        if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp', '.ico', '.avif'].includes(ext)) {
+          fileType = 'image';
+        } else if (ext === '.pdf') {
+          fileType = 'pdf';
+        }
+
+        const dateInfo = parseUploadDateFromR2Key(result.objectKey, new Date());
+        const filename = path.basename(result.objectKey);
+
+        uploaded.push({
+          key: result.objectKey,
+          name: filename,
+          folder: destFolder,
+          size: file.size || file.buffer.length,
+          uploadedAt: dateInfo.uploadedAt,
+          modifiedAt: new Date().toISOString(),
+          uploadTimeSource: dateInfo.uploadTimeSource,
+          publicUrl: result.publicUrl,
+          fileType,
+        });
+      }
+
+      res.json({
+        ok: true,
+        uploaded,
+        message: `Đã tải lên thành công ${uploaded.length} tệp tin vào thư mục "${destFolder}".`,
+      });
+    } catch (err: any) {
+      console.error('[adminController.uploadMediaFiles] Error:', err);
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi tải tệp tin lên kho Media R2.',
+        details: err?.stack || String(err),
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/media/check-usage
+   * Quét tham chiếu URL/key trong cả Supabase DB và Local JSON fallback
+   * trên products, categories, menus, và toàn bộ site_configs (kể cả trong chuỗi html_content).
+   */
+  async checkMediaUsage(req: Request, res: Response): Promise<void> {
+    try {
+      const rawKeys = Array.isArray(req.body.keys)
+        ? req.body.keys
+        : req.body.key
+          ? [req.body.key]
+          : req.body.url
+            ? [req.body.url]
+            : [];
+
+      if (!Array.isArray(req.body.keys) && !req.body.key && !req.body.url) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng cung cấp danh sách keys cần kiểm tra (mảng keys).',
+        });
+        return;
+      }
+
+      const keys: string[] = rawKeys.filter((k: any) => typeof k === 'string' && k.trim());
+      if (keys.length === 0) {
+        res.json({
+          ok: true,
+          inUse: false,
+          usages: [],
+        });
+        return;
+      }
+
+      const r2Domain = process.env.R2_DOMAIN || '';
+      const targets = buildMatcherTargets(keys, r2Domain);
+      const usages: MediaUsage[] = [];
+
+      // Quét trước các mock usages được thiết lập cho testing
+      if (mockUsagesForTesting.length > 0) {
+        for (const mockU of mockUsagesForTesting) {
+          const matchedTarget = targets.find((t) => {
+            const cleanTarget = t.key.trim().replace(/^\/+/, '');
+            const cleanMockKey = mockU.key.trim().replace(/^\/+/, '');
+            return (
+              t.patterns.some((p) => mockU.key.includes(p) || p.includes(mockU.key)) ||
+              cleanTarget === cleanMockKey ||
+              cleanMockKey.endsWith(cleanTarget) ||
+              cleanTarget.endsWith(cleanMockKey)
+            );
+          });
+          if (matchedTarget) {
+            usages.push(mockU);
+          }
+        }
+      }
+
+      // 1. Quét trên Supabase PostgreSQL (nếu cấu hình)
+      if (isSupabaseConfigured && supabaseAdmin) {
+        try {
+          const [prodRes, catRes, menuRes, configRes] = await Promise.all([
+            supabaseAdmin
+              .from('products')
+              .select('id, slug, title, thumbnail_url, sample_pdf_url, preview_images, detail_blocks'),
+            supabaseAdmin
+              .from('categories')
+              .select('id, slug, name, blocks'),
+            supabaseAdmin
+              .from('menus')
+              .select('id, name, items'),
+            supabaseAdmin
+              .from('site_configs')
+              .select('key, value'),
+          ]);
+
+          if (Array.isArray(prodRes.data)) {
+            for (const prod of prodRes.data) {
+              const loc = `Sản phẩm: "${prod.title || prod.slug}" (${prod.slug})`;
+              deepScanValue(prod.thumbnail_url, targets, loc, 'Ảnh bìa (thumbnail_url)', usages);
+              deepScanValue(prod.sample_pdf_url, targets, loc, 'PDF đọc thử (sample_pdf_url)', usages);
+              deepScanValue(prod.preview_images, targets, loc, 'Danh sách ảnh đọc thử (preview_images)', usages);
+              deepScanValue(prod.detail_blocks, targets, loc, 'Bố cục chi tiết (detail_blocks)', usages);
+            }
+          }
+
+          if (Array.isArray(catRes.data)) {
+            for (const cat of catRes.data) {
+              const loc = `Danh mục: "${cat.name || cat.slug}" (${cat.slug})`;
+              deepScanValue(cat.blocks, targets, loc, 'Khối giao diện (blocks)', usages);
+            }
+          }
+
+          if (Array.isArray(menuRes.data)) {
+            for (const menu of menuRes.data) {
+              const loc = `Menu: "${menu.name || menu.id}"`;
+              deepScanValue(menu.items, targets, loc, 'Liên kết menu (items)', usages);
+            }
+          }
+
+          if (Array.isArray(configRes.data)) {
+            for (const cfg of configRes.data) {
+              const loc = `Cấu hình hệ thống (site_configs): "${cfg.key}"`;
+              deepScanValue(cfg.value, targets, loc, 'value', usages);
+            }
+          }
+        } catch (sbErr) {
+          console.warn('[adminController.checkMediaUsage] Supabase scan warning:', sbErr);
+        }
+      }
+
+      // 2. Quét đồng thời trên Local JSON fallback
+      try {
+        let localDb: any = null;
+        const localDbPath = path.resolve(__dirname, '..', '..', 'data', 'local_db.json');
+        if (fs.existsSync(localDbPath)) {
+          localDb = JSON.parse(fs.readFileSync(localDbPath, 'utf-8'));
+        }
+        if (localDb) {
+          if (Array.isArray(localDb.products)) {
+            for (const prod of localDb.products) {
+              const loc = `[Local] Sản phẩm: "${prod.title || prod.slug}" (${prod.slug})`;
+              deepScanValue(prod.thumbnail_url, targets, loc, 'thumbnail_url', usages);
+              deepScanValue(prod.sample_pdf_url, targets, loc, 'sample_pdf_url', usages);
+              deepScanValue(prod.preview_images, targets, loc, 'preview_images', usages);
+              deepScanValue(prod.detail_blocks, targets, loc, 'detail_blocks', usages);
+            }
+          }
+
+          if (Array.isArray(localDb.categories)) {
+            for (const cat of localDb.categories) {
+              const loc = `[Local] Danh mục: "${cat.name || cat.slug}" (${cat.slug})`;
+              deepScanValue(cat.blocks, targets, loc, 'blocks', usages);
+            }
+          }
+
+          if (Array.isArray(localDb.menus)) {
+            for (const menu of localDb.menus) {
+              const loc = `[Local] Menu: "${menu.name || menu.title || menu.id}"`;
+              deepScanValue(menu.items || menu.children, targets, loc, 'items', usages);
+            }
+          }
+
+          if (localDb.site_configs && typeof localDb.site_configs === 'object') {
+            for (const [key, val] of Object.entries(localDb.site_configs)) {
+              const loc = `[Local] Cấu hình hệ thống (site_configs): "${key}"`;
+              deepScanValue(val, targets, loc, 'value', usages);
+            }
+          }
+        }
+      } catch (localErr) {
+        console.warn('[adminController.checkMediaUsage] Local DB scan warning:', localErr);
+      }
+
+      // Loại bỏ các mục trùng lặp theo key, location và details
+      const seen = new Set<string>();
+      const deduplicatedUsages = usages.filter((u) => {
+        const id = `${u.key}:::${u.location}:::${u.details}`;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+
+      res.json({
+        ok: true,
+        inUse: deduplicatedUsages.length > 0,
+        usages: deduplicatedUsages,
+      });
+    } catch (err: any) {
+      console.error('[adminController.checkMediaUsage] Error:', err);
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi kiểm tra mức độ sử dụng tệp tin.',
+        details: err?.stack || String(err),
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/media/delete
+   * Nhận danh sách keys, gọi deleteR2Objects thực thi DeleteObjectCommand
+   * xóa vật lý vĩnh viễn trên R2 bucket.
+   */
+  async deleteMediaFiles(req: Request, res: Response): Promise<void> {
+    try {
+      const rawKeys = Array.isArray(req.body.keys)
+        ? req.body.keys
+        : req.body.key
+          ? [req.body.key]
+          : req.body.url
+            ? [req.body.url]
+            : [];
+
+      if (!Array.isArray(req.body.keys) && !req.body.key && !req.body.url) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng cung cấp danh sách keys cần xóa (mảng keys).',
+        });
+        return;
+      }
+
+      const keys: string[] = rawKeys.filter((k: any) => typeof k === 'string' && k.trim());
+
+      const result = await deleteR2Objects(keys);
+
+      res.json({
+        ok: true,
+        deletedKeys: result.deletedKeys,
+        errors: result.errors || [],
+        message: `Đã xóa thành công ${result.deletedKeys.length}/${keys.length} tệp tin trên Cloudflare R2 bucket.`,
+      });
+    } catch (err: any) {
+      console.error('[adminController.deleteMediaFiles] Error:', err);
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi xóa tệp tin trên Cloudflare R2.',
+        details: err?.stack || String(err),
+      });
+    }
+  },
+
   /**
    * POST /api/admin/stamp-pdf
    * Đóng dấu Watermark chéo (Lớp 2 - pdf-lib) lên file PDF đọc thử trước khi lưu lên R2
@@ -611,6 +1090,32 @@ export const adminController = {
       const filePath = path.join(basePath, safeType + '.png');
 
       if (!fs.existsSync(filePath)) {
+        // Fallback xử lý riêng cho khối custom_html khi chưa có file ảnh tĩnh PNG
+        if (safeType === 'custom_html') {
+          const svgFallback = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220" fill="none">
+            <rect width="400" height="220" rx="6" fill="#18181b"/>
+            <rect x="0" y="0" width="400" height="32" rx="6" fill="#27272a"/>
+            <circle cx="20" cy="16" r="5" fill="#ef4444"/>
+            <circle cx="36" cy="16" r="5" fill="#f59e0b"/>
+            <circle cx="52" cy="16" r="5" fill="#10b981"/>
+            <text x="75" y="20" fill="#a1a1aa" font-family="monospace" font-size="11">custom_html_block.html</text>
+            <rect x="300" y="8" width="90" height="18" rx="3" fill="#e60049"/>
+            <text x="312" y="21" fill="#ffffff" font-family="sans-serif" font-size="9" font-weight="bold">CUSTOM HTML</text>
+            <text x="25" y="60" fill="#38bdf8" font-family="monospace" font-size="12">&lt;div <tspan fill="#f43f5e">class</tspan>=<tspan fill="#fef08a">"huytutor-custom-section"</tspan>&gt;</text>
+            <text x="45" y="85" fill="#4ade80" font-family="monospace" font-size="12">&lt;h2&gt;<tspan fill="#f4f4f5">Nội dung HTML &amp; CSS Tùy biến</tspan>&lt;/h2&gt;</text>
+            <text x="45" y="110" fill="#cbd5e1" font-family="monospace" font-size="12">&lt;p&gt;<tspan fill="#94a3b8">Cô lập Shadow DOM tuyệt đối, không tràn CSS...</tspan>&lt;/p&gt;</text>
+            <text x="45" y="135" fill="#fbbf24" font-family="monospace" font-size="12">&lt;img <tspan fill="#f43f5e">src</tspan>=<tspan fill="#fef08a">"/media/..."</tspan> /&gt;</text>
+            <text x="25" y="160" fill="#38bdf8" font-family="monospace" font-size="12">&lt;/div&gt;</text>
+            <rect x="25" y="180" width="350" height="24" rx="4" fill="#3f3f46" stroke="#52525b" stroke-dasharray="3 3"/>
+            <text x="80" y="196" fill="#e4e4e7" font-family="sans-serif" font-size="10">⚡ Hỗ trợ Boxed / Full-width &amp; Thư viện Media R2</text>
+          </svg>`;
+
+          res.setHeader('Content-Type', 'image/svg+xml');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.send(svgFallback);
+          return;
+        }
+
         res.status(404).json({ ok: false, error: 'Không tìm thấy ảnh minh họa cho khối này.' });
         return;
       }

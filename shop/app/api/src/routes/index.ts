@@ -71,6 +71,15 @@ router.post(
   adminController.uploadFileDirect
 );
 router.post('/admin/delete-file', adminAuthMiddleware, adminController.deleteR2File);
+router.get('/admin/media', adminAuthMiddleware, adminController.listMedia);
+router.post(
+  '/admin/media/upload',
+  adminAuthMiddleware,
+  upload.array('files', 50),
+  adminController.uploadMediaFiles
+);
+router.post('/admin/media/check-usage', adminAuthMiddleware, adminController.checkMediaUsage);
+router.post('/admin/media/delete', adminAuthMiddleware, adminController.deleteMediaFiles);
 router.post('/admin/stamp-pdf', adminAuthMiddleware, adminController.stampPdfWatermark);
 router.post(
   '/admin/orders/:orderCode/resync-form',
