@@ -111,7 +111,10 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
                 <div className="max-w-[70%]">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-gray-500 w-5">#{index + 1}</span>
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor}`}>
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor?.startsWith('#') ? 'text-white' : meta.badgeColor}`}
+                      style={meta.badgeColor?.startsWith('#') ? { backgroundColor: meta.badgeColor } : undefined}
+                    >
                       {block.type}
                     </span>
                     <h3 className="text-xs font-black text-gray-900">{meta.label}</h3>

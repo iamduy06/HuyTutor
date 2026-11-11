@@ -130,7 +130,10 @@ export const UniversalBlockPickerModal: React.FC<UniversalBlockPickerModalProps>
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-sm ${item.badgeColor}`}>
+                      <span
+                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-sm ${item.badgeColor?.startsWith('#') ? 'text-white' : item.badgeColor}`}
+                        style={item.badgeColor?.startsWith('#') ? { backgroundColor: item.badgeColor } : undefined}
+                      >
                         {item.type}
                       </span>
                       <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">

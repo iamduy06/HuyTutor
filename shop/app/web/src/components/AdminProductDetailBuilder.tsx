@@ -85,6 +85,11 @@ const DETAIL_BLOCK_META: Record<
     badgeColor: 'bg-red-600 text-white',
     desc: 'Dòng text kêu gọi ủng hộ tác giả kèm nút chuyển đến trang /donate.',
   },
+  custom_html: {
+    label: 'Mã HTML tùy biến',
+    badgeColor: '#ec4899',
+    desc: 'Nhúng mã HTML, CSS và nội dung tùy chỉnh an toàn trong Shadow DOM',
+  },
 };
 
 function collectBlockR2Urls(block: ProductDetailBlockItem): string[] {
@@ -343,6 +348,20 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
             is_active: true,
           },
         };
+      case 'custom_html':
+        return {
+          id,
+          type,
+          title_label: DETAIL_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            html_content: '<div style="padding: 24px; text-align: center;">\n  <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 8px;">Khối HTML tùy biến</h3>\n  <p style="color: #6b7280;">Chỉnh sửa nội dung HTML/CSS trong trình soạn thảo.</p>\n</div>',
+            container_mode: 'boxed',
+            no_padding: false,
+            admin_label: 'Khối HTML',
+          },
+        };
     }
   };
 
@@ -554,6 +573,7 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
           { type: 'gift_preview_download', label: 'Quà Tặng Tải Ngay' },
           { type: 'gift_cross_sell', label: 'Quà Tặng Bán Kèm' },
           { type: 'gift_donate_cta', label: 'Ủng Hộ Donate' },
+          { type: 'custom_html', label: 'Mã HTML' },
         ]}
       />
     </div>

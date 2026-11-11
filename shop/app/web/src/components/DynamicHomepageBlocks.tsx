@@ -1,5 +1,6 @@
 import React from 'react';
 import { SmartLink } from './SmartLink';
+import { IsolatedHtmlBlock } from './IsolatedHtmlBlock';
 import {
   HomepageBottomBannerConfig,
   HomepageCategoriesGridConfig,
@@ -18,9 +19,9 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
   if (config.mode === 'custom_html') {
     if (!config.custom_html?.trim()) return null;
     return (
-      <section
-        className="w-full overflow-hidden"
-        dangerouslySetInnerHTML={{ __html: config.custom_html }}
+      <IsolatedHtmlBlock
+        htmlContent={config.custom_html}
+        containerMode="full_width"
       />
     );
   }
@@ -101,9 +102,9 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
   if (config.mode === 'custom_html') {
     if (!config.custom_html?.trim()) return null;
     return (
-      <section
-        className="w-full overflow-hidden"
-        dangerouslySetInnerHTML={{ __html: config.custom_html }}
+      <IsolatedHtmlBlock
+        htmlContent={config.custom_html}
+        containerMode="full_width"
       />
     );
   }
@@ -377,9 +378,9 @@ export const BottomBannerBlock: React.FC<{
   if (config.mode === 'custom_html') {
     if (!config.custom_html?.trim()) return null;
     return (
-      <section
-        className="w-full overflow-hidden"
-        dangerouslySetInnerHTML={{ __html: config.custom_html }}
+      <IsolatedHtmlBlock
+        htmlContent={config.custom_html}
+        containerMode="full_width"
       />
     );
   }

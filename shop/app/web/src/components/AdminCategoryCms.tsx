@@ -66,6 +66,11 @@ const CATEGORY_BLOCK_META: Record<
     badgeColor: 'bg-red-600 text-white',
     desc: 'Dòng text kêu gọi ủng hộ tác giả kèm nút đỏ dẫn trực tiếp sang trang /donate.',
   },
+  custom_html: {
+    label: 'PHẦN MỞ RỘNG: Mã HTML tùy biến',
+    badgeColor: '#ec4899',
+    desc: 'Nhúng mã HTML, CSS và nội dung tùy chỉnh an toàn trong Shadow DOM',
+  },
 };
 
 function collectBlockR2Urls(block: CategoryBlockItem): string[] {
@@ -284,6 +289,20 @@ export const AdminCategoryCms: React.FC = () => {
             button_text: 'Ủng hộ tác giả',
             target_url: '/donate',
             is_active: true,
+          },
+        };
+      case 'custom_html':
+        return {
+          id,
+          type,
+          title_label: CATEGORY_BLOCK_META[type].label,
+          is_active: true,
+          sort_order: sortOrder,
+          config: {
+            html_content: '<div style="padding: 24px; text-align: center;">\n  <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 8px;">Khối HTML tùy biến</h3>\n  <p style="color: #6b7280;">Chỉnh sửa nội dung HTML/CSS trong trình soạn thảo.</p>\n</div>',
+            container_mode: 'boxed',
+            no_padding: false,
+            admin_label: 'Khối HTML',
           },
         };
     }
@@ -577,6 +596,7 @@ export const AdminCategoryCms: React.FC = () => {
             { type: 'gift_hero_anchors', label: 'Quà Tặng Anchor' },
             { type: 'gift_form_embed', label: 'Form Nhúng' },
             { type: 'gift_donate_cta', label: 'Ủng Hộ Donate' },
+            { type: 'custom_html', label: 'Mã HTML' },
           ]}
         />
       </form>

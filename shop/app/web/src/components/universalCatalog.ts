@@ -292,6 +292,15 @@ export const UNIVERSAL_BLOCK_CATALOG: UniversalBlockMeta[] = [
     desc: 'Nhúng Google Form hoặc form nội bộ để khách hàng nhập Gmail nhận tài liệu miễn phí.',
     originPage: 'Trang Quà Tặng',
   },
+  {
+    type: 'custom_html',
+    category: 'content',
+    categoryLabel: 'Nội dung',
+    label: 'Mã HTML tùy biến',
+    badgeColor: '#ec4899',
+    desc: 'Nhúng mã HTML, CSS và nội dung tùy chỉnh an toàn trong Shadow DOM',
+    originPage: 'Tất cả trang',
+  },
 
   // --- NHÓM 4: BẢNG GIÁ & CHÍNH SÁCH ---
   {
@@ -755,6 +764,16 @@ export function createDefaultUniversalBlock(
         prompt_text: 'Ủng hộ tác giả để có thêm nhiều tài liệu miễn phí chất lượng!',
         button_text: 'Ủng hộ tác giả',
         target_url: '/donate',
+        is_active: true,
+      };
+      break;
+
+    case 'custom_html':
+      config = {
+        html_content: '<div style="padding: 24px; text-align: center;">\n  <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 8px;">Khối HTML tùy biến</h3>\n  <p style="color: #6b7280;">Chỉnh sửa nội dung HTML/CSS trong trình soạn thảo.</p>\n</div>',
+        container_mode: 'boxed',
+        no_padding: false,
+        admin_label: 'Khối HTML',
         is_active: true,
       };
       break;

@@ -50,6 +50,7 @@ import {
 } from '../types';
 import { R2ImageUploader } from './R2ImageUploader';
 import { R2MultiImageUploader } from './R2MultiImageUploader';
+import { CustomHtmlBlockEditor } from './CustomHtmlBlockEditor';
 
 interface UniversalBlockItemEditorProps {
   block: UniversalBlockItem;
@@ -65,6 +66,18 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   context,
 }) => {
   const cfg = block.config || {};
+
+  // ==========================================
+  // KHỐI HTML TÙY BIẾN
+  // ==========================================
+  if (block.type === 'custom_html') {
+    return (
+      <CustomHtmlBlockEditor
+        config={block.config || {}}
+        onChange={(newCfg) => onUpdateConfig(newCfg)}
+      />
+    );
+  }
 
   // ==========================================
   // 1. HERO TRANG CHỦ

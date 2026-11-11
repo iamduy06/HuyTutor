@@ -63,6 +63,11 @@ const FLASHCARD_BLOCK_META: Record<
     desc: 'Banner hình ảnh full-width chèn vào giữa các phần trên trang Flashcard.',
     badgeColor: 'bg-sky-600 text-white',
   },
+  custom_html: {
+    label: 'Mã HTML tùy biến',
+    desc: 'Nhúng mã HTML, CSS và nội dung tùy chỉnh an toàn trong Shadow DOM',
+    badgeColor: '#ec4899',
+  },
 };
 
 export const AdminFlashcardCms: React.FC = () => {
@@ -374,6 +379,7 @@ export const AdminFlashcardCms: React.FC = () => {
           { type: 'flashcard_group_pricing', label: 'Bảng Giá Nhóm' },
           { type: 'flashcard_contact_notice', label: 'Kênh Hỗ Trợ' },
           { type: 'flashcard_banner', label: 'Banner' },
+          { type: 'custom_html', label: 'Mã HTML' },
         ]}
         renderCustomEditor={(block, onUpdate) => {
           if (block.type === 'flashcard_hero') {

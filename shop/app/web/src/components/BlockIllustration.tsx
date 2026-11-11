@@ -194,6 +194,29 @@ export const BlockIllustration: React.FC<BlockIllustrationProps> = ({
         </div>
       );
 
+    case 'custom_html':
+      return (
+        <div className={`bg-gradient-to-br from-slate-900 to-indigo-950 rounded border border-slate-700 p-2.5 flex items-center justify-between text-white overflow-hidden relative ${className}`}>
+          <div className="space-y-1 z-10">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span className="text-[7px] text-pink-400 font-mono ml-1">&lt;/&gt; HTML/CSS</span>
+            </div>
+            <div className="text-[9px] font-mono font-bold text-gray-200">
+              &lt;<span className="text-pink-400">div</span> <span className="text-indigo-300">class</span>=&quot;...&quot;&gt;
+            </div>
+            <div className="w-20 h-1 bg-pink-500/40 rounded-full"></div>
+          </div>
+          <div className="w-10 h-10 rounded border border-pink-500/30 bg-pink-950/40 flex items-center justify-center text-pink-400">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+          </div>
+        </div>
+      );
+
     default:
       return (
         <div className={`bg-gray-100 rounded border border-dashed border-gray-300 p-2 flex items-center justify-center text-gray-500 text-xs ${className}`}>

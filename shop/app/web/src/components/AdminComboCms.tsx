@@ -68,6 +68,11 @@ const COMBO_BLOCK_META: Record<
     badgeColor: 'bg-zinc-700 text-white',
     desc: 'Hộp thông báo hoặc lưu ý chính sách với các tông màu hồng, vàng, xanh.',
   },
+  custom_html: {
+    label: 'KHỐI PHỤ: Mã HTML tùy biến',
+    badgeColor: '#ec4899',
+    desc: 'Nhúng mã HTML, CSS và nội dung tùy chỉnh an toàn trong Shadow DOM',
+  },
 };
 
 import { ensurePackageFormatPricings } from '../utils/comboPricingEngine';
@@ -243,6 +248,13 @@ export const AdminComboCms: React.FC = () => {
         badge_label: 'LƯU Ý',
         theme: 'pink',
       } as ComboNoticeBlockConfig;
+    } else if (type === 'custom_html') {
+      initialConfig = {
+        html_content: '<div style="padding: 24px; text-align: center;">\n  <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 8px;">Khối HTML tùy biến</h3>\n  <p style="color: #6b7280;">Chỉnh sửa nội dung HTML/CSS trong trình soạn thảo.</p>\n</div>',
+        container_mode: 'boxed',
+        no_padding: false,
+        admin_label: 'Khối HTML',
+      };
     }
 
     const newBlock: ComboPageBlockItem = {
@@ -345,7 +357,10 @@ export const AdminComboCms: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-gray-500 w-5">#{index + 1}</span>
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor}`}>
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-sm ${meta.badgeColor?.startsWith('#') ? 'text-white' : meta.badgeColor}`}
+                      style={meta.badgeColor?.startsWith('#') ? { backgroundColor: meta.badgeColor } : undefined}
+                    >
                       {block.type}
                     </span>
                     <h3 className="text-xs font-black text-gray-900">{meta.label}</h3>
@@ -482,16 +497,25 @@ export const AdminComboCms: React.FC = () => {
       <div className="bg-gray-50 border border-dashed border-gray-300 rounded-md p-5 text-center space-y-3">
         <div className="text-xs font-bold text-gray-700 uppercase">+ Thêm Khối Mới Vào Trang Combo THPT</div>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {(Object.keys(COMBO_BLOCK_META) as ComboBlockType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleAddBlock(type)}
-              className="bg-white border border-gray-300 hover:border-[#e60049] text-gray-800 hover:text-[#e60049] font-bold text-xs px-3.5 py-1.5 rounded-sm transition shadow-2xs"
-            >
-              + {COMBO_BLOCK_META[type].label.split(':')[0]}
-            </button>
-          ))}
+          {(Object.keys(COMBO_BLOCK_META) as ComboBlockType[])
+            .filter((type) => type !== 'custom_html')
+            .map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleAddBlock(type)}
+                className="bg-white border border-gray-300 hover:border-[#e60049] text-gray-800 hover:text-[#e60049] font-bold text-xs px-3.5 py-1.5 rounded-sm transition shadow-2xs"
+              >
+                + {COMBO_BLOCK_META[type].label.split(':')[0]}
+              </button>
+            ))}
+          <button
+            type="button"
+            onClick={() => handleAddBlock('custom_html')}
+            className="bg-white border border-gray-300 hover:border-[#ec4899] text-gray-800 hover:text-[#ec4899] font-bold text-xs px-3.5 py-1.5 rounded-sm transition shadow-2xs"
+          >
+            + Mã HTML
+          </button>
           <button
             type="button"
             onClick={() => setShowUniversalPicker(true)}

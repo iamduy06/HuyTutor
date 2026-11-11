@@ -58,6 +58,11 @@ const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string
     color: 'bg-emerald-700 text-white',
     desc: 'Banner chân trang (Tải ảnh banner rộng hoặc HTML)',
   },
+  custom_html: {
+    name: 'Khối HTML tùy biến',
+    color: 'bg-pink-600 text-white',
+    desc: 'Nhúng mã HTML, CSS an toàn trong Shadow DOM',
+  },
 };
 
 export const AdminHomepageCms: React.FC = () => {
@@ -252,6 +257,13 @@ export const AdminHomepageCms: React.FC = () => {
       initialConfig = { text: '', cta_button_text: '', cta_button_link: '', is_active: true };
     } else if (type === 'bottom_banner') {
       initialConfig = { mode: 'structured', title: '', link_url: '', books: [], is_active: true };
+    } else if (type === 'custom_html') {
+      initialConfig = {
+        html_content: '<div style="padding: 24px; text-align: center;">\n  <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 8px;">Khối HTML tùy biến</h3>\n  <p style="color: #6b7280;">Chỉnh sửa nội dung HTML/CSS trong trình soạn thảo.</p>\n</div>',
+        container_mode: 'boxed',
+        no_padding: false,
+        admin_label: 'Khối HTML',
+      };
     }
 
     const newBlock: HomepageBlockItem = {
@@ -461,6 +473,7 @@ export const AdminHomepageCms: React.FC = () => {
           { type: 'section_groups', label: 'Nhóm Tài Liệu' },
           { type: 'notice_text', label: 'Thông Báo CTA' },
           { type: 'bottom_banner', label: 'Bottom Banner' },
+          { type: 'custom_html', label: 'Mã HTML' },
         ]}
       />
     </div>

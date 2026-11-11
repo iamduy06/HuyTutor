@@ -83,6 +83,7 @@ import {
 import { ProductImageFrame } from './ProductImageFrame';
 import { SmartLink } from './SmartLink';
 import { buildProductUrl } from '../utils/urlHelper';
+import { IsolatedHtmlBlock } from './IsolatedHtmlBlock';
 
 export interface UniversalBlockRendererProps {
   blocks: (UniversalBlockItem | any)[];
@@ -492,6 +493,17 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
               <div key={key} className="max-w-[920px] mx-auto py-4 empty:hidden">
                 <GiftDonateCtaBlock config={cfg} />
               </div>
+            );
+
+          case 'custom_html':
+            return (
+              <IsolatedHtmlBlock
+                key={key}
+                htmlContent={block.config?.html_content}
+                containerMode={block.config?.container_mode || 'boxed'}
+                noPadding={block.config?.no_padding}
+                className={block.config?.className}
+              />
             );
 
           default:
