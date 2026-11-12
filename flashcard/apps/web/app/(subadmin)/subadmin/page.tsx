@@ -54,7 +54,7 @@ export default async function SubAdminPage() {
             <div className="mt-2 h-1.5 bg-[#f0e0e7] rounded-full overflow-hidden">
               <div
                 className="h-full bg-brand rounded-full"
-                style={{ width: `${Math.min(100, ((managedCount ?? 0) / totalMaxUsers) * 100)}%` }}
+                style={{ width: `${Math.min(100, ((managedCount ?? 0) / (totalMaxUsers || 1)) * 100)}%` }}
               />
             </div>
           )}
@@ -103,13 +103,30 @@ export default async function SubAdminPage() {
           {!isAdmin && (myDecks as any[])?.length > 0 && (
             <div className="p-3 rounded-xl border-2 border-[#f0e0e7]">
               <div className="font-semibold text-sm text-[#1a1a2e] mb-2">📚 Flashcard bạn được phân quyền:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {(myDecks as any[]).map((ud: any) => (
-                  <span key={ud.deck?.id ?? ud.id}
-                    className="text-xs bg-brand-light text-brand px-2.5 py-1 rounded-full font-semibold">
-                    {ud.deck?.title ?? ud.title ?? "?"}
-                  </span>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {(myDecks as any[]).map((ud: any) => {
+                  const title = ud.deck?.title ?? ud.title ?? "?";
+                  const used = ud.used_slots ?? 0;
+                  const max = ud.max_users ?? 10;
+                  const isFull = used >= max;
+                  return (
+                    <div
+                      key={ud.deck?.id ?? ud.id}
+                      className="flex items-center gap-2 bg-[#f8f9fa] border border-[#f0e0e7] rounded-xl px-3 py-1.5 shadow-sm"
+                    >
+                      <span className="text-xs font-bold text-[#1a1a2e]">{title}</span>
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                          isFull
+                            ? "bg-red-100 text-red-700 border border-red-200"
+                            : "bg-brand-light text-brand border border-brand/20"
+                        }`}
+                      >
+                        Đã dùng {used} / {max} slots
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

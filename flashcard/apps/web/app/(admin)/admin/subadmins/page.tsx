@@ -22,7 +22,7 @@ import { PaginationControls } from "@/components/common/PaginationControls";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeckItem { id: string; title: string; }
-interface GroupDeck { deck_id: string; expired_at: string | null; deck?: { title: string } }
+interface GroupDeck { deck_id: string; max_users?: number; expired_at: string | null; deck?: { title: string } }
 interface UserDeviceItem { id: string; device_id: string; device_name?: string; ip_address?: string; last_seen: string; }
 interface UserDeckItem { deck_id: string; expired_at: string | null; progress_percent: number; learned_count: number; deck?: { title: string } }
 interface GroupMember {
@@ -100,9 +100,16 @@ export default function AdminSubAdminsPage() {
 
   // Selectable states for Group Decks
   const [selectedGroupDecksIds, setSelectedGroupDecksIds] = useState<Set<string>>(new Set());
+  const [newDecksConfig, setNewDecksConfig] = useState<Record<string, { max_users: number; expired_at: string }>>({});
+  const [groupDecksDefaultQuota, setGroupDecksDefaultQuota] = useState<number>(10);
   const [groupDecksExpiry, setGroupDecksExpiry] = useState("");
   const [assignAllUsers, setAssignAllUsers] = useState(false);
   const [selectedUserForGroup, setSelectedUserForGroup] = useState<string>("none");
+
+  // Inline edit state for existing group decks
+  const [editingGroupDeckId, setEditingGroupDeckId] = useState<string | null>(null);
+  const [editDeckMaxUsers, setEditDeckMaxUsers] = useState<number>(10);
+  const [editDeckExpiry, setEditDeckExpiry] = useState<string>("");
 
   // Queries
   const { data, isLoading } = useQuery({
@@ -146,8 +153,12 @@ export default function AdminSubAdminsPage() {
       if (vars.action === "assign_group_deck") { 
         setShowGroupDecks(null); 
         setSelectedGroupDecksIds(new Set());
+        setNewDecksConfig({});
         setGroupDecksExpiry("");
         setAssignAllUsers(false);
+      }
+      if (vars.action === "update_group_deck") {
+        setEditingGroupDeckId(null);
       }
       toast({ title: "Thành công" });
     },
@@ -380,12 +391,15 @@ export default function AdminSubAdminsPage() {
                      )}
                      <span className="text-xs font-normal text-gray-400">#{group.id.slice(0,8)}</span>
                    </h3>
-                   <div className="text-xs text-gray-500 mt-1 flex items-center gap-3">
+                   <div className="text-xs text-gray-500 mt-1 flex items-center gap-3 flex-wrap">
                      <span className="bg-white px-2 py-0.5 rounded border">
                        Thành viên: <strong className="text-brand">{group.user_count}</strong> / {group.max_users}
                      </span>
                      <span className="bg-white px-2 py-0.5 rounded border">
                        Flashcard nhóm: <strong className="text-blue-600">{group.group_decks.length}</strong>
+                       <span className="text-[10px] text-gray-400 ml-1">
+                         (∑ Quota: {group.group_decks.reduce((sum, gd) => sum + (gd.max_users ?? 10), 0)})
+                       </span>
                       </span>
                       {(() => {
                         const subadmins = (group.group_users || []).filter(u => u.is_subadmin || u.is_group_subadmin || u.role === "SUBADMIN");
@@ -406,8 +420,10 @@ export default function AdminSubAdminsPage() {
                 <Button size="sm" variant="outline" className="h-9 gap-1.5" title="Quản lý Flashcard dùng chung toàn nhóm" 
                   onClick={() => { 
                     setSelectedGroupDecksIds(new Set()); 
+                    setNewDecksConfig({});
                     setGroupDecksExpiry(""); 
                     setAssignAllUsers(false);
+                    setEditingGroupDeckId(null);
                     setShowGroupDecks(group); 
                   }}>
                   <BookOpen className="w-3.5 h-3.5" /> Quản lý Đề Nhóm
@@ -554,7 +570,9 @@ export default function AdminSubAdminsPage() {
                 <Label className="text-xs font-bold uppercase text-gray-500">Số thành viên tối đa</Label>
                 <Input type="number" min={editGroup?.user_count || 1} value={editGroup?.max_users} 
                   onChange={e => setEditGroup(prev => prev ? {...prev, max_users: parseInt(e.target.value)} : null)} className="mt-1" />
-                <p className="text-[10px] text-muted-foreground mt-1">Hiện có: {editGroup?.user_count} user</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Hiện có: {editGroup?.user_count} user (∑ Quota Flashcard: {(editGroup?.group_decks ?? []).reduce((sum, gd) => sum + (gd.max_users ?? 10), 0)})
+                </p>
               </div>
               <div>
                 <Label className="text-xs font-bold uppercase text-gray-500">Thiết bị / User</Label>
@@ -638,83 +656,385 @@ export default function AdminSubAdminsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showGroupDecks} onOpenChange={() => setShowGroupDecks(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600"/> Tài nguyên Nhóm: {showGroupDecks?.name}</DialogTitle>
-            <p className="text-[11px] text-muted-foreground mt-1 uppercase font-bold tracking-tight">Kế thừa: Toàn bộ thành viên sẽ thấy các Flashcard này.</p>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-6 pt-2 pr-1">
-            <div className="space-y-2">
-              <Label className="uppercase text-[10px] font-bold text-gray-400">Đề đang có trong nhóm</Label>
-              {!showGroupDecks?.group_decks.length ? <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">Chưa có Flashcard nào.</p> : (
-                <div className="space-y-2">
-                   {showGroupDecks.group_decks.map(gd => (
-                     <div key={gd.deck_id} className="p-3 border rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-brand-light transition">
-                       <div className="min-w-0 flex-1">
-                         <p className="font-bold text-sm text-[#1a1a2e] truncate flex items-center gap-2">
-                           <BookOpen className="w-3.5 h-3.5 text-brand" /> {gd.deck?.title}
-                         </p>
-                         <p className="text-[10px] font-semibold text-red-500 mt-1">{gd.expired_at ? `⏳ Hết hạn: ${new Date(gd.expired_at).toLocaleString()}` : "∞ Dùng vĩnh viễn"}</p>
-                       </div>
-                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0" title="Rút đề"
-                        onClick={() => { if(confirm("Gỡ Flashcard này khỏi nhóm?")) groupAction.mutate({ groupId: showGroupDecks.id, action: "revoke_group_deck", payload: { deck_id: gd.deck_id }})}}><Trash2 className="w-4 h-4"/></Button>
-                     </div>
-                   ))}
+      <Dialog open={!!showGroupDecks} onOpenChange={() => { setShowGroupDecks(null); setEditingGroupDeckId(null); }}>
+        {(() => {
+          const activeGroup = groups.find(g => g.id === showGroupDecks?.id) ?? showGroupDecks;
+          if (!activeGroup) return null;
+
+          const currentTotalQuota = (activeGroup.group_decks ?? []).reduce(
+            (sum, gd) => sum + (gd.max_users ?? 10),
+            0
+          );
+
+          const availableDecks = decks.filter(d => !activeGroup.group_decks.some(gd => gd.deck_id === d.id));
+
+          const addedQuota = Array.from(selectedGroupDecksIds).reduce((sum, deckId) => {
+            const cfg = newDecksConfig[deckId];
+            return sum + (cfg?.max_users ?? groupDecksDefaultQuota);
+          }, 0);
+
+          return (
+            <DialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <BookOpen className="w-5 h-5 text-blue-600" /> Tài nguyên Nhóm: {activeGroup.name}
+                </DialogTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs">
+                  <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
+                    Kế thừa: Toàn bộ thành viên sẽ thấy các Flashcard này.
+                  </span>
+                  <span className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg font-bold text-blue-700">
+                    Tổng hạn ngạch nhóm: <strong className="text-blue-900">{currentTotalQuota} slots</strong> ({activeGroup.group_decks.length} Flashcard)
+                  </span>
                 </div>
-              )}
-            </div>
-            
-            <div className="pt-4 border-t space-y-4 bg-brand-light/30 p-4 rounded-xl border border-brand-light">
-              <Label className="text-brand font-bold uppercase text-xs tracking-wider">Giao nhiều Flashcard mới</Label>
-              
-              <div className="max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y">
-                 {decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).length === 0 ? (
-                   <p className="p-3 text-xs text-center text-gray-400 italic">Nhóm đã có tất cả các Flashcard.</p>
-                 ) : decks.filter(d => !showGroupDecks?.group_decks.some(gd => gd.deck_id === d.id)).map(d => {
-                    const isSelected = selectedGroupDecksIds.has(d.id);
-                    return (
-                      <label key={d.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors">
-                        <input type="checkbox" checked={isSelected} 
-                          onChange={e => {
-                            const next = new Set(selectedGroupDecksIds);
-                            if (e.target.checked) next.add(d.id); else next.delete(d.id);
-                            setSelectedGroupDecksIds(next);
-                          }} 
-                          className="w-4 h-4 accent-brand" />
-                        <span className={`text-sm ${isSelected ? "font-bold text-brand" : "text-gray-700"}`}>{d.title}</span>
-                      </label>
-                    );
-                 })}
-              </div>
+              </DialogHeader>
 
-              <div>
-                 <Label className="text-[10px] font-bold uppercase text-gray-500">Hết hạn (Tuỳ chọn)</Label>
-                 <Input type="date" value={groupDecksExpiry} onChange={e=>setGroupDecksExpiry(e.target.value)} className="mt-1 bg-white h-9" />
-              </div>
+              <div className="flex-1 overflow-y-auto space-y-6 pt-2 pr-1">
+                {/* 1. Existing Decks */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="uppercase text-[10px] font-bold text-gray-400">
+                      Flashcard đang có trong nhóm ({activeGroup.group_decks.length})
+                    </Label>
+                    <span className="text-[10px] text-gray-400">
+                      (groups.max_users = ∑ quotas = {currentTotalQuota})
+                    </span>
+                  </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input type="checkbox" id="assign_all" checked={assignAllUsers} onChange={e=>setAssignAllUsers(e.target.checked)} className="w-4 h-4 accent-brand" />
-                <Label htmlFor="assign_all" className="text-xs font-bold text-[#1a1a2e] cursor-pointer">Tự động cấp quyền học cho tất cả user trong nhóm này</Label>
-              </div>
+                  {!activeGroup.group_decks.length ? (
+                    <p className="text-sm italic text-gray-500 border-2 border-dashed p-4 text-center rounded-xl bg-gray-50">
+                      Chưa có Flashcard nào.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeGroup.group_decks.map(gd => {
+                        const isEditingThis = editingGroupDeckId === gd.deck_id;
 
-              <Button variant="brand" className="w-full h-11 text-base font-bold" 
-                disabled={selectedGroupDecksIds.size === 0 || groupAction.isPending}
-                onClick={() => groupAction.mutate({ 
-                  groupId: showGroupDecks!.id, 
-                  action: "assign_group_deck", 
-                  payload: { 
-                    deck_ids: Array.from(selectedGroupDecksIds), 
-                    expired_at: groupDecksExpiry ? groupDecksExpiry + "T23:59:59Z" : "",
-                    assign_all_users: assignAllUsers
-                  } 
-                })}>
-                {groupAction.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Giao {selectedGroupDecksIds.size} Flashcard đã chọn
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
+                        if (isEditingThis) {
+                          return (
+                            <div key={gd.deck_id} className="p-3.5 border-2 border-brand-light rounded-xl bg-blue-50/50 space-y-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <p className="font-bold text-sm text-brand truncate flex items-center gap-2">
+                                  <BookOpen className="w-3.5 h-3.5 text-brand" /> {gd.deck?.title}
+                                </p>
+                                <span className="text-xs font-semibold text-blue-700">Chỉnh sửa Quota & Hạn</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                                    Hạn ngạch (max_users)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={editDeckMaxUsers}
+                                    onChange={e => setEditDeckMaxUsers(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="h-8 mt-1 bg-white text-sm font-semibold"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                                    Hạn dùng (expired_at)
+                                  </Label>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <Input
+                                      type="date"
+                                      value={editDeckExpiry}
+                                      onChange={e => setEditDeckExpiry(e.target.value)}
+                                      className="h-8 bg-white text-xs flex-1"
+                                    />
+                                    {editDeckExpiry && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-1.5 text-xs text-gray-400 hover:text-gray-600"
+                                        onClick={() => setEditDeckExpiry("")}
+                                        title="Bỏ hạn dùng (Dùng vĩnh viễn)"
+                                      >
+                                        ✕
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-1 border-t border-blue-100">
+                                <Button
+                                  size="sm"
+                                  variant="brand"
+                                  className="h-8 flex-1 text-xs font-bold"
+                                  disabled={groupAction.isPending}
+                                  onClick={() => {
+                                    groupAction.mutate({
+                                      groupId: activeGroup.id,
+                                      action: "update_group_deck",
+                                      payload: {
+                                        deck_id: gd.deck_id,
+                                        max_users: editDeckMaxUsers,
+                                        expired_at: editDeckExpiry ? editDeckExpiry + "T23:59:59Z" : null,
+                                      },
+                                    });
+                                  }}
+                                >
+                                  {groupAction.isPending && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                                  Lưu thay đổi
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 text-xs text-gray-500 hover:bg-gray-200"
+                                  onClick={() => setEditingGroupDeckId(null)}
+                                >
+                                  Hủy
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={gd.deck_id}
+                            className="p-3 border rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-brand-light transition"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-sm text-[#1a1a2e] truncate flex items-center gap-2">
+                                <BookOpen className="w-3.5 h-3.5 text-brand" /> {gd.deck?.title}
+                              </p>
+                              <div className="flex items-center gap-2 flex-wrap mt-1">
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-bold">
+                                  Hạn ngạch: {gd.max_users ?? 10} học viên
+                                </span>
+                                <span className={`text-[10px] font-semibold ${gd.expired_at ? "text-red-500" : "text-gray-400"}`}>
+                                  {gd.expired_at ? `⏳ Hết hạn: ${new Date(gd.expired_at).toLocaleDateString()}` : "∞ Dùng vĩnh viễn"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs font-semibold px-2.5 bg-gray-50 hover:bg-gray-100"
+                                title="Chỉnh sửa hạn ngạch & ngày hết hạn"
+                                onClick={() => {
+                                  setEditingGroupDeckId(gd.deck_id);
+                                  setEditDeckMaxUsers(gd.max_users ?? 10);
+                                  setEditDeckExpiry(gd.expired_at ? new Date(gd.expired_at).toISOString().slice(0, 10) : "");
+                                }}
+                              >
+                                Sửa
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                title="Rút đề khỏi nhóm"
+                                onClick={() => {
+                                  if (confirm(`Gỡ Flashcard "${gd.deck?.title ?? gd.deck_id}" khỏi nhóm? Hệ thống sẽ thu hồi slot của học sinh và cập nhật tổng quota nhóm.`)) {
+                                    groupAction.mutate({
+                                      groupId: activeGroup.id,
+                                      action: "revoke_group_deck",
+                                      payload: { deck_id: gd.deck_id },
+                                    });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Assign New Decks Section */}
+                <div className="pt-4 border-t space-y-4 bg-brand-light/30 p-4 rounded-xl border border-brand-light">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-brand font-bold uppercase text-xs tracking-wider">
+                      Giao thêm Flashcard mới vào nhóm
+                    </Label>
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      Đã chọn: <strong className="text-brand">{selectedGroupDecksIds.size}</strong> bộ thẻ
+                    </span>
+                  </div>
+
+                  {/* Batch defaults */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-white/80 rounded-lg border border-brand-light/50">
+                    <div>
+                      <Label className="text-[10px] font-bold uppercase text-gray-500">Hạn ngạch mặc định / bộ thẻ</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="10"
+                        value={groupDecksDefaultQuota}
+                        onChange={e => {
+                          const val = Math.max(1, parseInt(e.target.value) || 10);
+                          setGroupDecksDefaultQuota(val);
+                        }}
+                        className="mt-1 bg-white h-8 text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] font-bold uppercase text-gray-500">Hạn dùng chung (Tuỳ chọn)</Label>
+                      <Input
+                        type="date"
+                        value={groupDecksExpiry}
+                        onChange={e => setGroupDecksExpiry(e.target.value)}
+                        className="mt-1 bg-white h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Available decks checklist with per-deck inputs */}
+                  <div className="max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y">
+                    {availableDecks.length === 0 ? (
+                      <p className="p-3 text-xs text-center text-gray-400 italic">Nhóm đã có tất cả các Flashcard.</p>
+                    ) : (
+                      availableDecks.map(d => {
+                        const isSelected = selectedGroupDecksIds.has(d.id);
+                        const deckCfg = newDecksConfig[d.id] ?? {
+                          max_users: groupDecksDefaultQuota,
+                          expired_at: groupDecksExpiry,
+                        };
+
+                        return (
+                          <div key={d.id} className={`p-3 transition-colors ${isSelected ? "bg-blue-50/70" : "hover:bg-gray-50"}`}>
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={e => {
+                                  const next = new Set(selectedGroupDecksIds);
+                                  const nextCfg = { ...newDecksConfig };
+                                  if (e.target.checked) {
+                                    next.add(d.id);
+                                    nextCfg[d.id] = {
+                                      max_users: groupDecksDefaultQuota,
+                                      expired_at: groupDecksExpiry,
+                                    };
+                                  } else {
+                                    next.delete(d.id);
+                                    delete nextCfg[d.id];
+                                  }
+                                  setSelectedGroupDecksIds(next);
+                                  setNewDecksConfig(nextCfg);
+                                }}
+                                className="w-4 h-4 accent-brand flex-shrink-0"
+                              />
+                              <span className={`text-sm flex-1 ${isSelected ? "font-bold text-brand" : "text-gray-700"}`}>
+                                {d.title}
+                              </span>
+                            </label>
+
+                            {/* Per-deck quota & expiry inputs when selected */}
+                            {isSelected && (
+                              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-blue-100 pl-7">
+                                <div>
+                                  <Label className="text-[10px] font-bold text-gray-500 uppercase">Hạn ngạch (slots)</Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={deckCfg.max_users}
+                                    onChange={e => {
+                                      const val = Math.max(1, parseInt(e.target.value) || 1);
+                                      setNewDecksConfig(prev => ({
+                                        ...prev,
+                                        [d.id]: {
+                                          ...prev[d.id],
+                                          max_users: val,
+                                          expired_at: prev[d.id]?.expired_at ?? groupDecksExpiry,
+                                        },
+                                      }));
+                                    }}
+                                    className="h-7 bg-white text-xs mt-0.5"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] font-bold text-gray-500 uppercase">Hạn dùng riêng</Label>
+                                  <Input
+                                    type="date"
+                                    value={deckCfg.expired_at || ""}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewDecksConfig(prev => ({
+                                        ...prev,
+                                        [d.id]: {
+                                          ...prev[d.id],
+                                          max_users: prev[d.id]?.max_users ?? groupDecksDefaultQuota,
+                                          expired_at: val,
+                                        },
+                                      }));
+                                    }}
+                                    className="h-7 bg-white text-xs mt-0.5"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Summary of added quota */}
+                  {selectedGroupDecksIds.size > 0 && (
+                    <div className="p-2.5 bg-brand-light/50 border border-brand/30 rounded-lg text-xs font-medium text-brand-dark flex items-center justify-between">
+                      <span>Tổng hạn ngạch mới của nhóm:</span>
+                      <span className="font-bold text-sm text-brand">
+                        {currentTotalQuota} + {addedQuota} = {currentTotalQuota + addedQuota} học viên
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="assign_all"
+                      checked={assignAllUsers}
+                      onChange={e => setAssignAllUsers(e.target.checked)}
+                      className="w-4 h-4 accent-brand"
+                    />
+                    <Label htmlFor="assign_all" className="text-xs font-bold text-[#1a1a2e] cursor-pointer">
+                      Tự động cấp quyền học cho tất cả user trong nhóm này
+                    </Label>
+                  </div>
+
+                  <Button
+                    variant="brand"
+                    className="w-full h-11 text-base font-bold"
+                    disabled={selectedGroupDecksIds.size === 0 || groupAction.isPending}
+                    onClick={() => {
+                      const decksPayload = Array.from(selectedGroupDecksIds).map(deckId => {
+                        const cfg = newDecksConfig[deckId];
+                        const expiry = cfg?.expired_at || groupDecksExpiry;
+                        return {
+                          deck_id: deckId,
+                          max_users: cfg?.max_users ?? groupDecksDefaultQuota,
+                          expired_at: expiry ? expiry + "T23:59:59Z" : null,
+                        };
+                      });
+
+                      groupAction.mutate({
+                        groupId: activeGroup.id,
+                        action: "assign_group_deck",
+                        payload: {
+                          decks: decksPayload,
+                          deck_ids: Array.from(selectedGroupDecksIds),
+                          assign_all_users: assignAllUsers,
+                        },
+                      });
+                    }}
+                  >
+                    {groupAction.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Giao {selectedGroupDecksIds.size} Flashcard đã chọn
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          );
+        })()}
       </Dialog>
 
       <Dialog open={!!showAddMember} onOpenChange={() => setShowAddMember(null)}>

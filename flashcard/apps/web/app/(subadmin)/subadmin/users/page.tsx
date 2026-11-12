@@ -24,7 +24,15 @@ import type { PaginationMeta } from "@huytutor/shared";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UserDevice { id: string; device_id: string; device_name: string | null; ip_address: string | null; last_seen: string; }
 interface ManagedGroup { group_id: string; groups: { id: string; name: string; max_users: number; max_device_per_user: number; } }
-interface DeckItem { id: string; title: string; level?: string; word_count?: number; group_expired_at?: string | null; }
+interface DeckItem {
+  id: string;
+  title: string;
+  level?: string;
+  word_count?: number;
+  group_expired_at?: string | null;
+  max_users?: number;
+  used_slots?: number;
+}
 interface UserDeckItem {
   id: string;
   deck_id: string;
@@ -670,11 +678,27 @@ export default function SubAdminUsersPage() {
           <div className="space-y-4 overflow-y-auto flex-1 pr-1">
             {(assignedUser?.user_decks ?? []).length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Đã có:</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Bộ thẻ đang sở hữu:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {(assignedUser?.user_decks ?? []).map(ud => (
-                    <span key={ud.id} className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full font-semibold">
-                      {ud.deck?.title ?? "?"}
+                    <span
+                      key={ud.id}
+                      className="text-xs bg-brand-light text-brand px-2.5 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 border border-brand/20"
+                    >
+                      <span>{ud.deck?.title ?? "?"}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (assignedUser) {
+                            revokeDeck.mutate({ userId: assignedUser.id, deckId: ud.deck_id });
+                          }
+                        }}
+                        disabled={revokeDeck.isPending}
+                        className="hover:text-red-600 font-bold text-sm leading-none ml-0.5 transition-colors"
+                        title="Gỡ bộ thẻ để giải phóng slot cho học sinh khác"
+                      >
+                        ×
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -685,6 +709,11 @@ export default function SubAdminUsersPage() {
               assignedUser={assignedUser}
               assignDeckIds={assignDeckIds}
               setAssignDeckIds={setAssignDeckIds}
+              onRevokeDeck={(deckId) => {
+                if (assignedUser) {
+                  revokeDeck.mutate({ userId: assignedUser.id, deckId });
+                }
+              }}
             />
             <div>
               <Label>Ngày hết hạn</Label>
@@ -839,24 +868,39 @@ interface SubAssignDeckListProps {
   assignedUser: UserData | undefined;
   assignDeckIds: Set<string>;
   setAssignDeckIds: (s: Set<string>) => void;
+  onRevokeDeck?: (deckId: string) => void;
 }
 
-function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckIds }: SubAssignDeckListProps) {
-  const assignable = decks.filter(d =>
-    !assignedUser?.user_decks?.some(ud => ud.deck_id === d.id)
-  );
+function SubAssignDeckList({
+  decks,
+  assignedUser,
+  assignDeckIds,
+  setAssignDeckIds,
+  onRevokeDeck,
+}: SubAssignDeckListProps) {
+  const assignable = decks.filter(d => {
+    const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+    const max = d.max_users ?? 10;
+    const used = d.used_slots ?? 0;
+    const isFull = used >= max;
+    return !alreadyHas && !isFull;
+  });
   const allSelected = assignable.length > 0 && assignable.every(d => assignDeckIds.has(d.id));
 
   function toggleAll() {
     const next = new Set(assignDeckIds);
-    if (allSelected) { assignable.forEach(d => next.delete(d.id)); }
-    else { assignable.forEach(d => next.add(d.id)); }
+    if (allSelected) {
+      assignable.forEach(d => next.delete(d.id));
+    } else {
+      assignable.forEach(d => next.add(d.id));
+    }
     setAssignDeckIds(next);
   }
 
   function toggleOne(id: string, checked: boolean) {
     const next = new Set(assignDeckIds);
-    if (checked) next.add(id); else next.delete(id);
+    if (checked) next.add(id);
+    else next.delete(id);
     setAssignDeckIds(next);
   }
 
@@ -874,28 +918,76 @@ function SubAssignDeckList({ decks, assignedUser, assignDeckIds, setAssignDeckId
       {decks.length === 0 ? (
         <p className="text-xs text-muted-foreground">Bạn chưa được phân quyền Flashcard nào cho nhóm.</p>
       ) : (
-        <div className="max-h-52 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
+        <div className="max-h-56 overflow-y-auto border-2 border-[#f0e0e7] rounded-xl divide-y divide-[#f0e0e7]">
           {decks.map(d => {
             const alreadyHas = assignedUser?.user_decks?.some(ud => ud.deck_id === d.id);
+            const max = d.max_users ?? 10;
+            const used = d.used_slots ?? 0;
+            const isFull = used >= max;
+            const remaining = Math.max(0, max - used);
+            const disabled = Boolean(alreadyHas || isFull);
             const checked = assignDeckIds.has(d.id);
+
             return (
-              <label key={d.id} className={[
-                "flex items-center gap-3 px-3 py-2.5 transition-colors",
-                alreadyHas ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-brand-light",
-                checked && !alreadyHas ? "bg-brand-light" : "",
-              ].join(" ")}>
-                <input type="checkbox" disabled={!!alreadyHas} checked={checked}
-                  onChange={e => toggleOne(d.id, e.target.checked)}
-                  className="w-4 h-4 accent-brand flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
-                    {alreadyHas ? "✓ " : ""}{d.title}
+              <div
+                key={d.id}
+                className={[
+                  "flex items-center justify-between px-3 py-2.5 transition-colors gap-2",
+                  alreadyHas ? "bg-gray-50/70 opacity-60" : isFull ? "bg-red-50/40 opacity-70" : "hover:bg-brand-light/30",
+                  checked && !alreadyHas ? "bg-brand-light/50" : "",
+                ].join(" ")}
+              >
+                <label className={`flex items-center gap-3 flex-1 min-w-0 select-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                  <input
+                    type="checkbox"
+                    disabled={disabled}
+                    checked={checked}
+                    onChange={e => toggleOne(d.id, e.target.checked)}
+                    className="w-4 h-4 accent-brand flex-shrink-0 disabled:cursor-not-allowed"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-semibold truncate ${checked ? "text-brand" : "text-[#1a1a2e]"}`}>
+                      {alreadyHas ? "✓ " : ""}{d.title}
+                    </div>
+                    {d.level && (
+                      <div className="text-xs text-muted-foreground">
+                        {d.level}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {d.level || ""}
-                  </div>
+                </label>
+
+                {/* Badges and action */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {alreadyHas ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+                        Đã có
+                      </span>
+                      {onRevokeDeck && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold"
+                          title="Gỡ bộ thẻ để giải phóng slot"
+                          onClick={() => onRevokeDeck(d.id)}
+                        >
+                          Gỡ
+                        </Button>
+                      )}
+                    </div>
+                  ) : isFull ? (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                      Hết slot ({used}/{max})
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Còn {remaining} / {max} slots
+                    </span>
+                  )}
                 </div>
-              </label>
+              </div>
             );
           })}
         </div>

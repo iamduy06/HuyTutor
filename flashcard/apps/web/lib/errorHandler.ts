@@ -10,7 +10,7 @@
 
 export function parseApiErrorMessage(
   data: any,
-  fallback = "Đã có lỗi xảy ra trong quá trình xử lý."
+  fallback = "Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ."
 ): string {
   if (!data) return fallback;
   if (typeof data === "string") {
@@ -39,10 +39,21 @@ export function parseApiErrorMessage(
 
 export function getClientErrorMessage(
   rawError: any,
-  fallbackMessage = "Đã có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại sau hoặc liên hệ hỗ trợ."
+  fallbackOrIsAdmin: string | boolean = "Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
+  isAdminRouteParam?: boolean
 ): string {
-  const isAdminRoute =
+  let fallbackMessage = "Đã có lỗi xảy ra trong quá trình xử lý, vui lòng thử lại sau hoặc liên hệ hỗ trợ.";
+  let isAdminRoute =
     typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+
+  if (typeof fallbackOrIsAdmin === "boolean") {
+    isAdminRoute = fallbackOrIsAdmin;
+  } else if (typeof fallbackOrIsAdmin === "string") {
+    fallbackMessage = fallbackOrIsAdmin;
+    if (typeof isAdminRouteParam === "boolean") {
+      isAdminRoute = isAdminRouteParam;
+    }
+  }
 
   let rawMsg = "";
   if (typeof rawError === "string") {
@@ -75,7 +86,7 @@ export function getClientErrorMessage(
   // 2. Tuyến đường Client & Subadmin:
   // Lọc bỏ toàn bộ lỗi kỹ thuật (Database, SQL, Supabase, PGRST, Server 500, UUID, Token, Internal...)
   const isTechnicalError =
-    /supabase|pgrst|postgres|database|syntax|column|relation|table|uuid|stack|jwt|token|bearer|crypto|sha3|sha256|500|502|503|504|econnrefused|failed to fetch|networkerror|internal server/i.test(
+    /supabase|pgrst|postgres|database|syntax|column|relation|table|uuid|stack|jwt|token|bearer|crypto|sha3|sha256|500|502|503|504|econnrefused|failed to fetch|networkerror|internal server|duplicate|unique|constraint/i.test(
       rawMsg
     );
 
@@ -91,6 +102,7 @@ export function getClientErrorMessage(
     rawMsg.startsWith("Không thể") ||
     rawMsg.startsWith("Người dùng") ||
     rawMsg.startsWith("Quy tắc") ||
+    rawMsg.startsWith("Bộ thẻ") ||
     rawMsg.startsWith("⚠️") ||
     rawMsg.includes("không khớp") ||
     rawMsg.includes("không chính xác") ||
@@ -100,7 +112,9 @@ export function getClientErrorMessage(
     rawMsg.includes("tồn tại") ||
     rawMsg.includes("hết hạn") ||
     rawMsg.includes("giới hạn") ||
-    rawMsg.includes("phạm vi");
+    rawMsg.includes("phạm vi") ||
+    rawMsg.includes("Bộ thẻ") ||
+    rawMsg.toLowerCase().includes("slot");
 
   if (isSafeUserPrompt) {
     return rawMsg;
