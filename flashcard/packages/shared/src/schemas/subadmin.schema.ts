@@ -14,6 +14,7 @@ export const subadminUpdateUserSchema = z.object({
     "reset_password",
     "assign_deck",
     "revoke_deck",
+    "unassign_deck",
     "change_role",
     "remove_device",
     "reset_devices",

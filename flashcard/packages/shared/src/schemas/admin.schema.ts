@@ -48,28 +48,65 @@ export const adminUpdateSubadminGroupSchema = z.object({
   max_device_per_user: z.coerce.number().int().positive().optional(),
 });
 
-export const adminSubadminGroupActionSchema = z.object({
-  action: z.enum([
-    "toggle_subadmin",
-    "assign_group_deck",
-    "revoke_group_deck",
-    "change_group_deck_expiry",
-    "assign_user_deck",
-    "revoke_user_deck",
-    "move_user",
-    "remove_user",
-    "move_member",
-    "add_member",
-  ]),
-  user_id: z.string().optional(),
-  is_subadmin: z.boolean().optional(),
-  deck_id: z.string().optional(),
-  deck_ids: z.array(z.string()).optional(),
+export const adminSubadminGroupDeckItemSchema = z.object({
+  deck_id: z.string().uuid("deck_id phải là UUID hợp lệ"),
+  max_users: z.coerce.number().int().positive().optional(),
   expired_at: z.string().nullable().optional(),
-  assign_all_users: z.boolean().optional(),
-  target_group_id: z.string().optional(),
-  clear_decks: z.boolean().optional(),
 });
+
+export const adminSubadminGroupActionSchema = z
+  .object({
+    action: z.enum([
+      "toggle_subadmin",
+      "assign_group_deck",
+      "update_group_deck",
+      "revoke_group_deck",
+      "change_group_deck_expiry",
+      "assign_user_deck",
+      "revoke_user_deck",
+      "move_user",
+      "remove_user",
+      "move_member",
+      "add_member",
+    ]),
+    user_id: z.string().optional(),
+    is_subadmin: z.boolean().optional(),
+    deck_id: z.string().uuid("deck_id phải là định dạng UUID hợp lệ").optional(),
+    deck_ids: z.array(z.string()).optional(),
+    max_users: z.coerce.number().int().positive().optional(),
+    decks: z.array(adminSubadminGroupDeckItemSchema).optional(),
+    expired_at: z.string().nullable().optional(),
+    assign_all_users: z.boolean().optional(),
+    target_group_id: z.string().optional(),
+    clear_decks: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.action === "update_group_deck") {
+      if (!data.deck_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deck_id"],
+          message: "deck_id là bắt buộc khi cập nhật Flashcard của nhóm",
+        });
+      }
+      if (data.max_users === undefined || data.max_users === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max_users"],
+          message: "max_users là bắt buộc khi cập nhật Flashcard của nhóm",
+        });
+      }
+    }
+    if (data.action === "revoke_group_deck") {
+      if (!data.deck_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deck_id"],
+          message: "deck_id là bắt buộc khi thu hồi Flashcard của nhóm",
+        });
+      }
+    }
+  });
 
 export const adminCreateGroupSchema = z.object({
   name: z.string().min(1, "Tên nhóm là bắt buộc"),
@@ -170,6 +207,7 @@ export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>;
 export type AdminCreateSubadminGroupInput = z.infer<typeof adminCreateSubadminGroupSchema>;
 export type AdminUpdateSubadminGroupInput = z.infer<typeof adminUpdateSubadminGroupSchema>;
+export type AdminSubadminGroupDeckItem = z.infer<typeof adminSubadminGroupDeckItemSchema>;
 export type AdminSubadminGroupActionInput = z.infer<typeof adminSubadminGroupActionSchema>;
 export type AdminCreateGroupInput = z.infer<typeof adminCreateGroupSchema>;
 export type AdminUpdateGroupInput = z.infer<typeof adminUpdateGroupSchema>;
