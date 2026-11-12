@@ -19,6 +19,7 @@ import {
   AdminUserRecord,
   CascadeDeleteProductReport,
   CategoryItem,
+  FlashcardDeckOption,
   FooterPolicyLink,
   FooterSocialLink,
   FORMAT_TO_GOOGLE_FORM_MAP,
@@ -358,7 +359,11 @@ export const AdminPage: React.FC = () => {
     is_combo_eligible: true,
     is_active: true,
     formats: DEFAULT_FORMATS,
+    linked_deck_ids: [],
   });
+
+  const [flashcardDecks, setFlashcardDecks] = useState<FlashcardDeckOption[]>([]);
+  const [deckSearchQuery, setDeckSearchQuery] = useState('');
 
   const [uploadingThumb, setUploadingThumb] = useState(false);
   const [newPreviewImageUrl, setNewPreviewImageUrl] = useState('');
@@ -366,15 +371,19 @@ export const AdminPage: React.FC = () => {
   const loadOverview = async () => {
     setLoading(true);
     try {
-      const [data, usersRes] = await Promise.all([
+      const [data, usersRes, decksRes] = await Promise.all([
         apiClient.getAdminOverview(),
         apiClient.getAdminUsers().catch(() => ({ ok: true, users: [] })),
+        apiClient.getFlashcardDecks().catch(() => ({ ok: true, decks: [] })),
       ]);
       setStats(data.stats);
       setProducts(data.products);
       setCategories(data.categories);
       setOrders(data.orders);
       setAdminUsers(usersRes.users || []);
+      if (Array.isArray(decksRes?.decks)) {
+        setFlashcardDecks(decksRes.decks);
+      }
       if (Array.isArray(data.menus)) {
         setAdminMenus(data.menus);
       }
@@ -408,6 +417,7 @@ export const AdminPage: React.FC = () => {
       features: prod.features?.length ? [...prod.features] : [],
       preview_images: prod.preview_images ? [...prod.preview_images] : [],
       detail_blocks: initialBlocks,
+      linked_deck_ids: Array.isArray(prod.linked_deck_ids) ? [...prod.linked_deck_ids] : [],
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -438,6 +448,7 @@ export const AdminPage: React.FC = () => {
       is_combo_eligible: true,
       is_active: true,
       formats: DEFAULT_FORMATS.map((f) => ({ ...f })),
+      linked_deck_ids: [],
     });
   };
 
@@ -731,6 +742,35 @@ export const AdminPage: React.FC = () => {
     const start = (userPage - 1) * USERS_PER_PAGE;
     return filteredAdminUsers.slice(start, start + USERS_PER_PAGE);
   }, [filteredAdminUsers, userPage]);
+
+  // Bộ lọc tìm kiếm cho Flashcard Decks
+  const filteredDecks = useMemo(() => {
+    if (!deckSearchQuery.trim()) return flashcardDecks;
+    const q = deckSearchQuery.trim().toLowerCase();
+    return flashcardDecks.filter(
+      (d) =>
+        (d.title || '').toLowerCase().includes(q) ||
+        (d.description || '').toLowerCase().includes(q) ||
+        (d.level || '').toLowerCase().includes(q)
+    );
+  }, [flashcardDecks, deckSearchQuery]);
+
+  const handleToggleDeck = (deckId: string) => {
+    setEditingProduct((prev) => {
+      const current = prev.linked_deck_ids || [];
+      const next = current.includes(deckId)
+        ? current.filter((id) => id !== deckId)
+        : [...current, deckId];
+      return { ...prev, linked_deck_ids: next };
+    });
+  };
+
+  const handleRemoveDeck = (deckId: string) => {
+    setEditingProduct((prev) => ({
+      ...prev,
+      linked_deck_ids: (prev.linked_deck_ids || []).filter((id) => id !== deckId),
+    }));
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen pb-14">
@@ -1565,6 +1605,123 @@ export const AdminPage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* KHỐI LIÊN KẾT BỘ THẺ FLASHCARD (DECKS) */}
+              <div className="border border-gray-200 rounded-sm p-4 space-y-3 bg-white">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                  <div className="text-xs font-extrabold text-gray-900 uppercase">
+                    [LIÊN KẾT BỘ THẺ FLASHCARD (DECKS)] - [Chọn một hoặc nhiều bộ thẻ Flashcard cấp quyền cho tài khoản học sinh khi mua]
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-sm">
+                      Đã chọn: {(editingProduct.linked_deck_ids || []).length} bộ thẻ
+                    </span>
+                    {(editingProduct.linked_deck_ids || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct((prev) => ({ ...prev, linked_deck_ids: [] }))}
+                        className="text-[11px] text-gray-500 hover:text-red-600 underline font-medium cursor-pointer"
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Danh sách thẻ đã chọn (Pill tags có nút xoá) */}
+                {(editingProduct.linked_deck_ids || []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-gray-200 rounded-sm">
+                    {(editingProduct.linked_deck_ids || []).map((id) => {
+                      const deck = flashcardDecks.find((d) => d.id === id);
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-300 text-blue-900 text-xs rounded-sm shadow-xs font-medium"
+                        >
+                          <span className="truncate max-w-[200px]" title={deck?.title || id}>
+                            {deck?.title || id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDeck(id)}
+                            className="text-gray-400 hover:text-red-600 font-bold ml-0.5 leading-none cursor-pointer"
+                            title="Gỡ bộ thẻ này"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Ô tìm kiếm bộ thẻ */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={deckSearchQuery}
+                    onChange={(e) => setDeckSearchQuery(e.target.value)}
+                    placeholder="Tìm kiếm bộ thẻ Flashcard theo tên, mô tả hoặc trình độ..."
+                    className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 font-medium"
+                  />
+                  {deckSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setDeckSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Danh sách các bộ thẻ có thể chọn */}
+                <div className="border border-gray-200 rounded-sm max-h-56 overflow-y-auto divide-y divide-gray-100 bg-white">
+                  {filteredDecks.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-gray-400 italic">
+                      {flashcardDecks.length === 0
+                        ? 'Chưa có bộ thẻ Flashcard nào trong hệ thống.'
+                        : 'Không tìm thấy bộ thẻ nào khớp với từ khóa tìm kiếm.'}
+                    </div>
+                  ) : (
+                    filteredDecks.map((deck) => {
+                      const isSelected = (editingProduct.linked_deck_ids || []).includes(deck.id);
+                      return (
+                        <label
+                          key={deck.id}
+                          className={`flex items-start gap-2.5 p-2.5 cursor-pointer text-xs transition select-none ${
+                            isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleDeck(deck.id)}
+                            className="mt-0.5 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-900 truncate">
+                                {deck.title}
+                              </span>
+                              {deck.level && (
+                                <span className="px-1.5 py-0.2 bg-gray-100 text-gray-600 text-[10px] font-mono rounded-sm border border-gray-200 uppercase">
+                                  {deck.level}
+                                </span>
+                              )}
+                            </div>
+                            {deck.description && (
+                              <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                                {deck.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 

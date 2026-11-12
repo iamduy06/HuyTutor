@@ -2,6 +2,7 @@ import { AdminUserRecord,
   CategoryItem,
   ComboRule,
   CustomerGroupType,
+  FlashcardDeckOption,
   MenuItem,
   OrderRecord,
   PaymentInstruction,
@@ -401,6 +402,10 @@ export const apiClient = {
     orders: OrderRecord[];
   }> {
     return requestJson('/api/admin/overview');
+  },
+
+  async getFlashcardDecks(): Promise<{ ok: boolean; decks: FlashcardDeckOption[] }> {
+    return requestJson('/api/admin/flashcard-decks');
   },
 
   async upsertProduct(productPayload: Partial<Product>): Promise<{

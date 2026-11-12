@@ -962,6 +962,15 @@ export interface Product {
   image_frame_config?: ImageFrameConfig;
   custom_campaign_frame_url?: string;
   disable_campaign_frame?: boolean;
+  linked_deck_ids?: string[];
+}
+
+export interface FlashcardDeckOption {
+  id: string;
+  title: string;
+  description?: string;
+  level?: string;
+  created_at?: string;
 }
 
 export interface CartItem {

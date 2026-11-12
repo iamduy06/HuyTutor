@@ -86,6 +86,7 @@ export interface SeedProduct {
   is_active: boolean;
   formats: SeedProductFormat[];
   detail_blocks?: any[];
+  linked_deck_ids?: string[];
 }
 
 export interface SeedOrderItem {
@@ -942,6 +943,7 @@ export const dbService = {
               Array.isArray(row.detail_blocks) && row.detail_blocks.length > 0
                 ? row.detail_blocks
                 : blocksBySlug[row.slug] || [],
+            linked_deck_ids: Array.isArray(row.linked_deck_ids) ? row.linked_deck_ids : [],
           }));
 
           if (options?.categorySlug) {
@@ -1089,6 +1091,9 @@ export const dbService = {
       detail_blocks: Array.isArray(payload.detail_blocks)
         ? payload.detail_blocks
         : existing?.detail_blocks || [],
+      linked_deck_ids: Array.isArray(payload.linked_deck_ids)
+        ? payload.linked_deck_ids
+        : existing?.linked_deck_ids || [],
     };
 
     if (isSupabaseConfigured && supabaseAdmin) {
@@ -1115,6 +1120,7 @@ export const dbService = {
         is_featured: productRecord.is_featured,
         is_combo_eligible: productRecord.is_combo_eligible,
         is_active: productRecord.is_active,
+        linked_deck_ids: productRecord.linked_deck_ids || [],
       };
 
       // Thử lưu trực tiếp cột detail_blocks vào bảng products trước
@@ -1155,6 +1161,24 @@ export const dbService = {
 
       if (!prodErr && upsertedProd) {
         productRecord.id = upsertedProd.id;
+
+        // Đồng bộ bảng quan hệ phụ trợ product_decks
+        try {
+          await supabaseAdmin.from('product_decks').delete().eq('product_id', upsertedProd.id);
+          if (Array.isArray(productRecord.linked_deck_ids) && productRecord.linked_deck_ids.length > 0) {
+            const deckRows = productRecord.linked_deck_ids.map((deckId) => ({
+              product_id: upsertedProd.id,
+              deck_id: deckId,
+            }));
+            const { error: deckErr } = await supabaseAdmin.from('product_decks').insert(deckRows);
+            if (deckErr) {
+              console.error('[dbService] Error inserting product_decks in Supabase:', deckErr);
+            }
+          }
+        } catch (deckSyncErr) {
+          console.error('[dbService] Lỗi đồng bộ bảng product_decks:', deckSyncErr);
+        }
+
         // Xóa formats cũ và insert formats mới (tránh lỗi 42P10 thiếu constraint unique trên product_formats)
         await supabaseAdmin.from('product_formats').delete().eq('product_id', upsertedProd.id);
         if (Array.isArray(productRecord.formats) && productRecord.formats.length > 0) {

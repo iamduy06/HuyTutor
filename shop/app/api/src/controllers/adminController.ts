@@ -178,6 +178,10 @@ export const adminController = {
         return;
       }
 
+      if (payload.linked_deck_ids !== undefined && !Array.isArray(payload.linked_deck_ids)) {
+        payload.linked_deck_ids = [];
+      }
+
       const savedProduct = await dbService.upsertProduct(payload);
       res.json({
         ok: true,
@@ -1131,6 +1135,37 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi đọc ảnh minh họa khối.',
+      });
+    }
+  },
+
+  /**
+   * GET /api/admin/flashcard-decks
+   * Lấy danh sách các bộ thẻ Flashcard (decks) để liên kết với sản phẩm Shop
+   */
+  async getFlashcardDecks(_req: Request, res: Response): Promise<void> {
+    try {
+      if (!isSupabaseConfigured || !supabaseAdmin) {
+        res.json({ ok: true, decks: [] });
+        return;
+      }
+      const { data, error } = await supabaseAdmin
+        .from('decks')
+        .select('id, title, description, level, created_at')
+        .order('title', { ascending: true });
+
+      if (error) {
+        res.status(500).json({
+          ok: false,
+          error: error.message || 'Lỗi truy vấn danh sách Flashcard Decks từ Supabase.',
+        });
+        return;
+      }
+      res.json({ ok: true, decks: data || [] });
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi lấy danh sách Flashcard Decks.',
       });
     }
   },
