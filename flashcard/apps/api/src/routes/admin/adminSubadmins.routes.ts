@@ -22,7 +22,7 @@ router.get('/admin/subadmins', async (_req: Request, res: Response) => {
     .select(`
       id, name, max_users, max_device_per_user, is_system, system_type, created_at, branding,
       group_decks(
-        deck_id, expired_at, 
+        deck_id, max_users, expired_at, 
         deck:decks(title)
       ),
       group_users(
@@ -106,7 +106,7 @@ router.post('/admin/subadmins', validate({ body: adminCreateSubadminGroupSchema 
 
 // GET /admin/subadmins/:id/managed
 router.get('/admin/subadmins/:id/managed', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const db = getAdminClient();
 
   const { data: subGroups, error: sgErr } = await db
@@ -135,7 +135,7 @@ router.get('/admin/subadmins/:id/managed', async (req: Request, res: Response) =
 
 // PATCH /admin/subadmins/groups/:id - Update group basic limits
 const adminUpdateSubadminGroupHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, max_users, max_device_per_user } = req.body;
 
   if (name !== undefined && (!name || name.trim() === '')) {
@@ -170,7 +170,7 @@ router.put('/admin/subadmins/groups/:id', validate({ body: adminUpdateSubadminGr
 
 // DELETE /admin/subadmins/groups/:id - Delete group
 router.delete('/admin/subadmins/groups/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const supabase = getAdminClient();
 
   const { count } = await supabase
@@ -190,9 +190,38 @@ router.delete('/admin/subadmins/groups/:id', async (req: Request, res: Response)
   return res.status(200).json({ success: true });
 });
 
+/**
+ * Recalculate groups.max_users as SUM(group_decks.max_users)
+ * Keeps group quota automatically synchronized with deck quotas.
+ */
+async function syncGroupMaxUsers(supabase: any, groupId: string): Promise<number> {
+  const { data: decks, error } = await supabase
+    .from('group_decks')
+    .select('max_users')
+    .eq('group_id', groupId);
+
+  if (error) {
+    console.error(`[syncGroupMaxUsers] Failed to fetch group_decks for group ${groupId}:`, error);
+    return 0;
+  }
+
+  const total = (decks ?? []).reduce((sum: number, d: any) => sum + (Number(d.max_users) || 0), 0);
+
+  const { error: updateError } = await supabase
+    .from('groups')
+    .update({ max_users: total })
+    .eq('id', groupId);
+
+  if (updateError) {
+    console.error(`[syncGroupMaxUsers] Failed to update groups.max_users for group ${groupId}:`, updateError);
+  }
+
+  return total;
+}
+
 // POST /admin/subadmins/groups/:id/actions - Advanced group operations
 router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadminGroupActionSchema }), async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const body = req.body;
   const supabase = getAdminClient();
   const { action } = body;
@@ -226,17 +255,33 @@ router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadmi
 
   // Assign multiple Decks to Group
   if (action === 'assign_group_deck') {
-    const { deck_ids, expired_at, assign_all_users } = body;
-    const finalExpiry = expired_at?.trim() ? expired_at : null;
+    const { decks, deck_ids, max_users: bodyMaxUsers, expired_at, assign_all_users } = body;
+    const defaultMaxUsers = bodyMaxUsers ? Number(bodyMaxUsers) : 10;
+    const globalExpiry = expired_at?.trim() ? expired_at.trim() : null;
 
-    if (!Array.isArray(deck_ids) || deck_ids.length === 0) {
+    let itemsToAssign: Array<{ deck_id: string; max_users: number; expired_at: string | null }> = [];
+
+    if (Array.isArray(decks) && decks.length > 0) {
+      itemsToAssign = decks.map((d: any) => ({
+        deck_id: d.deck_id,
+        max_users: d.max_users ? Number(d.max_users) : defaultMaxUsers,
+        expired_at: d.expired_at !== undefined ? (d.expired_at?.trim() ? d.expired_at.trim() : null) : globalExpiry,
+      }));
+    } else if (Array.isArray(deck_ids) && deck_ids.length > 0) {
+      itemsToAssign = deck_ids.map((deck_id: string) => ({
+        deck_id,
+        max_users: defaultMaxUsers,
+        expired_at: globalExpiry,
+      }));
+    } else {
       return res.status(400).json({ error: 'Chưa chọn Flashcard' });
     }
 
-    const groupDeckRows = deck_ids.map(deck_id => ({
+    const groupDeckRows = itemsToAssign.map(item => ({
       group_id: id,
-      deck_id,
-      expired_at: finalExpiry,
+      deck_id: item.deck_id,
+      max_users: item.max_users,
+      expired_at: item.expired_at,
     }));
 
     const { error: gdError } = await supabase
@@ -244,6 +289,9 @@ router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadmi
       .upsert(groupDeckRows, { onConflict: 'group_id,deck_id' });
 
     if (gdError) return res.status(500).json({ error: gdError.message });
+
+    // Synchronize total group quota: groups.max_users = SUM(group_decks.max_users)
+    const totalMaxUsers = await syncGroupMaxUsers(supabase, id);
 
     if (assign_all_users) {
       const { data: members } = await supabase
@@ -253,12 +301,12 @@ router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadmi
 
       if (members && members.length > 0) {
         const userDeckRows: any[] = [];
-        members.forEach(m => {
-          deck_ids.forEach(dId => {
+        members.forEach((m: any) => {
+          itemsToAssign.forEach(item => {
             userDeckRows.push({
               user_id: m.user_id,
-              deck_id: dId,
-              expired_at: finalExpiry,
+              deck_id: item.deck_id,
+              expired_at: item.expired_at,
             });
           });
         });
@@ -266,20 +314,68 @@ router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadmi
       }
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, totalMaxUsers });
+  }
+
+  // Update single Deck Quota & Expiry in Group
+  if (action === 'update_group_deck') {
+    const { deck_id, max_users, expired_at } = body;
+    if (!deck_id) {
+      return res.status(400).json({ error: 'deck_id là bắt buộc' });
+    }
+    const finalMaxUsers = Number(max_users);
+    if (!finalMaxUsers || finalMaxUsers < 1) {
+      return res.status(400).json({ error: 'max_users phải là số nguyên dương' });
+    }
+    const finalExpiry = expired_at?.trim() ? expired_at.trim() : null;
+
+    const { error: updateError } = await supabase
+      .from('group_decks')
+      .update({
+        max_users: finalMaxUsers,
+        expired_at: finalExpiry,
+      })
+      .eq('group_id', id)
+      .eq('deck_id', deck_id);
+
+    if (updateError) return res.status(500).json({ error: updateError.message });
+
+    // Synchronize total group quota: groups.max_users = SUM(group_decks.max_users)
+    const totalMaxUsers = await syncGroupMaxUsers(supabase, id);
+
+    return res.status(200).json({ success: true, totalMaxUsers });
   }
 
   // Revoke Deck from Group
   if (action === 'revoke_group_deck') {
     const { deck_id } = body;
-    const { error } = await supabase
+    if (!deck_id) {
+      return res.status(400).json({ error: 'deck_id là bắt buộc' });
+    }
+
+    const { error: gdDeleteError } = await supabase
       .from('group_decks')
       .delete()
       .eq('group_id', id)
       .eq('deck_id', deck_id);
 
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ success: true });
+    if (gdDeleteError) return res.status(500).json({ error: gdDeleteError.message });
+
+    // Clean up student deck slot assignments in group_user_decks
+    const { error: gudError } = await supabase
+      .from('group_user_decks')
+      .delete()
+      .eq('group_id', id)
+      .eq('deck_id', deck_id);
+
+    if (gudError) {
+      console.warn(`[revoke_group_deck] Failed to clear group_user_decks for group ${id}, deck ${deck_id}:`, gudError.message);
+    }
+
+    // Synchronize total group quota: groups.max_users = SUM(group_decks.max_users)
+    const totalMaxUsers = await syncGroupMaxUsers(supabase, id);
+
+    return res.status(200).json({ success: true, totalMaxUsers });
   }
 
   // Move member to another group
@@ -327,7 +423,7 @@ router.post('/admin/subadmins/groups/:id/actions', validate({ body: adminSubadmi
 
 // GET /admin/subadmins/groups/:id/branding
 router.get('/admin/subadmins/groups/:id/branding', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const supabase = getAdminClient();
 
   const { data, error } = await supabase
@@ -342,7 +438,7 @@ router.get('/admin/subadmins/groups/:id/branding', async (req: Request, res: Res
 
 // POST & PATCH /admin/subadmins/groups/:id/branding
 const updateBrandingHandler = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { branding } = req.body;
 
   if (!branding || typeof branding !== 'object') {

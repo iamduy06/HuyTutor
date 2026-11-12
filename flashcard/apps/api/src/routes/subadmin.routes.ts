@@ -220,9 +220,52 @@ router.get('/subadmin/overview', async (req: Request, res: Response) => {
     ? await admin.from('group_users').select('*', { count: 'exact', head: true }).in('group_id', groupIds)
     : await admin.from('users').select('*', { count: 'exact', head: true });
 
-  const { data: myDecks } = me.role === 'SUBADMIN'
-    ? await admin.from('group_decks').select('deck:decks(id, title)').in('group_id', groupIds)
-    : await admin.from('decks').select('id, title');
+  let myDecks: any[] = [];
+  if (me.role === 'SUBADMIN') {
+    const { data: groupDecks } = await admin
+      .from('group_decks')
+      .select('group_id, deck_id, max_users, expired_at, deck:decks(id, title, description, level)')
+      .in('group_id', groupIds);
+
+    const { data: assignedRows } = await admin
+      .from('group_user_decks')
+      .select('group_id, deck_id')
+      .in('group_id', groupIds);
+
+    const usedSlotsMap: Record<string, number> = {};
+    (assignedRows ?? []).forEach((row: any) => {
+      const key = `${row.group_id}_${row.deck_id}`;
+      usedSlotsMap[key] = (usedSlotsMap[key] ?? 0) + 1;
+    });
+
+    myDecks = (groupDecks ?? []).map((gd: any) => {
+      const usedKey = `${gd.group_id}_${gd.deck_id}`;
+      const used = usedSlotsMap[usedKey] ?? 0;
+      const max = gd.max_users != null ? Number(gd.max_users) : 10;
+      return {
+        id: gd.deck_id,
+        title: gd.deck?.title ?? 'Flashcard',
+        description: gd.deck?.description,
+        level: gd.deck?.level,
+        group_id: gd.group_id,
+        group_expired_at: gd.expired_at,
+        max_users: max,
+        used_slots: used,
+        deck: gd.deck,
+      };
+    });
+  } else {
+    const { data: allDecks } = await admin.from('decks').select('id, title, description, level');
+    myDecks = (allDecks ?? []).map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      description: d.description,
+      level: d.level,
+      max_users: 999999,
+      used_slots: 0,
+      deck: d,
+    }));
+  }
 
   const totalMaxUsers = me.role === 'SUBADMIN'
     ? (managedGroups ?? []).reduce((acc: number, g: any) => acc + (g.groups?.max_users ?? 0), 0)
@@ -488,31 +531,57 @@ router.post('/subadmin/users', validate({ body: subadminCreateUserSchema }), asy
   if (assign_all_decks && targetGroupId) {
     const { data: groupDecks } = await admin
       .from('group_decks')
-      .select('deck_id, expired_at')
+      .select('deck_id, max_users, expired_at')
       .eq('group_id', targetGroupId);
 
     if (groupDecks && groupDecks.length > 0) {
-      const userDeckRows = groupDecks.map((gd: any) => {
-        let finalExpiry = gd.expired_at;
-        if (expired_at) {
-          const chosenTime = new Date(
-            expired_at.includes('T') ? expired_at : expired_at + 'T23:59:59Z'
-          ).getTime();
-          if (gd.expired_at) {
-            const groupTime = new Date(gd.expired_at).getTime();
-            finalExpiry = chosenTime < groupTime ? new Date(chosenTime).toISOString() : gd.expired_at;
-          } else {
-            finalExpiry = new Date(chosenTime).toISOString();
-          }
-        }
-        return {
-          user_id: userId,
-          deck_id: gd.deck_id,
-          expired_at: finalExpiry,
-        };
-      });
+      const userDeckRows: any[] = [];
+      const groupUserDeckRows: any[] = [];
 
-      await admin.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
+      for (const gd of groupDecks) {
+        const max = gd.max_users != null ? Number(gd.max_users) : 10;
+        const { count: used } = await admin
+          .from('group_user_decks')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', targetGroupId)
+          .eq('deck_id', gd.deck_id);
+
+        if ((used ?? 0) < max) {
+          let finalExpiry = gd.expired_at;
+          if (expired_at) {
+            const chosenTime = new Date(
+              expired_at.includes('T') ? expired_at : expired_at + 'T23:59:59Z'
+            ).getTime();
+            if (gd.expired_at) {
+              const groupTime = new Date(gd.expired_at).getTime();
+              finalExpiry = chosenTime < groupTime ? new Date(chosenTime).toISOString() : gd.expired_at;
+            } else {
+              finalExpiry = new Date(chosenTime).toISOString();
+            }
+          }
+
+          userDeckRows.push({
+            user_id: userId,
+            deck_id: gd.deck_id,
+            expired_at: finalExpiry,
+          });
+
+          groupUserDeckRows.push({
+            group_id: targetGroupId,
+            user_id: userId,
+            deck_id: gd.deck_id,
+            assigned_by: me.id,
+            assigned_at: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (groupUserDeckRows.length > 0) {
+        await admin.from('group_user_decks').upsert(groupUserDeckRows, { onConflict: 'group_id,user_id,deck_id' });
+      }
+      if (userDeckRows.length > 0) {
+        await admin.from('user_decks').upsert(userDeckRows, { onConflict: 'user_id,deck_id' });
+      }
     }
   }
 
@@ -550,7 +619,7 @@ const subadminUpdateUserHandler = async (req: Request, res: Response) => {
       .select('group_id')
       .eq('user_id', id)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!userGroup) {
       return res.status(400).json({ error: 'User không thuộc nhóm nào' });
@@ -558,13 +627,36 @@ const subadminUpdateUserHandler = async (req: Request, res: Response) => {
 
     const { data: groupDeck } = await admin
       .from('group_decks')
-      .select('expired_at')
+      .select('expired_at, max_users')
       .eq('group_id', userGroup.group_id)
       .eq('deck_id', deck_id)
       .maybeSingle();
 
     if (!groupDeck) {
       return res.status(403).json({ error: 'Flashcard này không thuộc kho tài nguyên của nhóm' });
+    }
+
+    // Check if student already holds this slot in group_user_decks
+    const { data: existingGUD } = await admin
+      .from('group_user_decks')
+      .select('id')
+      .eq('group_id', userGroup.group_id)
+      .eq('user_id', id)
+      .eq('deck_id', deck_id)
+      .maybeSingle();
+
+    const maxUsers = groupDeck.max_users != null ? Number(groupDeck.max_users) : 10;
+
+    if (!existingGUD) {
+      const { count: usedSlots } = await admin
+        .from('group_user_decks')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', userGroup.group_id)
+        .eq('deck_id', deck_id);
+
+      if ((usedSlots ?? 0) >= maxUsers) {
+        return res.status(400).json({ error: 'Bộ thẻ này đã hết slot' });
+      }
     }
 
     let finalExpiredAt = expired_at;
@@ -579,6 +671,41 @@ const subadminUpdateUserHandler = async (req: Request, res: Response) => {
             error: `Hạn dùng không được vượt quá hạn của nhóm (${gExp.toLocaleString()})`,
           });
         }
+      }
+    }
+
+    // Insert slot assignment into group_user_decks
+    const { error: gudErr } = await admin.from('group_user_decks').upsert(
+      {
+        group_id: userGroup.group_id,
+        user_id: id,
+        deck_id,
+        assigned_by: me.id,
+        assigned_at: new Date().toISOString(),
+      },
+      { onConflict: 'group_id,user_id,deck_id' }
+    );
+
+    if (gudErr) {
+      return res.status(500).json({ error: gudErr.message });
+    }
+
+    // Race condition guard: verify slot limit hasn't been exceeded
+    if (!existingGUD) {
+      const { count: finalSlots } = await admin
+        .from('group_user_decks')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', userGroup.group_id)
+        .eq('deck_id', deck_id);
+
+      if (finalSlots !== null && finalSlots > maxUsers) {
+        await admin
+          .from('group_user_decks')
+          .delete()
+          .eq('group_id', userGroup.group_id)
+          .eq('user_id', id)
+          .eq('deck_id', deck_id);
+        return res.status(400).json({ error: 'Bộ thẻ này đã hết slot' });
       }
     }
 
@@ -598,12 +725,36 @@ const subadminUpdateUserHandler = async (req: Request, res: Response) => {
     return res.status(200).json({ success: true });
   }
 
-  if (body.action === 'revoke_deck') {
+  if (body.action === 'revoke_deck' || body.action === 'unassign_deck') {
+    const { deck_id } = body;
+
+    const { data: userGroup } = await admin
+      .from('group_users')
+      .select('group_id')
+      .eq('user_id', id)
+      .limit(1)
+      .maybeSingle();
+
+    if (userGroup) {
+      await admin
+        .from('group_user_decks')
+        .delete()
+        .eq('group_id', userGroup.group_id)
+        .eq('user_id', id)
+        .eq('deck_id', deck_id);
+    } else {
+      await admin
+        .from('group_user_decks')
+        .delete()
+        .eq('user_id', id)
+        .eq('deck_id', deck_id);
+    }
+
     const { error } = await admin
       .from('user_decks')
       .delete()
       .eq('user_id', id)
-      .eq('deck_id', body.deck_id);
+      .eq('deck_id', deck_id);
 
     if (error) return res.status(400).json({ error: error.message });
     return res.status(200).json({ success: true });
@@ -725,7 +876,8 @@ router.delete('/subadmin/users/:id', validate({ params: idParamSchema }), async 
 
     const admin = getAdminClient();
 
-    // 1. Cascade all learning records and deck progress in user_decks
+    // 1. Cascade all learning records and deck progress in user_decks and slot assignments in group_user_decks
+    await admin.from('group_user_decks').delete().eq('user_id', id);
     const { error: udErr } = await admin.from('user_decks').delete().eq('user_id', id);
     if (udErr) {
       return res.status(500).json({
@@ -807,6 +959,8 @@ router.get('/subadmin/decks', async (req: Request, res: Response) => {
       ...d,
       word_count: d.flashcards?.[0]?.count ?? 0,
       flashcards: undefined,
+      max_users: 999999,
+      used_slots: 0,
     }));
     return res.status(200).json({ decks: formatted });
   }
@@ -822,7 +976,7 @@ router.get('/subadmin/decks', async (req: Request, res: Response) => {
 
   const { data: groupDecks } = await admin
     .from('group_decks')
-    .select('deck_id, expired_at, deck:decks(id, title, description, level, access_level)')
+    .select('group_id, deck_id, max_users, expired_at, deck:decks(id, title, description, level, access_level)')
     .in('group_id', groupIds);
 
   const deckIds = Array.from(
@@ -830,6 +984,18 @@ router.get('/subadmin/decks', async (req: Request, res: Response) => {
   );
 
   if (deckIds.length === 0) return res.status(200).json({ decks: [] });
+
+  // Count active assigned slots used_slots from group_user_decks
+  const { data: assignedRows } = await admin
+    .from('group_user_decks')
+    .select('group_id, deck_id')
+    .in('group_id', groupIds);
+
+  const usedSlotsMap: Record<string, number> = {};
+  (assignedRows ?? []).forEach((row: any) => {
+    const key = `${row.group_id}_${row.deck_id}`;
+    usedSlotsMap[key] = (usedSlotsMap[key] ?? 0) + 1;
+  });
 
   const { data: cards } = await admin
     .from('flashcards')
@@ -841,11 +1007,19 @@ router.get('/subadmin/decks', async (req: Request, res: Response) => {
     wordMap[c.deck_id] = (wordMap[c.deck_id] ?? 0) + 1;
   });
 
-  const decks = (groupDecks ?? []).map((gd: any) => ({
-    ...(gd.deck ?? {}),
-    word_count: wordMap[gd.deck?.id] ?? 0,
-    group_expired_at: gd.expired_at,
-  }));
+  const decks = (groupDecks ?? []).map((gd: any) => {
+    const usedKey = `${gd.group_id}_${gd.deck?.id}`;
+    const used = usedSlotsMap[usedKey] ?? 0;
+    const max = gd.max_users != null ? Number(gd.max_users) : 10;
+    return {
+      ...(gd.deck ?? {}),
+      group_id: gd.group_id,
+      word_count: wordMap[gd.deck?.id] ?? 0,
+      group_expired_at: gd.expired_at,
+      max_users: max,
+      used_slots: used,
+    };
+  });
 
   return res.status(200).json({ decks });
 });
