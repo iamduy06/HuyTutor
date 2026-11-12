@@ -142,8 +142,19 @@ CREATE TABLE IF NOT EXISTS public.group_decks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
   deck_id UUID NOT NULL REFERENCES public.decks(id) ON DELETE CASCADE,
+  max_users INTEGER NOT NULL DEFAULT 10,
   expired_at TIMESTAMPTZ DEFAULT NULL,
   UNIQUE (group_id, deck_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.group_user_decks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  deck_id UUID NOT NULL REFERENCES public.decks(id) ON DELETE CASCADE,
+  assigned_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_group_user_deck UNIQUE (group_id, user_id, deck_id)
 );
 
 -- Indexes cho Flashcard
@@ -154,6 +165,10 @@ CREATE INDEX IF NOT EXISTS idx_group_users_uid ON public.group_users(user_id);
 CREATE INDEX IF NOT EXISTS idx_group_users_gid ON public.group_users(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_decks_gid ON public.group_decks(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_decks_did ON public.group_decks(deck_id);
+CREATE INDEX IF NOT EXISTS idx_gud_group_deck ON public.group_user_decks(group_id, deck_id);
+CREATE INDEX IF NOT EXISTS idx_gud_user ON public.group_user_decks(user_id);
+
+ALTER TABLE public.group_user_decks ENABLE ROW LEVEL SECURITY;
 
 -- ── 5. CÁC BẢNG CỦA SHOP (HUYTUTOR COMMERCE) ─────────────────────
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -195,6 +210,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   is_combo_eligible BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true,
   detail_blocks JSONB DEFAULT '[]'::jsonb,
+  linked_deck_ids JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -207,6 +223,14 @@ CREATE TABLE IF NOT EXISTS public.product_formats (
   is_active BOOLEAN DEFAULT true,
   drive_url TEXT DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.product_decks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  deck_id UUID NOT NULL REFERENCES public.decks(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_product_deck UNIQUE (product_id, deck_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -303,9 +327,13 @@ CREATE TABLE IF NOT EXISTS public.site_configs (
 -- Indexes cho Shop
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON public.products(slug);
+CREATE INDEX IF NOT EXISTS idx_product_decks_pid ON public.product_decks(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_decks_did ON public.product_decks(deck_id);
 CREATE INDEX IF NOT EXISTS idx_orders_uid ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_email ON public.orders(customer_email);
 CREATE INDEX IF NOT EXISTS idx_user_library_uid ON public.user_library(user_id);
+
+ALTER TABLE public.product_decks ENABLE ROW LEVEL SECURITY;
 
 -- ── 6. CÁC HÀM BẢO MẬT & TÍNH TOÁN NGHIỆP VỤ ─────────────────────
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id UUID)
