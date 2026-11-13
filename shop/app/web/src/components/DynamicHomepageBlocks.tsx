@@ -13,6 +13,8 @@ import {
 /**
  * 1. Hero Header (Phần đầu trang - Tiêu đề, phụ đề, gạch đầu dòng và ảnh Thầy giáo đứng riêng, không khung viền)
  */
+export const DEFAULT_HERO_TEACHER_IMAGE = '/favicon.png';
+
 export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ config }) => {
   if (!config || config.is_active === false) return null;
 
@@ -31,19 +33,22 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
     if (!img?.trim()) return null;
     return (
       <section className="w-full overflow-hidden">
-        <img
-          src={img}
-          alt={config.title || ''}
-          className="w-full h-auto object-contain block"
-        />
+        <div className="max-w-[1100px] mx-auto px-4">
+          <img
+            src={img}
+            alt={config.title || ''}
+            className="w-full h-auto object-contain block"
+          />
+        </div>
       </section>
     );
   }
 
   const bullets = (config.bullets || []).filter((b) => b && b.trim().length > 0);
+  const teacherImage = config.image_url?.trim() || DEFAULT_HERO_TEACHER_IMAGE;
 
   // Nếu không có nội dung gì thì không render
-  if (!config.title && !config.subtitle && bullets.length === 0 && !config.image_url) {
+  if (!config.title && !config.subtitle && bullets.length === 0 && !teacherImage) {
     return null;
   }
 
@@ -52,7 +57,7 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
       <div className="max-w-[1100px] mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Cột Trái: Chữ (Tiêu đề, phụ đề, gạch đầu dòng) */}
-          <div className={config.image_url ? 'md:col-span-7 space-y-3' : 'col-span-12 space-y-3'}>
+          <div className={teacherImage ? 'md:col-span-7 space-y-3' : 'col-span-12 space-y-3'}>
             {config.subtitle && (
               <p className="text-[#e60049] font-bold text-sm sm:text-base leading-snug">
                 {config.subtitle}
@@ -76,10 +81,10 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
           </div>
 
           {/* Cột Phải: Hình ảnh Thầy giáo tự nhiên (Tuyệt đối không đóng khung, viền hay vòm CSS) */}
-          {config.image_url && (
+          {teacherImage && (
             <div className="md:col-span-5 flex justify-center items-center">
               <img
-                src={config.image_url}
+                src={teacherImage}
                 alt={config.title || 'Huy Tutor'}
                 className="max-h-[280px] sm:max-h-[340px] w-auto max-w-full object-contain mx-auto block"
               />
@@ -102,19 +107,21 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
   if (config.mode === 'custom_html') {
     if (!config.custom_html?.trim()) return null;
     return (
-      <IsolatedHtmlBlock
-        htmlContent={config.custom_html}
-        containerMode="full_width"
-      />
+      <div className="max-w-[1100px] mx-auto px-4">
+        <IsolatedHtmlBlock
+          htmlContent={config.custom_html}
+          containerMode="full_width"
+        />
+      </div>
     );
   }
 
   const imageUrl = config.image_url || config.custom_image_url;
 
-  // Khi có ảnh: Ảnh đứng một mình (full-width container), KHÔNG bao giờ bị nhốt trong khung nền vàng!
+  // Khi có ảnh: Ảnh đứng một mình (max-w-[1100px]), KHÔNG bao giờ bị nhốt trong khung nền vàng!
   if (imageUrl) {
     return (
-      <section className="space-y-3">
+      <section className="max-w-[1100px] mx-auto px-4 space-y-3">
         {config.header_label && (
           <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
         )}
@@ -139,7 +146,7 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
   }
 
   return (
-    <section className="space-y-3">
+    <section className="max-w-[1100px] mx-auto px-4 space-y-3">
       {config.header_label && (
         <h2 className="text-[#e60049] font-bold text-sm sm:text-base">{config.header_label}</h2>
       )}
@@ -199,6 +206,92 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
   );
 };
 
+// =========================================================================
+// Category3DFolderIcon: Biểu tượng Folder hồng 3D chuẩn nguyên bản Huy Tutor
+// =========================================================================
+export const Category3DFolderIcon: React.FC<{
+  iconCode?: string;
+  className?: string;
+}> = ({ iconCode = '', className = 'w-full aspect-square' }) => {
+  const code = (iconCode || '').toLowerCase().trim();
+
+  // Render SVG vector biểu tượng bên trong Folder (tuyệt đối không in text thô)
+  const renderInnerVector = () => {
+    // 1. Flashcard (+)
+    if (code === 'flashcard' || code === 'plus' || code === '+' || code === 'zap') {
+      return (
+        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      );
+    }
+
+    // 2. HSG (Bóng đèn)
+    if (code === 'gifted-students' || code === 'hsg' || code === 'lightbulb' || code === 'a+') {
+      return (
+        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+          <path d="M9 18h6" />
+          <path d="M10 22h4" />
+        </svg>
+      );
+    }
+
+    // 3. THCS (Học sinh / Mở sách)
+    if (code === 'secondary-school' || code === 'thcs' || code === 'bookopen' || code === 'school' || code === 'users' || code === '9' || code === 'middle-school') {
+      return (
+        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      );
+    }
+
+    // 4. Mẫu trang tính (T / Table / Sheet / Combo)
+    if (code === 'template' || code === 'utilities' || code === 'table' || code === 'sheet' || code === 'filespreadsheet' || code === 't' || code === '≡' || code === 'layers') {
+      return (
+        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="3" y1="15" x2="21" y2="15" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+        </svg>
+      );
+    }
+
+    // 5. Tài liệu miễn phí (↓ / Download / Gift)
+    if (code === 'gifts' || code === 'gift' || code === 'free' || code === 'download' || code === 'arrow-down' || code === '↓') {
+      return (
+        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+      );
+    }
+
+    // 6. THPT (Mũ cử nhân) - Mặc định an toàn cho mọi code khác (academic-cap, graduationcap, high-school...)
+    return (
+      <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c3 3 9 3 12 0v-5" />
+      </svg>
+    );
+  };
+
+  return (
+    <div className={`relative rounded-2xl bg-gradient-to-br from-[#e60049] via-[#cf003f] to-[#99002e] p-3 flex items-center justify-center shadow-xs overflow-hidden ${className}`}>
+      {/* Hiệu ứng nắp gập 3D Folder và vạt bóng */}
+      <div className="absolute top-0 left-3 w-10 h-2 bg-white/20 rounded-b-md" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-white/10 pointer-events-none" />
+      <div className="relative z-10 w-full h-full flex items-center justify-center">
+        {renderInnerVector()}
+      </div>
+    </div>
+  );
+};
+
 /**
  * 3. Danh mục sản phẩm (Các ô icon tự đứng một mình, linh hoạt số lượng)
  */
@@ -210,7 +303,7 @@ export const CategoriesGridBlock: React.FC<{
   if (activeItems.length === 0) return null;
 
   return (
-    <section>
+    <section className="max-w-[1100px] mx-auto px-4">
       {config.title && (
         <h2 className="text-[#e60049] font-bold text-sm sm:text-base mb-4">{config.title}</h2>
       )}
@@ -228,11 +321,12 @@ export const CategoriesGridBlock: React.FC<{
                 alt={cat.label || ''}
                 className="w-full aspect-square object-contain rounded-2xl shadow-xs group-hover:scale-105 transition-transform duration-200 block"
               />
-            ) : cat.icon_code ? (
-              <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-[#c8003f] to-[#9e0031] p-3 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform duration-200 text-white font-black text-xl sm:text-2xl">
-                {cat.icon_code}
-              </div>
-            ) : null}
+            ) : (
+              <Category3DFolderIcon
+                iconCode={cat.icon_code}
+                className="w-full aspect-square group-hover:scale-105 transition-transform duration-200"
+              />
+            )}
             {cat.label && (
               <span className="block text-xs font-bold text-gray-900 mt-2 text-center group-hover:text-[#e60049] transition truncate max-w-full">
                 {cat.label}
@@ -257,7 +351,7 @@ export const SectionGroupsBlock: React.FC<{
   if (activeSections.length === 0) return null;
 
   return (
-    <div className="space-y-12">
+    <div className="max-w-[1100px] mx-auto px-4 space-y-12">
       {activeSections.map((sec) => {
         const activeItems = (sec.items || []).filter(
           (it) => it.is_active !== false && (Boolean(it.image_url?.trim()) || Boolean(it.display_title?.trim()))
@@ -347,7 +441,7 @@ export const NoticeTextBlock: React.FC<{
   if (!config.text && !config.cta_button_text) return null;
 
   return (
-    <div className="space-y-3 text-center py-4">
+    <div className="max-w-[1100px] mx-auto px-4 space-y-3 text-center py-4">
       {config.text && (
         <p className="text-sm sm:text-base font-bold text-[#e60049] leading-relaxed max-w-[850px] mx-auto whitespace-pre-line">
           {config.text}
@@ -378,19 +472,21 @@ export const BottomBannerBlock: React.FC<{
   if (config.mode === 'custom_html') {
     if (!config.custom_html?.trim()) return null;
     return (
-      <IsolatedHtmlBlock
-        htmlContent={config.custom_html}
-        containerMode="full_width"
-      />
+      <div className="max-w-[1100px] mx-auto px-4">
+        <IsolatedHtmlBlock
+          htmlContent={config.custom_html}
+          containerMode="full_width"
+        />
+      </div>
     );
   }
 
   const imageUrl = config.image_url || config.custom_image_url;
 
-  // Khi có ảnh: Ảnh đứng một mình (full-width), KHÔNG bị bọc trong khung màu!
+  // Khi có ảnh: Ảnh đứng một mình (max-w-[1100px]), KHÔNG bị bọc trong khung màu!
   if (imageUrl) {
     return (
-      <section>
+      <section className="max-w-[1100px] mx-auto px-4">
         <SmartLink
           to={config.link_url}
           className="block w-full overflow-hidden rounded-2xl shadow-sm hover:opacity-95 transition"
@@ -411,7 +507,7 @@ export const BottomBannerBlock: React.FC<{
   }
 
   return (
-    <section>
+    <section className="max-w-[1100px] mx-auto px-4">
       <SmartLink
         to={config.link_url}
         className="block rounded-2xl overflow-hidden border border-sky-200 shadow-sm bg-gradient-to-r from-sky-200 via-blue-100 to-sky-200 p-6 sm:p-8 hover:opacity-95 transition"

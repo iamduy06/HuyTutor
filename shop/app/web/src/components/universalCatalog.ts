@@ -16,6 +16,7 @@ import {
   FlashcardGroupPricingBlockConfig,
   FlashcardHeroBlockConfig,
   FlashcardPricingBlockConfig,
+  HomepageBlockItem,
   HomepageBottomBannerConfig,
   HomepageCategoriesGridConfig,
   HomepageCategoryTile,
@@ -495,10 +496,12 @@ export function createDefaultUniversalBlock(
       config = {
         title: 'Danh mục sản phẩm',
         items: [
-          { id: 'cat_thpt', category_slug: 'high-school', label: 'TÀI LIỆU THPT', icon_code: 'GraduationCap', image_url: '', to: '/high-school', is_active: true },
-          { id: 'cat_thcs', category_slug: 'middle-school', label: 'TÀI LIỆU THCS', icon_code: 'BookOpen', image_url: '', to: '/middle-school', is_active: true },
-          { id: 'cat_combo', category_slug: 'combo-thpt', label: 'COMBO THPT', icon_code: 'Layers', image_url: '', to: '/combo-thpt', is_active: true },
-          { id: 'cat_fc', category_slug: 'flashcard', label: 'FLASHCARD', icon_code: 'Zap', image_url: '', to: '/flashcard', is_active: true },
+          { id: 'cat_fc', category_slug: 'flashcard', label: 'Flashcard', icon_code: 'flashcard', image_url: '', to: '/flashcard', is_active: true },
+          { id: 'cat_thpt', category_slug: 'high-school', label: 'TÀI LIỆU THPT', icon_code: 'high-school', image_url: '', to: '/high-school', is_active: true },
+          { id: 'cat_hsg', category_slug: 'gifted-students', label: 'TÀI LIỆU HSG', icon_code: 'gifted-students', image_url: '', to: '/gifted-students', is_active: true },
+          { id: 'cat_thcs', category_slug: 'secondary-school', label: 'TÀI LIỆU THCS', icon_code: 'secondary-school', image_url: '', to: '/secondary-school', is_active: true },
+          { id: 'cat_template', category_slug: 'template', label: 'MẪU TRANG TÍNH', icon_code: 'template', image_url: '', to: '/template', is_active: true },
+          { id: 'cat_gifts', category_slug: 'gifts', label: 'TÀI LIỆU MIỄN PHÍ', icon_code: 'gifts', image_url: '', to: '/gifts', is_active: true },
         ],
         is_active: true,
       } as HomepageCategoriesGridConfig;
@@ -524,7 +527,48 @@ export function createDefaultUniversalBlock(
 
     case 'section_groups':
       config = {
-        sections: [],
+        sections: [
+          {
+            id: 'sec_thpt',
+            title: 'Tài liệu THPT',
+            category_slug: 'high-school',
+            is_active: true,
+            sort_order: 1,
+            items: [
+              {
+                id: 'item_thpt_1',
+                display_title: '30 đề thi thử ngôn ngữ Anh - Đánh giá năng lực Bộ Công an',
+                image_url: '',
+                target_url: '/high-school/dgnlbca',
+                badge_text: 'Mới',
+                tag_text: 'Luyện từ cơ bản đến nâng cao bám sát đề thi',
+                is_active: true,
+                sort_order: 1,
+              },
+              {
+                id: 'item_thpt_2',
+                display_title: 'Đột phá đề thi THPTQG môn Tiếng Anh (B2 - C2)',
+                image_url: '',
+                target_url: '/high-school/de-nang-cao-b2-c2',
+                badge_text: 'Hot',
+                tag_text: 'Dành cho kỳ thi THPTQG từ năm 2025',
+                is_active: true,
+                sort_order: 2,
+              },
+              {
+                id: 'item_thpt_3',
+                display_title: 'Bộ đề chuẩn cấu trúc (B1 - C1)',
+                image_url: '',
+                target_url: '/high-school/bo-de-chuan-cau-truc',
+                badge_text: 'Bán chạy',
+                tag_text: 'Dành cho Kỳ thi THPTQG từ năm 2025',
+                is_active: true,
+                sort_order: 3,
+              },
+            ],
+          },
+        ],
+        is_active: true,
       } as HomepageSectionGroupsConfig;
       break;
 
@@ -792,3 +836,147 @@ export function createDefaultUniversalBlock(
     config,
   };
 }
+
+/**
+ * Cấu hình 6 khối mặc định chuẩn nguyên bản của Trang Chủ Huy Tutor
+ * Sử dụng để khởi tạo ban đầu hoặc phục hồi qua nút "Khôi phục Cấu hình Gốc"
+ */
+export const DEFAULT_HOMEPAGE_BLOCKS: HomepageBlockItem[] = [
+  {
+    id: 'block_hero_default',
+    type: 'hero',
+    title_label: 'Hero Header (Phần đầu trang)',
+    is_active: true,
+    sort_order: 1,
+    config: {
+      mode: 'structured',
+      title: 'Dạy & học tiếng Anh với tài nguyên',
+      subtitle: 'Chuẩn mực & Chi tiết',
+      bullets: [
+        '150+ đề thi thử, 9+ tài liệu bổ sung',
+        'Hệ thống flashcard trực tuyến',
+        'Sử dụng dễ dàng',
+        'Bám sát xu hướng mới',
+      ],
+      image_url: '',
+      is_active: true,
+    } as HomepageHeroConfig,
+  },
+  {
+    id: 'block_banner_default',
+    type: 'top_banner',
+    title_label: 'Top Banner (Ưu đãi / Nổi bật)',
+    is_active: true,
+    sort_order: 2,
+    config: {
+      mode: 'image_text',
+      header_label: 'ƯU ĐÃI ĐẶC BIỆT',
+      tag: 'HOT',
+      title: 'Ưu đãi từ 15% khi mua combo',
+      subtitle: 'Tích lũy điểm thưởng thành viên trọn đời',
+      cta_badge: 'Xem ngay',
+      link_url: '/combo-thpt',
+      image_url: '',
+      is_active: true,
+    } as HomepageTopBannerConfig,
+  },
+  {
+    id: 'block_cat_grid_default',
+    type: 'categories_grid',
+    title_label: 'Danh mục sản phẩm',
+    is_active: true,
+    sort_order: 3,
+    config: {
+      title: 'Danh mục sản phẩm',
+      items: [
+        { id: 'cat_fc', category_slug: 'flashcard', label: 'Flashcard', icon_code: 'flashcard', image_url: '', to: '/flashcard', is_active: true },
+        { id: 'cat_thpt', category_slug: 'high-school', label: 'Tài liệu THPT', icon_code: 'high-school', image_url: '', to: '/high-school', is_active: true },
+        { id: 'cat_hsg', category_slug: 'gifted-students', label: 'Tài liệu HSG', icon_code: 'gifted-students', image_url: '', to: '/gifted-students', is_active: true },
+        { id: 'cat_thcs', category_slug: 'secondary-school', label: 'Tài liệu THCS', icon_code: 'secondary-school', image_url: '', to: '/secondary-school', is_active: true },
+        { id: 'cat_template', category_slug: 'template', label: 'Mẫu trang tính', icon_code: 'template', image_url: '', to: '/template', is_active: true },
+        { id: 'cat_gifts', category_slug: 'gifts', label: 'Tài liệu miễn phí', icon_code: 'gifts', image_url: '', to: '/gifts', is_active: true },
+      ],
+      is_active: true,
+    } as HomepageCategoriesGridConfig,
+  },
+  {
+    id: 'block_sec_groups_default',
+    type: 'section_groups',
+    title_label: 'Nhóm tài liệu & Sản phẩm',
+    is_active: true,
+    sort_order: 4,
+    config: {
+      sections: [
+        {
+          id: 'sec_thpt',
+          title: 'Tài liệu THPT',
+          category_slug: 'high-school',
+          is_active: true,
+          sort_order: 1,
+          items: [
+            {
+              id: 'item_thpt_1',
+              display_title: '30 đề thi thử ngôn ngữ Anh - Đánh giá năng lực Bộ Công an',
+              image_url: '',
+              target_url: '/high-school/dgnlbca',
+              badge_text: 'Mới',
+              tag_text: 'Luyện từ cơ bản đến nâng cao bám sát đề thi',
+              is_active: true,
+              sort_order: 1,
+            },
+            {
+              id: 'item_thpt_2',
+              display_title: 'Đột phá đề thi THPTQG môn Tiếng Anh (B2 - C2)',
+              image_url: '',
+              target_url: '/high-school/de-nang-cao-b2-c2',
+              badge_text: 'Hot',
+              tag_text: 'Dành cho kỳ thi THPTQG từ năm 2025',
+              is_active: true,
+              sort_order: 2,
+            },
+            {
+              id: 'item_thpt_3',
+              display_title: 'Bộ đề chuẩn cấu trúc (B1 - C1)',
+              image_url: '',
+              target_url: '/high-school/bo-de-chuan-cau-truc',
+              badge_text: 'Bán chạy',
+              tag_text: 'Dành cho Kỳ thi THPTQG từ năm 2025',
+              is_active: true,
+              sort_order: 3,
+            },
+          ],
+        },
+      ],
+      is_active: true,
+    } as HomepageSectionGroupsConfig,
+  },
+  {
+    id: 'block_notice_default',
+    type: 'notice_text',
+    title_label: 'Thông báo & Kêu gọi hành động',
+    is_active: true,
+    sort_order: 5,
+    config: {
+      text: 'Tham gia nhóm Thảo luận & Hỗ trợ chuyên môn giáo viên tiếng Anh trên Facebook',
+      cta_button_text: 'Tham gia ngay',
+      cta_button_link: 'https://web.facebook.com/huytutor',
+      is_active: true,
+    } as HomepageNoticeTextConfig,
+  },
+  {
+    id: 'block_btm_banner_default',
+    type: 'bottom_banner',
+    title_label: 'Bottom Banner (Chân trang)',
+    is_active: true,
+    sort_order: 6,
+    config: {
+      mode: 'structured',
+      title: 'Tài liệu Tiếng Anh Huy Tutor',
+      tag: 'TÀI LIỆU CHÍNH HÃNG',
+      badge_text: 'CAM KẾT CHẤT LƯỢNG',
+      link_url: '/combo-thpt',
+      books: [],
+      is_active: true,
+    } as HomepageBottomBannerConfig,
+  },
+];
