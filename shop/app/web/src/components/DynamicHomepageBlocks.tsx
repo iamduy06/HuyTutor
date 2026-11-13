@@ -46,6 +46,7 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
 
   const bullets = (config.bullets || []).filter((b) => b && b.trim().length > 0);
   const teacherImage = config.image_url?.trim() || DEFAULT_HERO_TEACHER_IMAGE;
+  const isImageLeft = config.layout_direction === 'image_left_text_right';
 
   // Nếu không có nội dung gì thì không render
   if (!config.title && !config.subtitle && bullets.length === 0 && !teacherImage) {
@@ -56,8 +57,8 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-8 bg-gradient-to-b from-[#fff6f8] via-[#fffbfc] to-white border-b border-pink-50/60">
       <div className="max-w-[1100px] mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-          {/* Cột Trái: Chữ (Tiêu đề, phụ đề, gạch đầu dòng) */}
-          <div className={teacherImage ? 'md:col-span-7 space-y-3' : 'col-span-12 space-y-3'}>
+          {/* Cột Chữ (Tiêu đề, phụ đề, gạch đầu dòng) */}
+          <div className={teacherImage ? (isImageLeft ? 'md:col-span-7 md:order-2 space-y-3' : 'md:col-span-7 md:order-1 space-y-3') : 'col-span-12 space-y-3'}>
             {config.subtitle && (
               <p className="text-[#e60049] font-bold text-sm sm:text-base leading-snug">
                 {config.subtitle}
@@ -80,9 +81,9 @@ export const HeroBlock: React.FC<{ config?: HomepageHeroConfig | null }> = ({ co
             )}
           </div>
 
-          {/* Cột Phải: Hình ảnh Thầy giáo tự nhiên (Tuyệt đối không đóng khung, viền hay vòm CSS) */}
+          {/* Cột Hình ảnh Thầy giáo tự nhiên */}
           {teacherImage && (
-            <div className="md:col-span-5 flex justify-center items-center">
+            <div className={`md:col-span-5 flex justify-center items-center ${isImageLeft ? 'md:order-1' : 'md:order-2'}`}>
               <img
                 src={teacherImage}
                 alt={config.title || 'Huy Tutor'}
@@ -206,94 +207,8 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
   );
 };
 
-// =========================================================================
-// Category3DFolderIcon: Biểu tượng Folder hồng 3D chuẩn nguyên bản Huy Tutor
-// =========================================================================
-export const Category3DFolderIcon: React.FC<{
-  iconCode?: string;
-  className?: string;
-}> = ({ iconCode = '', className = 'w-full aspect-square' }) => {
-  const code = (iconCode || '').toLowerCase().trim();
-
-  // Render SVG vector biểu tượng bên trong Folder (tuyệt đối không in text thô)
-  const renderInnerVector = () => {
-    // 1. Flashcard (+)
-    if (code === 'flashcard' || code === 'plus' || code === '+' || code === 'zap') {
-      return (
-        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      );
-    }
-
-    // 2. HSG (Bóng đèn)
-    if (code === 'gifted-students' || code === 'hsg' || code === 'lightbulb' || code === 'a+') {
-      return (
-        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-          <path d="M9 18h6" />
-          <path d="M10 22h4" />
-        </svg>
-      );
-    }
-
-    // 3. THCS (Học sinh / Mở sách)
-    if (code === 'secondary-school' || code === 'thcs' || code === 'bookopen' || code === 'school' || code === 'users' || code === '9' || code === 'middle-school') {
-      return (
-        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
-      );
-    }
-
-    // 4. Mẫu trang tính (T / Table / Sheet / Combo)
-    if (code === 'template' || code === 'utilities' || code === 'table' || code === 'sheet' || code === 'filespreadsheet' || code === 't' || code === '≡' || code === 'layers') {
-      return (
-        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <line x1="3" y1="9" x2="21" y2="9" />
-          <line x1="3" y1="15" x2="21" y2="15" />
-          <line x1="9" y1="3" x2="9" y2="21" />
-        </svg>
-      );
-    }
-
-    // 5. Tài liệu miễn phí (↓ / Download / Gift)
-    if (code === 'gifts' || code === 'gift' || code === 'free' || code === 'download' || code === 'arrow-down' || code === '↓') {
-      return (
-        <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-      );
-    }
-
-    // 6. THPT (Mũ cử nhân) - Mặc định an toàn cho mọi code khác (academic-cap, graduationcap, high-school...)
-    return (
-      <svg className="w-1/2 h-1/2 text-white drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-        <path d="M6 12v5c3 3 9 3 12 0v-5" />
-      </svg>
-    );
-  };
-
-  return (
-    <div className={`relative rounded-2xl bg-gradient-to-br from-[#e60049] via-[#cf003f] to-[#99002e] p-3 flex items-center justify-center shadow-xs overflow-hidden ${className}`}>
-      {/* Hiệu ứng nắp gập 3D Folder và vạt bóng */}
-      <div className="absolute top-0 left-3 w-10 h-2 bg-white/20 rounded-b-md" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-white/10 pointer-events-none" />
-      <div className="relative z-10 w-full h-full flex items-center justify-center">
-        {renderInnerVector()}
-      </div>
-    </div>
-  );
-};
-
 /**
- * 3. Danh mục sản phẩm (Các ô icon tự đứng một mình, linh hoạt số lượng)
+ * 3. Danh mục sản phẩm (Bắt buộc 100% ảnh R2, placeholder sạch khi link rỗng)
  */
 export const CategoriesGridBlock: React.FC<{
   config?: HomepageCategoriesGridConfig | null;
@@ -314,7 +229,7 @@ export const CategoriesGridBlock: React.FC<{
             to={cat.to || cat.category_slug}
             className="group text-center flex flex-col items-center"
           >
-            {/* Nếu có ảnh: Ảnh hiển thị trực tiếp một mình, không bị nhồi nhét vào hộp màu khác */}
+            {/* 100% hiển thị hình ảnh từ R2, nếu link rỗng thì hiển thị placeholder trung tính */}
             {cat.image_url && cat.image_url.trim() ? (
               <img
                 src={cat.image_url}
@@ -322,10 +237,12 @@ export const CategoriesGridBlock: React.FC<{
                 className="w-full aspect-square object-contain rounded-2xl shadow-xs group-hover:scale-105 transition-transform duration-200 block"
               />
             ) : (
-              <Category3DFolderIcon
-                iconCode={cat.icon_code}
-                className="w-full aspect-square group-hover:scale-105 transition-transform duration-200"
-              />
+              <div className="w-full aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-3 text-gray-400 group-hover:border-pink-300 transition">
+                <svg className="w-8 h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-[10px] font-bold text-gray-400">Chưa có ảnh</span>
+              </div>
             )}
             {cat.label && (
               <span className="block text-xs font-bold text-gray-900 mt-2 text-center group-hover:text-[#e60049] transition truncate max-w-full">
@@ -340,7 +257,7 @@ export const CategoriesGridBlock: React.FC<{
 };
 
 /**
- * 4. Nhóm tài liệu & Sản phẩm (Chuẩn giao diện: Hộp bìa sách 3D + Badge & Tag -> Nút Đọc thử -> Tên sách căn giữa)
+ * 4. Nhóm tài liệu & Sản phẩm (Chuẩn giao diện: Hộp bìa sách 3D đứng một mình ở giữa -> Nút Đọc thử -> Tên sách căn giữa in đậm)
  */
 export const SectionGroupsBlock: React.FC<{
   config?: HomepageSectionGroupsConfig | null;
@@ -367,41 +284,27 @@ export const SectionGroupsBlock: React.FC<{
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
               {activeItems.map((item) => (
                 <div key={item.id} className="flex flex-col">
-                  {/* Hộp trên: Bìa sách 3D bên trái + Badge & Mô tả bên phải */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[160px] flex items-center justify-center gap-4 shadow-2xs hover:border-gray-300 transition">
-                    {/* Cột trái: Mockup bìa sách 3D */}
+                  {/* Hộp trắng: Bìa sách 3D đứng một mình ở giữa hộp */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-4 h-48 sm:h-52 flex items-center justify-center shadow-2xs hover:border-gray-300 transition">
                     <SmartLink
                       to={item.target_url}
-                      className="h-full flex items-center justify-center shrink-0"
+                      className="w-full h-full flex items-center justify-center"
                     >
                       {item.image_url && item.image_url.trim() ? (
                         <img
                           src={item.image_url}
                           alt={item.display_title || ''}
-                          className="max-h-[135px] w-auto max-w-full object-contain drop-shadow-md hover:scale-105 transition-transform duration-200 block"
+                          className="h-40 sm:h-44 w-auto object-contain mx-auto drop-shadow-md hover:scale-105 transition-transform duration-200 block"
                         />
                       ) : (
-                        <div className="w-20 h-28 bg-gray-100 rounded border border-dashed flex items-center justify-center text-gray-400 font-bold text-[11px]">
-                          Tài liệu
+                        <div className="w-24 h-36 bg-gray-50 rounded border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 font-bold text-xs p-2 text-center">
+                          <svg className="w-6 h-6 mb-1 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                          <span>Bìa 3D</span>
                         </div>
                       )}
                     </SmartLink>
-
-                    {/* Cột phải: Badge "Mới" / "Chính chủ" + Dòng mô tả (nếu có) */}
-                    {(item.badge_text || item.tag_text) && (
-                      <div className="flex flex-col justify-start items-start space-y-1.5 flex-1 min-w-0">
-                        {item.badge_text && (
-                          <span className="bg-[#e60049] text-white text-[10px] font-bold px-2 py-0.5 rounded-xs tracking-wide">
-                            {item.badge_text}
-                          </span>
-                        )}
-                        {item.tag_text && (
-                          <span className="text-[12px] font-medium text-gray-800 leading-snug line-clamp-3">
-                            {item.tag_text}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
