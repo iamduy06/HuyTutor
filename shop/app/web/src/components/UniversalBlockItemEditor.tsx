@@ -61,15 +61,6 @@ const CategoriesGridBlockEditor: React.FC<{
 }> = ({ gridCfg, onUpdateConfig }) => {
   const items = Array.isArray(gridCfg.items) ? gridCfg.items : [];
 
-  const PRESET_FOLDERS = [
-    { key: 'flashcard', label: 'Flashcard', slug: 'flashcard', to: '/flashcard', icon_code: 'flashcard', badge: '+', title: 'Flashcard (+)' },
-    { key: 'high-school', label: 'Tài liệu THPT', slug: 'high-school', to: '/high-school', icon_code: 'high-school', badge: 'THPT', title: 'THPT (Mũ cử nhân)' },
-    { key: 'gifted-students', label: 'Tài liệu HSG', slug: 'gifted-students', to: '/gifted-students', icon_code: 'gifted-students', badge: 'HSG', title: 'HSG (Bóng đèn)' },
-    { key: 'secondary-school', label: 'Tài liệu THCS', slug: 'secondary-school', to: '/secondary-school', icon_code: 'secondary-school', badge: 'THCS', title: 'THCS (Học sinh)' },
-    { key: 'template', label: 'Mẫu trang tính', slug: 'template', to: '/template', icon_code: 'template', badge: 'T', title: 'Mẫu trang tính (T)' },
-    { key: 'gifts', label: 'Tài liệu miễn phí', slug: 'gifts', to: '/gifts', icon_code: 'gifts', badge: '↓', title: 'Tài liệu miễn phí (↓)' },
-  ];
-
   const moveItem = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= items.length) return;
@@ -109,14 +100,13 @@ const CategoriesGridBlockEditor: React.FC<{
           <button
             type="button"
             onClick={() => {
-              const nextPreset = PRESET_FOLDERS[items.length % PRESET_FOLDERS.length];
               const newItem: HomepageCategoryTile = {
                 id: `cat_${Date.now()}`,
-                category_slug: nextPreset.slug,
-                label: nextPreset.label,
-                icon_code: nextPreset.icon_code,
+                category_slug: '',
+                label: 'Danh mục mới',
+                icon_code: '',
                 image_url: '',
-                to: nextPreset.to,
+                to: '',
                 is_active: true,
               };
               onUpdateConfig({ items: [...items, newItem] });
@@ -191,49 +181,11 @@ const CategoriesGridBlockEditor: React.FC<{
                 </div>
               </div>
 
-              {/* Khu vực chọn Preset Folder 3D hồng chuẩn gốc */}
-              <div>
-                <label className="block font-bold text-gray-700 mb-1 text-[11px]">
-                  Chọn nhanh biểu tượng Folder 3D hồng chuẩn gốc Huy Tutor:
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5">
-                  {PRESET_FOLDERS.map((preset) => (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      onClick={() => {
-                        const next = [...items];
-                        next[idx] = {
-                          ...next[idx],
-                          icon_code: preset.icon_code,
-                          category_slug: it.category_slug || preset.slug,
-                          label: it.label === 'Danh mục mới' || !it.label ? preset.label : it.label,
-                          to: it.to || preset.to,
-                        };
-                        onUpdateConfig({ items: next });
-                      }}
-                      className={`p-1.5 rounded border text-left flex flex-col items-center justify-center gap-1 transition ${
-                        it.icon_code === preset.icon_code
-                          ? 'border-[#e60049] bg-pink-50 ring-1 ring-[#e60049]'
-                          : 'border-gray-200 bg-white hover:border-pink-300'
-                      }`}
-                    >
-                      <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#e60049] to-[#99002e] text-white flex items-center justify-center font-black text-xs shadow-2xs">
-                        {preset.badge}
-                      </span>
-                      <span className="text-[10px] font-bold text-gray-800 text-center line-clamp-1">
-                        {preset.title}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tải ảnh riêng lên Cloudflare R2 (với nút xóa vĩnh viễn ✕ đỏ) */}
+              {/* Tải ảnh danh mục lên Cloudflare R2 (Bắt buộc 100% ảnh R2) */}
               <div className="pt-1">
                 <R2ImageUploader
-                  label="Hoặc tải ảnh riêng từ máy lên Cloudflare R2"
-                  helperText="Nếu có ảnh tải lên, hệ thống sẽ ưu tiên hiển thị ảnh này thay cho biểu tượng Folder mặc định."
+                  label="Tải ảnh danh mục lên Cloudflare R2 (Bắt buộc)"
+                  helperText="Tải ảnh biểu tượng danh mục. Nếu chưa tải ảnh, hệ thống hiển thị ô placeholder trung tính."
                   imageUrl={it.image_url || ''}
                   onUrlChange={(url) => {
                     const next = [...items];
@@ -448,7 +400,7 @@ const SectionGroupsBlockEditor: React.FC<{
       display_title: 'Tài liệu mới',
       image_url: '',
       target_url: '/high-school',
-      badge_text: 'MỚI',
+      badge_text: '',
       tag_text: '',
       is_active: true,
       sort_order: items.length + 1,
@@ -468,8 +420,8 @@ const SectionGroupsBlockEditor: React.FC<{
       display_title: p.title,
       image_url: p.thumbnail_url || '',
       target_url: targetUrl,
-      badge_text: p.cover_tag || 'MỚI',
-      tag_text: p.short_desc || '',
+      badge_text: '',
+      tag_text: '',
       is_active: true,
       sort_order: items.length + 1,
     };
@@ -497,7 +449,7 @@ const SectionGroupsBlockEditor: React.FC<{
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
         <div>
           <span className="text-xs font-extrabold text-[#e60049] uppercase">
-            [NHÓM TÀI LIỆU & SẢN PHẨM] - Quản lý các nhóm chuyên mục nổi bật, bìa sách 3D, badge, nút Đọc thử và liên kết điều hướng
+            [NHÓM TÀI LIỆU & SẢN PHẨM] - Quản lý các nhóm chuyên mục nổi bật, bìa sách 3D, nút Đọc thử và liên kết điều hướng
           </span>
           <p className="text-[11px] text-gray-500 mt-0.5">
             Tổng cộng: <strong>{sections.length} nhóm</strong> hiển thị trên trang chủ
@@ -716,11 +668,6 @@ const SectionGroupsBlockEditor: React.FC<{
                         <span className="font-bold text-gray-900 truncate">
                           {it.display_title || 'Tài liệu chưa đặt tên'}
                         </span>
-                        {it.badge_text && (
-                          <span className="bg-[#e60049] text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                            {it.badge_text}
-                          </span>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -793,34 +740,6 @@ const SectionGroupsBlockEditor: React.FC<{
                             className="w-full border border-gray-300 rounded px-2.5 py-1 bg-white font-mono text-[11px] focus:border-[#e60049]"
                           />
                         </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
-                              Badge đỏ nổi bật
-                            </label>
-                            <input
-                              type="text"
-                              value={it.badge_text || ''}
-                              onChange={(e) => updateBook(sIdx, iIdx, { badge_text: e.target.value })}
-                              placeholder="MỚI, HOT, BÁN CHẠY..."
-                              className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:border-[#e60049]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
-                              Mô tả / Tag phụ
-                            </label>
-                            <input
-                              type="text"
-                              value={it.tag_text || ''}
-                              onChange={(e) => updateBook(sIdx, iIdx, { tag_text: e.target.value })}
-                              placeholder="Luyện từ cơ bản đến nâng cao..."
-                              className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:border-[#e60049]"
-                            />
-                          </div>
-                        </div>
                       </div>
 
                       {/* Cột 2: Bộ tải ảnh bìa 3D Cloudflare R2 */}
@@ -882,6 +801,24 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
     const heroCfg = cfg as HomepageHeroConfig;
     return (
       <div className="space-y-4">
+        <div>
+          <label className="block font-bold text-gray-700 mb-1 text-xs">
+            Bố cục hiển thị (Hướng Chữ / Hình)
+          </label>
+          <select
+            value={heroCfg.layout_direction || 'text_left_image_right'}
+            onChange={(e) =>
+              onUpdateConfig({
+                layout_direction: e.target.value as 'text_left_image_right' | 'image_left_text_right',
+              })
+            }
+            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs font-medium"
+          >
+            <option value="text_left_image_right">Chữ bên trái — Hình bên phải (Mặc định)</option>
+            <option value="image_left_text_right">Hình bên trái — Chữ bên phải</option>
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block font-bold text-gray-700 mb-1">
