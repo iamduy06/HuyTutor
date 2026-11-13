@@ -26,6 +26,7 @@ import { normalizeTargetUrl } from './SmartLink';
 import { R2ImageUploader } from './R2ImageUploader';
 import { UniversalBlockCardRepeater } from './UniversalBlockCardRepeater';
 import { UniversalBlockRenderer } from './UniversalBlockRenderer';
+import { DEFAULT_HOMEPAGE_BLOCKS } from './universalCatalog';
 
 const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string; desc: string }> = {
   hero: {
@@ -66,7 +67,7 @@ const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string
 };
 
 export const AdminHomepageCms: React.FC = () => {
-  const { siteConfigs, updateSiteConfig, showToast } = useStore();
+  const { siteConfigs, updateSiteConfig, showToast, products } = useStore();
 
   // Danh sách các khung (Block-based layout) - hoàn toàn động số lượng và thứ tự
   const [blocks, setBlocks] = useState<HomepageBlockItem[]>(() => {
@@ -402,6 +403,42 @@ export const AdminHomepageCms: React.FC = () => {
     }
   };
 
+  const handleResetToOriginal = async () => {
+    if (
+      !window.confirm(
+        'Bạn có chắc chắn muốn khôi phục cấu hình Trang chủ về mẫu gốc ban đầu không? Mọi chỉnh sửa chưa lưu hoặc hiện tại sẽ được nạp lại theo chuẩn thiết kế.'
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      setBlocks(DEFAULT_HOMEPAGE_BLOCKS);
+
+      await updateSiteConfig('homepage_blocks', DEFAULT_HOMEPAGE_BLOCKS);
+
+      const hero = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'hero');
+      if (hero) await updateSiteConfig('homepage_hero', hero.config);
+      const banner = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'top_banner');
+      if (banner) await updateSiteConfig('homepage_top_banner', banner.config);
+      const cat = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'categories_grid');
+      if (cat) await updateSiteConfig('homepage_categories_grid', cat.config);
+      const sec = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'section_groups');
+      if (sec) await updateSiteConfig('homepage_section_groups', sec.config);
+      const noti = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'notice_text');
+      if (noti) await updateSiteConfig('homepage_notice_text', noti.config);
+      const btm = DEFAULT_HOMEPAGE_BLOCKS.find((b) => b.type === 'bottom_banner');
+      if (btm) await updateSiteConfig('homepage_bottom_banner', btm.config);
+
+      showToast('Đã khôi phục toàn bộ cấu hình gốc của Trang chủ thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi khi khôi phục cấu hình gốc.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header Controls */}
@@ -419,6 +456,14 @@ export const AdminHomepageCms: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResetToOriginal}
+            disabled={saving}
+            className="border border-pink-300 hover:border-[#e60049] bg-pink-50 hover:bg-pink-100 text-[#e60049] font-bold text-xs px-3.5 py-2 rounded-sm transition"
+          >
+            🔄 Khôi phục Cấu hình Gốc
+          </button>
           <button
             type="button"
             onClick={() => setIsSideBySide(!isSideBySide)}
@@ -450,6 +495,7 @@ export const AdminHomepageCms: React.FC = () => {
               context={{
                 pageType: 'homepage',
                 siteConfigs,
+                allProducts: products,
               }}
             />
           </div>
@@ -462,9 +508,11 @@ export const AdminHomepageCms: React.FC = () => {
         pageRouteLabel="/"
         blocks={blocks}
         onBlocksChange={(newBlocks) => setBlocks(newBlocks)}
+        allProducts={products}
         context={{
           pageType: 'homepage',
           siteConfigs,
+          allProducts: products,
         }}
         quickAddTypes={[
           { type: 'hero', label: 'Hero Đầu Trang' },

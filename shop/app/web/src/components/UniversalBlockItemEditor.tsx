@@ -1,5 +1,5 @@
 import { buildProductUrl } from '../utils/urlHelper';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { ReorderableProductSelector } from './ReorderableProductSelector';
 import {
@@ -52,6 +52,802 @@ import { R2ImageUploader } from './R2ImageUploader';
 import { R2MultiImageUploader } from './R2MultiImageUploader';
 import { CustomHtmlBlockEditor } from './CustomHtmlBlockEditor';
 
+// =========================================================================
+// CategoriesGridBlockEditor: Trình soạn thảo Lưới Danh Mục Trang Chủ
+// =========================================================================
+const CategoriesGridBlockEditor: React.FC<{
+  gridCfg: HomepageCategoriesGridConfig;
+  onUpdateConfig: (partial: any) => void;
+}> = ({ gridCfg, onUpdateConfig }) => {
+  const items = Array.isArray(gridCfg.items) ? gridCfg.items : [];
+
+  const PRESET_FOLDERS = [
+    { key: 'flashcard', label: 'Flashcard', slug: 'flashcard', to: '/flashcard', icon_code: 'flashcard', badge: '+', title: 'Flashcard (+)' },
+    { key: 'high-school', label: 'Tài liệu THPT', slug: 'high-school', to: '/high-school', icon_code: 'high-school', badge: 'THPT', title: 'THPT (Mũ cử nhân)' },
+    { key: 'gifted-students', label: 'Tài liệu HSG', slug: 'gifted-students', to: '/gifted-students', icon_code: 'gifted-students', badge: 'HSG', title: 'HSG (Bóng đèn)' },
+    { key: 'secondary-school', label: 'Tài liệu THCS', slug: 'secondary-school', to: '/secondary-school', icon_code: 'secondary-school', badge: 'THCS', title: 'THCS (Học sinh)' },
+    { key: 'template', label: 'Mẫu trang tính', slug: 'template', to: '/template', icon_code: 'template', badge: 'T', title: 'Mẫu trang tính (T)' },
+    { key: 'gifts', label: 'Tài liệu miễn phí', slug: 'gifts', to: '/gifts', icon_code: 'gifts', badge: '↓', title: 'Tài liệu miễn phí (↓)' },
+  ];
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    const next = [...items];
+    const temp = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = temp;
+    onUpdateConfig({ items: next });
+  };
+
+  const deleteItem = (index: number) => {
+    const itemToDelete = items[index];
+    if (itemToDelete?.image_url) {
+      apiClient.deleteR2File(itemToDelete.image_url).catch(() => {});
+    }
+    onUpdateConfig({ items: items.filter((_, i) => i !== index) });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block font-bold text-gray-700 mb-1">Tiêu đề lưới danh mục</label>
+        <input
+          type="text"
+          value={gridCfg.title || ''}
+          onChange={(e) => onUpdateConfig({ title: e.target.value })}
+          className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
+          placeholder="Danh mục sản phẩm"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-800">
+            Các ô danh mục hiển thị ({items.length} ô):
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const nextPreset = PRESET_FOLDERS[items.length % PRESET_FOLDERS.length];
+              const newItem: HomepageCategoryTile = {
+                id: `cat_${Date.now()}`,
+                category_slug: nextPreset.slug,
+                label: nextPreset.label,
+                icon_code: nextPreset.icon_code,
+                image_url: '',
+                to: nextPreset.to,
+                is_active: true,
+              };
+              onUpdateConfig({ items: [...items, newItem] });
+            }}
+            className="text-[11px] font-bold text-[#e60049] bg-white hover:bg-pink-50 border border-pink-200 px-3 py-1 rounded cursor-pointer shadow-2xs transition"
+          >
+            + Thêm ô danh mục
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {items.map((it, idx) => (
+            <div key={it.id || idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-3 text-xs shadow-2xs">
+              {/* Header thanh công cụ của từng ô: Thứ tự, Tiêu đề, Đổi chỗ Lên/Xuống, Bật/Tắt, Xóa */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#e60049] text-white flex items-center justify-center font-black text-[10px]">
+                    {idx + 1}
+                  </span>
+                  <span className="font-bold text-gray-800 text-xs truncate max-w-[180px]">
+                    {it.label || 'Chưa đặt tên'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Nút Lên / Xuống */}
+                  <button
+                    type="button"
+                    disabled={idx === 0}
+                    onClick={() => moveItem(idx, 'up')}
+                    title="Di chuyển lên trên"
+                    className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    disabled={idx === items.length - 1}
+                    onClick={() => moveItem(idx, 'down')}
+                    title="Di chuyển xuống dưới"
+                    className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                  >
+                    ▼
+                  </button>
+
+                  {/* Nút Bật / Tắt kích hoạt */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = [...items];
+                      next[idx] = { ...next[idx], is_active: next[idx].is_active === false ? true : false };
+                      onUpdateConfig({ items: next });
+                    }}
+                    className={`px-2 py-0.5 rounded font-bold text-[11px] border transition ${
+                      it.is_active !== false
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-gray-100 text-gray-400 border-gray-300'
+                    }`}
+                  >
+                    {it.is_active !== false ? '👁️ Hiển thị' : '🚫 Đang ẩn'}
+                  </button>
+
+                  {/* Nút Xóa */}
+                  <button
+                    type="button"
+                    onClick={() => deleteItem(idx)}
+                    title="Xóa ô danh mục này"
+                    className="text-red-600 hover:text-red-800 font-bold px-2 py-0.5 border border-red-200 rounded hover:bg-red-50 bg-white"
+                  >
+                    ✕ Xóa
+                  </button>
+                </div>
+              </div>
+
+              {/* Khu vực chọn Preset Folder 3D hồng chuẩn gốc */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1 text-[11px]">
+                  Chọn nhanh biểu tượng Folder 3D hồng chuẩn gốc Huy Tutor:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5">
+                  {PRESET_FOLDERS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      onClick={() => {
+                        const next = [...items];
+                        next[idx] = {
+                          ...next[idx],
+                          icon_code: preset.icon_code,
+                          category_slug: it.category_slug || preset.slug,
+                          label: it.label === 'Danh mục mới' || !it.label ? preset.label : it.label,
+                          to: it.to || preset.to,
+                        };
+                        onUpdateConfig({ items: next });
+                      }}
+                      className={`p-1.5 rounded border text-left flex flex-col items-center justify-center gap-1 transition ${
+                        it.icon_code === preset.icon_code
+                          ? 'border-[#e60049] bg-pink-50 ring-1 ring-[#e60049]'
+                          : 'border-gray-200 bg-white hover:border-pink-300'
+                      }`}
+                    >
+                      <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#e60049] to-[#99002e] text-white flex items-center justify-center font-black text-xs shadow-2xs">
+                        {preset.badge}
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-800 text-center line-clamp-1">
+                        {preset.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tải ảnh riêng lên Cloudflare R2 (với nút xóa vĩnh viễn ✕ đỏ) */}
+              <div className="pt-1">
+                <R2ImageUploader
+                  label="Hoặc tải ảnh riêng từ máy lên Cloudflare R2"
+                  helperText="Nếu có ảnh tải lên, hệ thống sẽ ưu tiên hiển thị ảnh này thay cho biểu tượng Folder mặc định."
+                  imageUrl={it.image_url || ''}
+                  onUrlChange={(url) => {
+                    const next = [...items];
+                    next[idx] = { ...next[idx], image_url: url };
+                    onUpdateConfig({ items: next });
+                  }}
+                  folder="homepage/categories"
+                  aspectRatioHint="Ảnh vuông 1:1, PNG trong suốt hoặc WebP"
+                  maxPreviewHeight="max-h-24"
+                  fitMode="contain"
+                />
+              </div>
+
+              {/* Các trường cấu hình văn bản */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Tên hiển thị</label>
+                  <input
+                    type="text"
+                    value={it.label}
+                    onChange={(e) => {
+                      const next = [...items];
+                      next[idx] = { ...next[idx], label: e.target.value };
+                      onUpdateConfig({ items: next });
+                    }}
+                    placeholder="VD: Tài liệu THPT"
+                    className="w-full font-bold border border-gray-300 rounded px-2 py-1 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Slug danh mục</label>
+                  <input
+                    type="text"
+                    value={it.category_slug}
+                    onChange={(e) => {
+                      const next = [...items];
+                      next[idx] = { ...next[idx], category_slug: e.target.value };
+                      onUpdateConfig({ items: next });
+                    }}
+                    placeholder="high-school"
+                    className="w-full border border-gray-300 rounded px-2 py-1 bg-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Đường dẫn đích (URL)</label>
+                  <input
+                    type="text"
+                    value={it.to}
+                    onChange={(e) => {
+                      const next = [...items];
+                      next[idx] = { ...next[idx], to: e.target.value };
+                      onUpdateConfig({ items: next });
+                    }}
+                    placeholder="/high-school"
+                    className="w-full border border-gray-300 rounded px-2 py-1 bg-white font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =========================================================================
+// SectionGroupsBlockEditor: Trình soạn thảo Nhóm Tài Liệu & Sách 3D Trang Chủ
+// =========================================================================
+const SectionGroupsBlockEditor: React.FC<{
+  secCfg: HomepageSectionGroupsConfig;
+  onUpdateConfig: (partial: any) => void;
+  allProducts: Product[];
+  context?: UniversalPageContext;
+}> = ({ secCfg, onUpdateConfig, allProducts, context }) => {
+  const sections = Array.isArray(secCfg.sections) ? secCfg.sections : [];
+
+  // Danh sách sản phẩm khả dụng
+  const initialProducts =
+    allProducts && allProducts.length > 0
+      ? allProducts
+      : context?.allProducts && context.allProducts.length > 0
+      ? context.allProducts
+      : [];
+
+  const [productsList, setProductsList] = useState<Product[]>(initialProducts);
+  const [pickingForSectionIndex, setPickingForSectionIndex] = useState<number | null>(null);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (productsList.length === 0) {
+      apiClient
+        .getCatalogInit()
+        .then((res) => {
+          if (Array.isArray(res?.products)) {
+            setProductsList(res.products);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi tải sản phẩm cho bộ chọn:', err);
+        });
+    }
+  }, [productsList.length]);
+
+  // Cập nhật mảng sections
+  const updateSections = (nextSections: HomepageSectionGroup[]) => {
+    onUpdateConfig({ sections: nextSections });
+  };
+
+  // Di chuyển nhóm lên / xuống
+  const moveSection = (sIdx: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? sIdx - 1 : sIdx + 1;
+    if (targetIdx < 0 || targetIdx >= sections.length) return;
+    const next = [...sections];
+    const temp = next[sIdx];
+    next[sIdx] = next[targetIdx];
+    next[targetIdx] = temp;
+    updateSections(next);
+  };
+
+  // Bật/tắt nhóm
+  const toggleSectionActive = (sIdx: number) => {
+    const next = [...sections];
+    next[sIdx] = {
+      ...next[sIdx],
+      is_active: next[sIdx].is_active === false ? true : false,
+    };
+    updateSections(next);
+  };
+
+  // Xóa nhóm
+  const deleteSection = (sIdx: number) => {
+    const secToDelete = sections[sIdx];
+    if (Array.isArray(secToDelete?.items)) {
+      secToDelete.items.forEach((it) => {
+        if (it.image_url) apiClient.deleteR2File(it.image_url).catch(() => {});
+      });
+    }
+    updateSections(sections.filter((_, i) => i !== sIdx));
+  };
+
+  // Thêm nhóm mới
+  const addSection = () => {
+    const newSec: HomepageSectionGroup = {
+      id: `sec_${Date.now()}`,
+      title: 'Nhóm tài liệu mới',
+      is_active: true,
+      sort_order: sections.length + 1,
+      items: [],
+    };
+    updateSections([...sections, newSec]);
+  };
+
+  // Di chuyển sách trong nhóm lên / xuống
+  const moveBook = (sIdx: number, iIdx: number, direction: 'up' | 'down') => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    const targetIdx = direction === 'up' ? iIdx - 1 : iIdx + 1;
+    if (targetIdx < 0 || targetIdx >= items.length) return;
+    const temp = items[iIdx];
+    items[iIdx] = items[targetIdx];
+    items[targetIdx] = temp;
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items };
+    updateSections(nextSections);
+  };
+
+  // Bật/tắt kích hoạt sách
+  const toggleBookActive = (sIdx: number, iIdx: number) => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    items[iIdx] = {
+      ...items[iIdx],
+      is_active: items[iIdx].is_active === false ? true : false,
+    };
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items };
+    updateSections(nextSections);
+  };
+
+  // Xóa sách trong nhóm
+  const deleteBook = (sIdx: number, iIdx: number) => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    const itemToDelete = items[iIdx];
+    if (itemToDelete?.image_url) {
+      apiClient.deleteR2File(itemToDelete.image_url).catch(() => {});
+    }
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items: items.filter((_, i) => i !== iIdx) };
+    updateSections(nextSections);
+  };
+
+  // Cập nhật thuộc tính của sách
+  const updateBook = (sIdx: number, iIdx: number, patch: Partial<HomepageSectionItem>) => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    items[iIdx] = { ...items[iIdx], ...patch };
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items };
+    updateSections(nextSections);
+  };
+
+  // Thêm sách thủ công
+  const addBookManual = (sIdx: number) => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    const newItem: HomepageSectionItem = {
+      id: `item_${Date.now()}`,
+      display_title: 'Tài liệu mới',
+      image_url: '',
+      target_url: '/high-school',
+      badge_text: 'MỚI',
+      tag_text: '',
+      is_active: true,
+      sort_order: items.length + 1,
+    };
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items: [...items, newItem] };
+    updateSections(nextSections);
+  };
+
+  // Thêm sách từ sản phẩm có sẵn
+  const addProductToSection = (sIdx: number, p: Product) => {
+    const sec = sections[sIdx];
+    const items = Array.isArray(sec.items) ? [...sec.items] : [];
+    const targetUrl = buildProductUrl(p.category_slug, p.slug);
+    const newItem: HomepageSectionItem = {
+      id: `item_${Date.now()}_${p.id || p.slug}`,
+      display_title: p.title,
+      image_url: p.thumbnail_url || '',
+      target_url: targetUrl,
+      badge_text: p.cover_tag || 'MỚI',
+      tag_text: p.short_desc || '',
+      is_active: true,
+      sort_order: items.length + 1,
+    };
+    const nextSections = [...sections];
+    nextSections[sIdx] = { ...sec, items: [...items, newItem] };
+    updateSections(nextSections);
+    setPickingForSectionIndex(null);
+    setProductSearchTerm('');
+  };
+
+  // Lọc sản phẩm tìm kiếm
+  const filteredProducts = productsList.filter((p) => {
+    if (!productSearchTerm.trim()) return true;
+    const term = productSearchTerm.toLowerCase();
+    return (
+      (p.title || '').toLowerCase().includes(term) ||
+      (p.code || '').toLowerCase().includes(term) ||
+      (p.slug || '').toLowerCase().includes(term) ||
+      (p.category_slug || '').toLowerCase().includes(term)
+    );
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+        <div>
+          <span className="text-xs font-extrabold text-[#e60049] uppercase">
+            [NHÓM TÀI LIỆU & SẢN PHẨM] - Quản lý các nhóm chuyên mục nổi bật, bìa sách 3D, badge, nút Đọc thử và liên kết điều hướng
+          </span>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Tổng cộng: <strong>{sections.length} nhóm</strong> hiển thị trên trang chủ
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={addSection}
+          className="text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] px-3.5 py-1.5 rounded-sm cursor-pointer shadow-xs transition"
+        >
+          + Thêm nhóm chuyên mục
+        </button>
+      </div>
+
+      {sections.map((sec, sIdx) => {
+        const secItems = Array.isArray(sec.items) ? sec.items : [];
+        const isSelectorOpen = pickingForSectionIndex === sIdx;
+
+        return (
+          <div
+            key={sec.id || sIdx}
+            className="border-2 border-pink-200 rounded-lg p-4 bg-white space-y-4 shadow-xs"
+          >
+            {/* Header Nhóm chuyên mục */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3 bg-pink-50/50 -m-4 mb-3 p-4 rounded-t-lg">
+              <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
+                <span className="w-6 h-6 rounded-full bg-[#e60049] text-white flex items-center justify-center font-black text-xs shrink-0">
+                  {sIdx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={sec.title}
+                  onChange={(e) => {
+                    const next = [...sections];
+                    next[sIdx] = { ...next[sIdx], title: e.target.value };
+                    updateSections(next);
+                  }}
+                  className="font-extrabold text-sm border border-gray-300 rounded px-2.5 py-1 bg-white flex-1 focus:border-[#e60049]"
+                  placeholder="Tiêu đề nhóm (VD: TÀI LIỆU LUYỆN THI THPT QUỐC GIA)"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Đổi thứ tự nhóm */}
+                <button
+                  type="button"
+                  disabled={sIdx === 0}
+                  onClick={() => moveSection(sIdx, 'up')}
+                  title="Di chuyển nhóm lên trên"
+                  className="px-2.5 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs"
+                >
+                  ▲ Lên
+                </button>
+                <button
+                  type="button"
+                  disabled={sIdx === sections.length - 1}
+                  onClick={() => moveSection(sIdx, 'down')}
+                  title="Di chuyển nhóm xuống dưới"
+                  className="px-2.5 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs"
+                >
+                  ▼ Xuống
+                </button>
+
+                {/* Bật / Tắt kích hoạt nhóm */}
+                <button
+                  type="button"
+                  onClick={() => toggleSectionActive(sIdx)}
+                  className={`px-2.5 py-1 rounded font-bold text-xs border transition ${
+                    sec.is_active !== false
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                      : 'bg-gray-100 text-gray-400 border-gray-300'
+                  }`}
+                >
+                  {sec.is_active !== false ? '👁️ Hiển thị' : '🚫 Đang ẩn'}
+                </button>
+
+                {/* Xóa nhóm */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc muốn xóa nhóm "${sec.title || 'này'}" cùng toàn bộ sách bên trong?`)) {
+                      deleteSection(sIdx);
+                    }
+                  }}
+                  className="text-red-600 hover:bg-red-50 text-xs font-bold px-2.5 py-1 border border-red-200 rounded bg-white"
+                >
+                  ✕ Xóa nhóm
+                </button>
+              </div>
+            </div>
+
+            {/* Thanh công cụ thêm sách cho nhóm */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <span className="text-xs font-bold text-gray-800">
+                Danh sách tài liệu trong nhóm ({secItems.length} tài liệu):
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickingForSectionIndex(isSelectorOpen ? null : sIdx);
+                    setProductSearchTerm('');
+                  }}
+                  className="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3 py-1 rounded transition"
+                >
+                  {isSelectorOpen ? '✕ Đóng bộ chọn' : '🛒 + Thêm từ sản phẩm có sẵn trong Shop'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addBookManual(sIdx)}
+                  className="text-xs font-bold text-[#e60049] bg-pink-50 hover:bg-pink-100 border border-pink-200 px-3 py-1 rounded transition"
+                >
+                  ✏️ + Thêm tài liệu tùy biến thủ công
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer / Hộp thoại chọn sản phẩm từ Shop */}
+            {isSelectorOpen && (
+              <div className="border border-purple-300 bg-purple-50/40 rounded-lg p-3.5 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-purple-900 uppercase">
+                    Chọn sản phẩm để tự động điền thông tin (Tiêu đề, Bìa 3D, Link, Badge, Tag):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPickingForSectionIndex(null)}
+                    className="text-gray-500 hover:text-gray-700 font-bold text-xs"
+                  >
+                    ✕ Đóng
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  placeholder="Gõ tìm kiếm tên sách, mã sản phẩm hoặc slug..."
+                  className="w-full border border-purple-300 rounded px-2.5 py-1.5 bg-white text-xs focus:border-purple-600 focus:outline-hidden"
+                  autoFocus
+                />
+                <div className="max-h-60 overflow-y-auto space-y-1.5 divide-y divide-purple-100 bg-white rounded border border-purple-200 p-2">
+                  {filteredProducts.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-gray-500">
+                      Không tìm thấy sản phẩm nào phù hợp với từ khóa.
+                    </div>
+                  ) : (
+                    filteredProducts.map((p) => (
+                      <div
+                        key={p.id || p.slug}
+                        onClick={() => addProductToSection(sIdx, p)}
+                        className="flex items-center justify-between gap-3 p-2 hover:bg-purple-50 rounded cursor-pointer transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {p.thumbnail_url ? (
+                            <img
+                              src={p.thumbnail_url}
+                              alt=""
+                              className="w-9 h-12 object-contain rounded border border-gray-200 shrink-0 bg-white"
+                            />
+                          ) : (
+                            <div className="w-9 h-12 rounded border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-[9px] text-gray-400 shrink-0">
+                              3D
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-bold text-xs text-gray-900 truncate">
+                              {p.title}
+                            </div>
+                            <div className="text-[10px] text-gray-500 flex items-center gap-2 mt-0.5">
+                              <span className="font-mono bg-gray-100 px-1 rounded">{p.slug}</span>
+                              {p.cover_tag && (
+                                <span className="bg-red-50 text-red-600 px-1 rounded font-bold">
+                                  {p.cover_tag}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-[#e60049] shrink-0">
+                          + Chọn sách này
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Danh sách các tài liệu trong nhóm */}
+            <div className="space-y-3">
+              {secItems.length === 0 ? (
+                <div className="text-center py-6 border border-dashed border-gray-300 rounded-md bg-gray-50 text-xs text-gray-500">
+                  Nhóm này chưa có tài liệu nào. Bấm <strong>"+ Thêm từ sản phẩm có sẵn"</strong> hoặc <strong>"+ Thêm tài liệu tùy biến"</strong> ở trên để thêm sách.
+                </div>
+              ) : (
+                secItems.map((it, iIdx) => (
+                  <div
+                    key={it.id || iIdx}
+                    className="border border-gray-200 rounded-lg p-3 bg-gray-50/80 space-y-3 text-xs shadow-2xs"
+                  >
+                    {/* Header Item */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-bold text-gray-500">#{iIdx + 1}</span>
+                        {it.image_url ? (
+                          <img
+                            src={it.image_url}
+                            alt=""
+                            className="w-7 h-9 object-contain rounded border border-gray-300 bg-white shrink-0"
+                          />
+                        ) : (
+                          <div className="w-7 h-9 rounded border border-dashed border-gray-300 bg-gray-100 flex items-center justify-center text-[9px] text-gray-400 shrink-0">
+                            3D
+                          </div>
+                        )}
+                        <span className="font-bold text-gray-900 truncate">
+                          {it.display_title || 'Tài liệu chưa đặt tên'}
+                        </span>
+                        {it.badge_text && (
+                          <span className="bg-[#e60049] text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            {it.badge_text}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={iIdx === 0}
+                          onClick={() => moveBook(sIdx, iIdx, 'up')}
+                          title="Di chuyển lên trên"
+                          className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          disabled={iIdx === secItems.length - 1}
+                          onClick={() => moveBook(sIdx, iIdx, 'down')}
+                          title="Di chuyển xuống dưới"
+                          className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleBookActive(sIdx, iIdx)}
+                          className={`px-2 py-0.5 rounded font-bold text-[11px] border transition ${
+                            it.is_active !== false
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : 'bg-gray-100 text-gray-400 border-gray-300'
+                          }`}
+                        >
+                          {it.is_active !== false ? '👁️' : '🚫'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteBook(sIdx, iIdx)}
+                          title="Xóa tài liệu này"
+                          className="text-red-600 hover:text-red-800 font-bold px-2 py-0.5 border border-red-200 rounded hover:bg-red-50 bg-white"
+                        >
+                          ✕ Xóa
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Chi tiết Item: Grid 2 cột */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                      {/* Cột 1: Thông tin văn bản */}
+                      <div className="md:col-span-7 space-y-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                            Tên tài liệu hiển thị
+                          </label>
+                          <input
+                            type="text"
+                            value={it.display_title}
+                            onChange={(e) => updateBook(sIdx, iIdx, { display_title: e.target.value })}
+                            placeholder="VD: 30 đề thi thử ngôn ngữ Anh - Đánh giá năng lực Bộ Công an"
+                            className="w-full font-bold border border-gray-300 rounded px-2.5 py-1 bg-white focus:border-[#e60049]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                            Đường dẫn điều hướng (URL chi tiết hoặc link ngoài)
+                          </label>
+                          <input
+                            type="text"
+                            value={it.target_url}
+                            onChange={(e) => updateBook(sIdx, iIdx, { target_url: e.target.value })}
+                            placeholder="/high-school/dgnlbca"
+                            className="w-full border border-gray-300 rounded px-2.5 py-1 bg-white font-mono text-[11px] focus:border-[#e60049]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                              Badge đỏ nổi bật
+                            </label>
+                            <input
+                              type="text"
+                              value={it.badge_text || ''}
+                              onChange={(e) => updateBook(sIdx, iIdx, { badge_text: e.target.value })}
+                              placeholder="MỚI, HOT, BÁN CHẠY..."
+                              className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:border-[#e60049]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                              Mô tả / Tag phụ
+                            </label>
+                            <input
+                              type="text"
+                              value={it.tag_text || ''}
+                              onChange={(e) => updateBook(sIdx, iIdx, { tag_text: e.target.value })}
+                              placeholder="Luyện từ cơ bản đến nâng cao..."
+                              className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:border-[#e60049]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Cột 2: Bộ tải ảnh bìa 3D Cloudflare R2 */}
+                      <div className="md:col-span-5 bg-white border border-gray-200 rounded p-2.5">
+                        <R2ImageUploader
+                          label="Bìa sách 3D (Cloudflare R2)"
+                          helperText="Khuyến nghị ảnh mockup 3D PNG trong suốt hoặc tỉ lệ 3:4. Có nút ✕ đỏ xóa vật lý vĩnh viễn trên R2."
+                          imageUrl={it.image_url || ''}
+                          onUrlChange={(url) => updateBook(sIdx, iIdx, { image_url: url })}
+                          folder="homepage/books"
+                          aspectRatioHint="Mockup 3D tỉ lệ 3:4 hoặc 4:5"
+                          maxPreviewHeight="max-h-28"
+                          fitMode="contain"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 interface UniversalBlockItemEditorProps {
   block: UniversalBlockItem;
   onUpdateConfig: (partial: any) => void;
@@ -88,23 +884,27 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block font-bold text-gray-700 mb-1">Tiêu đề phụ / Dòng trên</label>
+            <label className="block font-bold text-gray-700 mb-1">
+              Tiêu đề phụ / Dòng trên (font nhỏ, chữ đỏ)
+            </label>
+            <input
+              type="text"
+              value={heroCfg.subtitle || ''}
+              onChange={(e) => onUpdateConfig({ subtitle: e.target.value })}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
+              placeholder="Thầy Huy biên soạn: Sách tài liệu tiếng Anh"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-gray-700 mb-1">
+              Tiêu đề chính (Đỏ đậm, font lớn)
+            </label>
             <input
               type="text"
               value={heroCfg.title || ''}
               onChange={(e) => onUpdateConfig({ title: e.target.value })}
               className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
               placeholder="Dạy & học tiếng Anh với tài nguyên"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-gray-700 mb-1">Tiêu đề chính (Đỏ đậm)</label>
-            <input
-              type="text"
-              value={heroCfg.subtitle || ''}
-              onChange={(e) => onUpdateConfig({ subtitle: e.target.value })}
-              className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049]"
-              placeholder="Chuẩn mực & Chi tiết"
             />
           </div>
         </div>
@@ -129,7 +929,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
           imageUrl={heroCfg.image_url}
           onUrlChange={(url) => onUpdateConfig({ image_url: url })}
           folder="homepage/hero"
-          aspectRatioHint="Khuyến nghị ảnh chân dung PNG trong suốt hoặc tỉ lệ 1:1"
+          aspectRatioHint="Khuyến nghị ảnh chân dung PNG trong suốt hoặc tỉ lệ 1:1. Nếu để trống, hệ thống tự động hiển thị ảnh Thầy Huy mặc định."
         />
       </div>
     );
@@ -1971,99 +2771,11 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   // KHỐI LƯỚI DANH MỤC TRANG CHỦ: categories_grid
   // ==========================================
   if (block.type === 'categories_grid') {
-    const gridCfg = cfg as HomepageCategoriesGridConfig;
-    const items = Array.isArray(gridCfg.items) ? gridCfg.items : [];
-
     return (
-      <div className="space-y-4">
-        <div>
-          <label className="block font-bold text-gray-700 mb-1">Tiêu đề lưới danh mục</label>
-          <input
-            type="text"
-            value={gridCfg.title || ''}
-            onChange={(e) => onUpdateConfig({ title: e.target.value })}
-            className="w-full border border-gray-300 rounded px-2.5 py-1.5 focus:border-[#e60049] bg-white text-xs"
-            placeholder="TÀI LIỆU TIẾNG ANH THEO CẤP HỌC"
-          />
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-800">
-              Các ô danh mục hiển thị ({items.length} ô):
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                const newItem: HomepageCategoryTile = {
-                  id: `cat_${Date.now()}`,
-                  category_slug: 'high-school',
-                  label: 'Danh mục mới',
-                  icon_code: 'academic-cap',
-                  image_url: '',
-                  to: '/high-school',
-                  is_active: true,
-                };
-                onUpdateConfig({ items: [...items, newItem] });
-              }}
-              className="text-[11px] font-bold text-[#e60049] bg-white hover:bg-pink-50 border border-pink-200 px-2 py-0.5 rounded cursor-pointer"
-            >
-              + Thêm ô danh mục
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {items.map((it, idx) => (
-              <div key={it.id || idx} className="border border-gray-200 rounded p-2.5 bg-gray-50 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <input
-                    type="text"
-                    value={it.label}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...next[idx], label: e.target.value };
-                      onUpdateConfig({ items: next });
-                    }}
-                    placeholder="Tên danh mục (VD: THPT Quốc Gia)"
-                    className="font-bold border border-gray-300 rounded px-2 py-1 bg-white flex-1 mr-2"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onUpdateConfig({ items: items.filter((_, i) => i !== idx) })}
-                    className="text-red-600 font-bold px-1"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={it.category_slug}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...next[idx], category_slug: e.target.value };
-                      onUpdateConfig({ items: next });
-                    }}
-                    placeholder="Slug (VD: high-school)"
-                    className="w-1/2 border border-gray-300 rounded px-2 py-1 bg-white text-[11px]"
-                  />
-                  <input
-                    type="text"
-                    value={it.to}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...next[idx], to: e.target.value };
-                      onUpdateConfig({ items: next });
-                    }}
-                    placeholder="Link (VD: /high-school)"
-                    className="flex-1 border border-gray-300 rounded px-2 py-1 bg-white text-[11px]"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <CategoriesGridBlockEditor
+        gridCfg={cfg as HomepageCategoriesGridConfig}
+        onUpdateConfig={onUpdateConfig}
+      />
     );
   }
 
@@ -2071,62 +2783,13 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   // KHỐI CÁC NHÓM CHUYÊN MỤC TRANG CHỦ: section_groups
   // ==========================================
   if (block.type === 'section_groups') {
-    const secCfg = cfg as HomepageSectionGroupsConfig;
-    const sections = Array.isArray(secCfg.sections) ? secCfg.sections : [];
-
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-gray-800">
-            Danh sách các nhóm chuyên mục nổi bật trang chủ ({sections.length} nhóm):
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              const newSec: HomepageSectionGroup = {
-                id: `sec_${Date.now()}`,
-                title: 'Nhóm tài liệu mới',
-                is_active: true,
-                sort_order: sections.length + 1,
-                items: [],
-              };
-              onUpdateConfig({ sections: [...sections, newSec] });
-            }}
-            className="text-[11px] font-bold text-[#e60049] bg-white hover:bg-pink-50 border border-pink-200 px-2.5 py-1 rounded cursor-pointer"
-          >
-            + Thêm nhóm chuyên mục
-          </button>
-        </div>
-
-        {sections.map((sec, sIdx) => (
-          <div key={sec.id || sIdx} className="border border-gray-200 rounded-md p-3.5 bg-gray-50/60 space-y-3">
-            <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2">
-              <input
-                type="text"
-                value={sec.title}
-                onChange={(e) => {
-                  const next = [...sections];
-                  next[sIdx] = { ...next[sIdx], title: e.target.value };
-                  onUpdateConfig({ sections: next });
-                }}
-                className="font-bold text-xs border border-gray-300 rounded px-2 py-1 bg-white flex-1"
-                placeholder="Tiêu đề nhóm (VD: TÀI LIỆU LUYỆN THI THPT QUỐC GIA)"
-              />
-              <button
-                type="button"
-                onClick={() => onUpdateConfig({ sections: sections.filter((_, i) => i !== sIdx) })}
-                className="text-red-600 hover:bg-red-50 text-xs font-bold px-2 py-1 rounded"
-              >
-                ✕ Xóa nhóm
-              </button>
-            </div>
-
-            <p className="text-[11px] text-gray-500">
-              Số lượng tài liệu trong nhóm: <strong>{sec.items?.length || 0} tài liệu</strong>.
-            </p>
-          </div>
-        ))}
-      </div>
+      <SectionGroupsBlockEditor
+        secCfg={cfg as HomepageSectionGroupsConfig}
+        onUpdateConfig={onUpdateConfig}
+        allProducts={allProducts}
+        context={context}
+      />
     );
   }
 
