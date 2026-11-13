@@ -20,7 +20,7 @@ import {
   ComboCartEvaluation,
 } from '../utils/comboPricingEngine';
 
-interface StoreContextValue {
+export interface StoreContextValue {
   isLoading: boolean;
   apiError: string | null;
   menus: MenuItem[];
@@ -62,10 +62,14 @@ interface StoreContextValue {
   buyNow: (product: Product, formatCode: UiFormatCode, quantity?: number) => void;
   toggleCartItemSelect: (cartItemId: string) => void;
   selectOnlyFormat: (formatCode: UiFormatCode) => void;
+  deselectAllCartItems: () => void;
+  bulkChangeSelectedFormats: (targetFormat: 'Word' | 'PDF') => void;
   updateCartItemQty: (cartItemId: string, delta: number) => void;
   updateCartItemFormat: (cartItemId: string, newFormatCode: UiFormatCode) => void;
   removeCartItem: (cartItemId: string) => void;
   clearSelectedCartItems: () => void;
+  checkoutItems: CartItem[];
+  setCheckoutItems: (items: CartItem[]) => void;
 
   // Modals & Drawers
   isCartOpen: boolean;
@@ -139,6 +143,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<CartItem[]>([]);
   const [sampleModalProduct, setSampleModalProduct] = useState<Product | null>(null);
   const [formatModalProduct, setFormatModalProduct] = useState<Product | null>(null);
   const [formatModalInitialFormat, setFormatModalInitialFormat] = useState<UiFormatCode | undefined>(undefined);
@@ -662,6 +667,86 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  const deselectAllCartItems = () => {
+    setCartItems((prev) => prev.map((item) => ({ ...item, selected: false })));
+  };
+
+  const bulkChangeSelectedFormats = (targetFormat: 'Word' | 'PDF') => {
+    setCartItems((prev) => {
+      let changedCount = 0;
+      let skippedCount = 0;
+      const nextMap = new Map<string, CartItem>();
+
+      for (const item of prev) {
+        if (!item.selected) {
+          if (!nextMap.has(item.cartItemId)) {
+            nextMap.set(item.cartItemId, item);
+          }
+          continue;
+        }
+
+        if (item.formatCode === targetFormat) {
+          nextMap.set(item.cartItemId, { ...item, selected: true });
+          continue;
+        }
+
+        const product = products.find((p) => p.id === item.productId || p.slug === item.slug);
+        const hasTargetFormat = product
+          ? (product.formats || []).some((f) => f.format_code === targetFormat && f.is_active)
+          : true;
+        const status = checkOwnershipStatus(item.slug, targetFormat);
+
+        if (!hasTargetFormat || !status.canPurchase) {
+          skippedCount++;
+          if (!nextMap.has(item.cartItemId)) {
+            nextMap.set(item.cartItemId, item);
+          }
+          continue;
+        }
+
+        let newUnitPrice = product ? resolveFormatPrice(product, targetFormat) : item.unitPrice;
+        const originalPrice = newUnitPrice;
+        let upgradeOffset = 0;
+        const isUpgrade = status.isUpgrade;
+
+        if (isUpgrade && product) {
+          const pdfPrice = resolveFormatPrice(product, 'PDF');
+          upgradeOffset = Math.min(pdfPrice, newUnitPrice);
+          newUnitPrice = Math.max(0, newUnitPrice - upgradeOffset);
+        }
+
+        const newCartItemId = `${item.slug}__${targetFormat}`;
+        const newQty = 1;
+
+        const convertedItem: CartItem = {
+          ...item,
+          cartItemId: newCartItemId,
+          formatCode: targetFormat,
+          unitPrice: newUnitPrice,
+          originalPrice,
+          upgradeOffset,
+          isUpgrade,
+          upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+          quantity: newQty,
+          selected: true,
+        };
+
+        nextMap.set(newCartItemId, convertedItem);
+        changedCount++;
+      }
+
+      if (changedCount > 0) {
+        showToast(`Đã chuyển ${changedCount} tài liệu sang định dạng ${targetFormat}.`);
+      } else if (skippedCount > 0) {
+        showToast(`Không thể chuyển một số tài liệu sang định dạng ${targetFormat} do đã sở hữu hoặc không hỗ trợ.`);
+      } else {
+        showToast(`Các tài liệu đã chọn đều đang ở định dạng ${targetFormat}.`);
+      }
+
+      return Array.from(nextMap.values());
+    });
+  };
+
   const updateCartItemFormat = (cartItemId: string, newFormatCode: UiFormatCode) => {
     setCartItems((prev) => {
       const item = prev.find((it) => it.cartItemId === cartItemId);
@@ -763,7 +848,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const clearSelectedCartItems = () => {
-    setCartItems((prev) => prev.filter((item) => !item.selected));
+    const checkoutIds = new Set(checkoutItems.map((it) => it.cartItemId));
+    setCartItems((prev) =>
+      prev.filter((item) => !item.selected && !checkoutIds.has(item.cartItemId))
+    );
+    setCheckoutItems([]);
   };
 
   const selectedCartItems = useMemo(
@@ -906,10 +995,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         buyNow,
         toggleCartItemSelect,
         selectOnlyFormat,
+        deselectAllCartItems,
+        bulkChangeSelectedFormats,
         updateCartItemQty,
         updateCartItemFormat,
         removeCartItem,
         clearSelectedCartItems,
+        checkoutItems,
+        setCheckoutItems,
         isCartOpen,
         setIsCartOpen,
         isSearchOpen,

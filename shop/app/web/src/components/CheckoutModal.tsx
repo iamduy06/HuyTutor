@@ -29,6 +29,9 @@ export const CheckoutModal: React.FC = () => {
     clientRegion,
     setRegionOverride,
     clearSelectedCartItems,
+    deselectAllCartItems,
+    checkoutItems,
+    setCheckoutItems,
     siteConfigs,
     showToast,
   } = useStore();
@@ -98,30 +101,46 @@ export const CheckoutModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [createdOrder, clearSelectedCartItems, showToast]);
 
+  const effectiveCheckoutItems = useMemo(() => {
+    if (checkoutItems.length > 0) return checkoutItems;
+    return selectedCartItems;
+  }, [checkoutItems, selectedCartItems]);
+
   // Tính toán số tiền thực tế đồng bộ với số lượng Flashcard tài khoản
-  const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
+  const activeFormat: UiFormatCode = useMemo(() => {
+    if (effectiveCheckoutItems.length > 0) {
+      return effectiveCheckoutItems[0].formatCode;
+    }
+    return selectedFormats[0] || 'Word';
+  }, [effectiveCheckoutItems, selectedFormats]);
 
   const displaySubtotal = useMemo(() => {
-    if (activeFormat === 'Flashcard' && selectedCartItems.length > 0) {
-      return selectedCartItems.reduce(
+    if (activeFormat === 'Flashcard' && effectiveCheckoutItems.length > 0) {
+      return effectiveCheckoutItems.reduce(
         (acc, it) => acc + it.unitPrice * Math.max(1, flashcardQuantity),
         0
       );
     }
+    if (effectiveCheckoutItems.length > 0) {
+      return effectiveCheckoutItems.reduce(
+        (acc, it) => acc + it.unitPrice * (it.quantity || 1),
+        0
+      );
+    }
     return subtotalAmount;
-  }, [activeFormat, selectedCartItems, flashcardQuantity, subtotalAmount]);
+  }, [activeFormat, effectiveCheckoutItems, flashcardQuantity, subtotalAmount]);
 
   const displayTotal = useMemo(() => {
-    if (activeFormat === 'Flashcard' && selectedCartItems.length > 0) {
+    if (effectiveCheckoutItems.length > 0) {
       const discount = Math.round((displaySubtotal * discountPercent) / 100);
       return Math.max(0, displaySubtotal - discount);
     }
     return totalAmount;
-  }, [activeFormat, selectedCartItems, flashcardQuantity, displaySubtotal, discountPercent, totalAmount]);
-
-  if (!isCheckoutOpen) return null;
+  }, [effectiveCheckoutItems, displaySubtotal, discountPercent, totalAmount]);
 
   const handleClose = () => {
+    setCheckoutItems([]);
+    deselectAllCartItems();
     setIsCheckoutOpen(false);
     setFormError(null);
     if (createdOrder?.payment_status === 'paid') {
@@ -130,37 +149,54 @@ export const CheckoutModal: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isCheckoutOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCheckoutOpen]);
+
+  if (!isCheckoutOpen) return null;
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    if (selectedCartItems.length === 0) {
+    if (effectiveCheckoutItems.length === 0) {
       setFormError('Không có sản phẩm nào được chọn để thanh toán.');
       return;
     }
 
-    if (hasFormatConflict) {
+    const checkoutFormats = Array.from(new Set(effectiveCheckoutItems.map((it) => it.formatCode)));
+    if (checkoutFormats.length > 1) {
       setFormError(
         'Mỗi đơn hàng chỉ được phép thanh toán cho 1 định dạng duy nhất. Vui lòng quay lại giỏ hàng để chọn đồng nhất định dạng.'
       );
       return;
     }
 
-    if (hasMultipleProductsConflict) {
+    const hasMultipleNonFlashcard = effectiveCheckoutItems.some(
+      (it) => it.formatCode !== 'Flashcard' && (it.quantity || 1) > 1
+    );
+    if (hasMultipleNonFlashcard) {
       setFormError(
         'Trừ định dạng Flashcard, mỗi tài liệu chỉ được phép đặt với số lượng 1. Vui lòng điều chỉnh lại giỏ hàng.'
       );
       return;
     }
 
-    const hasOwnedItem = selectedCartItems.some((it) => {
+    const hasOwnedItem = effectiveCheckoutItems.some((it) => {
       if (it.isUpgrade) return false;
       if (!isItemInLibrary) return false;
       if (it.formatCode === 'PDF' && isItemInLibrary(it.slug, 'Word')) return true;
       return isItemInLibrary(it.slug, it.formatCode);
     });
     if (hasOwnedItem) {
-      const isWordOwnedPdfRequest = selectedCartItems.some(
+      const isWordOwnedPdfRequest = effectiveCheckoutItems.some(
         (it) => it.formatCode === 'PDF' && isItemInLibrary && isItemInLibrary(it.slug, 'Word')
       );
       if (isWordOwnedPdfRequest) {
@@ -231,7 +267,7 @@ export const CheckoutModal: React.FC = () => {
         paymentMethod: isVietnamUser ? 'sepay' : selectedGateway,
         consentOrderProcessing: true,
         consentMarketingEmails: Boolean(consentMarketingEmails),
-        items: selectedCartItems.map((it) => ({
+        items: effectiveCheckoutItems.map((it) => ({
           productId: it.slug,
           productTitle: it.title,
           formatCode: it.formatCode,
@@ -271,8 +307,14 @@ export const CheckoutModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 overflow-y-auto">
-      <div className="bg-white rounded-md border border-gray-200 shadow-2xl w-full max-w-2xl overflow-hidden my-8">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 overflow-y-auto"
+      onClick={handleClose}
+    >
+      <div
+        className="bg-white rounded-md border border-gray-200 shadow-2xl w-full max-w-2xl overflow-hidden my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-[#e60049] text-white px-6 py-4 flex items-center justify-between">
           <div>
@@ -286,9 +328,11 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="button"
             onClick={handleClose}
-            className="px-2.5 py-1 bg-white text-[#e60049] font-bold text-xs rounded-sm hover:bg-gray-100 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-white text-[#e60049] font-bold text-xs rounded-sm hover:bg-gray-100 transition cursor-pointer"
+            aria-label="Đóng popup thanh toán"
           >
-            Đóng
+            <span className="text-sm font-black leading-none">✕</span>
+            <span>Đóng</span>
           </button>
         </div>
 
@@ -538,9 +582,9 @@ export const CheckoutModal: React.FC = () => {
               {/* Tóm tắt sản phẩm & tiền thanh toán */}
               <div className="bg-gray-50 border border-gray-200 rounded-md p-3.5 space-y-2 text-xs">
                 <div className="font-bold text-gray-800 border-b border-gray-200 pb-1.5">
-                  Danh sách tài liệu ({selectedCartItems.length} tài liệu - Định dạng {activeFormat}):
+                  Danh sách tài liệu ({effectiveCheckoutItems.length} tài liệu - Định dạng {activeFormat}):
                 </div>
-                {selectedCartItems.map((it) => {
+                {effectiveCheckoutItems.map((it) => {
                   const effectiveQty =
                     activeFormat === 'Flashcard' ? Math.max(1, flashcardQuantity) : it.quantity;
                   const isComboItem =

@@ -82,6 +82,7 @@ export interface HomepageHeroConfig {
   title?: string;
   bullets?: string[];
   image_url?: string;
+  layout_direction?: 'text_left_image_right' | 'image_left_text_right';
   is_active?: boolean;
 }
 
@@ -1254,5 +1255,10 @@ export interface UploadMediaResult {
   message?: string;
   error?: string;
   details?: string;
+}
+
+export interface StoreContextType {
+  deselectAllCartItems: () => void;
+  bulkChangeSelectedFormats: (targetFormat: 'Word' | 'PDF') => void;
 }
 
