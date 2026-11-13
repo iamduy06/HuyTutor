@@ -186,6 +186,7 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
                       block={block}
                       onUpdateConfig={(cfg) => handleUpdateBlockConfig(block.id, cfg)}
                       allProducts={allProducts}
+                      allCategories={allCategories}
                       context={context}
                     />
                   )}

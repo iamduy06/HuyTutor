@@ -1,11 +1,12 @@
 import { buildProductUrl } from '../utils/urlHelper';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import { ReorderableProductSelector } from './ReorderableProductSelector';
 import {
   BottomCtaBlockConfig,
   CategoryBannerBlockConfig,
   CategoryHeroBlockConfig,
+  CategoryItem,
   CategoryNoticeBlockConfig,
   CategorySectionBlockConfig,
   ComboBannerBlockConfig,
@@ -55,11 +56,101 @@ import { CustomHtmlBlockEditor } from './CustomHtmlBlockEditor';
 // =========================================================================
 // CategoriesGridBlockEditor: Trình soạn thảo Lưới Danh Mục Trang Chủ
 // =========================================================================
+const CORE_HUB_PAGES = [
+  { name: 'Flashcard', slug: 'flashcard', to: '/flashcard', isCore: true },
+  { name: 'Combo THPT', slug: 'combo-thpt', to: '/combo-thpt', isCore: true },
+];
+
 const CategoriesGridBlockEditor: React.FC<{
   gridCfg: HomepageCategoriesGridConfig;
   onUpdateConfig: (partial: any) => void;
-}> = ({ gridCfg, onUpdateConfig }) => {
+  allCategories?: CategoryItem[];
+  context?: UniversalPageContext;
+}> = ({ gridCfg, onUpdateConfig, allCategories = [], context }) => {
   const items = Array.isArray(gridCfg.items) ? gridCfg.items : [];
+
+  const initialCategories =
+    allCategories && allCategories.length > 0
+      ? allCategories
+      : context?.allCategories && context.allCategories.length > 0
+      ? context.allCategories
+      : [];
+
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(initialCategories);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+
+  // Đồng bộ khi props allCategories hoặc context cập nhật
+  useEffect(() => {
+    if (allCategories && allCategories.length > 0) {
+      setCategoriesList(allCategories);
+    } else if (context?.allCategories && context.allCategories.length > 0) {
+      setCategoriesList(context.allCategories);
+    }
+  }, [allCategories, context?.allCategories]);
+
+  // Fallback nạp từ API getCatalogInit nếu danh mục rỗng
+  useEffect(() => {
+    if (categoriesList.length === 0) {
+      apiClient
+        .getCatalogInit()
+        .then((res) => {
+          if (Array.isArray(res?.categories) && res.categories.length > 0) {
+            setCategoriesList(res.categories);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi tải danh mục cho bộ chọn CategoriesGrid:', err);
+        });
+    }
+  }, [categoriesList.length]);
+
+  // Tổng hợp danh sách Trang Cấp 1 (CSDL categories + Hub cốt lõi, deduplicate theo slug)
+  const availableLevel1Pages = useMemo(() => {
+    const list: { id: string; name: string; slug: string; to: string; isCore?: boolean }[] = [];
+    const seen = new Set<string>();
+
+    categoriesList.forEach((c) => {
+      const slug = (c.slug || '').trim().replace(/^\/+/, '');
+      if (!slug || seen.has(slug)) return;
+      seen.add(slug);
+      list.push({
+        id: c.id || `cat_${slug}`,
+        name: c.name || slug,
+        slug,
+        to: `/${slug}`,
+        isCore: false,
+      });
+    });
+
+    CORE_HUB_PAGES.forEach((hub) => {
+      const slug = hub.slug.trim().replace(/^\/+/, '');
+      if (!seen.has(slug)) {
+        seen.add(slug);
+        list.push({
+          id: `hub_${slug}`,
+          name: hub.name,
+          slug,
+          to: hub.to,
+          isCore: true,
+        });
+      }
+    });
+
+    return list;
+  }, [categoriesList]);
+
+  // Lọc tìm kiếm theo tên hoặc slug hoặc to
+  const filteredLevel1Pages = useMemo(() => {
+    if (!categorySearchTerm.trim()) return availableLevel1Pages;
+    const term = categorySearchTerm.toLowerCase().trim();
+    return availableLevel1Pages.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        p.slug.toLowerCase().includes(term) ||
+        p.to.toLowerCase().includes(term)
+    );
+  }, [availableLevel1Pages, categorySearchTerm]);
 
   const moveItem = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
@@ -77,6 +168,34 @@ const CategoriesGridBlockEditor: React.FC<{
       apiClient.deleteR2File(itemToDelete.image_url).catch(() => {});
     }
     onUpdateConfig({ items: items.filter((_, i) => i !== index) });
+  };
+
+  const addCategoryManual = () => {
+    const newItem: HomepageCategoryTile = {
+      id: `cat_${Date.now()}`,
+      category_slug: '',
+      label: 'Danh mục mới',
+      icon_code: '',
+      image_url: '',
+      to: '',
+      is_active: true,
+    };
+    onUpdateConfig({ items: [...items, newItem] });
+  };
+
+  const handleAddFromLevel1 = (cat: { name: string; slug: string; to: string }) => {
+    const newItem: HomepageCategoryTile = {
+      id: `cat_${Date.now()}_${cat.slug}`,
+      category_slug: cat.slug,
+      label: cat.name,
+      icon_code: cat.slug,
+      image_url: '',
+      to: cat.to,
+      is_active: true,
+    };
+    onUpdateConfig({ items: [...items, newItem] });
+    setIsPickerOpen(false);
+    setCategorySearchTerm('');
   };
 
   return (
@@ -97,25 +216,93 @@ const CategoriesGridBlockEditor: React.FC<{
           <span className="text-xs font-bold text-gray-800">
             Các ô danh mục hiển thị ({items.length} ô):
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              const newItem: HomepageCategoryTile = {
-                id: `cat_${Date.now()}`,
-                category_slug: '',
-                label: 'Danh mục mới',
-                icon_code: '',
-                image_url: '',
-                to: '',
-                is_active: true,
-              };
-              onUpdateConfig({ items: [...items, newItem] });
-            }}
-            className="text-[11px] font-bold text-[#e60049] bg-white hover:bg-pink-50 border border-pink-200 px-3 py-1 rounded cursor-pointer shadow-2xs transition"
-          >
-            + Thêm ô danh mục
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPickerOpen(!isPickerOpen);
+                setCategorySearchTerm('');
+              }}
+              className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3 py-1 rounded cursor-pointer transition shadow-2xs"
+            >
+              {isPickerOpen ? '✕ Đóng bộ chọn' : '📂 + Thêm từ Trang Cấp 1 có sẵn'}
+            </button>
+            <button
+              type="button"
+              onClick={addCategoryManual}
+              className="text-[11px] font-bold text-[#e60049] bg-white hover:bg-pink-50 border border-pink-200 px-3 py-1 rounded cursor-pointer shadow-2xs transition"
+            >
+              ✏️ + Thêm ô danh mục thủ công
+            </button>
+          </div>
         </div>
+
+        {/* Collapsible Drawer/Panel: Chọn Trang Cấp 1 có sẵn */}
+        {isPickerOpen && (
+          <div className="border border-purple-300 bg-purple-50/40 rounded-lg p-3.5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-extrabold text-purple-900 uppercase">
+                Chọn Trang Cấp 1 để thêm nhanh vào Lưới Danh Mục:
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen(false)}
+                className="text-gray-500 hover:text-gray-700 font-bold text-xs cursor-pointer"
+              >
+                ✕ Đóng
+              </button>
+            </div>
+            <input
+              type="text"
+              value={categorySearchTerm}
+              onChange={(e) => setCategorySearchTerm(e.target.value)}
+              placeholder="Gõ tìm kiếm tên danh mục hoặc slug..."
+              className="w-full border border-purple-300 rounded px-2.5 py-1.5 bg-white text-xs focus:border-purple-600 focus:outline-hidden"
+              autoFocus
+            />
+            <div className="max-h-60 overflow-y-auto space-y-1 divide-y divide-purple-100 bg-white rounded border border-purple-200 p-2">
+              {filteredLevel1Pages.length === 0 ? (
+                <div className="text-center py-4 text-xs text-gray-500">
+                  Không tìm thấy Trang Cấp 1 nào phù hợp với từ khóa.
+                </div>
+              ) : (
+                filteredLevel1Pages.map((cat) => (
+                  <div
+                    key={cat.id || cat.slug}
+                    onClick={() => handleAddFromLevel1(cat)}
+                    className="flex items-center justify-between gap-3 p-2 hover:bg-purple-50 rounded cursor-pointer transition"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-8 h-8 rounded bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        📁
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-gray-900 truncate">
+                          {cat.name}
+                        </div>
+                        <div className="text-[10px] text-gray-500 flex items-center gap-2 mt-0.5">
+                          <span className="font-mono bg-gray-100 px-1 rounded">{cat.to}</span>
+                          {cat.isCore ? (
+                            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                              Trang Hub Cốt Lõi
+                            </span>
+                          ) : (
+                            <span className="bg-blue-50 text-blue-700 text-[10px] px-1.5 py-0.2 rounded font-medium">
+                              Danh mục CSDL
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-[#e60049] shrink-0">
+                      + Thêm ô này
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {items.map((it, idx) => (
@@ -179,6 +366,51 @@ const CategoriesGridBlockEditor: React.FC<{
                     ✕ Xóa
                   </button>
                 </div>
+              </div>
+
+              {/* Dropdown liên kết nhanh với Trang Cấp 1 */}
+              <div className="bg-purple-50/50 border border-purple-200 rounded p-2.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-purple-900 flex items-center gap-1">
+                    <span>🔗</span>
+                    <span>Liên kết nhanh với Trang Cấp 1:</span>
+                  </label>
+                  {it.category_slug && (
+                    <span className="text-[10px] text-purple-700 font-mono">
+                      Slug: {it.category_slug}
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={
+                    availableLevel1Pages.some((p) => p.slug === it.category_slug)
+                      ? it.category_slug
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const selectedSlug = e.target.value;
+                    if (!selectedSlug) return;
+                    const found = availableLevel1Pages.find((p) => p.slug === selectedSlug);
+                    if (found) {
+                      const next = [...items];
+                      next[idx] = {
+                        ...next[idx],
+                        label: found.name,
+                        category_slug: found.slug,
+                        to: found.to,
+                      };
+                      onUpdateConfig({ items: next });
+                    }
+                  }}
+                  className="w-full border border-purple-300 rounded px-2.5 py-1.5 bg-white text-xs font-medium text-gray-800 focus:border-purple-600 focus:outline-hidden"
+                >
+                  <option value="">-- Chọn Trang Cấp 1 để tự động điền Tên, Slug và Đường dẫn --</option>
+                  {availableLevel1Pages.map((p) => (
+                    <option key={p.id || p.slug} value={p.slug}>
+                      {p.name} ({p.to}) {p.isCore ? '[Trang Hub Cốt Lõi]' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Tải ảnh danh mục lên Cloudflare R2 (Bắt buộc 100% ảnh R2) */}
@@ -771,6 +1003,7 @@ interface UniversalBlockItemEditorProps {
   block: UniversalBlockItem;
   onUpdateConfig: (partial: any) => void;
   allProducts?: Product[];
+  allCategories?: CategoryItem[];
   context?: UniversalPageContext;
 }
 
@@ -778,6 +1011,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
   block,
   onUpdateConfig,
   allProducts = [],
+  allCategories = [],
   context,
 }) => {
   const cfg = block.config || {};
@@ -2712,6 +2946,8 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
       <CategoriesGridBlockEditor
         gridCfg={cfg as HomepageCategoriesGridConfig}
         onUpdateConfig={onUpdateConfig}
+        allCategories={allCategories}
+        context={context}
       />
     );
   }

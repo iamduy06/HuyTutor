@@ -67,7 +67,7 @@ const BLOCK_TYPE_LABELS: Record<HomepageBlockType, { name: string; color: string
 };
 
 export const AdminHomepageCms: React.FC = () => {
-  const { siteConfigs, updateSiteConfig, showToast, products } = useStore();
+  const { siteConfigs, updateSiteConfig, showToast, products, categories } = useStore();
 
   // Danh sách các khung (Block-based layout) - hoàn toàn động số lượng và thứ tự
   const [blocks, setBlocks] = useState<HomepageBlockItem[]>(() => {
@@ -496,6 +496,7 @@ export const AdminHomepageCms: React.FC = () => {
                 pageType: 'homepage',
                 siteConfigs,
                 allProducts: products,
+                allCategories: categories,
               }}
             />
           </div>
@@ -509,10 +510,12 @@ export const AdminHomepageCms: React.FC = () => {
         blocks={blocks}
         onBlocksChange={(newBlocks) => setBlocks(newBlocks)}
         allProducts={products}
+        allCategories={categories}
         context={{
           pageType: 'homepage',
           siteConfigs,
           allProducts: products,
+          allCategories: categories,
         }}
         quickAddTypes={[
           { type: 'hero', label: 'Hero Đầu Trang' },
