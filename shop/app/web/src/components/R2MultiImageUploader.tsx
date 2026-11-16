@@ -234,10 +234,17 @@ export const R2MultiImageUploader: React.FC<R2MultiImageUploaderProps> = ({
   const handleDeleteImage = async (url: string, index: number) => {
     setIsDeletingUrl(url);
     try {
-      await apiClient.deleteR2File(url);
+      const res = await apiClient.deleteR2File(url);
       const next = images.filter((_, idx) => idx !== index);
       onImagesChange(next);
-      showToast(`Đã xóa vĩnh viễn trang ${index + 1} khỏi Cloudflare R2.`);
+      const cleanupCount = res?.cleanupReport?.totalCleaned ?? 0;
+      if (cleanupCount > 0) {
+        showToast(
+          `Đã xóa vĩnh viễn trang ${index + 1} khỏi Cloudflare R2 và dọn sạch ${cleanupCount} liên kết trong CSDL.`
+        );
+      } else {
+        showToast(`Đã xóa vĩnh viễn trang ${index + 1} khỏi Cloudflare R2.`);
+      }
     } catch (err: any) {
       console.warn('Lỗi xóa file trên R2, gỡ khỏi danh sách:', err);
       const next = images.filter((_, idx) => idx !== index);

@@ -67,9 +67,16 @@ export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
     if (!imageUrl) return;
     setIsDeleting(true);
     try {
-      await apiClient.deleteR2File(imageUrl);
+      const res = await apiClient.deleteR2File(imageUrl);
       onUrlChange('');
-      showToast('Đã xóa vĩnh viễn hình ảnh khỏi Cloudflare R2.');
+      const cleanupCount = res?.cleanupReport?.totalCleaned ?? 0;
+      if (cleanupCount > 0) {
+        showToast(
+          `Đã xóa vĩnh viễn hình ảnh khỏi Cloudflare R2 và dọn sạch ${cleanupCount} liên kết trong CSDL.`
+        );
+      } else {
+        showToast('Đã xóa vĩnh viễn hình ảnh khỏi Cloudflare R2.');
+      }
     } catch (err: any) {
       showToast(err?.message || 'Lỗi xóa file trên R2. Đã bỏ liên kết ảnh.');
       onUrlChange('');

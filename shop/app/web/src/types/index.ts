@@ -1240,11 +1240,25 @@ export interface MediaDeleteError {
   error: string;
 }
 
+export interface CleanupReport {
+  totalCleaned: number;
+  details: Record<string, number>;
+}
+
 export interface DeleteMediaResult {
   ok: boolean;
   deletedKeys: string[];
   errors: MediaDeleteError[];
+  cleanupReport?: CleanupReport;
   message?: string;
+  error?: string;
+  details?: string;
+}
+
+export interface DeleteR2FileResult {
+  ok: boolean;
+  result?: any;
+  cleanupReport?: CleanupReport;
   error?: string;
   details?: string;
 }

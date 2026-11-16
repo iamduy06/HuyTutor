@@ -233,16 +233,28 @@ export const AdminMediaManager: React.FC = () => {
     setDeleteModal((prev) => ({ ...prev, isDeleting: true }));
     try {
       const res = await apiClient.deleteMediaFiles(deleteModal.keys);
+      const cleanupCount = res.cleanupReport?.totalCleaned ?? 0;
+      const cleanupDetailsStr = res.cleanupReport?.details
+        ? Object.entries(res.cleanupReport.details)
+            .filter(([_, count]) => count > 0)
+            .map(([table, count]) => `${table}: ${count}`)
+            .join(', ')
+        : '';
+
+      const cleanupMsg =
+        cleanupCount > 0
+          ? ` Đã tự động dọn sạch ${cleanupCount} liên kết trong CSDL (${cleanupDetailsStr}).`
+          : ' Không có liên kết CSDL nào cần dọn.';
+
       if (res.errors && res.errors.length > 0) {
         showToast(
-          `Xóa một phần: Đã xóa ${res.deletedKeys.length} tệp, thất bại ${res.errors.length} tệp: ${res.errors
+          `Xóa một phần: Đã xóa ${res.deletedKeys.length} tệp trên R2, thất bại ${res.errors.length} tệp: ${res.errors
             .map((e) => `${e.key}: ${e.error}`)
-            .join('; ')}`
+            .join('; ')}.${cleanupMsg}`
         );
       } else {
         showToast(
-          res.message ||
-            `Đã xóa thành công ${res.deletedKeys.length} tệp tin vĩnh viễn trên Cloudflare R2 bucket!`
+          `Đã xóa thành công ${res.deletedKeys.length} tệp tin vĩnh viễn trên Cloudflare R2 bucket!${cleanupMsg}`
         );
       }
 
@@ -1109,12 +1121,15 @@ export const AdminMediaManager: React.FC = () => {
               </div>
             ) : deleteModal.inUse ? (
               <div className="space-y-3">
-                <div className="bg-red-50 border border-red-200 p-3 rounded-xs text-xs text-red-800 space-y-1">
-                  <p className="font-extrabold text-red-700 uppercase">
-                    🚨 CẢNH BÁO: TỆP TIN ĐANG ĐƯỢC SỬ DỤNG TRÊN WEBSITE!
+                <div className="bg-amber-50 border border-amber-300 p-3 rounded-xs text-xs text-amber-900 space-y-1.5">
+                  <p className="font-extrabold text-amber-800 uppercase flex items-center gap-1.5">
+                    <span>⚠️</span> CẢNH BÁO: TỆP TIN ĐANG ĐƯỢC SỬ DỤNG TRÊN WEBSITE!
                   </p>
                   <p className="text-[11px] leading-relaxed">
-                    Có <strong>{deleteModal.usages.length} vị trí</strong> đang liên kết trực tiếp tới các tệp tin này. Nếu xóa vĩnh viễn trên R2, website sẽ bị lỗi hiển thị ảnh hoặc hỏng liên kết!
+                    Có <strong>{deleteModal.usages.length} vị trí</strong> đang liên kết trực tiếp tới các tệp tin này.
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-950">
+                    Khi xác nhận xóa, hệ thống sẽ xóa vĩnh viễn tệp trên Cloudflare R2 đồng thời <strong>tự động kích hoạt Cascade Cleanup</strong> để dọn sạch (gán rỗng) toàn bộ các liên kết mồ côi trong Cơ sở dữ liệu (sản phẩm, danh mục, cấu hình trang chủ...), ngăn ngừa lỗi hiển thị ảnh hỏng. Hãy tải ảnh thay thế mới cho các vị trí này nếu cần.
                   </p>
                 </div>
 
@@ -1136,7 +1151,7 @@ export const AdminMediaManager: React.FC = () => {
                   Hệ thống đã quét kiểm tra toàn bộ Database &amp; cấu hình: <strong>Không phát hiện tệp tin nào đang được sử dụng.</strong>
                 </p>
                 <p className="text-gray-500">
-                  Bạn có chắc chắn muốn xóa vĩnh viễn <strong>{deleteModal.keys.length} tệp tin</strong> trên Cloudflare R2 bucket? Thao tác này sẽ giải phóng dung lượng và không thể hoàn tác.
+                  Bạn có chắc chắn muốn xóa vĩnh viễn <strong>{deleteModal.keys.length} tệp tin</strong> trên Cloudflare R2 bucket? Hệ thống cũng sẽ tự động dọn sạch mọi liên kết mồ côi (nếu có) trong CSDL và giải phóng dung lượng lưu trữ. Thao tác này không thể hoàn tác.
                 </p>
               </div>
             )}

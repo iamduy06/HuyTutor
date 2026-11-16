@@ -22,7 +22,9 @@ import { AdminUserRecord,
   MediaUsage,
   CheckMediaUsageResult,
   DeleteMediaResult,
-  UploadMediaResult } from '../types';
+  UploadMediaResult,
+  CleanupReport,
+  DeleteR2FileResult } from '../types';
 
 export type {
   MediaItem,
@@ -34,6 +36,8 @@ export type {
   CheckMediaUsageResult,
   DeleteMediaResult,
   UploadMediaResult,
+  CleanupReport,
+  DeleteR2FileResult,
 };
 
 const rawApiBase = import.meta.env.API_BASE_URL;
@@ -501,15 +505,15 @@ export const apiClient = {
     return { url: res.publicUrl, objectKey: res.objectKey };
   },
 
-  async deleteR2File(urlOrKey: string): Promise<{ ok: boolean; result?: any }> {
+  async deleteR2File(urlOrKey: string): Promise<DeleteR2FileResult> {
     if (!urlOrKey) return { ok: true };
     try {
-      return await requestJson('/api/admin/delete-file', {
+      return await requestJson<DeleteR2FileResult>('/api/admin/delete-file', {
         method: 'POST',
         body: JSON.stringify({ url: urlOrKey }),
       });
-    } catch {
-      return { ok: false };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Lỗi kết nối khi xóa file R2.' };
     }
   },
 
