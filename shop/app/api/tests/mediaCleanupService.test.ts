@@ -5,7 +5,11 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
-import { createTestServer } from './helpers/testServer.ts';
+import {
+  createTestServer,
+  __setSimulatedR2Objects,
+  __clearSimulatedR2Objects,
+} from './helpers/testServer.ts';
 import type { TestServerContext } from './helpers/testServer.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -229,6 +233,118 @@ describe('Milestone 1: Media Cleanup Service & Cascade Reference Cleanup', () =>
       assert(body.cleanupReport !== undefined);
       assert.strictEqual(typeof body.cleanupReport.totalCleaned, 'number');
       assert.strictEqual(typeof body.cleanupReport.details, 'object');
+    });
+  });
+
+  describe('5. Iteration 2 Targeted Fixes Verification', () => {
+    let ctx: TestServerContext;
+
+    before(async () => {
+      ctx = await createTestServer();
+    });
+
+    after(async () => {
+      await ctx.close();
+    });
+
+    it('T2-MCS-01: Encoded URI keys and incoming values with %2F match correctly', () => {
+      const { isMatch } = createMediaMatchers(['media-library/261112013015.png']);
+
+      // Raw, decoded, and encoded should match
+      assert.strictEqual(isMatch('media-library/261112013015.png'), true);
+      assert.strictEqual(isMatch('media-library%2F261112013015.png'), true);
+      assert.strictEqual(isMatch('/media-library%2F261112013015.png'), true);
+      assert.strictEqual(isMatch('https://media.test/media-library%2F261112013015.png'), true);
+      assert.strictEqual(isMatch('https://media.test/media-library%2F261112013015.png?v=123'), true);
+    });
+
+    it('T2-MCS-02: Encoded rawKey inputs correctly decode and generate both raw and encoded patterns', () => {
+      const { isMatch, targets } = createMediaMatchers(['media-library%2F261112013015.png']);
+
+      assert.strictEqual(targets[0].cleanKey, 'media-library/261112013015.png');
+      assert.strictEqual(targets[0].filename, '261112013015.png');
+      assert.strictEqual(isMatch('media-library/261112013015.png'), true);
+      assert.strictEqual(isMatch('media-library%2F261112013015.png'), true);
+      assert.strictEqual(isMatch('/media-library/261112013015.png'), true);
+    });
+
+    it('T2-MCS-03: Filename suffix matching is constrained to avoid collateral damage on foreign external domains', () => {
+      // Deleting a generic filename (not a 12-digit timestamp)
+      const { isMatch } = createMediaMatchers(['samples/cover.png']);
+
+      // Must NOT match foreign domains
+      assert.strictEqual(isMatch('https://images.amazon.com/products/cover.png'), false);
+      assert.strictEqual(isMatch('https://google.com/static/cover.png'), false);
+      assert.strictEqual(isMatch('https://external-cdn.xyz/assets/cover.png'), false);
+      assert.strictEqual(isMatch('http://another-site.org/cover.png'), false);
+
+      // Must still match relative paths or target cleanKey
+      assert.strictEqual(isMatch('samples/cover.png'), true);
+      assert.strictEqual(isMatch('/samples/cover.png'), true);
+      assert.strictEqual(isMatch('/other-folder/cover.png'), true);
+      assert.strictEqual(isMatch('cover.png'), true);
+    });
+
+    it('T2-MCS-04: Suffix matching is permitted for 12-digit timestamp filenames across any path', () => {
+      // Timestamp filenames are unique to Huy Tutor R2
+      const { isMatch } = createMediaMatchers(['media-library/261112013015.png']);
+
+      assert.strictEqual(isMatch('261112013015.png'), true);
+      assert.strictEqual(isMatch('/previews/261112013015.png'), true);
+      assert.strictEqual(isMatch('/custom/path/261112013015.png'), true);
+    });
+
+    it('T2-MCS-05: replaceInText strips matching URLs along with trailing query strings (?v=...) and hash fragments (#...)', () => {
+      const { replaceInText } = createMediaMatchers(['media-library/261112013015.png']);
+
+      // HTML img with query string
+      const htmlQuery = '<div class="content"><img src="media-library/261112013015.png?v=123" alt="Test" /><p>Hello</p></div>';
+      const resQuery = replaceInText(htmlQuery);
+      assert.strictEqual(resQuery.count, 1);
+      assert.strictEqual(resQuery.replaced, '<div class="content"><img src="" alt="Test" /><p>Hello</p></div>');
+
+      // HTML img with hash fragment
+      const htmlHash = '<div class="content"><img src="media-library/261112013015.png#preview" alt="Test" /></div>';
+      const resHash = replaceInText(htmlHash);
+      assert.strictEqual(resHash.count, 1);
+      assert.strictEqual(resHash.replaced, '<div class="content"><img src="" alt="Test" /></div>');
+
+      // Combined query and hash
+      const htmlBoth = '<img src="media-library/261112013015.png?v=123&t=456#sec" />';
+      const resBoth = replaceInText(htmlBoth);
+      assert.strictEqual(resBoth.count, 1);
+      assert.strictEqual(resBoth.replaced, '<img src="" />');
+
+      // Multiple occurrences in complex text
+      const multi = '<p><img src="media-library/261112013015.png?cache=0" /></p><p><img src="media-library/261112013015.png#thumb" /></p>';
+      const resMulti = replaceInText(multi);
+      assert.strictEqual(resMulti.count, 2);
+      assert.strictEqual(resMulti.replaced, '<p><img src="" /></p><p><img src="" /></p>');
+    });
+
+    it('T2-MCS-06: POST /api/admin/media/delete returns ok: true even when partial errors occur', async () => {
+      __setSimulatedR2Objects([
+        { key: 'media-library/valid_cascade.png' },
+      ]);
+
+      const res = await ctx.fetch('/api/admin/media/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keys: ['media-library/valid_cascade.png', 'media-library/fail_me.png'],
+        }),
+      });
+
+      assert.strictEqual(res.status, 200);
+      const body = (await res.json()) as any;
+      assert.strictEqual(body.ok, true, 'deleteMediaFiles must return ok: true so client.ts does not throw HTTP Error 200 on partial error');
+      assert.strictEqual(body.deletedKeys.length, 1);
+      assert.strictEqual(body.errors.length, 1);
+      assert.strictEqual(body.errors[0].key, 'media-library/fail_me.png');
+      assert(body.cleanupReport !== undefined);
+      assert.strictEqual(typeof body.cleanupReport.totalCleaned, 'number');
+
+      __clearSimulatedR2Objects();
     });
   });
 });

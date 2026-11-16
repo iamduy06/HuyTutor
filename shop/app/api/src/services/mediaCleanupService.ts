@@ -16,6 +16,23 @@ export interface MatcherTarget {
   urlSubstrings: string[];
 }
 
+function isR2OrRelative(urlStr: string, r2Host: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  const trimmed = urlStr.trim();
+  if (!trimmed.startsWith('//') && !trimmed.includes('://')) {
+    return true;
+  }
+  try {
+    const parsed = new URL(trimmed.startsWith('//') ? `https:${trimmed}` : trimmed);
+    if (r2Host && (parsed.host === r2Host || parsed.hostname === r2Host)) {
+      return true;
+    }
+    return false;
+  } catch {
+    return !trimmed.includes('://') && !trimmed.startsWith('//');
+  }
+}
+
 export function createMediaMatchers(keys: string[]): {
   isMatch: (value: string) => boolean;
   replaceInText: (text: string) => { replaced: string; count: number };
@@ -40,23 +57,38 @@ export function createMediaMatchers(keys: string[]): {
     const trimmed = rawKey.trim();
     if (!trimmed) continue;
 
-    const cleanKey = (extractR2ObjectKey(trimmed) || trimmed.replace(/^\/+/, '')).trim();
+    let decodedTrimmed = trimmed;
+    try {
+      decodedTrimmed = decodeURIComponent(trimmed);
+    } catch {
+      // Keep trimmed if decoding throws
+    }
+
+    const cleanKey = (
+      extractR2ObjectKey(decodedTrimmed) ||
+      extractR2ObjectKey(trimmed) ||
+      decodedTrimmed.replace(/^\/+/, '')
+    ).trim();
     if (!cleanKey) continue;
 
     const filename = path.basename(cleanKey);
 
     const patterns = new Set<string>();
     patterns.add(trimmed);
+    patterns.add(decodedTrimmed);
     patterns.add(cleanKey);
     patterns.add(`/${cleanKey}`);
     patterns.add(encodeURI(cleanKey));
     patterns.add(`/${encodeURI(cleanKey)}`);
+    patterns.add(encodeURIComponent(cleanKey));
+    patterns.add(`/${encodeURIComponent(cleanKey)}`);
     patterns.add(decodeURIComponent(cleanKey));
     patterns.add(`/${decodeURIComponent(cleanKey)}`);
 
     if (r2Domain) {
       patterns.add(`${r2Domain}/${cleanKey}`);
       patterns.add(`${r2Domain}/${encodeURI(cleanKey)}`);
+      patterns.add(`${r2Domain}/${encodeURIComponent(cleanKey)}`);
       patterns.add(`${r2Domain}/${decodeURIComponent(cleanKey)}`);
     }
 
@@ -68,6 +100,9 @@ export function createMediaMatchers(keys: string[]): {
       patterns.add(`https://${r2Host}/${encodeURI(cleanKey)}`);
       patterns.add(`http://${r2Host}/${encodeURI(cleanKey)}`);
       patterns.add(`//${r2Host}/${encodeURI(cleanKey)}`);
+      patterns.add(`https://${r2Host}/${encodeURIComponent(cleanKey)}`);
+      patterns.add(`http://${r2Host}/${encodeURIComponent(cleanKey)}`);
+      patterns.add(`//${r2Host}/${encodeURIComponent(cleanKey)}`);
     }
 
     for (const p of patterns) {
@@ -75,11 +110,13 @@ export function createMediaMatchers(keys: string[]): {
       substringPatterns.push(p);
     }
 
-    if (filename.length >= 10 && (/^\d{12}/.test(filename) || filename.includes('.'))) {
+    if (/^\d{12}/.test(filename)) {
       exactSet.add(filename);
       exactSet.add(encodeURI(filename));
+      exactSet.add(encodeURIComponent(filename));
       exactSet.add(decodeURIComponent(filename));
       substringPatterns.push(filename);
+      substringPatterns.push(encodeURIComponent(filename));
     }
 
     targets.push({
@@ -100,17 +137,53 @@ export function createMediaMatchers(keys: string[]): {
     if (!trimmed) return false;
 
     const baseVal = trimmed.split('?')[0].split('#')[0];
-    if (exactSet.has(trimmed) || exactSet.has(baseVal)) return true;
+    let decodedVal = baseVal;
+    try {
+      decodedVal = decodeURIComponent(baseVal);
+    } catch {
+      // Keep baseVal if decoding throws
+    }
+
+    if (
+      exactSet.has(trimmed) ||
+      exactSet.has(baseVal) ||
+      exactSet.has(decodedVal)
+    ) {
+      return true;
+    }
 
     const unslashed = baseVal.replace(/^\/+/, '');
-    if (exactSet.has(unslashed)) return true;
+    const unslashedDecoded = decodedVal.replace(/^\/+/, '');
+    if (exactSet.has(unslashed) || exactSet.has(unslashedDecoded)) {
+      return true;
+    }
 
     for (const target of targets) {
-      if (baseVal === target.cleanKey || baseVal.endsWith('/' + target.cleanKey)) {
+      const isTimestamp = /^\d{12}/.test(target.filename);
+      const isAllowed =
+        isTimestamp ||
+        isR2OrRelative(baseVal, r2Host) ||
+        isR2OrRelative(decodedVal, r2Host);
+
+      if (
+        baseVal === target.cleanKey ||
+        decodedVal === target.cleanKey ||
+        (isAllowed &&
+          (baseVal.endsWith('/' + target.cleanKey) ||
+            decodedVal.endsWith('/' + target.cleanKey)))
+      ) {
         return true;
       }
-      if (baseVal === target.filename || baseVal.endsWith('/' + target.filename)) {
-        return true;
+
+      if (isAllowed) {
+        if (
+          baseVal === target.filename ||
+          decodedVal === target.filename ||
+          baseVal.endsWith('/' + target.filename) ||
+          decodedVal.endsWith('/' + target.filename)
+        ) {
+          return true;
+        }
       }
     }
 
@@ -124,10 +197,14 @@ export function createMediaMatchers(keys: string[]): {
 
     for (const pattern of substringPatterns) {
       if (!pattern || pattern.length < 5) continue;
-      if (current.includes(pattern)) {
-        const parts = current.split(pattern);
-        count += parts.length - 1;
-        current = parts.join('');
+      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match pattern optionally followed by query string (?...) or hash fragment (#...)
+      // terminated by quotes, whitespace, or HTML/Markdown/CSS delimiters (<, >, ))
+      const regex = new RegExp(escaped + '(?:[?#][^"\'\\s<>()]*)?', 'g');
+      const matches = current.match(regex);
+      if (matches && matches.length > 0) {
+        count += matches.length;
+        current = current.replace(regex, '');
       }
     }
 

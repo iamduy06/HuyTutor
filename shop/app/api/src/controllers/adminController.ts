@@ -899,7 +899,7 @@ export const adminController = {
       }
 
       res.json({
-        ok: result.errors.length === 0,
+        ok: true,
         deletedKeys: result.deletedKeys,
         errors: result.errors || [],
         cleanupReport,
