@@ -482,6 +482,31 @@ export const AdminMediaManager: React.FC = () => {
             </button>
           </div>
 
+          {/* Nút Chọn tất cả */}
+          <button
+            type="button"
+            onClick={toggleSelectAllCurrentPage}
+            disabled={items.length === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xs border text-xs font-bold transition shadow-2xs ${
+              items.length > 0 && items.every((i) => selectedKeys.has(i.key))
+                ? 'bg-[#e60049] text-white border-[#e60049]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-[#e60049] hover:text-[#e60049]'
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+            title="Chọn hoặc bỏ chọn tất cả tệp tin đang hiển thị trên trang"
+          >
+            <input
+              type="checkbox"
+              checked={items.length > 0 && items.every((i) => selectedKeys.has(i.key))}
+              readOnly
+              className="w-3.5 h-3.5 rounded-xs text-[#e60049] focus:ring-[#e60049] pointer-events-none"
+            />
+            <span>
+              {items.length > 0 && items.every((i) => selectedKeys.has(i.key))
+                ? 'Bỏ chọn tất cả'
+                : `Chọn tất cả (${items.length})`}
+            </span>
+          </button>
+
           {/* View Switcher: Grid vs List */}
           <div className="flex items-center border border-gray-300 rounded-xs bg-white overflow-hidden">
             <button
@@ -578,7 +603,26 @@ export const AdminMediaManager: React.FC = () => {
         </div>
       ) : viewMode === 'grid' ? (
         /* GRID VIEW */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between pb-1 text-xs text-gray-600 border-b border-gray-100">
+            <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-gray-700 hover:text-[#e60049]">
+              <input
+                type="checkbox"
+                checked={items.length > 0 && items.every((i) => selectedKeys.has(i.key))}
+                onChange={toggleSelectAllCurrentPage}
+                className="w-4 h-4 rounded-xs text-[#e60049] focus:ring-[#e60049] cursor-pointer"
+              />
+              <span>
+                {items.length > 0 && items.every((i) => selectedKeys.has(i.key))
+                  ? `Đang chọn toàn bộ ${items.length} tệp trên trang (Nhấn để bỏ chọn)`
+                  : `Chọn tất cả ${items.length} tệp trên trang`}
+              </span>
+            </label>
+            <span className="text-[11px] text-gray-400">
+              Hiển thị {items.length} / tổng số {pagination.totalItems} tệp
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {items.map((item) => {
             const isSelected = selectedKeys.has(item.key);
             return (
@@ -691,6 +735,7 @@ export const AdminMediaManager: React.FC = () => {
               </div>
             );
           })}
+          </div>
         </div>
       ) : (
         /* LIST VIEW TABLE */
