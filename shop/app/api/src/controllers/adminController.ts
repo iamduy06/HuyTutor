@@ -15,6 +15,8 @@ import {
 } from '../services/r2Service';
 import { submitOrderToGoogleForm } from '../services/googleFormService';
 import { isSupabaseConfigured, supabaseAdmin } from '../config/supabase';
+import { mediaCleanupService } from '../services/mediaCleanupService';
+import type { CleanupReport } from '../services/mediaCleanupService';
 
 export interface MediaUsage {
   key: string;
@@ -465,7 +467,8 @@ export const adminController = {
 
   /**
    * POST /api/admin/delete-file
-   * Xóa file khỏi Cloudflare R2 khi thay đổi ảnh hoặc xóa block, section, item
+   * Xóa file khỏi Cloudflare R2 khi thay đổi ảnh hoặc nhấn nút xóa ✕ trên giao diện.
+   * Tự động dọn sạch liên kết trong Cơ sở dữ liệu nếu file xóa thành công.
    */
   async deleteR2File(req: Request, res: Response): Promise<void> {
     try {
@@ -479,15 +482,32 @@ export const adminController = {
         return;
       }
 
+      // 1. Xóa vật lý trên Cloudflare R2
       const result = await deleteR2Object(String(target));
+
+      // 2. Cascade Reference Cleanup nếu xóa thành công
+      let cleanupReport: CleanupReport = { totalCleaned: 0, details: {} };
+      if (result.deleted) {
+        const cleanKey = result.key || String(target);
+        try {
+          cleanupReport = await mediaCleanupService.cleanDatabaseReferences([cleanKey]);
+        } catch (cleanupErr: any) {
+          console.error('[adminController.deleteR2File] Cascade cleanup error:', cleanupErr);
+        }
+      }
+
       res.json({
         ok: true,
         result,
+        cleanupReport,
       });
     } catch (err: any) {
+      console.error('[adminController.deleteR2File] Error:', err);
+      // Quy chuẩn GEMINI.md: Route /admin hiển thị đầy đủ chi tiết kỹ thuật
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi xóa file trên Cloudflare R2.',
+        details: err?.stack || String(err),
       });
     }
   },
@@ -830,6 +850,7 @@ export const adminController = {
    * POST /api/admin/media/delete
    * Nhận danh sách keys, gọi deleteR2Objects thực thi DeleteObjectCommand
    * xóa vật lý vĩnh viễn trên R2 bucket.
+   * Kèm tự động quét Cascade Reference Cleanup trong Cơ sở dữ liệu và local_db.json.
    */
   async deleteMediaFiles(req: Request, res: Response): Promise<void> {
     try {
@@ -851,19 +872,45 @@ export const adminController = {
 
       const keys: string[] = rawKeys.filter((k: any) => typeof k === 'string' && k.trim());
 
+      // 1. Xóa vật lý các tệp tin trên Cloudflare R2 bucket
       const result = await deleteR2Objects(keys);
 
+      // 2. Tự động quét và dọn sạch các liên kết mồ côi trong CSDL (Cascade Cleanup)
+      let cleanupReport: CleanupReport = { totalCleaned: 0, details: {} };
+      if (result.deletedKeys && result.deletedKeys.length > 0) {
+        try {
+          cleanupReport = await mediaCleanupService.cleanDatabaseReferences(result.deletedKeys);
+        } catch (cleanupErr: any) {
+          console.error('[adminController.deleteMediaFiles] Cascade cleanup error:', cleanupErr);
+          result.errors = result.errors || [];
+          result.errors.push({
+            key: 'database_cascade_cleanup',
+            error: cleanupErr?.message || 'Lỗi dọn sạch liên kết mồ côi trong CSDL.',
+          });
+        }
+      }
+
+      // 3. Phản hồi kết quả chi tiết cho Admin CMS
+      const totalDeleted = result.deletedKeys.length;
+      const totalCleaned = cleanupReport.totalCleaned;
+      let message = `Đã xóa thành công ${totalDeleted}/${keys.length} tệp tin trên Cloudflare R2 bucket.`;
+      if (totalCleaned > 0) {
+        message += ` Đã tự động dọn sạch ${totalCleaned} liên kết mồ côi trong CSDL.`;
+      }
+
       res.json({
-        ok: true,
+        ok: result.errors.length === 0,
         deletedKeys: result.deletedKeys,
         errors: result.errors || [],
-        message: `Đã xóa thành công ${result.deletedKeys.length}/${keys.length} tệp tin trên Cloudflare R2 bucket.`,
+        cleanupReport,
+        message,
       });
     } catch (err: any) {
       console.error('[adminController.deleteMediaFiles] Error:', err);
+      // Quy chuẩn GEMINI.md: Route /admin hiển thị đầy đủ chi tiết kỹ thuật
       res.status(500).json({
         ok: false,
-        error: err?.message || 'Lỗi xóa tệp tin trên Cloudflare R2.',
+        error: err?.message || 'Lỗi xóa tệp tin trên Cloudflare R2 hoặc dọn liên kết CSDL.',
         details: err?.stack || String(err),
       });
     }
