@@ -68,6 +68,13 @@ export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
     setIsDeleting(true);
     try {
       const res = await apiClient.deleteR2File(imageUrl);
+      if (!res?.ok || (res.result && !res.result.deleted)) {
+        showToast(
+          (res as any)?.error || res?.result?.reason || 'Lỗi khi xóa file trên Cloudflare R2.'
+        );
+        onUrlChange('');
+        return;
+      }
       onUrlChange('');
       const cleanupCount = res?.cleanupReport?.totalCleaned ?? 0;
       if (cleanupCount > 0) {
