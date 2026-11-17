@@ -15,6 +15,8 @@ import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
 import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuilder';
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import { ProductDeleteReportModal } from '../components/ProductDeleteReportModal';
+import { ManualPaymentConfirmModal } from '../components/admin/ManualPaymentConfirmModal';
+import { getClientErrorMessage } from '../utils/errorHandler';
 import {
   AdminUserRecord,
   CascadeDeleteProductReport,
@@ -130,6 +132,11 @@ export const AdminPage: React.FC = () => {
   const [userPage, setUserPage] = useState(1);
   const USERS_PER_PAGE = 20;
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
+
+  // State cho Bộ lọc thời gian & Duyệt thanh toán thủ công đơn hàng
+  const [orderTimeFilter, setOrderTimeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | 'THIS_MONTH'>('ALL');
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<OrderRecord | null>(null);
+  const [resyncingOrderCode, setResyncingOrderCode] = useState<string | null>(null);
 
   // State cho Tab 5: Cấu hình Trang cấp 2 (Chi tiết tài liệu)
   const [selectedDetailProductSlug, setSelectedDetailProductSlug] = useState<string>('');
@@ -663,16 +670,20 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleResyncOrderForm = async (orderCode: string) => {
+    setResyncingOrderCode(orderCode);
     try {
       const res = await apiClient.resyncOrderGoogleForm(orderCode);
-      const firstSub = res.syncResult.submissions[0];
+      const firstSub = res?.syncResult?.submissions?.[0];
       if (firstSub) {
         setInspectedPayload(firstSub.payload);
       }
-      showToast(`Đã bắn lại 14 entry đơn ${orderCode} vào Google Form thành công.`);
+      showToast(`Đã kích hoạt gửi lại tài liệu cho đơn hàng ${orderCode} qua Google Form thành công!`);
       await loadOverview();
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi bắn lại Google Form.');
+      const detailed = getClientErrorMessage(err, true);
+      showToast(detailed || 'Lỗi gửi lại tài liệu qua Google Form.');
+    } finally {
+      setResyncingOrderCode(null);
     }
   };
 
@@ -754,6 +765,101 @@ export const AdminPage: React.FC = () => {
         (d.level || '').toLowerCase().includes(q)
     );
   }, [flashcardDecks, deckSearchQuery]);
+
+  // 1. Lọc đơn hàng theo mốc thời gian (Tất cả, Hôm nay, 7 ngày qua, Tháng này)
+  const filteredOrders = useMemo(() => {
+    if (orderTimeFilter === 'ALL') return orders;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    return orders.filter((ord) => {
+      if (!ord.created_at) return false;
+      const orderDate = new Date(ord.created_at);
+      if (isNaN(orderDate.getTime())) return false;
+
+      if (orderTimeFilter === 'TODAY') return orderDate >= todayStart;
+      if (orderTimeFilter === '7DAYS') return orderDate >= sevenDaysAgo;
+      if (orderTimeFilter === 'THIS_MONTH') return orderDate >= monthStart;
+      return true;
+    });
+  }, [orders, orderTimeFilter]);
+
+  // 2. Tính toán thống kê 2 tầng từ filteredOrders
+  const orderStats = useMemo(() => {
+    const total = filteredOrders.length;
+    let paidRev = 0;
+    let pendingRev = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+    let syncedPaidCount = 0;
+
+    const paymentBreakdown = {
+      sepay: { count: 0, revenue: 0 },
+      paypal: { count: 0, revenue: 0 },
+    };
+
+    const formatBreakdown: Record<string, { count: number; revenue: number }> = {
+      Word: { count: 0, revenue: 0 },
+      PDF: { count: 0, revenue: 0 },
+      Flashcard: { count: 0, revenue: 0 },
+      'Trang tính': { count: 0, revenue: 0 },
+      'Thiết kế': { count: 0, revenue: 0 },
+    };
+
+    const customerGroupBreakdown: Record<string, number> = {};
+    let vatRequestedCount = 0;
+
+    for (const ord of filteredOrders) {
+      const amount = Number(ord.total_amount) || 0;
+      if (ord.payment_status === 'paid') {
+        paidRev += amount;
+        paidCount++;
+        if (ord.google_form_submitted) {
+          syncedPaidCount++;
+        }
+      } else if (ord.payment_status === 'pending') {
+        pendingRev += amount;
+        pendingCount++;
+      }
+
+      const method = ord.payment_method === 'paypal' ? 'paypal' : 'sepay';
+      paymentBreakdown[method].count++;
+      paymentBreakdown[method].revenue += amount;
+
+      const fmt = ord.selected_format || 'Word';
+      if (!formatBreakdown[fmt]) formatBreakdown[fmt] = { count: 0, revenue: 0 };
+      formatBreakdown[fmt].count++;
+      formatBreakdown[fmt].revenue += amount;
+
+      const grp = ord.customer_group || 'Khác';
+      customerGroupBreakdown[grp] = (customerGroupBreakdown[grp] || 0) + 1;
+
+      if (ord.need_invoice) {
+        vatRequestedCount++;
+      }
+    }
+
+    const conversionRate = total > 0 ? ((paidCount / total) * 100).toFixed(1) : '0';
+    const deliveryRate = paidCount > 0 ? ((syncedPaidCount / paidCount) * 100).toFixed(1) : (total > 0 ? '0' : '100');
+
+    return {
+      total,
+      paidRev,
+      pendingRev,
+      paidCount,
+      pendingCount,
+      syncedPaidCount,
+      conversionRate,
+      deliveryRate,
+      paymentBreakdown,
+      formatBreakdown,
+      customerGroupBreakdown,
+      vatRequestedCount,
+      vatNotRequestedCount: total - vatRequestedCount,
+    };
+  }, [filteredOrders]);
 
   const handleToggleDeck = (deckId: string) => {
     setEditingProduct((prev) => {
@@ -1079,41 +1185,43 @@ export const AdminPage: React.FC = () => {
 
           {/* Nội dung bên phải (Main Content) */}
           <main className="flex-1 min-w-0 space-y-6">
-            {/* 4 KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-                <div className="text-[11px] text-gray-500 font-semibold">Tổng sản phẩm trong DB</div>
-                <div className="text-xl font-black text-gray-900 mt-1">
-                  {stats.totalProducts}{' '}
-                  <span className="text-xs font-semibold text-emerald-600">
-                    ({stats.activeProducts} đang hiển thị)
-                  </span>
+            {/* 4 KPI Cards (Ẩn khi ở Tab Orders để nhường chỗ cho Bảng thống kê doanh thu toàn diện) */}
+            {activeTab !== 'orders' && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                  <div className="text-[11px] text-gray-500 font-semibold">Tổng sản phẩm trong DB</div>
+                  <div className="text-xl font-black text-gray-900 mt-1">
+                    {stats.totalProducts}{' '}
+                    <span className="text-xs font-semibold text-emerald-600">
+                      ({stats.activeProducts} đang hiển thị)
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                  <div className="text-[11px] text-gray-500 font-semibold">Tổng đơn hàng</div>
+                  <div className="text-xl font-black text-gray-900 mt-1">
+                    {stats.totalOrders}{' '}
+                    <span className="text-xs font-semibold text-[#e60049]">
+                      ({stats.paidOrders} đã thanh toán)
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                  <div className="text-[11px] text-gray-500 font-semibold">Doanh thu đã đối soát</div>
+                  <div className="text-xl font-black text-[#e60049] mt-1">
+                    {formatVnd(stats.totalRevenue)}
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                  <div className="text-[11px] text-gray-500 font-semibold">
+                    Đồng bộ 14 Entry Google Form
+                  </div>
+                  <div className="text-xl font-black text-emerald-700 mt-1">
+                    {stats.syncedFormCount}/{stats.totalOrders} đơn
+                  </div>
                 </div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-                <div className="text-[11px] text-gray-500 font-semibold">Tổng đơn hàng</div>
-                <div className="text-xl font-black text-gray-900 mt-1">
-                  {stats.totalOrders}{' '}
-                  <span className="text-xs font-semibold text-[#e60049]">
-                    ({stats.paidOrders} đã thanh toán)
-                  </span>
-                </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-                <div className="text-[11px] text-gray-500 font-semibold">Doanh thu đã đối soát</div>
-                <div className="text-xl font-black text-[#e60049] mt-1">
-                  {formatVnd(stats.totalRevenue)}
-                </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
-                <div className="text-[11px] text-gray-500 font-semibold">
-                  Đồng bộ 14 Entry Google Form
-                </div>
-                <div className="text-xl font-black text-emerald-700 mt-1">
-                  {stats.syncedFormCount}/{stats.totalOrders} đơn
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* TAB HOMEPAGE CMS */}
             {activeTab === 'homepage_cms' && <AdminHomepageCms />}
@@ -2036,12 +2144,217 @@ export const AdminPage: React.FC = () => {
         {/* TAB 2: QUẢN LÝ ĐƠN HÀNG & BẮN LẠI 14 ENTRY GOOGLE FORM */}
         {activeTab === 'orders' && (
           <div className="space-y-5">
-            {/* KHỐI CẤU HÌNH FORM THANH TOÁN & TÙY CHỌN XUẤT HÓA ĐƠN VAT */}
-            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-3">
+            {/* KHỐI 1: BẢNG THỐNG KÊ DOANH THU & ĐƠN HÀNG TOÀN DIỆN */}
+            <div className="bg-white border border-gray-200 rounded-sm p-4 sm:p-5 shadow-xs space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
+                      THỐNG KÊ DOANH THU
+                    </span>
+                    <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                      [BẢNG THỐNG KÊ DOANH THU &amp; ĐƠN HÀNG TOÀN DIỆN] - [THEO DÕI VÀ PHÂN TÍCH CHỈ SỐ DOANH THU, TỶ LỆ CHUYỂN ĐỔI VÀ PHÂN BỔ ĐƠN HÀNG]
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Dữ liệu doanh thu thực thu, doanh thu chờ đối soát và phân bổ chuyên sâu theo thời gian thực.
+                  </p>
+                </div>
+
+                {/* Time Filter Buttons */}
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-sm border border-gray-200 shrink-0">
+                  {(['ALL', 'TODAY', '7DAYS', 'THIS_MONTH'] as const).map((filter) => {
+                    const labels: Record<'ALL' | 'TODAY' | '7DAYS' | 'THIS_MONTH', string> = {
+                      ALL: 'Tất cả thời gian',
+                      TODAY: 'Hôm nay',
+                      '7DAYS': '7 ngày qua',
+                      THIS_MONTH: 'Tháng này',
+                    };
+                    return (
+                      <button
+                        key={filter}
+                        type="button"
+                        onClick={() => setOrderTimeFilter(filter)}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-sm transition cursor-pointer ${
+                          orderTimeFilter === filter
+                            ? 'bg-[#e60049] text-white shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                        }`}
+                      >
+                        {labels[filter]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* TẦNG 1: 5 CORE KPI CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* Card 1: Doanh thu thực thu */}
+                <div className="bg-emerald-50/50 border border-emerald-200 rounded-sm p-3.5 space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                    Doanh thu thực thu
+                  </div>
+                  <div className="text-lg font-black text-emerald-700">
+                    {formatVnd(orderStats.paidRev)}
+                  </div>
+                  <div className="text-[10px] font-medium text-emerald-600">
+                    ({orderStats.paidCount} đơn đã hoàn tất)
+                  </div>
+                </div>
+
+                {/* Card 2: Doanh thu chờ xử lý */}
+                <div className="bg-amber-50/50 border border-amber-200 rounded-sm p-3.5 space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                    Doanh thu chờ thu
+                  </div>
+                  <div className="text-lg font-black text-amber-700">
+                    {formatVnd(orderStats.pendingRev)}
+                  </div>
+                  <div className="text-[10px] font-medium text-amber-600">
+                    ({orderStats.pendingCount} đơn đang pending)
+                  </div>
+                </div>
+
+                {/* Card 3: Tổng đơn & Tỷ lệ hoàn tất */}
+                <div className="bg-blue-50/50 border border-blue-200 rounded-sm p-3.5 space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-800">
+                    Tổng đơn đặt hàng
+                  </div>
+                  <div className="text-lg font-black text-blue-700">
+                    {orderStats.total} đơn
+                  </div>
+                  <div className="text-[10px] font-semibold text-blue-600">
+                    Tỷ lệ TT: {orderStats.conversionRate}%
+                  </div>
+                </div>
+
+                {/* Card 4: Đơn cần duyệt tay */}
+                <div className="bg-rose-50/50 border border-rose-200 rounded-sm p-3.5 space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-rose-800">
+                    Đơn cần duyệt tay
+                  </div>
+                  <div className="text-lg font-black text-rose-700">
+                    {orderStats.pendingCount} đơn
+                  </div>
+                  <div className="text-[10px] font-bold text-rose-600">
+                    {orderStats.pendingCount > 0 ? '⚠️ Cần kiểm tra bank' : '✓ Đã đối soát hết'}
+                  </div>
+                </div>
+
+                {/* Card 5: Tiến độ gửi tài liệu */}
+                <div className="bg-gray-50 border border-gray-200 rounded-sm p-3.5 space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-700">
+                    Tiến độ gửi tài liệu
+                  </div>
+                  <div className="text-lg font-black text-gray-900">
+                    {orderStats.syncedPaidCount}/{orderStats.paidCount} đơn
+                  </div>
+                  <div className="text-[10px] font-semibold text-emerald-700">
+                    Đạt {orderStats.deliveryRate}% đơn paid
+                  </div>
+                </div>
+              </div>
+
+              {/* TẦNG 2: 4 BREAKDOWN MINI-CARDS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {/* Breakdown 1: Cổng thanh toán */}
+                <div className="border border-gray-200 rounded-sm p-3 bg-gray-50/60 space-y-1.5">
+                  <div className="font-bold text-[11px] text-gray-800 uppercase flex items-center justify-between">
+                    <span>Cổng thanh toán</span>
+                    <span className="text-[10px] text-gray-500 font-mono">VietQR / PayPal</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200">
+                    <div className="flex justify-between">
+                      <span>• VietQR (SePay):</span>
+                      <strong className="text-gray-900">
+                        {orderStats.paymentBreakdown.sepay.count} đơn ({formatVnd(orderStats.paymentBreakdown.sepay.revenue)})
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• PayPal:</span>
+                      <strong className="text-gray-900">
+                        {orderStats.paymentBreakdown.paypal.count} đơn ({formatVnd(orderStats.paymentBreakdown.paypal.revenue)})
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Breakdown 2: Định dạng tài liệu */}
+                <div className="border border-gray-200 rounded-sm p-3 bg-gray-50/60 space-y-1.5">
+                  <div className="font-bold text-[11px] text-gray-800 uppercase flex items-center justify-between">
+                    <span>Định dạng tài liệu</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Word/PDF/Flashcard</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200">
+                    <div className="flex justify-between">
+                      <span>• Word:</span>
+                      <strong className="text-gray-900">{orderStats.formatBreakdown.Word?.count || 0} đơn</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• PDF:</span>
+                      <strong className="text-gray-900">{orderStats.formatBreakdown.PDF?.count || 0} đơn</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• Flashcard / Khác:</span>
+                      <strong className="text-gray-900">
+                        {(orderStats.formatBreakdown.Flashcard?.count || 0) +
+                          (orderStats.formatBreakdown['Trang tính']?.count || 0) +
+                          (orderStats.formatBreakdown['Thiết kế']?.count || 0)}{' '}
+                        đơn
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Breakdown 3: Nhóm khách hàng */}
+                <div className="border border-gray-200 rounded-sm p-3 bg-gray-50/60 space-y-1.5">
+                  <div className="font-bold text-[11px] text-gray-800 uppercase flex items-center justify-between">
+                    <span>Nhóm khách hàng</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Đối tượng</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200">
+                    {Object.entries(orderStats.customerGroupBreakdown).length > 0 ? (
+                      Object.entries(orderStats.customerGroupBreakdown).slice(0, 3).map(([grp, count]) => (
+                        <div key={grp} className="flex justify-between">
+                          <span>• {grp}:</span>
+                          <strong className="text-gray-900">
+                            {count} đơn ({orderStats.total > 0 ? ((count / orderStats.total) * 100).toFixed(1) : 0}%)
+                          </strong>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-gray-400 italic">Chưa có dữ liệu</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Breakdown 4: Hóa đơn VAT */}
+                <div className="border border-gray-200 rounded-sm p-3 bg-gray-50/60 space-y-1.5">
+                  <div className="font-bold text-[11px] text-gray-800 uppercase flex items-center justify-between">
+                    <span>Hóa đơn VAT</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Doanh nghiệp/CN</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200">
+                    <div className="flex justify-between">
+                      <span>• Yêu cầu VAT:</span>
+                      <strong className="text-[#e60049]">{orderStats.vatRequestedCount} đơn</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• Không lấy VAT:</span>
+                      <strong className="text-gray-900">{orderStats.vatNotRequestedCount} đơn</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* KHỐI CẤU HÌNH FORM THANH TOÁN & TÙY CHỌN XUẤT HÓA ĐƠN VAT */}
+            <div className="bg-white border border-gray-200 rounded-sm p-5 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
                       CẤU HÌNH THANH TOÁN
                     </span>
                     <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
@@ -2056,7 +2369,7 @@ export const AdminPage: React.FC = () => {
                   type="button"
                   onClick={handleSaveCheckoutConfig}
                   disabled={savingCheckoutConfig}
-                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50 shrink-0"
+                  className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-xs px-4 py-1.5 rounded-sm transition disabled:opacity-50 shrink-0 cursor-pointer"
                 >
                   {savingCheckoutConfig ? 'Đang lưu...' : 'Lưu Cấu Hình Thanh Toán'}
                 </button>
@@ -2084,101 +2397,144 @@ export const AdminPage: React.FC = () => {
               </label>
             </div>
 
-          <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-            <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#e60049] text-white">
-                    QUẢN LÝ ĐƠN HÀNG
-                  </span>
-                  <h2 className="text-sm font-black text-gray-900 uppercase">
-                    Danh Sách Đơn Hàng &amp; Trạng Thái Đồng Bộ 14 Entry Google Form
-                  </h2>
+            {/* KHỐI 3: DANH SÁCH ĐƠN HÀNG */}
+            <div className="bg-white border border-gray-200 rounded-sm p-5 shadow-sm space-y-4">
+              <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white">
+                      QUẢN LÝ ĐƠN HÀNG
+                    </span>
+                    <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                      [DANH SÁCH ĐƠN HÀNG] - [THEO DÕI KHÁCH HÀNG, DUYỆT THANH TOÁN THỦ CÔNG VÀ ĐỒNG BỘ 14 ENTRY GOOGLE FORM]
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Theo dõi danh sách khách hàng đặt mua ({filteredOrders.length} đơn hiển thị), trạng thái thanh toán VietQR / PayPal và đồng bộ dữ liệu vào Google Sheet.
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Theo dõi danh sách khách hàng đặt mua, trạng thái thanh toán VietQR / PayPal và đồng bộ dữ liệu vào Google Sheet.
-                </p>
               </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-100 text-gray-800 font-bold">
-                    <th className="border border-gray-200 p-2.5 text-left">Mã đơn</th>
-                    <th className="border border-gray-200 p-2.5 text-left">Khách hàng / Gmail</th>
-                    <th className="border border-gray-200 p-2.5 text-left">
-                      Định dạng &rarr; Ghi chú Form
-                    </th>
-                    <th className="border border-gray-200 p-2.5 text-left">Xuất HĐ VAT</th>
-                    <th className="border border-gray-200 p-2.5 text-left">Tổng tiền</th>
-                    <th className="border border-gray-200 p-2.5 text-left">Trạng thái</th>
-                    <th className="border border-gray-200 p-2.5 text-left">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((ord) => (
-                    <tr key={ord.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-200 p-2.5 font-extrabold text-[#e60049]">
-                        {ord.order_code}
-                      </td>
-                      <td className="border border-gray-200 p-2.5">
-                        <div className="font-bold text-gray-900">{ord.customer_name}</div>
-                        <div className="text-[11px] text-gray-500">
-                          {ord.customer_email} • {ord.customer_group}
-                        </div>
-                      </td>
-                      <td className="border border-gray-200 p-2.5">
-                        <span className="font-bold">{ord.selected_format}</span> &rarr;{' '}
-                        <span className="text-[#e60049] font-bold">
-                          {FORMAT_TO_GOOGLE_FORM_MAP[ord.selected_format]}
-                        </span>
-                      </td>
-                      <td className="border border-gray-200 p-2.5 text-[11px]">
-                        {ord.need_invoice ? (
-                          <span className="text-gray-800">
-                            MST/CCCD: {ord.invoice_tax_or_cccd}
-                            <br />
-                            Đ/c: {ord.invoice_address}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">Không (Gửi trống "")</span>
-                        )}
-                      </td>
-                      <td className="border border-gray-200 p-2.5 font-extrabold text-gray-900">
-                        {formatVnd(ord.total_amount)}
-                      </td>
-                      <td className="border border-gray-200 p-2.5">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-sm text-[10px] font-bold ${
-                            ord.payment_status === 'paid'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {ord.payment_status.toUpperCase()}
-                        </span>
-                        <div className="text-[10px] mt-1">
-                          Form:{' '}
-                          <strong>
-                            {ord.google_form_submitted ? 'Đã gửi 14 Entry' : 'Chưa gửi'}
-                          </strong>
-                        </div>
-                      </td>
-                      <td className="border border-gray-200 p-2.5">
-                        <button
-                          type="button"
-                          onClick={() => handleResyncOrderForm(ord.order_code)}
-                          className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-2.5 py-1 rounded-sm"
-                        >
-                          Bắn lại Google Form
-                        </button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-800 font-bold">
+                      <th className="border border-gray-200 p-2.5 text-left">Mã đơn</th>
+                      <th className="border border-gray-200 p-2.5 text-left">Khách hàng / Gmail</th>
+                      <th className="border border-gray-200 p-2.5 text-left">
+                        Định dạng &rarr; Ghi chú Form
+                      </th>
+                      <th className="border border-gray-200 p-2.5 text-left">Xuất HĐ VAT</th>
+                      <th className="border border-gray-200 p-2.5 text-left">Tổng tiền</th>
+                      <th className="border border-gray-200 p-2.5 text-left">Trạng thái</th>
+                      <th className="border border-gray-200 p-2.5 text-center">Chuyển trạng thái</th>
+                      <th className="border border-gray-200 p-2.5 text-center">Gửi lại tài liệu</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="border border-gray-200 p-6 text-center text-gray-400 italic">
+                          Không có đơn hàng nào trong khoảng thời gian đã chọn.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOrders.map((ord) => (
+                        <tr key={ord.id} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 p-2.5 font-extrabold text-[#e60049]">
+                            {ord.order_code}
+                          </td>
+                          <td className="border border-gray-200 p-2.5">
+                            <div className="font-bold text-gray-900">{ord.customer_name}</div>
+                            <div className="text-[11px] text-gray-500">
+                              {ord.customer_email} • {ord.customer_group}
+                            </div>
+                          </td>
+                          <td className="border border-gray-200 p-2.5">
+                            <span className="font-bold">{ord.selected_format}</span> &rarr;{' '}
+                            <span className="text-[#e60049] font-bold">
+                              {FORMAT_TO_GOOGLE_FORM_MAP[ord.selected_format]}
+                            </span>
+                          </td>
+                          <td className="border border-gray-200 p-2.5 text-[11px]">
+                            {ord.need_invoice ? (
+                              <span className="text-gray-800">
+                                MST/CCCD: {ord.invoice_tax_or_cccd}
+                                <br />
+                                Đ/c: {ord.invoice_address}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Không (Gửi trống "")</span>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 p-2.5 font-extrabold text-gray-900">
+                            {formatVnd(ord.total_amount)}
+                          </td>
+                          <td className="border border-gray-200 p-2.5">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                                ord.payment_status === 'paid'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {ord.payment_status.toUpperCase()}
+                            </span>
+                            <div className="text-[10px] mt-1">
+                              Form:{' '}
+                              <strong>
+                                {ord.google_form_submitted ? 'Đã gửi 14 Entry' : 'Chưa gửi'}
+                              </strong>
+                            </div>
+                          </td>
+
+                          {/* CỘT 7: CHUYỂN TRẠNG THÁI */}
+                          <td className="border border-gray-200 p-2.5 text-center">
+                            {ord.payment_status === 'pending' ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForPayment(ord)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-sm shadow-xs transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                              >
+                                <span>⚡</span> Duyệt Thanh Toán
+                              </button>
+                            ) : ord.payment_status === 'paid' ? (
+                              <div className="flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  ✓ Đã duyệt TT
+                                </span>
+                                {ord.paid_at && (
+                                  <span className="text-[9px] text-gray-500 mt-0.5" title={ord.paid_at}>
+                                    {new Date(ord.paid_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic">-</span>
+                            )}
+                          </td>
+
+                          {/* CỘT 8: GỬI LẠI TÀI LIỆU (CHỈ HIỂN THỊ KHI PAID) */}
+                          <td className="border border-gray-200 p-2.5 text-center">
+                            {ord.payment_status === 'paid' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleResyncOrderForm(ord.order_code)}
+                                disabled={resyncingOrderCode === ord.order_code}
+                                className="bg-[#e60049] hover:bg-[#cc0041] text-white font-bold text-[11px] px-2.5 py-1 rounded-sm shadow-xs transition disabled:opacity-50 cursor-pointer"
+                              >
+                                {resyncingOrderCode === ord.order_code ? 'Đang gửi...' : 'Gửi lại tài liệu'}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic font-medium">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
             {inspectedPayload && (
               <div className="bg-gray-900 text-emerald-400 p-4 rounded-md text-xs font-mono overflow-x-auto">
@@ -3194,6 +3550,15 @@ export const AdminPage: React.FC = () => {
         onConfirmDelete={handleConfirmDeleteProduct}
         report={deleteReport}
         isDeleting={isDeletingProduct}
+      />
+
+      {/* Modal Xác thực Duyệt Thanh Toán Thủ Công 2 lần */}
+      <ManualPaymentConfirmModal
+        isOpen={Boolean(selectedOrderForPayment)}
+        order={selectedOrderForPayment}
+        onClose={() => setSelectedOrderForPayment(null)}
+        onConfirmSuccess={loadOverview}
+        showToast={showToast}
       />
     </div>
   );
