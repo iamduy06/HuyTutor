@@ -132,18 +132,124 @@ export const adminController = {
       ]);
 
       const paidOrders = orders.filter((o) => o.payment_status === 'paid');
+      const pendingOrders = orders.filter((o) => o.payment_status === 'pending');
       const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      const pendingRevenue = pendingOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
       const syncedFormCount = orders.filter((o) => o.google_form_submitted).length;
+      const paidSyncedFormCount = paidOrders.filter((o) => o.google_form_submitted).length;
+
+      // Tier 1 Core KPIs
+      const totalOrdersCount = orders.length;
+      const paidOrdersCount = paidOrders.length;
+      const pendingOrdersCount = pendingOrders.length;
+      const conversionRate =
+        totalOrdersCount > 0
+          ? Number(((paidOrdersCount / totalOrdersCount) * 100).toFixed(1))
+          : 0;
+      const formDeliveryRate =
+        paidOrdersCount > 0
+          ? Number(((paidSyncedFormCount / paidOrdersCount) * 100).toFixed(1))
+          : 0;
+
+      // Tier 2: Payment Method Breakdown
+      const vietqrOrders = orders.filter((o) => o.payment_method === 'sepay' || (o.payment_method as any) === 'vietqr');
+      const paypalOrders = orders.filter((o) => o.payment_method === 'paypal');
+      const paymentMethodBreakdown = {
+        vietqr: {
+          count: vietqrOrders.length,
+          revenue: vietqrOrders
+            .filter((o) => o.payment_status === 'paid')
+            .reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+        },
+        paypal: {
+          count: paypalOrders.length,
+          revenue: paypalOrders
+            .filter((o) => o.payment_status === 'paid')
+            .reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+        },
+      };
+
+      // Tier 2: Format Breakdown
+      const formatBreakdown: Record<string, { count: number; revenue: number }> = {
+        word: { count: 0, revenue: 0 },
+        pdf: { count: 0, revenue: 0 },
+        flashcard: { count: 0, revenue: 0 },
+        sheets: { count: 0, revenue: 0 },
+        design: { count: 0, revenue: 0 },
+      };
+      for (const ord of orders) {
+        const fmt = (ord.selected_format || 'word').toLowerCase();
+        if (!formatBreakdown[fmt]) {
+          formatBreakdown[fmt] = { count: 0, revenue: 0 };
+        }
+        formatBreakdown[fmt].count += 1;
+        if (ord.payment_status === 'paid') {
+          formatBreakdown[fmt].revenue += Number(ord.total_amount || 0);
+        }
+      }
+
+      // Tier 2: Customer Group Breakdown
+      let studentCount = 0;
+      let teacherCount = 0;
+      let otherCount = 0;
+      for (const ord of orders) {
+        const grp = ord.customer_group || '';
+        if (grp.includes('Học sinh')) {
+          studentCount++;
+        } else if (grp.includes('Giáo viên')) {
+          teacherCount++;
+        } else {
+          otherCount++;
+        }
+      }
+      const customerGroupBreakdown = {
+        student: {
+          count: studentCount,
+          percent: totalOrdersCount > 0 ? Number(((studentCount / totalOrdersCount) * 100).toFixed(1)) : 0,
+        },
+        teacher: {
+          count: teacherCount,
+          percent: totalOrdersCount > 0 ? Number(((teacherCount / totalOrdersCount) * 100).toFixed(1)) : 0,
+        },
+        other: {
+          count: otherCount,
+          percent: totalOrdersCount > 0 ? Number(((otherCount / totalOrdersCount) * 100).toFixed(1)) : 0,
+        },
+      };
+
+      // Tier 2: VAT Invoice Breakdown
+      const vatRequestedCount = orders.filter((o) => Boolean(o.need_invoice)).length;
+      const vatBreakdown = {
+        requested: vatRequestedCount,
+        notRequested: totalOrdersCount - vatRequestedCount,
+      };
 
       res.json({
         ok: true,
         stats: {
+          // Backward-compatible keys:
           totalProducts: products.length,
           activeProducts: products.filter((p) => p.is_active).length,
-          totalOrders: orders.length,
-          paidOrders: paidOrders.length,
+          totalOrders: totalOrdersCount,
+          paidOrders: paidOrdersCount,
           totalRevenue,
           syncedFormCount,
+
+          // Expanded Tier 1 KPIs:
+          paidRevenue: totalRevenue,
+          pendingRevenue,
+          paidOrdersCount,
+          pendingOrdersCount,
+          reconciledRevenue: totalRevenue,
+          googleFormSyncedCount: syncedFormCount,
+          conversionRate,
+          formDeliveryRate,
+
+          // Expanded Tier 2 Breakdown Analytics:
+          paymentMethodBreakdown,
+          formatBreakdown,
+          customerGroupBreakdown,
+          vatBreakdown,
         },
         products,
         categories,
@@ -155,6 +261,7 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi tải dữ liệu trang quản trị.',
+        details: err?.stack || String(err),
       });
     }
   },
@@ -976,6 +1083,100 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi đồng bộ lại Google Form.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/orders/:orderCode/manual-payment
+   * Cho phép Admin duyệt thanh toán thủ công cho đơn hàng chuyển khoản kiểm tra bằng tay.
+   * Thực hiện chính xác quy trình như SePay/PayPal Webhook:
+   * 1. Cập nhật order payment_status = 'paid', paid_at = paidAt (hoặc now), payment_ref_id
+   * 2. Tự động cấp quyền sở hữu tài liệu vào Tủ sách cá nhân (my_library) qua grantOrderToUserLibrary()
+   * 3. Bắn 14 Entry vào Google Form qua submitOrderToGoogleForm() để gửi email tài liệu qua Gmail
+   */
+  async manualConfirmPayment(req: Request, res: Response): Promise<void> {
+    try {
+      const orderCode = String(req.params.orderCode || '').trim().toUpperCase();
+      if (!orderCode) {
+        res.status(400).json({
+          ok: false,
+          error: 'Vui lòng cung cấp mã đơn hàng hợp lệ.',
+        });
+        return;
+      }
+
+      const order = await dbService.getOrderByCode(orderCode);
+      if (!order) {
+        res.status(404).json({
+          ok: false,
+          error: `Không tìm thấy đơn hàng mã "${orderCode}".`,
+        });
+        return;
+      }
+
+      if (order.payment_status === 'paid') {
+        res.status(400).json({
+          ok: false,
+          error: `Đơn hàng "${orderCode}" đã ở trạng thái đã thanh toán trước đó.`,
+        });
+        return;
+      }
+
+      // Xử lý thời gian thanh toán thực tế do admin nhập (datetime-local hoặc ISO)
+      let paidAtIso = new Date().toISOString();
+      if (req.body?.paidAt) {
+        const parsedDate = new Date(req.body.paidAt);
+        if (!isNaN(parsedDate.getTime())) {
+          paidAtIso = parsedDate.toISOString();
+        }
+      }
+
+      const paymentRefId =
+        (typeof req.body?.paymentRefId === 'string' && req.body.paymentRefId.trim())
+          ? req.body.paymentRefId.trim()
+          : `MANUAL_ADMIN_${Date.now()}`;
+
+      // 1. Cập nhật trạng thái 'paid' kèm thời gian thanh toán
+      // (dbService.updateOrderStatus tự động gọi dbService.grantOrderToUserLibrary khi payment_status === 'paid')
+      const updatedOrder = await dbService.updateOrderStatus(order.order_code, {
+        payment_status: 'paid',
+        payment_ref_id: paymentRefId,
+        paid_at: paidAtIso,
+      });
+
+      // 2. Bảo đảm cấp quyền vào Tủ sách cá nhân (idempotent)
+      try {
+        await dbService.grantOrderToUserLibrary(updatedOrder || order);
+      } catch (grantErr: any) {
+        console.warn('[adminController.manualConfirmPayment] Cấp quyền thư viện cảnh báo:', grantErr);
+      }
+
+      // 3. Tự động bắn 14 Entry vào Google Form nội bộ để kích hoạt gửi Gmail link tài liệu
+      let formSyncResult: any = null;
+      try {
+        formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
+      } catch (syncErr: any) {
+        console.warn('[adminController.manualConfirmPayment] Google Form sync failed:', syncErr?.message);
+        formSyncResult = {
+          allSuccess: false,
+          error: syncErr?.message || 'Lỗi đồng bộ Google Form',
+        };
+      }
+
+      res.json({
+        ok: true,
+        message: `Đã duyệt thanh toán thủ công cho đơn hàng ${order.order_code} thành công.`,
+        order: updatedOrder || order,
+        googleFormSync: formSyncResult,
+      });
+    } catch (err: any) {
+      console.error('[adminController.manualConfirmPayment] Error:', err);
+      // Quy chuẩn GEMINI.md §4: Tuyến đường /admin hiển thị chi tiết lỗi kỹ thuật
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi xử lý duyệt thanh toán thủ công.',
+        details: err?.stack || String(err),
       });
     }
   },

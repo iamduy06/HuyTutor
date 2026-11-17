@@ -87,6 +87,11 @@ router.post(
   adminAuthMiddleware,
   adminController.resyncOrderToGoogleForm
 );
+router.post(
+  '/admin/orders/:orderCode/manual-payment',
+  adminAuthMiddleware,
+  adminController.manualConfirmPayment
+);
 router.get('/admin/block-previews/:type', adminAuthMiddleware, adminController.getBlockPreviewImage);
 router.get('/admin/users', adminAuthMiddleware, adminController.getUsers);
 router.put('/admin/users/:id/role', adminAuthMiddleware, adminController.updateUserRoleAndStatus);
