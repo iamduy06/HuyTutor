@@ -1,10 +1,17 @@
-import { AdminUserRecord,
+import {
+  AdminOverviewResponse,
+  AdminOverviewStats,
+  AdminUserRecord,
   CategoryItem,
   ComboRule,
   CustomerGroupType,
   FlashcardDeckOption,
+  GoogleFormSyncResult,
+  ManualPaymentPayload,
+  ManualPaymentResponse,
   MenuItem,
   OrderRecord,
+  OrderStatsBreakdown,
   PaymentInstruction,
   Product,
   SiteConfigs,
@@ -24,9 +31,16 @@ import { AdminUserRecord,
   DeleteMediaResult,
   UploadMediaResult,
   CleanupReport,
-  DeleteR2FileResult } from '../types';
+  DeleteR2FileResult,
+} from '../types';
 
 export type {
+  AdminOverviewResponse,
+  AdminOverviewStats,
+  GoogleFormSyncResult,
+  ManualPaymentPayload,
+  ManualPaymentResponse,
+  OrderStatsBreakdown,
   MediaItem,
   MediaFolder,
   MediaPagination,
@@ -389,23 +403,8 @@ export const apiClient = {
   // ====================================================================
   // NHÓM QUẢN TRỊ VIÊN (ADMIN)
   // ====================================================================
-  async getAdminOverview(): Promise<{
-    ok: boolean;
-    stats: {
-      totalProducts: number;
-      activeProducts: number;
-      totalOrders: number;
-      paidOrders: number;
-      totalRevenue: number;
-      syncedFormCount: number;
-    };
-    products: Product[];
-    categories: CategoryItem[];
-    menus: MenuItem[];
-    comboRules: ComboRule[];
-    orders: OrderRecord[];
-  }> {
-    return requestJson('/api/admin/overview');
+  async getAdminOverview(): Promise<AdminOverviewResponse> {
+    return requestJson<AdminOverviewResponse>('/api/admin/overview');
   },
 
   async getFlashcardDecks(): Promise<{ ok: boolean; decks: FlashcardDeckOption[] }> {
@@ -536,21 +535,32 @@ export const apiClient = {
 
   async resyncOrderGoogleForm(orderCode: string): Promise<{
     ok: boolean;
-    syncResult: {
-      orderCode: string;
-      allSuccess: boolean;
-      submissions: Array<{
-        productName: string;
-        mappedFormatNote: string;
-        httpStatus: number;
-        isSuccess: boolean;
-        payload: Record<string, string>;
-      }>;
-    };
+    syncResult: GoogleFormSyncResult;
   }> {
-    return requestJson(`/api/admin/orders/${encodeURIComponent(orderCode)}/resync-form`, {
+    return requestJson<{
+      ok: boolean;
+      syncResult: GoogleFormSyncResult;
+    }>(`/api/admin/orders/${encodeURIComponent(orderCode)}/resync-form`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * Duyệt thanh toán thủ công cho đơn hàng pending (Admin Manual Approval)
+   * POST /api/admin/orders/:orderCode/manual-payment
+   * Cập nhật payment_status='paid', paid_at, cấp tủ sách và bắn 14 Entry Google Form
+   */
+  async manualConfirmOrderPayment(
+    orderCode: string,
+    payload?: ManualPaymentPayload
+  ): Promise<ManualPaymentResponse> {
+    return requestJson<ManualPaymentResponse>(
+      `/api/admin/orders/${encodeURIComponent(orderCode)}/manual-payment`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      }
+    );
   },
 
   async getAdminUsers(): Promise<{

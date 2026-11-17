@@ -1013,10 +1013,12 @@ export interface OrderItemRecord {
 
 export interface OrderRecord {
   id: string;
+  user_id?: string | null;
   order_code: string;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  customer_note?: string;
   customer_group: CustomerGroupType | 'Giáo viên' | 'Khác';
   selected_format: UiFormatCode;
   flashcard_quantity: number | null;
@@ -1027,6 +1029,7 @@ export interface OrderRecord {
   discount_percent: number;
   discount_amount: number;
   total_amount: number;
+  final_amount?: number;
   payment_method: 'sepay' | 'paypal';
   payment_status: 'pending' | 'paid' | 'failed';
   payment_ref_id?: string;
@@ -1041,6 +1044,287 @@ export interface OrderRecord {
   client_user_agent?: string;
   created_at: string;
   items: OrderItemRecord[];
+}
+
+/**
+ * ============================================================================
+ * GOOGLE FORM SYNC & MANUAL PAYMENT APPROVAL TYPES
+ * ============================================================================
+ */
+export interface GoogleFormSyncSubmission {
+  productName: string;
+  mappedFormatNote: string;
+  httpStatus: number;
+  isSuccess: boolean;
+  payload: Record<string, string>;
+  errorMessage?: string;
+}
+
+export interface GoogleFormSyncResult {
+  orderCode: string;
+  allSuccess: boolean;
+  submissions: GoogleFormSyncSubmission[];
+}
+
+export interface ManualPaymentPayload {
+  paidAt?: string;
+  paymentRefId?: string;
+  notes?: string;
+}
+
+export interface ManualPaymentResponse {
+  ok: boolean;
+  message: string;
+  order: OrderRecord;
+  googleFormSync?: GoogleFormSyncResult;
+  syncResult?: GoogleFormSyncResult;
+}
+
+/**
+ * ============================================================================
+ * ORDERS EXPANDED STATISTICS & TIME FILTER (ADMIN ORDERS DASHBOARD)
+ * ============================================================================
+ */
+export type OrderStatsTimeFilter = 'all' | 'today' | '7days' | 'month';
+
+export interface PaymentMethodStat {
+  count: number;
+  revenue: number;
+}
+
+export interface PaymentMethodBreakdown {
+  vietqr: PaymentMethodStat;
+  paypal: PaymentMethodStat;
+  [key: string]: PaymentMethodStat | undefined;
+}
+
+export interface FormatStat {
+  count: number;
+  revenue: number;
+}
+
+export interface FormatBreakdown {
+  word: FormatStat;
+  pdf: FormatStat;
+  flashcard: FormatStat;
+  sheet?: FormatStat;
+  design?: FormatStat;
+  [key: string]: FormatStat | undefined;
+}
+
+export interface CustomerGroupStat {
+  count: number;
+  percent: number;
+  revenue?: number;
+}
+
+export type CustomerGroupBreakdown = Record<string, CustomerGroupStat>;
+
+export interface VatBreakdown {
+  requested: number;
+  notRequested: number;
+}
+
+export interface OrderStatsBreakdown {
+  paidRevenue: number;
+  pendingRevenue: number;
+  totalOrdersCount: number;
+  paidOrdersCount: number;
+  pendingOrdersCount: number;
+  conversionRate: number;
+  syncedFormCount: number;
+  formDeliveryRate: number;
+  paymentMethodBreakdown: PaymentMethodBreakdown;
+  formatBreakdown: FormatBreakdown;
+  customerGroupBreakdown: CustomerGroupBreakdown;
+  vatBreakdown: VatBreakdown;
+}
+
+export interface AdminOverviewStats {
+  totalProducts: number;
+  activeProducts: number;
+  totalOrders: number;
+  paidOrders: number;
+  totalRevenue: number;
+  syncedFormCount: number;
+
+  // Expanded fields (Tier 1 & Tier 2)
+  paidRevenue?: number;
+  pendingRevenue?: number;
+  paidOrdersCount?: number;
+  pendingOrdersCount?: number;
+  conversionRate?: number;
+  formDeliveryRate?: number;
+  paymentMethodBreakdown?: PaymentMethodBreakdown;
+  formatBreakdown?: FormatBreakdown;
+  customerGroupBreakdown?: CustomerGroupBreakdown;
+  vatBreakdown?: VatBreakdown;
+}
+
+export interface AdminOverviewResponse {
+  ok: boolean;
+  stats: AdminOverviewStats;
+  products: Product[];
+  categories: CategoryItem[];
+  menus: MenuItem[];
+  comboRules: ComboRule[];
+  orders: OrderRecord[];
+}
+
+/**
+ * Tính toán số liệu thống kê đơn hàng mở rộng (Tầng 1 & Tầng 2)
+ * Hỗ trợ bộ lọc thời gian: 'all' | 'today' | '7days' | 'month'
+ */
+export function computeOrderStats(
+  orders: OrderRecord[],
+  timeFilter: OrderStatsTimeFilter = 'all'
+): OrderStatsBreakdown {
+  const now = new Date();
+
+  const filteredOrders = orders.filter((o) => {
+    if (timeFilter === 'all') return true;
+    if (!o.created_at) return true;
+
+    const createdAt = new Date(o.created_at);
+    if (isNaN(createdAt.getTime())) return true;
+
+    if (timeFilter === 'today') {
+      return (
+        createdAt.getDate() === now.getDate() &&
+        createdAt.getMonth() === now.getMonth() &&
+        createdAt.getFullYear() === now.getFullYear()
+      );
+    }
+
+    if (timeFilter === '7days') {
+      const diffMs = now.getTime() - createdAt.getTime();
+      return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+    }
+
+    if (timeFilter === 'month') {
+      return (
+        createdAt.getMonth() === now.getMonth() &&
+        createdAt.getFullYear() === now.getFullYear()
+      );
+    }
+
+    return true;
+  });
+
+  const paidOrders = filteredOrders.filter((o) => o.payment_status === 'paid');
+  const pendingOrders = filteredOrders.filter((o) => o.payment_status === 'pending');
+
+  const paidRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+  const pendingRevenue = pendingOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+  const totalOrdersCount = filteredOrders.length;
+  const paidOrdersCount = paidOrders.length;
+  const pendingOrdersCount = pendingOrders.length;
+
+  const conversionRate =
+    totalOrdersCount > 0 ? Math.round((paidOrdersCount / totalOrdersCount) * 1000) / 10 : 0;
+
+  const syncedOrders = paidOrders.filter((o) => o.google_form_submitted);
+  const syncedFormCount = syncedOrders.length;
+  const formDeliveryRate =
+    paidOrdersCount > 0 ? Math.round((syncedFormCount / paidOrdersCount) * 1000) / 10 : 100;
+
+  // Phân bổ Cổng thanh toán
+  const vietqrOrders = filteredOrders.filter((o) => o.payment_method === 'sepay');
+  const paypalOrders = filteredOrders.filter((o) => o.payment_method === 'paypal');
+
+  const paymentMethodBreakdown: PaymentMethodBreakdown = {
+    vietqr: {
+      count: vietqrOrders.length,
+      revenue: vietqrOrders
+        .filter((o) => o.payment_status === 'paid')
+        .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0),
+    },
+    paypal: {
+      count: paypalOrders.length,
+      revenue: paypalOrders
+        .filter((o) => o.payment_status === 'paid')
+        .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0),
+    },
+  };
+
+  // Phân bổ Định dạng tài liệu
+  const formatBreakdown: FormatBreakdown = {
+    word: { count: 0, revenue: 0 },
+    pdf: { count: 0, revenue: 0 },
+    flashcard: { count: 0, revenue: 0 },
+    sheet: { count: 0, revenue: 0 },
+    design: { count: 0, revenue: 0 },
+  };
+
+  for (const ord of filteredOrders) {
+    const fmt = ord.selected_format;
+    const isPaid = ord.payment_status === 'paid';
+    const amount = Number(ord.total_amount) || 0;
+
+    if (fmt === 'Word') {
+      formatBreakdown.word.count++;
+      if (isPaid) formatBreakdown.word.revenue += amount;
+    } else if (fmt === 'PDF') {
+      formatBreakdown.pdf.count++;
+      if (isPaid) formatBreakdown.pdf.revenue += amount;
+    } else if (fmt === 'Flashcard') {
+      formatBreakdown.flashcard.count++;
+      if (isPaid) formatBreakdown.flashcard.revenue += amount;
+    } else if (fmt === 'Trang tính') {
+      if (formatBreakdown.sheet) {
+        formatBreakdown.sheet.count++;
+        if (isPaid) formatBreakdown.sheet.revenue += amount;
+      }
+    } else if (fmt === 'Thiết kế') {
+      if (formatBreakdown.design) {
+        formatBreakdown.design.count++;
+        if (isPaid) formatBreakdown.design.revenue += amount;
+      }
+    }
+  }
+
+  // Phân bổ Nhóm khách hàng
+  const customerGroupBreakdown: CustomerGroupBreakdown = {};
+  for (const ord of filteredOrders) {
+    const group = ord.customer_group || 'Khác';
+    if (!customerGroupBreakdown[group]) {
+      customerGroupBreakdown[group] = { count: 0, percent: 0, revenue: 0 };
+    }
+    customerGroupBreakdown[group].count++;
+    if (ord.payment_status === 'paid') {
+      customerGroupBreakdown[group].revenue =
+        (customerGroupBreakdown[group].revenue || 0) + (Number(ord.total_amount) || 0);
+    }
+  }
+  for (const key of Object.keys(customerGroupBreakdown)) {
+    customerGroupBreakdown[key].percent =
+      totalOrdersCount > 0
+        ? Math.round((customerGroupBreakdown[key].count / totalOrdersCount) * 1000) / 10
+        : 0;
+  }
+
+  // Phân bổ Hóa đơn VAT
+  const vatRequestedOrders = filteredOrders.filter((o) => o.need_invoice);
+  const vatBreakdown: VatBreakdown = {
+    requested: vatRequestedOrders.length,
+    notRequested: filteredOrders.length - vatRequestedOrders.length,
+  };
+
+  return {
+    paidRevenue,
+    pendingRevenue,
+    totalOrdersCount,
+    paidOrdersCount,
+    pendingOrdersCount,
+    conversionRate,
+    syncedFormCount,
+    formDeliveryRate,
+    paymentMethodBreakdown,
+    formatBreakdown,
+    customerGroupBreakdown,
+    vatBreakdown,
+  };
 }
 
 export interface UpgradeQuote {
