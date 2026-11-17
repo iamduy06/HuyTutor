@@ -34,6 +34,8 @@ export const CheckoutModal: React.FC = () => {
     setCheckoutItems,
     siteConfigs,
     showToast,
+    openAuthPrompt,
+    savePendingCheckout,
   } = useStore();
 
   const [customerName, setCustomerName] = useState('');
@@ -51,25 +53,65 @@ export const CheckoutModal: React.FC = () => {
   const [consentOrderProcessing, setConsentOrderProcessing] = useState(false);
   const [consentMarketingEmails, setConsentMarketingEmails] = useState(false);
 
-  // Tự động điền thông tin từ tài khoản đang đăng nhập
+  // Fallback guard: if checkout opens and user is null, close and show prompt modal
+  useEffect(() => {
+    if (isCheckoutOpen && !user) {
+      setIsCheckoutOpen(false);
+      const itemsToPrompt = checkoutItems.length > 0 ? checkoutItems : selectedCartItems;
+      if (itemsToPrompt.length > 0) {
+        savePendingCheckout(itemsToPrompt, 'cart');
+        openAuthPrompt(itemsToPrompt);
+      }
+    }
+  }, [isCheckoutOpen, user, checkoutItems, selectedCartItems, setIsCheckoutOpen, savePendingCheckout, openAuthPrompt]);
+
+  // Strict conditional autofill: CHỈ tự động điền các trường ĐÃ CÓ thông tin trong tài khoản
   useEffect(() => {
     if (user && isCheckoutOpen) {
-      setCustomerName((prev) => prev || user.fullName || '');
-      setCustomerEmail((prev) => prev || user.email || '');
-      setCustomerEmailConfirm((prev) => prev || user.email || '');
-      setCustomerPhone((prev) => prev || user.phone || '');
-      if (user.customerGroup) {
-        if ((CUSTOMER_GROUP_OPTIONS as readonly string[]).includes(user.customerGroup)) {
-          setCustomerGroup((prev) => prev || (user.customerGroup as CustomerGroupType));
-        } else if (user.customerGroup === 'Giáo viên') {
-          setCustomerGroup((prev) => prev || 'Giáo viên công lập');
-        }
+      // 1. Họ và tên: Chỉ điền nếu fullName có dữ liệu thực tế
+      if (user.fullName && user.fullName.trim()) {
+        setCustomerName(user.fullName.trim());
+      } else {
+        setCustomerName('');
       }
-      if (user.defaultTaxCccd) {
-        setInvoiceTaxOrCccd((prev) => prev || user.defaultTaxCccd);
+
+      // 2. Email: Chỉ điền nếu email có dữ liệu thực tế
+      if (user.email && user.email.trim()) {
+        const cleanEmail = user.email.trim().toLowerCase();
+        setCustomerEmail(cleanEmail);
+        setCustomerEmailConfirm(cleanEmail);
+      } else {
+        setCustomerEmail('');
+        setCustomerEmailConfirm('');
       }
-      if (user.defaultInvoiceAddress) {
-        setInvoiceAddress((prev) => prev || user.defaultInvoiceAddress);
+
+      // 3. Số điện thoại: Chỉ điền nếu phone có dữ liệu thực tế
+      if (user.phone && user.phone.trim()) {
+        setCustomerPhone(user.phone.trim());
+      } else {
+        setCustomerPhone('');
+      }
+
+      // 4. Nhóm khách hàng: Chỉ điền nếu customerGroup có dữ liệu hợp lệ trong CUSTOMER_GROUP_OPTIONS
+      if (
+        user.customerGroup &&
+        (CUSTOMER_GROUP_OPTIONS as readonly string[]).includes(user.customerGroup)
+      ) {
+        setCustomerGroup(user.customerGroup as CustomerGroupType);
+      } else {
+        setCustomerGroup('');
+      }
+
+      // 5. Thông tin xuất hóa đơn VAT: Chỉ điền nếu user đã từng lưu thông tin mặc định
+      if (user.defaultTaxCccd && user.defaultTaxCccd.trim()) {
+        setInvoiceTaxOrCccd(user.defaultTaxCccd.trim());
+      } else {
+        setInvoiceTaxOrCccd('');
+      }
+      if (user.defaultInvoiceAddress && user.defaultInvoiceAddress.trim()) {
+        setInvoiceAddress(user.defaultInvoiceAddress.trim());
+      } else {
+        setInvoiceAddress('');
       }
     }
   }, [user, isCheckoutOpen]);

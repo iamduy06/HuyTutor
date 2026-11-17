@@ -1,15 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { formatVnd, UiFormatCode } from '../types';
 import { ensurePackageFormatPricings, getProductRetailPrice } from '../utils/comboPricingEngine';
 
 export const ComboFormatSelectionModal: React.FC = () => {
+  const { user } = useAuth();
   const {
     comboModalPackage,
     comboModalAction,
     comboModalInitialFormat,
     closeComboFormatModal,
     addComboToCart,
+    openAuthPrompt,
+    savePendingCheckout,
     products,
   } = useStore();
 
@@ -66,6 +70,11 @@ export const ComboFormatSelectionModal: React.FC = () => {
       : 0;
 
   const handleConfirm = () => {
+    if (comboModalAction === 'buy_now' && !user) {
+      addComboToCart(comboModalPackage, selectedFormat, 'open_checkout');
+      closeComboFormatModal();
+      return;
+    }
     const actionType = comboModalAction === 'buy_now' ? 'open_checkout' : 'add_to_cart';
     addComboToCart(comboModalPackage, selectedFormat, actionType);
     closeComboFormatModal();

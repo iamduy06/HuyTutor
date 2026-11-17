@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { formatVnd, UiFormatCode } from '../types';
 
 export const CartDrawer: React.FC = () => {
-  const { isItemInLibrary } = useAuth();
+  const { isItemInLibrary, user } = useAuth();
   const {
     isCartOpen,
     setIsCartOpen,
@@ -24,6 +24,8 @@ export const CartDrawer: React.FC = () => {
     deselectAllCartItems,
     bulkChangeSelectedFormats,
     setCheckoutItems,
+    openAuthPrompt,
+    savePendingCheckout,
     products,
     updateCartItemQty,
     updateCartItemFormat,
@@ -48,6 +50,12 @@ export const CartDrawer: React.FC = () => {
 
   const handleProceedCheckout = () => {
     if (isCheckoutDisabled) return;
+    if (!user) {
+      savePendingCheckout([...selectedCartItems], 'cart');
+      openAuthPrompt([...selectedCartItems]);
+      setIsCartOpen(false);
+      return;
+    }
     setCheckoutItems([...selectedCartItems]);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { formatVnd, UiFormatCode } from '../types';
+import { CartItem, formatVnd, UiFormatCode } from '../types';
 
 export const ProductFormatSelectionModal: React.FC = () => {
   const { user, isItemInLibrary } = useAuth();
@@ -13,6 +13,8 @@ export const ProductFormatSelectionModal: React.FC = () => {
     checkOwnershipStatus,
     addToCart,
     buyNow,
+    openAuthPrompt,
+    savePendingCheckout,
   } = useStore();
 
   const [selectedFormat, setSelectedFormat] = useState<UiFormatCode>('Word');
@@ -76,6 +78,32 @@ export const ProductFormatSelectionModal: React.FC = () => {
 
   const handleBuyNow = () => {
     if (isBlocked) return;
+    if (!user) {
+      const cartItemId = `${formatModalProduct.slug}__${selectedFormat}`;
+      const finalUnitPrice = isUpgrade ? upgradeAmountToPay : unitPrice;
+      const pendingItem: CartItem = {
+        cartItemId,
+        productId: formatModalProduct.id,
+        slug: formatModalProduct.slug,
+        categorySlug: formatModalProduct.category_slug,
+        code: formatModalProduct.code,
+        title: formatModalProduct.title,
+        googleFormProductName: formatModalProduct.google_form_product_name || formatModalProduct.title,
+        formatCode: selectedFormat,
+        unitPrice: finalUnitPrice,
+        originalPrice: unitPrice,
+        upgradeOffset,
+        isUpgrade,
+        upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+        quantity: effectiveQty,
+        selected: true,
+        isComboEligible: formatModalProduct.is_combo_eligible,
+      };
+      savePendingCheckout([pendingItem], 'buy_now');
+      openAuthPrompt([pendingItem]);
+      closeFormatModal();
+      return;
+    }
     buyNow(formatModalProduct, selectedFormat, effectiveQty);
     closeFormatModal();
   };

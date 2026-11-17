@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { apiClient } from '../api/client';
+import { CheckoutAuthPromptModal } from '../components/CheckoutAuthPromptModal';
 import {
   CartItem,
   CategoryItem,
@@ -102,6 +103,15 @@ export interface StoreContextValue {
   closeComboFormatModal: () => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
+
+  // Checkout Auth Guard
+  isAuthPromptOpen: boolean;
+  setIsAuthPromptOpen: (open: boolean) => void;
+  pendingCheckoutItems: CartItem[];
+  openAuthPrompt: (items: CartItem[]) => void;
+  closeAuthPrompt: () => void;
+  savePendingCheckout: (items: CartItem[], source?: 'cart' | 'buy_now') => void;
+  restorePendingCheckout: () => CartItem[] | null;
 }
 
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
@@ -114,7 +124,7 @@ const DEFAULT_SITE_CONFIGS: SiteConfigs = {
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isItemInLibrary, userLibrary } = useAuth();
+  const { isItemInLibrary, userLibrary, user } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasInitialHydrated, setHasInitialHydrated] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -204,6 +214,83 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setToastMessage((prev) => (prev === displayMsg ? null : prev));
     }, 3200);
   };
+
+  // Checkout Auth Guard State & Helpers
+  const PENDING_CHECKOUT_KEY = 'ht_pending_checkout';
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const [pendingCheckoutItems, setPendingCheckoutItems] = useState<CartItem[]>([]);
+  const hasResumedPendingRef = useRef(false);
+
+  const savePendingCheckout = (items: CartItem[], source: 'cart' | 'buy_now' = 'cart') => {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = {
+        items,
+        source,
+        savedAt: Date.now(),
+      };
+      sessionStorage.setItem(PENDING_CHECKOUT_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const restorePendingCheckout = (): CartItem[] | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(PENDING_CHECKOUT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+      if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
+        return parsed.items as CartItem[];
+      }
+      return null;
+    } catch {
+      sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+      return null;
+    }
+  };
+
+  const openAuthPrompt = (items: CartItem[]) => {
+    setPendingCheckoutItems(items);
+    savePendingCheckout(items, 'cart');
+    setIsAuthPromptOpen(true);
+  };
+
+  const closeAuthPrompt = () => {
+    setIsAuthPromptOpen(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+    }
+  };
+
+  // Auto-resume checkout when authenticated
+  useEffect(() => {
+    if (!user) {
+      hasResumedPendingRef.current = false;
+      return;
+    }
+    if (!hasResumedPendingRef.current) {
+      if (typeof window === 'undefined') return;
+      try {
+        const raw = sessionStorage.getItem(PENDING_CHECKOUT_KEY);
+        if (raw) {
+          hasResumedPendingRef.current = true;
+          const parsed = JSON.parse(raw);
+          sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+          const items: CartItem[] = Array.isArray(parsed?.items) ? parsed.items : [];
+          if (items.length > 0) {
+            setCheckoutItems(items);
+            setIsCheckoutOpen(true);
+            showToast('Đã khôi phục đơn hàng, bạn có thể tiếp tục thanh toán.');
+          }
+        }
+      } catch {
+        sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+      }
+    }
+  }, [user]);
 
   const loadInitFromBackend = async (countryOverride?: 'VN' | 'INTL') => {
     setIsLoading(true);
@@ -473,6 +560,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const cartItemId = `${product.slug}__${formatCode}`;
 
+    const buyNowItem: CartItem = {
+      cartItemId,
+      productId: product.id,
+      slug: product.slug,
+      categorySlug: product.category_slug,
+      code: product.code,
+      title: product.title,
+      googleFormProductName: product.google_form_product_name || product.title,
+      formatCode,
+      unitPrice,
+      originalPrice,
+      upgradeOffset,
+      isUpgrade,
+      upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+      quantity: formatCode === 'Flashcard' ? quantity : 1,
+      selected: true,
+      isComboEligible: product.is_combo_eligible,
+    };
+
+    if (!user) {
+      savePendingCheckout([buyNowItem], 'buy_now');
+      openAuthPrompt([buyNowItem]);
+      setIsCartOpen(false);
+      return;
+    }
+
     if (formatCode !== 'Flashcard') {
       setCartItems((prev) => {
         const normalized = prev.map((it) => ({
@@ -644,6 +757,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast(`Đã thêm gói "${pkg.title}" (${formatCode}) vào giỏ hàng.`);
 
     if (actionType === 'open_checkout') {
+      if (!user) {
+        const comboItems: CartItem[] = unownedProducts.map((p) => {
+          const cartItemId = `${p.slug}__${formatCode}`;
+          let unitPrice = resolveFormatPrice(p, formatCode);
+          const originalPrice = unitPrice;
+          let upgradeOffset = 0;
+          const status = checkOwnershipStatus(p.slug, formatCode);
+          const isUpgrade = status.isUpgrade;
+          if (isUpgrade) {
+            const pdfPrice = resolveFormatPrice(p, 'PDF');
+            upgradeOffset = Math.min(pdfPrice, unitPrice);
+            unitPrice = Math.max(0, unitPrice - upgradeOffset);
+          }
+          return {
+            cartItemId,
+            productId: p.id,
+            slug: p.slug,
+            categorySlug: p.category_slug,
+            code: p.code,
+            title: p.title,
+            googleFormProductName: p.google_form_product_name || p.title,
+            formatCode,
+            unitPrice,
+            originalPrice,
+            upgradeOffset,
+            isUpgrade,
+            upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+            quantity: 1,
+            selected: true,
+            isComboEligible: p.is_combo_eligible,
+            comboPackageId: pkg.id,
+            comboPackageTitle: pkg.title,
+          };
+        });
+        savePendingCheckout(comboItems, 'buy_now');
+        openAuthPrompt(comboItems);
+        return;
+      }
       setIsCheckoutOpen(true);
     } else {
       setIsCartOpen(true);
@@ -1023,9 +1174,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         closeComboFormatModal,
         toastMessage,
         showToast,
+        isAuthPromptOpen,
+        setIsAuthPromptOpen,
+        pendingCheckoutItems,
+        openAuthPrompt,
+        closeAuthPrompt,
+        savePendingCheckout,
+        restorePendingCheckout,
       }}
     >
       <React.Fragment key={hasInitialHydrated ? 'hydrated' : 'loading'}>{children}</React.Fragment>
+      <CheckoutAuthPromptModal />
     </StoreContext.Provider>
   );
 };
