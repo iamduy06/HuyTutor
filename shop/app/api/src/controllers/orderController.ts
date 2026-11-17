@@ -294,6 +294,14 @@ export const orderController = {
    */
   async createOrder(req: Request, res: Response): Promise<void> {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          ok: false,
+          error: 'Vui lòng đăng nhập để thực hiện đặt hàng.',
+        });
+        return;
+      }
+
       const {
         customerName,
         customerEmail,
@@ -595,7 +603,7 @@ export const orderController = {
       const pkgBlock = comboBlocks.find((b: any) => b.type === 'combo_packages');
       const comboPackages: any[] = (pkgBlock?.config?.packages || []) as any[];
 
-      const userId = req.user?.id || '';
+      const userId = req.user.id;
       const orderProductKeys = new Set(
         resolvedItems.flatMap((it) => {
           const dbP = allProducts.find((p) => p.id === it.product_id || p.slug === it.product_id);
@@ -881,7 +889,7 @@ export const orderController = {
 
       const newOrder: SeedOrder = {
         id: `ord-${Date.now()}`,
-        user_id: req.user?.id || null,
+        user_id: req.user.id,
         order_code: orderCode,
         customer_name: String(customerName).trim(),
         customer_email: email1,
