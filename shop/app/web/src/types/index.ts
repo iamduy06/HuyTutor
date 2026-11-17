@@ -214,6 +214,8 @@ export interface ImageFrameConfig {
 }
 
 export type CampaignFramePreset = 'tet' | 'sale' | 'exam' | 'christmas';
+export type CampaignFrameScope = 'global' | 'specific' | 'specific_slugs' | 'specific_products';
+export type CampaignSlugMatchMode = 'exact' | 'include_children';
 
 export interface CampaignFrameBlockConfig {
   title?: string;
@@ -222,8 +224,10 @@ export interface CampaignFrameBlockConfig {
   frame_type: 'preset' | 'custom';
   preset_name?: CampaignFramePreset;
   custom_frame_url?: string;
-  scope: 'global' | 'specific';
+  scope: CampaignFrameScope;
   applied_product_ids?: string[];
+  applied_slugs?: string[];
+  slug_match_mode?: CampaignSlugMatchMode;
   banner_text?: string;
   cta_label?: string;
   cta_url?: string;
@@ -236,8 +240,10 @@ export interface CampaignFrameConfig {
   frame_type: 'preset' | 'custom';
   preset_name?: CampaignFramePreset;
   custom_frame_url?: string;
-  scope: 'global' | 'specific';
+  scope: CampaignFrameScope;
   applied_product_ids?: string[];
+  applied_slugs?: string[];
+  slug_match_mode?: CampaignSlugMatchMode;
 }
 
 export interface SiteConfigs {

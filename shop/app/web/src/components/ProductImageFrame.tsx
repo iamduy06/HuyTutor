@@ -1,10 +1,51 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import {
   AspectRatioMode,
   PresetAspectRatio,
   CampaignFramePreset,
+  CampaignFrameConfig,
 } from '../types';
+import { buildProductUrl } from '../utils/urlHelper';
+
+/**
+ * Kiểm tra xem một đường dẫn (rawPath) có khớp với danh sách appliedSlugs theo matchMode không.
+ * - 'exact': Khớp chính xác tuyệt đối sau khi chuẩn hóa trailing slash và alias /home.
+ * - 'include_children': Khớp chính xác hoặc khớp tiền tố trang con (slug + '/'), ngoại trừ '/' chỉ khớp đúng '/'.
+ */
+export function isPathMatchingAppliedSlugs(
+  rawPath: string,
+  appliedSlugs: string[],
+  matchMode: 'exact' | 'include_children' = 'exact'
+): boolean {
+  if (!rawPath || !Array.isArray(appliedSlugs) || appliedSlugs.length === 0) {
+    return false;
+  }
+  let cleanPath = rawPath.trim().replace(/\/+$/, '') || '/';
+  if (cleanPath === '/home') {
+    cleanPath = '/';
+  }
+
+  const normalizedSlugs = appliedSlugs
+    .map((s) => {
+      const trimmed = (s || '').trim();
+      if (!trimmed) return '';
+      const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+      return withSlash.replace(/\/+$/, '') || '/';
+    })
+    .filter(Boolean);
+
+  if (matchMode === 'exact') {
+    return normalizedSlugs.includes(cleanPath);
+  }
+
+  // include_children mode
+  return normalizedSlugs.some((slug) => {
+    if (slug === '/') return cleanPath === '/';
+    return cleanPath === slug || cleanPath.startsWith(`${slug}/`);
+  });
+}
 
 export interface ProductImageFrameProps {
   src?: string;
@@ -337,8 +378,14 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
   badgeText,
   children,
 }) => {
-  const { siteConfigs } = useStore();
-  const campaignConfig = siteConfigs?.campaign_frame;
+  const location = useLocation();
+  const { siteConfigs, products } = useStore();
+  const campaignConfig = siteConfigs?.campaign_frame as
+    | (CampaignFrameConfig & {
+        applied_slugs?: string[];
+        slug_match_mode?: 'exact' | 'include_children';
+      })
+    | undefined;
 
   // 1. Tính toán Aspect Ratio CSS
   let computedAspectRatio: string | undefined = undefined;
@@ -399,14 +446,47 @@ export const ProductImageFrame: React.FC<ProductImageFrameProps> = ({
     overlayType = 'custom_url';
     customOverlayUrl = customCampaignFrameUrl;
   } else if (!disableCampaignFrame && campaignConfig?.is_enabled) {
-    const isGlobal = campaignConfig.scope !== 'specific';
-    const isTargeted =
-      campaignConfig.scope === 'specific' &&
-      productId &&
-      Array.isArray(campaignConfig.applied_product_ids) &&
-      campaignConfig.applied_product_ids.includes(productId);
+    const scope = (campaignConfig.scope as string) || 'global';
+    let shouldShow = false;
 
-    if (isGlobal || isTargeted) {
+    if (scope === 'global') {
+      shouldShow = true;
+    } else if (scope === 'specific' || scope === 'specific_products') {
+      shouldShow = Boolean(
+        productId &&
+        Array.isArray(campaignConfig.applied_product_ids) &&
+        campaignConfig.applied_product_ids.includes(productId)
+      );
+    } else if (scope === 'specific_slugs') {
+      const rawSlugs = Array.isArray(campaignConfig.applied_slugs)
+        ? campaignConfig.applied_slugs
+        : [];
+      const matchMode = campaignConfig.slug_match_mode || 'exact';
+
+      let currentPath = (location?.pathname || '').trim().replace(/\/+$/, '') || '/';
+      if (currentPath === '/home') {
+        currentPath = '/';
+      }
+
+      // 1. Kiểm tra xem trang hiện tại (currentPath) có khớp với danh sách slug được chọn không
+      const isCurrentPageMatched = isPathMatchingAppliedSlugs(currentPath, rawSlugs, matchMode);
+
+      // 2. Nếu trang hiện tại chưa khớp, kiểm tra xem thẻ này có thuộc 1 sản phẩm có slug được tick chọn độc lập không
+      let isItemSlugMatched = false;
+      if (!isCurrentPageMatched && productId && Array.isArray(products)) {
+        const prod = products.find((p) => p.id === productId || p.slug === productId);
+        if (prod) {
+          const prodUrl = buildProductUrl(prod.category_slug, prod.slug);
+          isItemSlugMatched = isPathMatchingAppliedSlugs(prodUrl, rawSlugs, matchMode);
+        }
+      }
+
+      shouldShow = isCurrentPageMatched || isItemSlugMatched;
+    } else {
+      shouldShow = true;
+    }
+
+    if (shouldShow) {
       isOverlayActive = true;
       if (campaignConfig.frame_type === 'custom' && campaignConfig.custom_frame_url) {
         overlayType = 'custom_url';
