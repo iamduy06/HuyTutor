@@ -2,6 +2,7 @@ import {
   AdminOverviewResponse,
   AdminOverviewStats,
   AdminUserRecord,
+  AdminUserLibraryResponse,
   CategoryItem,
   ComboRule,
   CustomerGroupType,
@@ -568,6 +569,10 @@ export const apiClient = {
     users: AdminUserRecord[];
   }> {
     return requestJson('/api/admin/users');
+  },
+
+  async getAdminUserLibrary(userId: string): Promise<AdminUserLibraryResponse> {
+    return requestJson(`/api/admin/users/${encodeURIComponent(userId)}/library`);
   },
 
   async updateAdminUserRole(

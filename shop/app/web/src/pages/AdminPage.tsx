@@ -16,6 +16,7 @@ import { AdminProductDetailBuilder } from '../components/AdminProductDetailBuild
 import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProductDetailBlocks';
 import { ProductDeleteReportModal } from '../components/ProductDeleteReportModal';
 import { ManualPaymentConfirmModal } from '../components/admin/ManualPaymentConfirmModal';
+import { AdminUserPurchasedModal } from '../components/admin/AdminUserPurchasedModal';
 import { getClientErrorMessage } from '../utils/errorHandler';
 import {
   AdminUserRecord,
@@ -132,6 +133,7 @@ export const AdminPage: React.FC = () => {
   const [userPage, setUserPage] = useState(1);
   const USERS_PER_PAGE = 20;
   const [inspectedPayload, setInspectedPayload] = useState<Record<string, string> | null>(null);
+  const [selectedUserForPurchased, setSelectedUserForPurchased] = useState<AdminUserRecord | null>(null);
 
   // State cho Bộ lọc thời gian & Duyệt thanh toán thủ công đơn hàng
   const [orderTimeFilter, setOrderTimeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | 'THIS_MONTH'>('ALL');
@@ -2987,6 +2989,20 @@ export const AdminPage: React.FC = () => {
                         </td>
                         <td className="border border-gray-200 p-2.5 text-right">
                           <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForPurchased(u)}
+                              className="border border-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold text-[11px] px-2.5 py-1 rounded-sm transition flex items-center gap-1 shadow-2xs cursor-pointer group"
+                              title="Xem danh sách tài liệu"
+                            >
+                              <span>Tài liệu</span>
+                              {typeof u.purchasedDocumentsCount === 'number' && (
+                                <span className="bg-blue-600 text-white group-hover:bg-white group-hover:text-blue-600 px-1.5 py-0.2 rounded-full text-[10px] leading-tight font-extrabold">
+                                  {u.purchasedDocumentsCount}
+                                </span>
+                              )}
+                            </button>
+
                             <select
                               value={u.role}
                               onChange={(e) =>
@@ -3723,6 +3739,14 @@ export const AdminPage: React.FC = () => {
         order={selectedOrderForPayment}
         onClose={() => setSelectedOrderForPayment(null)}
         onConfirmSuccess={loadOverview}
+        showToast={showToast}
+      />
+
+      {/* Modal Tủ sách thành viên: Xem danh sách tài liệu */}
+      <AdminUserPurchasedModal
+        isOpen={Boolean(selectedUserForPurchased)}
+        user={selectedUserForPurchased}
+        onClose={() => setSelectedUserForPurchased(null)}
         showToast={showToast}
       />
     </div>

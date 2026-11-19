@@ -1396,14 +1396,18 @@ export interface UserLibraryItem {
   order_code: string;
   product_slug: string;
   product_title: string;
+  title?: string;
   format_code: UiFormatCode;
+  format?: string;
   access_drive_url: string;
   watermarked_pdf_url: string;
   download_count: number;
   last_downloaded_at?: string;
   is_active: boolean;
   granted_at: string;
+  activated_at?: string;
   paid_amount?: number;
+  final_price?: number;
   thumbnail_url?: string;
   cover_tag?: string;
   code?: string;
@@ -1413,6 +1417,28 @@ export interface UserLibraryItem {
 
 export interface AdminUserRecord extends UserProfile {
   activeSessions: number;
+  purchasedDocumentsCount?: number;
+}
+
+export interface AdminUserLibrarySummary {
+  totalDocuments: number;
+  totalSpent: number;
+  totalOrders: number;
+}
+
+export interface AdminUserLibraryData {
+  items: UserLibraryItem[];
+  summary: AdminUserLibrarySummary;
+}
+
+export interface AdminUserLibraryResponse {
+  ok?: boolean;
+  success?: boolean;
+  data?: AdminUserLibraryData;
+  items?: UserLibraryItem[];
+  summary?: AdminUserLibrarySummary;
+  error?: string;
+  detail?: string;
 }
 
 /**
