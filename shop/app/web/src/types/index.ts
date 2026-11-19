@@ -980,6 +980,21 @@ export interface FlashcardDeckOption {
   created_at?: string;
 }
 
+export interface CompactCartItem {
+  productId: string;
+  formatCode: UiFormatCode;
+  quantity: number;
+  selected: boolean;
+  comboPackageId?: string | null;
+  isUpgrade?: boolean;
+}
+
+export interface UserCartData {
+  items: CompactCartItem[];
+  cartHash: string;
+  updatedAt: string | null;
+}
+
 export interface CartItem {
   cartItemId: string;
   productId: string;
@@ -999,6 +1014,8 @@ export interface CartItem {
   originalPrice?: number;
   comboPackageId?: string;
   comboPackageTitle?: string;
+  isInactive?: boolean;
+  inactiveReason?: string;
 }
 
 export interface OrderItemRecord {

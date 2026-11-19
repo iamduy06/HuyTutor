@@ -45,8 +45,14 @@ export const CartDrawer: React.FC = () => {
     return isItemInLibrary(item.slug, item.formatCode);
   });
 
+  const hasInactiveItems = cartItems.some((item) => item.isInactive);
+
   const isCheckoutDisabled =
-    selectedCartItems.length === 0 || hasFormatConflict || hasMultipleProductsConflict || hasOwnedItemSelected;
+    selectedCartItems.length === 0 ||
+    hasFormatConflict ||
+    hasMultipleProductsConflict ||
+    hasOwnedItemSelected ||
+    hasInactiveItems;
 
   const handleProceedCheckout = () => {
     if (isCheckoutDisabled) return;
@@ -157,7 +163,9 @@ export const CartDrawer: React.FC = () => {
                 <div
                   key={item.cartItemId}
                   className={`p-3.5 rounded-md border transition ${
-                    item.selected
+                    item.isInactive
+                      ? 'border-red-500 bg-red-50/50'
+                      : item.selected
                       ? 'border-[#e60049] bg-[#fff5f7]/40'
                       : 'border-gray-200 bg-white opacity-75'
                   }`}
@@ -201,6 +209,16 @@ export const CartDrawer: React.FC = () => {
                               Tính giá lẻ
                             </span>
                           )}
+                        </div>
+                      )}
+
+                      {item.isInactive && (
+                        <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-[11px] text-red-700 font-bold flex items-center gap-1.5 leading-snug">
+                          <span className="shrink-0">⚠️</span>
+                          <span>
+                            {item.inactiveReason ||
+                              'Sản phẩm tạm ngưng kinh doanh. Vui lòng xóa món này khỏi giỏ hàng.'}
+                          </span>
                         </div>
                       )}
 
@@ -363,6 +381,21 @@ export const CartDrawer: React.FC = () => {
           </div>
         )}
 
+        {/* Cảnh báo Sản phẩm tạm ngưng kinh doanh trong giỏ (Chặn thanh toán) */}
+        {hasInactiveItems && (
+          <div className="mx-5 mb-2 p-3 bg-red-50 border border-red-500 rounded-md text-[11px] text-red-700 leading-relaxed flex items-start gap-2">
+            <span className="text-base shrink-0 leading-none">⛔</span>
+            <div>
+              <p className="font-extrabold uppercase mb-0.5">
+                Có sản phẩm tạm ngưng kinh doanh trong giỏ:
+              </p>
+              <p>
+                Giỏ hàng chứa sản phẩm đã tạm ngưng kinh doanh hoặc định dạng không còn khả dụng. Vui lòng xóa các sản phẩm viền đỏ ra khỏi giỏ để có thể tiến hành thanh toán.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tổng kết & Nút Tiến hành thanh toán */}
         <div className="p-5 border-t border-gray-200 bg-gray-50 space-y-2">
           <div className="flex justify-between text-xs text-gray-600">
@@ -391,13 +424,18 @@ export const CartDrawer: React.FC = () => {
             type="button"
             disabled={isCheckoutDisabled}
             onClick={handleProceedCheckout}
+            title={
+              hasInactiveItems
+                ? 'Vui lòng xóa sản phẩm viền đỏ ra khỏi giỏ để tiếp tục'
+                : undefined
+            }
             className={`w-full py-2.5 rounded-sm font-bold text-xs text-white transition ${
               isCheckoutDisabled
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-[#e60049] hover:bg-[#cc0041]'
             }`}
           >
-            Tiến hành thanh toán
+            {hasInactiveItems ? 'Có sản phẩm ngưng bán (Không thể thanh toán)' : 'Tiến hành thanh toán'}
           </button>
         </div>
       </div>

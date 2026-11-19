@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { apiClient } from '../api/client';
+import { apiClient, buildApiUrl, buildAuthHeaders } from '../api/client';
 import { CheckoutAuthPromptModal } from '../components/CheckoutAuthPromptModal';
 import {
   CartItem,
+  CompactCartItem,
   CategoryItem,
   ComboPackageItem,
   ComboPackagesBlockConfig,
@@ -69,6 +70,7 @@ export interface StoreContextValue {
   updateCartItemFormat: (cartItemId: string, newFormatCode: UiFormatCode) => void;
   removeCartItem: (cartItemId: string) => void;
   clearSelectedCartItems: () => void;
+  clearCart: () => Promise<void>;
   checkoutItems: CartItem[];
   setCheckoutItems: (items: CartItem[]) => void;
 
@@ -116,7 +118,169 @@ export interface StoreContextValue {
 
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
-const CART_STORAGE_KEY = 'huytutor_cart_v1';
+const CART_STORAGE_KEY = 'ht_cart';
+const OLD_CART_STORAGE_KEY = 'huytutor_cart_v1';
+
+/**
+ * Trích xuất danh sách CompactCartItem siêu nhẹ (<300 bytes) từ mảng CartItem đầy đủ
+ */
+export function compactCart(items: CartItem[]): CompactCartItem[] {
+  return items.map((it) => ({
+    productId: it.productId || it.slug,
+    formatCode: it.formatCode,
+    quantity: it.formatCode === 'Flashcard' ? Math.max(1, it.quantity || 1) : 1,
+    selected: it.selected !== false,
+    comboPackageId: it.comboPackageId || null,
+    isUpgrade: Boolean(it.isUpgrade),
+  }));
+}
+
+/**
+ * Tính toán chuỗi băm chuẩn hóa (Canonical Hash) xác định duy nhất trạng thái giỏ hàng
+ */
+export function computeCartHash(items: CompactCartItem[]): string {
+  const canonical = [...items]
+    .map((it) => ({
+      productId: String(it.productId || '').trim(),
+      formatCode: String(it.formatCode || '').trim(),
+      quantity: it.formatCode === 'Flashcard' ? Math.max(1, it.quantity || 1) : 1,
+      selected: it.selected !== false,
+      comboPackageId: it.comboPackageId ? String(it.comboPackageId).trim() : null,
+      isUpgrade: Boolean(it.isUpgrade),
+    }))
+    .sort((a, b) => {
+      const keyA = `${a.productId}:${a.formatCode}`;
+      const keyB = `${b.productId}:${b.formatCode}`;
+      return keyA.localeCompare(keyB);
+    });
+
+  const str = JSON.stringify(canonical);
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c64e6d;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
+}
+
+/**
+ * Tái tạo CartItem[] hoàn chỉnh từ CompactCartItem[] dựa trên danh mục sản phẩm trong RAM
+ * Tuân thủ Kịch bản 8: Nếu sản phẩm hoặc định dạng tạm ngưng kinh doanh,
+ * VẪN GIỮ NGUYÊN trong giỏ hàng và gán isInactive: true kèm inactiveReason.
+ */
+export function hydrateCompactCart(
+  compactItems: CompactCartItem[],
+  products: Product[],
+  isItemInLibrary?: (slug: string, format: UiFormatCode) => boolean,
+  comboPackages?: ComboPackageItem[]
+): CartItem[] {
+  return compactItems.map((compact) => {
+    const p = products.find(
+      (prod) => prod.id === compact.productId || prod.slug === compact.productId
+    );
+
+    // Kịch bản 8A: Sản phẩm không tìm thấy hoặc đã bị tắt is_active
+    if (!p || !p.is_active) {
+      return {
+        cartItemId: `${compact.productId}__${compact.formatCode}`,
+        productId: compact.productId,
+        slug: compact.productId,
+        categorySlug: '',
+        code: '',
+        title: p ? p.title : `Sản phẩm (${compact.productId})`,
+        googleFormProductName: p ? (p.google_form_product_name || p.title) : compact.productId,
+        formatCode: compact.formatCode,
+        unitPrice: 0,
+        originalPrice: 0,
+        upgradeOffset: 0,
+        quantity: compact.formatCode === 'Flashcard' ? Math.max(1, compact.quantity || 1) : 1,
+        selected: compact.selected !== false,
+        isComboEligible: false,
+        comboPackageId: compact.comboPackageId || undefined,
+        isUpgrade: Boolean(compact.isUpgrade),
+        isInactive: true,
+        inactiveReason: 'Sản phẩm tạm ngưng kinh doanh',
+      };
+    }
+
+    const fmt = (p.formats || []).find((f) => f.format_code === compact.formatCode);
+
+    // Kịch bản 8B: Định dạng không tồn tại hoặc đã bị tắt is_active
+    if (!fmt || !fmt.is_active) {
+      return {
+        cartItemId: `${p.slug}__${compact.formatCode}`,
+        productId: p.id,
+        slug: p.slug,
+        categorySlug: p.category_slug || '',
+        code: p.code || '',
+        title: p.title,
+        googleFormProductName: p.google_form_product_name || p.title,
+        formatCode: compact.formatCode,
+        unitPrice: fmt ? (Number(fmt.price) || 0) : 0,
+        originalPrice: fmt ? (Number(fmt.price) || 0) : 0,
+        upgradeOffset: 0,
+        quantity: compact.formatCode === 'Flashcard' ? Math.max(1, compact.quantity || 1) : 1,
+        selected: compact.selected !== false,
+        isComboEligible: p.is_combo_eligible,
+        comboPackageId: compact.comboPackageId || undefined,
+        isUpgrade: Boolean(compact.isUpgrade),
+        isInactive: true,
+        inactiveReason: 'Định dạng sản phẩm tạm ngưng kinh doanh',
+      };
+    }
+
+    // Sản phẩm và định dạng hoạt động bình thường
+    const catalogPrice = Number(fmt.price) || 0;
+    let unitPrice = catalogPrice;
+    const originalPrice = catalogPrice;
+    let upgradeOffset = 0;
+    let isUpgrade = false;
+
+    if (compact.isUpgrade && isItemInLibrary) {
+      const ownsWord = isItemInLibrary(p.slug, 'Word');
+      const ownsPdf = isItemInLibrary(p.slug, 'PDF');
+      if (compact.formatCode === 'Word' && ownsPdf && !ownsWord) {
+        isUpgrade = true;
+        const pdfFmt = (p.formats || []).find((f) => f.format_code === 'PDF');
+        const pdfPrice = pdfFmt ? (Number(pdfFmt.price) || 0) : 0;
+        upgradeOffset = Math.min(pdfPrice, catalogPrice);
+        unitPrice = Math.max(0, catalogPrice - upgradeOffset);
+      }
+    }
+
+    let comboPackageTitle: string | undefined = undefined;
+    if (compact.comboPackageId && comboPackages) {
+      const pkg = comboPackages.find((pkgItem) => pkgItem.id === compact.comboPackageId);
+      if (pkg) comboPackageTitle = pkg.title;
+    }
+
+    return {
+      cartItemId: `${p.slug}__${compact.formatCode}`,
+      productId: p.id,
+      slug: p.slug,
+      categorySlug: p.category_slug || '',
+      code: p.code || '',
+      title: p.title,
+      googleFormProductName: p.google_form_product_name || p.title,
+      formatCode: compact.formatCode,
+      unitPrice,
+      originalPrice,
+      upgradeOffset,
+      isUpgrade,
+      upgradeFromFormat: isUpgrade ? 'PDF' : undefined,
+      quantity: compact.formatCode === 'Flashcard' ? Math.max(1, compact.quantity || 1) : 1,
+      selected: compact.selected !== false,
+      isComboEligible: p.is_combo_eligible,
+      comboPackageId: compact.comboPackageId || undefined,
+      comboPackageTitle,
+      isInactive: false,
+    };
+  });
+}
 
 const DEFAULT_SITE_CONFIGS: SiteConfigs = {
   footer_social_links: [],
@@ -141,13 +305,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     usdExchangeRate: 26000,
   });
 
+  const comboPackages = useMemo(() => {
+    const blocks = siteConfigs?.combo_page_blocks || [];
+    const pkgBlock = blocks.find((b: any) => b.type === 'combo_packages');
+    const cfg = pkgBlock?.config as ComboPackagesBlockConfig | undefined;
+    return (cfg?.packages || []) as ComboPackageItem[];
+  }, [siteConfigs?.combo_page_blocks]);
+
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+      const raw =
+        localStorage.getItem(CART_STORAGE_KEY) ||
+        localStorage.getItem(OLD_CART_STORAGE_KEY);
+      if (raw) {
+        if (localStorage.getItem(OLD_CART_STORAGE_KEY)) {
+          localStorage.removeItem(OLD_CART_STORAGE_KEY);
+        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed as CartItem[];
+        }
+      }
     } catch {
-      return [];
+      // ignore storage errors
     }
+    return [];
   });
 
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -328,13 +511,405 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadInitFromBackend();
   }, []);
 
+  // ====================================================================
+  // CART SYNC ENGINE: REFS & PERSISTENCE
+  // ====================================================================
+  const cartItemsRef = useRef(cartItems);
+  cartItemsRef.current = cartItems;
+
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedHashRef = useRef<string | null>(null);
+  const isReconcilingRef = useRef<boolean>(false);
+
+  // Kịch bản 1: Khách vãng lai & đồng bộ LocalStorage tức thì (ht_cart)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
     } catch {
       // ignore storage errors
     }
   }, [cartItems]);
+
+  // Kịch bản 7: Sudden Unload Keepalive Flush
+  const flushCartImmediately = () => {
+    if (!userRef.current || isReconcilingRef.current) return;
+    const currentCompact = compactCart(cartItemsRef.current);
+    const currentHash = computeCartHash(currentCompact);
+
+    if (lastSyncedHashRef.current === currentHash) return;
+
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+      syncTimerRef.current = null;
+    }
+
+    lastSyncedHashRef.current = currentHash;
+
+    try {
+      const url = buildApiUrl('/api/cart');
+      const headers = buildAuthHeaders({ 'Content-Type': 'application/json' });
+      const body = JSON.stringify({ items: currentCompact, cartHash: currentHash });
+
+      fetch(url, {
+        method: 'PUT',
+        keepalive: true,
+        credentials: 'include',
+        headers,
+        body,
+      }).catch(() => {});
+    } catch {
+      // ignore unload errors
+    }
+  };
+
+  // Kịch bản 7 & 9: Bắt W3C visibilitychange (hidden), beforeunload, và online recovery
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushCartImmediately();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      flushCartImmediately();
+    };
+
+    const handleOnline = () => {
+      if (userRef.current && !isReconcilingRef.current) {
+        const currentCompact = compactCart(cartItemsRef.current);
+        const currentHash = computeCartHash(currentCompact);
+        if (lastSyncedHashRef.current !== currentHash) {
+          apiClient
+            .saveUserCart(currentCompact, currentHash)
+            .then(() => {
+              lastSyncedHashRef.current = currentHash;
+            })
+            .catch(() => {});
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  // Kịch bản 6: Multi-Tab Sync qua window.addEventListener('storage') & custom reset
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.storageArea !== window.localStorage) return;
+      if (e.key === CART_STORAGE_KEY || e.key === OLD_CART_STORAGE_KEY) {
+        if (e.newValue === null) {
+          setCartItems([]);
+          lastSyncedHashRef.current = null;
+          if (syncTimerRef.current) {
+            clearTimeout(syncTimerRef.current);
+            syncTimerRef.current = null;
+          }
+        } else {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (Array.isArray(parsed)) {
+              const rehydrated = hydrateCompactCart(
+                compactCart(parsed),
+                products,
+                isItemInLibrary,
+                comboPackages
+              );
+              setCartItems(rehydrated);
+              const newHash = computeCartHash(compactCart(rehydrated));
+              lastSyncedHashRef.current = newHash;
+              if (syncTimerRef.current) {
+                clearTimeout(syncTimerRef.current);
+                syncTimerRef.current = null;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
+    const handleCustomReset = () => {
+      setCartItems([]);
+      lastSyncedHashRef.current = null;
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('ht_cart_reset', handleCustomReset);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('ht_cart_reset', handleCustomReset);
+    };
+  }, [products, isItemInLibrary, comboPackages]);
+
+  // Kịch bản 4: 10-second Debounce Sync (chỉ chạy khi user đã đăng nhập)
+  useEffect(() => {
+    if (!user || isReconcilingRef.current) return;
+
+    const currentCompact = compactCart(cartItems);
+    const currentHash = computeCartHash(currentCompact);
+
+    if (lastSyncedHashRef.current === currentHash) {
+      return;
+    }
+
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+      syncTimerRef.current = null;
+    }
+
+    syncTimerRef.current = setTimeout(async () => {
+      try {
+        await apiClient.saveUserCart(currentCompact, currentHash);
+        lastSyncedHashRef.current = currentHash;
+      } catch (err) {
+        console.error('[StoreContext] Failed to sync cart to server:', err);
+      }
+    }, 10000);
+
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, [cartItems, user]);
+
+  // Kịch bản 3, 5, 10: Auth State Transitions (Reconciliation, Logout, User Switch)
+  const prevUserRef = useRef<any>(user);
+
+  useEffect(() => {
+    const prevUser = prevUserRef.current;
+    prevUserRef.current = user;
+
+    // Kịch bản 5: Đăng xuất (prevUser != null && user == null)
+    if (prevUser && !user) {
+      setCartItems([]);
+      lastSyncedHashRef.current = null;
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(CART_STORAGE_KEY);
+          localStorage.removeItem(OLD_CART_STORAGE_KEY);
+        } catch {}
+      }
+      return;
+    }
+
+    // Kịch bản 10: Chuyển đổi tài khoản (userA -> userB)
+    if (prevUser && user && prevUser.id !== user.id) {
+      setCartItems([]);
+      lastSyncedHashRef.current = null;
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+      (async () => {
+        try {
+          const res = await apiClient.getUserCart();
+          const serverItems = (res.cart?.items || []) as CompactCartItem[];
+          const hydrated = hydrateCompactCart(
+            serverItems,
+            products,
+            isItemInLibrary,
+            comboPackages
+          );
+          setCartItems(hydrated);
+          lastSyncedHashRef.current = computeCartHash(serverItems);
+        } catch (err) {
+          console.error('[StoreContext] Error loading user cart on account switch:', err);
+        }
+      })();
+      return;
+    }
+
+    // Kịch bản 3: Đăng nhập (prevUser == null && user != null)
+    if (!prevUser && user) {
+      (async () => {
+        if (isReconcilingRef.current) return;
+        isReconcilingRef.current = true;
+        try {
+          const res = await apiClient.getUserCart();
+          const serverItems = (res.cart?.items || []) as CompactCartItem[];
+          const localItems = cartItemsRef.current;
+          const localCompact = compactCart(localItems);
+
+          // Nhánh 1: Server rỗng, Local có món
+          if (serverItems.length === 0 && localCompact.length > 0) {
+            const hash = computeCartHash(localCompact);
+            await apiClient.saveUserCart(localCompact, hash);
+            lastSyncedHashRef.current = hash;
+            return;
+          }
+
+          // Nhánh 2: Server có món, Local rỗng
+          if (serverItems.length > 0 && localCompact.length === 0) {
+            const hydrated = hydrateCompactCart(
+              serverItems,
+              products,
+              isItemInLibrary,
+              comboPackages
+            );
+            setCartItems(hydrated);
+            lastSyncedHashRef.current = computeCartHash(serverItems);
+            return;
+          }
+
+          // Nhánh 3: Cả Server và Local đều có món -> Hợp nhất
+          if (serverItems.length > 0 && localCompact.length > 0) {
+            // Flashcard: Union theo productId
+            const flashcardMap = new Map<string, CompactCartItem>();
+            for (const item of serverItems.filter((i) => i.formatCode === 'Flashcard')) {
+              flashcardMap.set(item.productId, { ...item });
+            }
+            for (const item of localCompact.filter((i) => i.formatCode === 'Flashcard')) {
+              if (flashcardMap.has(item.productId)) {
+                const sItem = flashcardMap.get(item.productId)!;
+                flashcardMap.set(item.productId, {
+                  ...item,
+                  quantity: Math.max(item.quantity, sItem.quantity),
+                  selected: item.selected || sItem.selected,
+                });
+              } else {
+                flashcardMap.set(item.productId, { ...item });
+              }
+            }
+            const flashcards = Array.from(flashcardMap.values());
+
+            // Phi Flashcard: Quy chuẩn User Directive 1 - Ưu tiên tuyệt đối Local
+            const localNonFc = localCompact.filter((i) => i.formatCode !== 'Flashcard');
+            const serverNonFc = serverItems.filter((i) => i.formatCode !== 'Flashcard');
+
+            let chosenNonFc: CompactCartItem | null = null;
+            let hadConflict = false;
+
+            if (localNonFc.length > 0) {
+              chosenNonFc = { ...localNonFc[0], quantity: 1 };
+              if (
+                serverNonFc.length > 0 &&
+                (serverNonFc[0].productId !== chosenNonFc.productId ||
+                  serverNonFc[0].formatCode !== chosenNonFc.formatCode)
+              ) {
+                hadConflict = true;
+              }
+            } else if (serverNonFc.length > 0) {
+              chosenNonFc = { ...serverNonFc[0], quantity: 1 };
+            }
+
+            const mergedCompact: CompactCartItem[] = [...flashcards];
+            if (chosenNonFc) {
+              mergedCompact.push(chosenNonFc);
+            }
+
+            if (hadConflict) {
+              showToast('Đã đồng bộ giỏ hàng theo lựa chọn mới nhất của bạn.');
+            }
+
+            // Kiểm tra Tủ sách cá nhân
+            if (isItemInLibrary) {
+              for (const item of mergedCompact) {
+                if (!item.isUpgrade && isItemInLibrary(item.productId, item.formatCode)) {
+                  const p = products.find(
+                    (prod) => prod.id === item.productId || prod.slug === item.productId
+                  );
+                  const title = p?.title || item.productId;
+                  showToast(
+                    `⚠️ Bạn đã sở hữu tài liệu "${title}" (${item.formatCode}) trong Tủ sách cá nhân.`
+                  );
+                }
+              }
+            }
+
+            // Hydrate & Save ngay lập tức lên server
+            const hydrated = hydrateCompactCart(
+              mergedCompact,
+              products,
+              isItemInLibrary,
+              comboPackages
+            );
+            setCartItems(hydrated);
+            const hash = computeCartHash(mergedCompact);
+            await apiClient.saveUserCart(mergedCompact, hash);
+            lastSyncedHashRef.current = hash;
+          }
+        } catch (err) {
+          console.error('[StoreContext] Error during cart reconciliation on login:', err);
+        } finally {
+          isReconcilingRef.current = false;
+        }
+      })();
+    }
+  }, [user, products, comboPackages]);
+
+  // Kịch bản 8: Tự động rehydrate giỏ hàng khi products cập nhật từ backend
+  useEffect(() => {
+    if (products.length === 0) return;
+    setCartItems((prevItems) => {
+      if (prevItems.length === 0) return prevItems;
+      return prevItems.map((item) => {
+        const p = products.find(
+          (prod) => prod.id === item.productId || prod.slug === item.slug
+        );
+        if (!p || !p.is_active) {
+          return {
+            ...item,
+            isInactive: true,
+            inactiveReason: 'Sản phẩm tạm ngưng kinh doanh',
+          };
+        }
+        const fmt = (p.formats || []).find((f) => f.format_code === item.formatCode);
+        if (!fmt || !fmt.is_active) {
+          return {
+            ...item,
+            isInactive: true,
+            inactiveReason: 'Định dạng sản phẩm tạm ngưng kinh doanh',
+          };
+        }
+        const catalogPrice = Number(fmt.price) || 0;
+        let unitPrice = catalogPrice;
+        let upgradeOffset = item.upgradeOffset || 0;
+        if (item.isUpgrade) {
+          const pdfFmt = (p.formats || []).find((f) => f.format_code === 'PDF');
+          const pdfPrice = pdfFmt ? (Number(pdfFmt.price) || 0) : 0;
+          upgradeOffset = Math.min(pdfPrice, catalogPrice);
+          unitPrice = Math.max(0, catalogPrice - upgradeOffset);
+        }
+        return {
+          ...item,
+          productId: p.id,
+          slug: p.slug,
+          categorySlug: p.category_slug || item.categorySlug,
+          code: p.code || item.code,
+          title: p.title,
+          googleFormProductName: p.google_form_product_name || p.title,
+          unitPrice,
+          originalPrice: catalogPrice,
+          upgradeOffset,
+          isInactive: false,
+          inactiveReason: undefined,
+        };
+      });
+    });
+  }, [products]);
 
   // Phím tắt Ctrl+K mở tìm kiếm
   useEffect(() => {
@@ -1006,6 +1581,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCheckoutItems([]);
   };
 
+  const clearCart = async () => {
+    setCartItems([]);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        localStorage.removeItem(OLD_CART_STORAGE_KEY);
+      } catch {}
+    }
+    if (user) {
+      try {
+        await apiClient.clearUserCart();
+        lastSyncedHashRef.current = computeCartHash([]);
+      } catch (err) {
+        console.error('[StoreContext] Error clearing cart on server:', err);
+      }
+    }
+  };
+
   const selectedCartItems = useMemo(
     () => cartItems.filter((item) => item.selected),
     [cartItems]
@@ -1022,13 +1615,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const hasMultipleProductsConflict = useMemo(() => {
     return selectedCartItems.some((it) => it.formatCode !== 'Flashcard' && it.quantity > 1);
   }, [selectedCartItems]);
-
-  const comboPackages = useMemo(() => {
-    const blocks = siteConfigs?.combo_page_blocks || [];
-    const pkgBlock = blocks.find((b: any) => b.type === 'combo_packages');
-    const cfg = pkgBlock?.config as ComboPackagesBlockConfig | undefined;
-    return (cfg?.packages || []) as ComboPackageItem[];
-  }, [siteConfigs?.combo_page_blocks]);
 
   const activeFormat: UiFormatCode = selectedFormats[0] || 'Word';
 
@@ -1152,6 +1738,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateCartItemFormat,
         removeCartItem,
         clearSelectedCartItems,
+        clearCart,
         checkoutItems,
         setCheckoutItems,
         isCartOpen,

@@ -33,6 +33,8 @@ import {
   UploadMediaResult,
   CleanupReport,
   DeleteR2FileResult,
+  CompactCartItem,
+  UserCartData,
 } from '../types';
 
 export type {
@@ -53,6 +55,8 @@ export type {
   UploadMediaResult,
   CleanupReport,
   DeleteR2FileResult,
+  CompactCartItem,
+  UserCartData,
 };
 
 const rawApiBase = import.meta.env.API_BASE_URL;
@@ -65,12 +69,12 @@ export const R2_DOMAIN = (
 
 export const SESSION_STORAGE_KEY = 'ht_session_token';
 
-function buildApiUrl(path: string): string {
+export function buildApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${API_BASE_URL}${cleanPath}`;
 }
 
-function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
+export function buildAuthHeaders(extra?: HeadersInit): Record<string, string> {
   const headers: Record<string, string> = {};
   const savedToken =
     typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null;
@@ -704,6 +708,58 @@ export const apiClient = {
     return requestJson<DeleteMediaResult>('/api/admin/media/delete', {
       method: 'POST',
       body: JSON.stringify({ keys }),
+    });
+  },
+
+  // ====================================================================
+  // NHÓM CART SYNC (CROSS-DEVICE SYNC & PERSISTENCE)
+  // ====================================================================
+  /**
+   * GET /api/cart
+   * Lấy giỏ hàng đã lưu trên máy chủ của người dùng hiện tại (yêu cầu đăng nhập).
+   */
+  async getUserCart(): Promise<{
+    ok: boolean;
+    cart: {
+      items: CompactCartItem[];
+      cartHash: string;
+      updatedAt: string | null;
+    };
+  }> {
+    return requestJson('/api/cart', { method: 'GET' });
+  },
+
+  /**
+   * PUT /api/cart
+   * Lưu cập nhật giỏ hàng lên máy chủ (yêu cầu đăng nhập).
+   */
+  async saveUserCart(
+    items: CompactCartItem[],
+    cartHash?: string
+  ): Promise<{
+    ok: boolean;
+    cart: {
+      items: CompactCartItem[];
+      cartHash: string;
+      updatedAt: string;
+    };
+  }> {
+    return requestJson('/api/cart', {
+      method: 'PUT',
+      body: JSON.stringify({ items, cartHash }),
+    });
+  },
+
+  /**
+   * DELETE /api/cart
+   * Xóa giỏ hàng trên máy chủ (yêu cầu đăng nhập).
+   */
+  async clearUserCart(): Promise<{
+    ok: boolean;
+    message: string;
+  }> {
+    return requestJson('/api/cart', {
+      method: 'DELETE',
     });
   },
 };

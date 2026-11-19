@@ -237,7 +237,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem('ht_cart');
+        localStorage.removeItem('huytutor_cart_v1');
         sessionStorage.clear();
+        window.dispatchEvent(new CustomEvent('ht_cart_reset'));
 
         const past = 'Thu, 01 Jan 1970 00:00:00 GMT';
         const domains = ['.huytutor.edu.vn', 'huytutor.edu.vn', window.location.hostname, `.${window.location.hostname}`, ''];
@@ -301,7 +304,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem('ht_cart');
+        localStorage.removeItem('huytutor_cart_v1');
         sessionStorage.clear();
+        window.dispatchEvent(new CustomEvent('ht_cart_reset'));
       }
       setSessionToken(null);
       setUser(null);
