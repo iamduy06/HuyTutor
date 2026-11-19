@@ -1172,7 +1172,12 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
               onUrlChange={(url) => onUpdateConfig({ image_url: url })}
               folder="thumbnails"
               aspectRatioHint="Khuyến nghị ảnh mockup sách 3D trong suốt"
+              successUploadToast="Đã tải ảnh bìa thành công"
+              successDeleteToast="Đã xoá ảnh bìa thành công"
             />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Ảnh bìa này được đồng bộ trực tiếp với Ảnh bìa Thumbnail (Khối 2) của sản phẩm.
+            </p>
           </div>
 
           <div className="sm:col-span-4 space-y-3">

@@ -174,15 +174,27 @@ export const AdminPage: React.FC = () => {
     if (!currentDetailProduct || !currentDetailProduct.slug) return;
     setSavingDetailBlocks(true);
     try {
-      await apiClient.upsertProduct(currentDetailProduct);
+      const blocks = Array.isArray(currentDetailProduct.detail_blocks)
+        ? currentDetailProduct.detail_blocks
+        : [];
+      const heroBlock = blocks.find((b) => b.type === 'product_hero');
+      const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;
+
+      const payloadToSave: Partial<Product> = {
+        ...currentDetailProduct,
+        thumbnail_url: heroImg !== undefined ? heroImg : currentDetailProduct.thumbnail_url,
+      };
+
+      await apiClient.upsertProduct(payloadToSave);
       setProducts((prev) =>
         prev.map((p) =>
-          p.slug === currentDetailProduct.slug ? { ...p, ...currentDetailProduct } : p
+          p.slug === payloadToSave.slug ? { ...p, ...payloadToSave } : p
         )
       );
       showToast(`Đã lưu cấu hình Trang cấp 2 cho "${currentDetailProduct.title}" thành công!`);
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi lưu cấu hình Trang cấp 2.');
+      const detailed = getClientErrorMessage(err, true);
+      showToast(detailed || `Lỗi lưu cấu hình Trang cấp 2 [${err?.code || 'SAVE_ERROR'}]: ${err?.message || 'Lỗi không xác định'}`);
     } finally {
       setSavingDetailBlocks(false);
     }
@@ -586,11 +598,27 @@ export const AdminPage: React.FC = () => {
         : [];
       const payloadToSave: Partial<Product> = { ...editingProduct };
 
-      // Đồng bộ ngược từ detail_blocks sang các cột cấp cao nhất để tương thích hoàn toàn
-      const heroBlock = blocks.find((b) => b.type === 'product_hero');
+      // Đồng bộ 2 chiều thumbnail_url và khối product_hero (Single Source of Truth)
+      const thumbUrl = editingProduct.thumbnail_url || '';
+      payloadToSave.thumbnail_url = thumbUrl;
+      const updatedBlocks = blocks.map((b) => {
+        if (b.type === 'product_hero') {
+          return {
+            ...b,
+            config: {
+              ...(b.config as any),
+              image_url: thumbUrl,
+            },
+          };
+        }
+        return b;
+      });
+      payloadToSave.detail_blocks = updatedBlocks;
+
+      // Đồng bộ specs từ heroBlock nếu có
+      const heroBlock = updatedBlocks.find((b) => b.type === 'product_hero');
       if (heroBlock?.config) {
         const hCfg = heroBlock.config as ProductHeroBlockConfig;
-        if (hCfg.image_url) payloadToSave.thumbnail_url = hCfg.image_url;
         if (Array.isArray(hCfg.specs) && hCfg.specs.length > 0) {
           payloadToSave.specs = hCfg.specs;
         }
@@ -626,7 +654,7 @@ export const AdminPage: React.FC = () => {
       }
 
       const res = await apiClient.upsertProduct(payloadToSave);
-      showToast(res.message);
+      showToast(`Đã lưu cấu hình tài liệu "${editingProduct.title || editingProduct.slug}" thành công!`);
       await loadOverview();
       await refreshCatalog();
       setEditingProduct({
@@ -634,10 +662,11 @@ export const AdminPage: React.FC = () => {
         detail_blocks:
           Array.isArray(res.product.detail_blocks) && res.product.detail_blocks.length > 0
             ? res.product.detail_blocks
-            : blocks,
+            : updatedBlocks,
       });
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi lưu sản phẩm.');
+      const detailed = getClientErrorMessage(err, true);
+      showToast(detailed || `Lỗi lưu sản phẩm [${err?.code || 'UPSERT_FAILED'}]: ${err?.message || 'Lỗi không xác định'}`);
     } finally {
       setSaving(false);
     }
@@ -1326,7 +1355,17 @@ export const AdminPage: React.FC = () => {
                         product={currentDetailProduct}
                         allProducts={products}
                         onChangeBlocks={(nextBlocks) => {
-                          setCurrentDetailProduct((prev) => (prev ? { ...prev, detail_blocks: nextBlocks } : null));
+                          const heroBlock = nextBlocks.find((b) => b.type === 'product_hero');
+                          const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;
+                          setCurrentDetailProduct((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  detail_blocks: nextBlocks,
+                                  thumbnail_url: heroImg !== undefined ? heroImg : prev.thumbnail_url,
+                                }
+                              : null
+                          );
                         }}
                         showToast={showToast}
                       />
@@ -1593,27 +1632,45 @@ export const AdminPage: React.FC = () => {
                       KHỐI 2
                     </span>
                     <h3 className="text-xs font-black text-gray-900 uppercase">
-                      Ảnh Bìa Thumbnail (Cloudflare R2)
+                      [ẢNH BÌA THUMBNAIL &amp; KHUNG HERO TRANG CHI TIẾT] - [TẢI ẢNH BÌA SÁCH LÊN CLOUDFLARE R2 VÀ ĐỒNG BỘ TỰ ĐỘNG VỚI KHỐI HERO TRANG CẤP 2]
                     </h3>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-1">
-                    Tải ảnh bìa sách lên Cloudflare R2 với tên ngẫu nhiên 12 số. Khi có ảnh preview, bấm dấu ✕ ở góc trên bên phải để xóa vĩnh viễn khỏi R2.
+                    Tải ảnh bìa sách lên Cloudflare R2 với tên 12 số thời gian thực. Ảnh này sẽ tự động đồng bộ sang Khối Hero Trang cấp 2 và hiển thị ở Trang chủ, Danh mục, Giỏ hàng. Khi có ảnh preview, bấm dấu ✕ ở góc trên bên phải để xóa vĩnh viễn khỏi R2.
                   </p>
                 </div>
 
                 <R2ImageUploader
                   imageUrl={editingProduct.thumbnail_url}
                   onUrlChange={(url) =>
-                    setEditingProduct((prev) => ({
-                      ...prev,
-                      thumbnail_url: url,
-                    }))
+                    setEditingProduct((prev) => {
+                      const prevBlocks = Array.isArray(prev.detail_blocks) ? [...prev.detail_blocks] : [];
+                      const nextBlocks = prevBlocks.map((b) => {
+                        if (b.type === 'product_hero') {
+                          return {
+                            ...b,
+                            config: {
+                              ...(b.config as any),
+                              image_url: url,
+                            },
+                          };
+                        }
+                        return b;
+                      });
+                      return {
+                        ...prev,
+                        thumbnail_url: url,
+                        detail_blocks: nextBlocks,
+                      };
+                    })
                   }
                   folder="thumbnails"
                   pageLevel1={editingProduct.category_name || 'San pham'}
                   pageLevel2={editingProduct.title || editingProduct.slug || 'Thumbnail'}
                   fitMode="contain"
                   maxPreviewHeight="max-h-40"
+                  successUploadToast="Đã tải ảnh bìa lên Cloudflare R2 thành công!"
+                  successDeleteToast="Đã xoá ảnh thành công"
                 />
               </div>
 

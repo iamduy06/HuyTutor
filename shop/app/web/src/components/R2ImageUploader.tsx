@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
 import { useStore } from '../context/StoreContext';
+import { getClientErrorMessage } from '../utils/errorHandler';
 
 export interface R2ImageUploaderProps {
   label?: string;
@@ -14,6 +15,8 @@ export interface R2ImageUploaderProps {
   maxPreviewHeight?: string;
   fitMode?: 'contain' | 'cover';
   className?: string;
+  successUploadToast?: string;
+  successDeleteToast?: string;
 }
 
 export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
@@ -28,6 +31,8 @@ export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
   maxPreviewHeight = 'max-h-36',
   fitMode = 'contain',
   className = '',
+  successUploadToast,
+  successDeleteToast,
 }) => {
   const { showToast } = useStore();
   const [isUploading, setIsUploading] = useState(false);
@@ -54,9 +59,10 @@ export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
       }
 
       onUrlChange(res.url);
-      showToast('Tải ảnh lên Cloudflare R2 thành công!');
+      showToast(successUploadToast || 'Đã tải ảnh lên Cloudflare R2 thành công!');
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi tải ảnh lên R2.');
+      const detailed = getClientErrorMessage(err, true);
+      showToast(detailed || `Lỗi tải ảnh lên Cloudflare R2 [${err?.status || 500}]: ${err?.message || 'Không thể kết nối máy chủ lưu trữ'}`);
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -69,23 +75,16 @@ export const R2ImageUploader: React.FC<R2ImageUploaderProps> = ({
     try {
       const res = await apiClient.deleteR2File(imageUrl);
       if (!res?.ok || (res.result && !res.result.deleted)) {
-        showToast(
-          (res as any)?.error || res?.result?.reason || 'Lỗi khi xóa file trên Cloudflare R2.'
-        );
+        const errorReason = (res as any)?.error || res?.result?.reason || 'Lỗi khi xóa file trên Cloudflare R2.';
+        showToast(errorReason);
         onUrlChange('');
         return;
       }
       onUrlChange('');
-      const cleanupCount = res?.cleanupReport?.totalCleaned ?? 0;
-      if (cleanupCount > 0) {
-        showToast(
-          `Đã xóa vĩnh viễn hình ảnh khỏi Cloudflare R2 và dọn sạch ${cleanupCount} liên kết trong CSDL.`
-        );
-      } else {
-        showToast('Đã xóa vĩnh viễn hình ảnh khỏi Cloudflare R2.');
-      }
+      showToast(successDeleteToast || 'Đã xoá ảnh thành công');
     } catch (err: any) {
-      showToast(err?.message || 'Lỗi xóa file trên R2. Đã bỏ liên kết ảnh.');
+      const detailed = getClientErrorMessage(err, true);
+      showToast(detailed || `Lỗi xóa file vật lý trên Cloudflare R2: ${err?.message || 'Lỗi không xác định'}. Vui lòng thử lại.`);
       onUrlChange('');
     } finally {
       setIsDeleting(false);
