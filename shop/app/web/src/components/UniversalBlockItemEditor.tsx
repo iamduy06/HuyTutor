@@ -1168,7 +1168,7 @@ export const UniversalBlockItemEditor: React.FC<UniversalBlockItemEditorProps> =
           <div className="sm:col-span-8">
             <R2ImageUploader
               label="Ảnh bìa / Bìa sách 3D (Cloudflare R2)"
-              imageUrl={heroCfg.image_url}
+              imageUrl={heroCfg.image_url || context?.product?.thumbnail_url || ''}
               onUrlChange={(url) => onUpdateConfig({ image_url: url })}
               folder="thumbnails"
               aspectRatioHint="Khuyến nghị ảnh mockup sách 3D trong suốt"

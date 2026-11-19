@@ -178,11 +178,27 @@ export const AdminPage: React.FC = () => {
         ? currentDetailProduct.detail_blocks
         : [];
       const heroBlock = blocks.find((b) => b.type === 'product_hero');
-      const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;
+      const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url?.trim();
+      const currentThumb = currentDetailProduct.thumbnail_url?.trim();
+      const resolvedImage = heroImg || currentThumb || '';
+
+      const updatedBlocks = blocks.map((b) => {
+        if (b.type === 'product_hero') {
+          return {
+            ...b,
+            config: {
+              ...(b.config as any),
+              image_url: resolvedImage,
+            },
+          };
+        }
+        return b;
+      });
 
       const payloadToSave: Partial<Product> = {
         ...currentDetailProduct,
-        thumbnail_url: heroImg !== undefined ? heroImg : currentDetailProduct.thumbnail_url,
+        thumbnail_url: resolvedImage,
+        detail_blocks: updatedBlocks,
       };
 
       await apiClient.upsertProduct(payloadToSave);
@@ -428,14 +444,34 @@ export const AdminPage: React.FC = () => {
         ? prod.detail_blocks
         : buildInitialDetailBlocksFromProduct(prod);
 
+    // Đồng bộ 2 chiều: nếu 1 trong 2 nơi có URL ảnh thì cả hai cùng nhận
+    const heroBlock = initialBlocks.find((b) => b.type === 'product_hero');
+    const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url?.trim();
+    const prodThumb = prod.thumbnail_url?.trim();
+    const resolvedImage = prodThumb || heroImg || '';
+
+    const syncedBlocks = initialBlocks.map((b) => {
+      if (b.type === 'product_hero') {
+        return {
+          ...b,
+          config: {
+            ...(b.config as any),
+            image_url: resolvedImage,
+          },
+        };
+      }
+      return b;
+    });
+
     setEditingProduct({
       ...prod,
+      thumbnail_url: resolvedImage,
       formats: mergedFormats,
       specs: prod.specs?.length ? [...prod.specs] : [],
       topics: prod.topics?.length ? [...prod.topics] : [],
       features: prod.features?.length ? [...prod.features] : [],
       preview_images: prod.preview_images ? [...prod.preview_images] : [],
-      detail_blocks: initialBlocks,
+      detail_blocks: syncedBlocks,
       linked_deck_ids: Array.isArray(prod.linked_deck_ids) ? [...prod.linked_deck_ids] : [],
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -599,15 +635,22 @@ export const AdminPage: React.FC = () => {
       const payloadToSave: Partial<Product> = { ...editingProduct };
 
       // Đồng bộ 2 chiều thumbnail_url và khối product_hero (Single Source of Truth)
-      const thumbUrl = editingProduct.thumbnail_url || '';
-      payloadToSave.thumbnail_url = thumbUrl;
+      const existingHero = blocks.find((b) => b.type === 'product_hero');
+      const heroUrl = (existingHero?.config as ProductHeroBlockConfig)?.image_url?.trim();
+      const directThumbUrl = editingProduct.thumbnail_url?.trim();
+
+      // Nguồn chân lý: Ưu tiên ảnh mới được cập nhật (nếu cả 2 có thì ưu tiên directThumbUrl)
+      // Tuyệt đối không để 1 bên rỗng ghi đè làm mất ảnh của bên kia
+      const resolvedImage = directThumbUrl || heroUrl || '';
+
+      payloadToSave.thumbnail_url = resolvedImage;
       const updatedBlocks = blocks.map((b) => {
         if (b.type === 'product_hero') {
           return {
             ...b,
             config: {
               ...(b.config as any),
-              image_url: thumbUrl,
+              image_url: resolvedImage,
             },
           };
         }
@@ -1641,7 +1684,11 @@ export const AdminPage: React.FC = () => {
                 </div>
 
                 <R2ImageUploader
-                  imageUrl={editingProduct.thumbnail_url}
+                  imageUrl={
+                    editingProduct.thumbnail_url ||
+                    (editingProduct.detail_blocks?.find((b) => b.type === 'product_hero')?.config as any)?.image_url ||
+                    ''
+                  }
                   onUrlChange={(url) =>
                     setEditingProduct((prev) => {
                       const prevBlocks = Array.isArray(prev.detail_blocks) ? [...prev.detail_blocks] : [];
@@ -1894,12 +1941,15 @@ export const AdminPage: React.FC = () => {
               <AdminProductDetailBuilder
                 product={editingProduct}
                 allProducts={products}
-                onChangeBlocks={(nextBlocks) =>
+                onChangeBlocks={(nextBlocks) => {
+                  const heroBlock = nextBlocks.find((b) => b.type === 'product_hero');
+                  const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;
                   setEditingProduct((prev) => ({
                     ...prev,
                     detail_blocks: nextBlocks,
-                  }))
-                }
+                    thumbnail_url: heroImg !== undefined ? heroImg : prev.thumbnail_url,
+                  }));
+                }}
                 showToast={showToast}
               />
 
