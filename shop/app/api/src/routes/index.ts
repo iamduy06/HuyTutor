@@ -6,6 +6,7 @@ import { webhookController } from '../controllers/webhookController';
 import { adminController } from '../controllers/adminController';
 import { authController } from '../controllers/authController';
 import { userController } from '../controllers/userController';
+import cartRoutes from './cartRoutes';
 import { ipDetectMiddleware } from '../middlewares/ipDetect';
 import { adminAuthMiddleware } from '../middlewares/adminAuth';
 import { requireAuth, optionalAuth } from '../middlewares/authMiddleware';
@@ -35,6 +36,9 @@ router.post('/auth/reset-password', authController.resetPassword);
 router.get('/user/library', requireAuth, userController.getLibrary);
 router.get('/user/orders', requireAuth, userController.getOrders);
 router.put('/user/profile', requireAuth, userController.updateProfile);
+
+// 2.1 Luồng Giỏ hàng Đa thiết bị (Cross-Device Cart Sync)
+router.use('/cart', cartRoutes);
 
 // 3. Luồng dữ liệu Catalog (Menu, Danh mục, Sản phẩm, Quy tắc Combo) từ Backend
 router.get('/catalog/init', catalogController.getInitData);

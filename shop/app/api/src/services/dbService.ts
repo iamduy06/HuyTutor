@@ -14,6 +14,7 @@ import {
   FooterPolicyLink,
 } from '../config/seedData';
 import { UiFormatCode } from '../constants/formatMapping';
+import { computeCartHash } from '../utils/hash';
 
 export interface SeedMenuItem {
   id: string;
@@ -193,6 +194,22 @@ export interface SeedUserLibraryItem {
   paid_amount?: number;
 }
 
+export interface CompactCartItem {
+  productId: string;
+  formatCode: UiFormatCode;
+  quantity: number;
+  selected?: boolean;
+  comboPackageId?: string | null;
+  isUpgrade?: boolean;
+}
+
+export interface SeedUserCart {
+  user_id: string;
+  items: CompactCartItem[];
+  cart_hash: string;
+  updated_at: string;
+}
+
 export interface DbState {
   menus: SeedMenu[];
   categories: SeedCategory[];
@@ -203,6 +220,7 @@ export interface DbState {
   user_sessions: SeedUserSession[];
   user_library: SeedUserLibraryItem[];
   site_configs: SiteConfigs;
+  user_carts?: SeedUserCart[];
 }
 
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -462,6 +480,7 @@ function buildNormalizedSeedState(): DbState {
     user_sessions: [],
     user_library: [],
     site_configs: INITIAL_SITE_CONFIGS,
+    user_carts: [],
   };
 }
 
@@ -510,6 +529,10 @@ function ensureAuthArraysInState(parsed: DbState): boolean {
   }
   if (!Array.isArray(parsed.user_library)) {
     parsed.user_library = [];
+    mutated = true;
+  }
+  if (!Array.isArray(parsed.user_carts)) {
+    parsed.user_carts = [];
     mutated = true;
   }
   return mutated;
@@ -2496,5 +2519,186 @@ export const dbService = {
       (o) =>
         o.user_id === userId || o.customer_email.trim().toLowerCase() === cleanEmail
     );
+  },
+
+  /**
+   * Lấy giỏ hàng đồng bộ trên máy chủ của người dùng.
+   * Hỗ trợ dual-mode: Supabase `public.user_carts` với tự động fallback sang `local_db.json`.
+   */
+  async getUserCart(userId: string): Promise<SeedUserCart | null> {
+    const cleanId = String(userId || '').trim();
+    if (!cleanId) return null;
+
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('user_carts')
+          .select('user_id, items, cart_hash, updated_at')
+          .eq('user_id', cleanId)
+          .maybeSingle();
+
+        if (error) {
+          handleSupabaseAuthError(error);
+        } else if (data) {
+          return {
+            user_id: data.user_id,
+            items: Array.isArray(data.items) ? data.items : [],
+            cart_hash: data.cart_hash || '',
+            updated_at: data.updated_at || new Date().toISOString(),
+          };
+        }
+      } catch (err) {
+        handleSupabaseAuthError(err);
+      }
+    }
+
+    const db = loadLocalDb();
+    const found = (db.user_carts || []).find((c) => c.user_id === cleanId);
+    return found || null;
+  },
+
+  /**
+   * Lưu / Cập nhật giỏ hàng người dùng lên máy chủ.
+   * Tự động tính hash nếu client không cung cấp, hỗ trợ dual-mode.
+   */
+  async saveUserCart(
+    userId: string,
+    items: CompactCartItem[],
+    cartHash?: string
+  ): Promise<SeedUserCart> {
+    const cleanId = String(userId || '').trim();
+    const nowIso = new Date().toISOString();
+    const hash =
+      cartHash && typeof cartHash === 'string' && cartHash.trim()
+        ? cartHash.trim()
+        : computeCartHash(items);
+
+    const cartRecord: SeedUserCart = {
+      user_id: cleanId,
+      items: Array.isArray(items) ? items : [],
+      cart_hash: hash,
+      updated_at: nowIso,
+    };
+
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('user_carts')
+          .upsert(
+            {
+              user_id: cleanId,
+              items: cartRecord.items,
+              cart_hash: hash,
+              updated_at: nowIso,
+            },
+            { onConflict: 'user_id' }
+          )
+          .select('user_id, items, cart_hash, updated_at')
+          .maybeSingle();
+
+        if (error) {
+          handleSupabaseAuthError(error);
+        } else if (data) {
+          return {
+            user_id: data.user_id,
+            items: Array.isArray(data.items) ? data.items : [],
+            cart_hash: data.cart_hash || '',
+            updated_at: data.updated_at || nowIso,
+          };
+        }
+      } catch (err) {
+        handleSupabaseAuthError(err);
+      }
+    }
+
+    const db = loadLocalDb();
+    if (!Array.isArray(db.user_carts)) {
+      db.user_carts = [];
+    }
+    const idx = db.user_carts.findIndex((c) => c.user_id === cleanId);
+    if (idx >= 0) {
+      db.user_carts[idx] = cartRecord;
+    } else {
+      db.user_carts.push(cartRecord);
+    }
+    saveLocalDb(db);
+
+    return cartRecord;
+  },
+
+  /**
+   * Xóa sạch giỏ hàng người dùng trên máy chủ (ví dụ khi hoàn tất đơn hoặc xóa giỏ).
+   */
+  async clearUserCart(userId: string): Promise<void> {
+    const cleanId = String(userId || '').trim();
+    if (!cleanId) return;
+
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      try {
+        const { error } = await supabaseAdmin
+          .from('user_carts')
+          .delete()
+          .eq('user_id', cleanId);
+
+        if (error) {
+          handleSupabaseAuthError(error);
+        }
+      } catch (err) {
+        handleSupabaseAuthError(err);
+      }
+    }
+
+    const db = loadLocalDb();
+    if (Array.isArray(db.user_carts)) {
+      db.user_carts = db.user_carts.filter((c) => c.user_id !== cleanId);
+      saveLocalDb(db);
+    }
+  },
+
+  /**
+   * Dọn dẹp các bản ghi giỏ hàng hết hạn lưu trữ (mặc định 30 ngày theo quyết định người dùng).
+   * Hỗ trợ dual-mode: Supabase delete lt + local_db filter.
+   */
+  async cleanupExpiredCarts(days: number = 30): Promise<number> {
+    const retentionDays = Math.max(1, Math.floor(days || 30));
+    const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const cutoffIso = cutoffDate.toISOString();
+    let totalDeleted = 0;
+
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('user_carts')
+          .delete()
+          .lt('updated_at', cutoffIso)
+          .select('user_id');
+
+        if (error) {
+          handleSupabaseAuthError(error);
+        } else if (Array.isArray(data)) {
+          totalDeleted += data.length;
+        }
+      } catch (err) {
+        handleSupabaseAuthError(err);
+      }
+    }
+
+    const db = loadLocalDb();
+    if (Array.isArray(db.user_carts)) {
+      const beforeCount = db.user_carts.length;
+      db.user_carts = db.user_carts.filter((c) => {
+        const updatedTime = new Date(c.updated_at).getTime();
+        return !isNaN(updatedTime) && updatedTime >= cutoffDate.getTime();
+      });
+      const localDeleted = beforeCount - db.user_carts.length;
+      if (localDeleted > 0) {
+        saveLocalDb(db);
+      }
+      if (totalDeleted === 0) {
+        totalDeleted = localDeleted;
+      }
+    }
+
+    return totalDeleted;
   },
 };
