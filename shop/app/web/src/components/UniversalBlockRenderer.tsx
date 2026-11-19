@@ -300,10 +300,23 @@ export const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
           // 2. SẢN PHẨM & BÁN HÀNG
           // ==========================================
           case 'categories_grid':
-            return <CategoriesGridBlock key={key} config={cfg as HomepageCategoriesGridConfig} />;
+            return (
+              <CategoriesGridBlock
+                key={key}
+                config={cfg as HomepageCategoriesGridConfig}
+                allProducts={context?.allProducts || []}
+                allCategories={context?.allCategories || []}
+              />
+            );
 
           case 'section_groups':
-            return <SectionGroupsBlock key={key} config={cfg as HomepageSectionGroupsConfig} />;
+            return (
+              <SectionGroupsBlock
+                key={key}
+                config={cfg as HomepageSectionGroupsConfig}
+                allProducts={context?.allProducts || []}
+              />
+            );
 
           case 'combo_packages':
             return (

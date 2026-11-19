@@ -657,6 +657,7 @@ const SectionGroupsBlockEditor: React.FC<{
       is_active: true,
       sort_order: items.length + 1,
     };
+    (newItem as any).product_id = p.id;
     const nextSections = [...sections];
     nextSections[sIdx] = { ...sec, items: [...items, newItem] };
     updateSections(nextSections);
@@ -877,119 +878,149 @@ const SectionGroupsBlockEditor: React.FC<{
                   Nhóm này chưa có tài liệu nào. Bấm <strong>"+ Thêm từ sản phẩm có sẵn"</strong> hoặc <strong>"+ Thêm tài liệu tùy biến"</strong> ở trên để thêm sách.
                 </div>
               ) : (
-                secItems.map((it, iIdx) => (
-                  <div
-                    key={it.id || iIdx}
-                    className="border border-gray-200 rounded-lg p-3 bg-gray-50/80 space-y-3 text-xs shadow-2xs"
-                  >
-                    {/* Header Item */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className="text-[11px] font-bold text-gray-500">#{iIdx + 1}</span>
-                        {it.image_url ? (
-                          <img
-                            src={it.image_url}
-                            alt=""
-                            className="w-7 h-9 object-contain rounded border border-gray-300 bg-white shrink-0"
-                          />
-                        ) : (
-                          <div className="w-7 h-9 rounded border border-dashed border-gray-300 bg-gray-100 flex items-center justify-center text-[9px] text-gray-400 shrink-0">
-                            3D
+                secItems.map((it, iIdx) => {
+                  const matchedProd = productsList.find((p) => {
+                    if (!p) return false;
+                    if ((it as any).product_id && (it as any).product_id === p.id) return true;
+                    if (it.id && (it.id.includes(p.id) || (p.slug && it.id.includes(p.slug)))) return true;
+                    if (it.target_url) {
+                      const cleanTarget = it.target_url.trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+                      const prodUrl = buildProductUrl(p.category_slug, p.slug).trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+                      if (cleanTarget === prodUrl) return true;
+                      if (p.slug && (cleanTarget === p.slug.toLowerCase() || cleanTarget.endsWith(`/${p.slug.toLowerCase()}`))) return true;
+                    }
+                    if (it.display_title && p.title && it.display_title.trim().toLowerCase() === p.title.trim().toLowerCase()) return true;
+                    return false;
+                  });
+                  const effectivePreviewImg = (it.image_url || matchedProd?.thumbnail_url || '').trim();
+
+                  return (
+                    <div
+                      key={it.id || iIdx}
+                      className="border border-gray-200 rounded-lg p-3 bg-gray-50/80 space-y-3 text-xs shadow-2xs"
+                    >
+                      {/* Header Item */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <span className="text-[11px] font-bold text-gray-500">#{iIdx + 1}</span>
+                          {effectivePreviewImg ? (
+                            <img
+                              src={effectivePreviewImg}
+                              alt=""
+                              className="w-7 h-9 object-contain rounded border border-gray-300 bg-white shrink-0"
+                            />
+                          ) : (
+                            <div className="w-7 h-9 rounded border border-dashed border-gray-300 bg-gray-100 flex items-center justify-center text-[9px] text-gray-400 shrink-0">
+                              3D
+                            </div>
+                          )}
+                          <span className="font-bold text-gray-900 truncate">
+                            {it.display_title || matchedProd?.title || 'Tài liệu chưa đặt tên'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={iIdx === 0}
+                            onClick={() => moveBook(sIdx, iIdx, 'up')}
+                            title="Di chuyển lên trên"
+                            className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={iIdx === secItems.length - 1}
+                            onClick={() => moveBook(sIdx, iIdx, 'down')}
+                            title="Di chuyển xuống dưới"
+                            className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                          >
+                            ▼
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleBookActive(sIdx, iIdx)}
+                            className={`px-2 py-0.5 rounded font-bold text-[11px] border transition ${
+                              it.is_active !== false
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : 'bg-gray-100 text-gray-400 border-gray-300'
+                            }`}
+                          >
+                            {it.is_active !== false ? '👁️' : '🚫'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteBook(sIdx, iIdx)}
+                            title="Xóa tài liệu này"
+                            className="text-red-600 hover:text-red-800 font-bold px-2 py-0.5 border border-red-200 rounded hover:bg-red-50 bg-white"
+                          >
+                            ✕ Xóa
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Chi tiết Item: Grid 2 cột */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                        {/* Cột 1: Thông tin văn bản */}
+                        <div className="md:col-span-7 space-y-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                              Tên tài liệu hiển thị
+                            </label>
+                            <input
+                              type="text"
+                              value={it.display_title}
+                              onChange={(e) => updateBook(sIdx, iIdx, { display_title: e.target.value })}
+                              placeholder="VD: 30 đề thi thử ngôn ngữ Anh - Đánh giá năng lực Bộ Công an"
+                              className="w-full font-bold border border-gray-300 rounded px-2.5 py-1 bg-white focus:border-[#e60049]"
+                            />
                           </div>
-                        )}
-                        <span className="font-bold text-gray-900 truncate">
-                          {it.display_title || 'Tài liệu chưa đặt tên'}
-                        </span>
-                      </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={iIdx === 0}
-                          onClick={() => moveBook(sIdx, iIdx, 'up')}
-                          title="Di chuyển lên trên"
-                          className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          disabled={iIdx === secItems.length - 1}
-                          onClick={() => moveBook(sIdx, iIdx, 'down')}
-                          title="Di chuyển xuống dưới"
-                          className="px-2 py-0.5 border border-gray-300 rounded bg-white text-gray-700 hover:border-[#e60049] disabled:opacity-30 disabled:cursor-not-allowed font-bold"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleBookActive(sIdx, iIdx)}
-                          className={`px-2 py-0.5 rounded font-bold text-[11px] border transition ${
-                            it.is_active !== false
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                              : 'bg-gray-100 text-gray-400 border-gray-300'
-                          }`}
-                        >
-                          {it.is_active !== false ? '👁️' : '🚫'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteBook(sIdx, iIdx)}
-                          title="Xóa tài liệu này"
-                          className="text-red-600 hover:text-red-800 font-bold px-2 py-0.5 border border-red-200 rounded hover:bg-red-50 bg-white"
-                        >
-                          ✕ Xóa
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Chi tiết Item: Grid 2 cột */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                      {/* Cột 1: Thông tin văn bản */}
-                      <div className="md:col-span-7 space-y-2">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
-                            Tên tài liệu hiển thị
-                          </label>
-                          <input
-                            type="text"
-                            value={it.display_title}
-                            onChange={(e) => updateBook(sIdx, iIdx, { display_title: e.target.value })}
-                            placeholder="VD: 30 đề thi thử ngôn ngữ Anh - Đánh giá năng lực Bộ Công an"
-                            className="w-full font-bold border border-gray-300 rounded px-2.5 py-1 bg-white focus:border-[#e60049]"
-                          />
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
+                              Đường dẫn điều hướng (URL chi tiết hoặc link ngoài)
+                            </label>
+                            <input
+                              type="text"
+                              value={it.target_url}
+                              onChange={(e) => updateBook(sIdx, iIdx, { target_url: e.target.value })}
+                              placeholder="/high-school/dgnlbca"
+                              className="w-full border border-gray-300 rounded px-2.5 py-1 bg-white font-mono text-[11px] focus:border-[#e60049]"
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-0.5">
-                            Đường dẫn điều hướng (URL chi tiết hoặc link ngoài)
-                          </label>
-                          <input
-                            type="text"
-                            value={it.target_url}
-                            onChange={(e) => updateBook(sIdx, iIdx, { target_url: e.target.value })}
-                            placeholder="/high-school/dgnlbca"
-                            className="w-full border border-gray-300 rounded px-2.5 py-1 bg-white font-mono text-[11px] focus:border-[#e60049]"
+                        {/* Cột 2: Bộ tải ảnh bìa 3D Cloudflare R2 */}
+                        <div className="md:col-span-5 bg-white border border-gray-200 rounded p-2.5">
+                          <R2ImageUploader
+                            label="Bìa sách 3D (Cloudflare R2)"
+                            helperText="Khuyến nghị ảnh mockup 3D PNG trong suốt hoặc tỉ lệ 3:4. Có nút ✕ đỏ xóa vật lý vĩnh viễn trên R2."
+                            imageUrl={it.image_url || ''}
+                            onUrlChange={(url) => updateBook(sIdx, iIdx, { image_url: url })}
+                            folder="homepage/books"
+                            aspectRatioHint="Mockup 3D tỉ lệ 3:4 hoặc 4:5"
+                            maxPreviewHeight="max-h-28"
+                            fitMode="contain"
                           />
+                          {!it.image_url && matchedProd?.thumbnail_url && (
+                            <div className="mt-2 p-1.5 bg-blue-50 border border-blue-200 rounded flex items-center gap-2 text-[11px] text-blue-800">
+                              <img
+                                src={matchedProd.thumbnail_url}
+                                alt=""
+                                className="w-6 h-8 object-contain rounded bg-white border border-blue-200 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <span className="font-semibold block truncate">Tự động dùng ảnh Thumbnail</span>
+                                <span className="text-[10px] text-blue-600 block truncate">({matchedProd.title})</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {/* Cột 2: Bộ tải ảnh bìa 3D Cloudflare R2 */}
-                      <div className="md:col-span-5 bg-white border border-gray-200 rounded p-2.5">
-                        <R2ImageUploader
-                          label="Bìa sách 3D (Cloudflare R2)"
-                          helperText="Khuyến nghị ảnh mockup 3D PNG trong suốt hoặc tỉ lệ 3:4. Có nút ✕ đỏ xóa vật lý vĩnh viễn trên R2."
-                          imageUrl={it.image_url || ''}
-                          onUrlChange={(url) => updateBook(sIdx, iIdx, { image_url: url })}
-                          folder="homepage/books"
-                          aspectRatioHint="Mockup 3D tỉ lệ 3:4 hoặc 4:5"
-                          maxPreviewHeight="max-h-28"
-                          fitMode="contain"
-                        />
-                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

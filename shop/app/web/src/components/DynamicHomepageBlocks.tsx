@@ -2,13 +2,56 @@ import React from 'react';
 import { SmartLink } from './SmartLink';
 import { IsolatedHtmlBlock } from './IsolatedHtmlBlock';
 import {
+  CategoryItem,
   HomepageBottomBannerConfig,
   HomepageCategoriesGridConfig,
   HomepageHeroConfig,
   HomepageNoticeTextConfig,
   HomepageSectionGroupsConfig,
   HomepageTopBannerConfig,
+  Product,
 } from '../types';
+import { buildProductUrl } from '../utils/urlHelper';
+
+function findMatchedProduct(
+  allProducts: Product[],
+  opts: {
+    productId?: string | null;
+    itemId?: string | null;
+    targetUrl?: string | null;
+    displayTitle?: string | null;
+  }
+): Product | undefined {
+  if (!allProducts || allProducts.length === 0) return undefined;
+  const { productId, itemId, targetUrl, displayTitle } = opts;
+
+  return allProducts.find((p) => {
+    if (!p) return false;
+    // 1. Match theo product_id rõ ràng
+    if (productId && (p.id === productId || p.slug === productId)) return true;
+
+    // 2. Match theo itemId (item_123_{id} hoặc item_123_{slug})
+    if (itemId) {
+      if (itemId === p.id || itemId === p.slug) return true;
+      if (itemId.includes(p.id) || (p.slug && itemId.includes(p.slug))) return true;
+    }
+
+    // 3. Match theo targetUrl
+    if (targetUrl) {
+      const cleanTarget = targetUrl.trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+      const prodUrl = buildProductUrl(p.category_slug, p.slug).trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+      if (cleanTarget === prodUrl) return true;
+      if (p.slug && (cleanTarget === p.slug.toLowerCase() || cleanTarget.endsWith(`/${p.slug.toLowerCase()}`))) return true;
+    }
+
+    // 4. Match theo tên hiển thị
+    if (displayTitle && p.title && displayTitle.trim().toLowerCase() === p.title.trim().toLowerCase()) {
+      return true;
+    }
+
+    return false;
+  });
+}
 
 /**
  * 1. Hero Header (Phần đầu trang - Tiêu đề, phụ đề, gạch đầu dòng và ảnh Thầy giáo đứng riêng, không khung viền)
@@ -208,11 +251,13 @@ export const TopBannerBlock: React.FC<{ config?: HomepageTopBannerConfig | null 
 };
 
 /**
- * 3. Danh mục sản phẩm (Bắt buộc 100% ảnh R2, placeholder sạch khi link rỗng)
+ * 3. Danh mục sản phẩm (Bắt buộc 100% ảnh R2, placeholder sạch khi link rỗng, tự động đồng bộ từ Thumbnail sản phẩm)
  */
 export const CategoriesGridBlock: React.FC<{
   config?: HomepageCategoriesGridConfig | null;
-}> = ({ config }) => {
+  allProducts?: Product[];
+  allCategories?: CategoryItem[];
+}> = ({ config, allProducts = [], allCategories = [] }) => {
   if (!config || config.is_active === false) return null;
   const activeItems = (config.items || []).filter((it) => it.is_active !== false);
   if (activeItems.length === 0) return null;
@@ -223,34 +268,44 @@ export const CategoriesGridBlock: React.FC<{
         <h2 className="text-[#e60049] font-bold text-sm sm:text-base mb-4">{config.title}</h2>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-        {activeItems.map((cat) => (
-          <SmartLink
-            key={cat.id}
-            to={cat.to || cat.category_slug}
-            className="group text-center flex flex-col items-center"
-          >
-            {/* 100% hiển thị hình ảnh từ R2, nếu link rỗng thì hiển thị placeholder trung tính */}
-            {cat.image_url && cat.image_url.trim() ? (
-              <img
-                src={cat.image_url}
-                alt={cat.label || ''}
-                className="w-full aspect-square object-contain rounded-2xl shadow-xs group-hover:scale-105 transition-transform duration-200 block"
-              />
-            ) : (
-              <div className="w-full aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-3 text-gray-400 group-hover:border-pink-300 transition">
-                <svg className="w-8 h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-[10px] font-bold text-gray-400">Chưa có ảnh</span>
-              </div>
-            )}
-            {cat.label && (
-              <span className="block text-xs font-bold text-gray-900 mt-2 text-center group-hover:text-[#e60049] transition truncate max-w-full">
-                {cat.label}
-              </span>
-            )}
-          </SmartLink>
-        ))}
+        {activeItems.map((cat) => {
+          const matchedProd = findMatchedProduct(allProducts, {
+            productId: (cat as any).product_id,
+            itemId: cat.id,
+            targetUrl: cat.to || cat.category_slug,
+            displayTitle: cat.label,
+          });
+          const imageUrl = (cat.image_url || matchedProd?.thumbnail_url || '').trim();
+
+          return (
+            <SmartLink
+              key={cat.id}
+              to={cat.to || cat.category_slug}
+              className="group text-center flex flex-col items-center"
+            >
+              {/* 100% hiển thị hình ảnh từ R2, tự động fallback sang Thumbnail nếu chưa có ảnh riêng */}
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={cat.label || ''}
+                  className="w-full aspect-square object-contain rounded-2xl shadow-xs group-hover:scale-105 transition-transform duration-200 block"
+                />
+              ) : (
+                <div className="w-full aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-3 text-gray-400 group-hover:border-pink-300 transition">
+                  <svg className="w-8 h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-gray-400">Chưa có ảnh</span>
+                </div>
+              )}
+              {cat.label && (
+                <span className="block text-xs font-bold text-gray-900 mt-2 text-center group-hover:text-[#e60049] transition truncate max-w-full">
+                  {cat.label}
+                </span>
+              )}
+            </SmartLink>
+          );
+        })}
       </div>
     </section>
   );
@@ -258,10 +313,12 @@ export const CategoriesGridBlock: React.FC<{
 
 /**
  * 4. Nhóm tài liệu & Sản phẩm (Chuẩn giao diện: Hộp bìa sách 3D đứng một mình ở giữa -> Nút Đọc thử -> Tên sách căn giữa in đậm)
+ * Tự động đồng bộ ảnh bìa từ Thumbnail sản phẩm trong CSDL nếu item.image_url chưa được điền riêng
  */
 export const SectionGroupsBlock: React.FC<{
   config?: HomepageSectionGroupsConfig | null;
-}> = ({ config }) => {
+  allProducts?: Product[];
+}> = ({ config, allProducts = [] }) => {
   if (!config || !Array.isArray(config.sections)) return null;
 
   const activeSections = config.sections.filter((sec) => sec.is_active !== false);
@@ -270,9 +327,18 @@ export const SectionGroupsBlock: React.FC<{
   return (
     <div className="max-w-[1100px] mx-auto px-4 space-y-12">
       {activeSections.map((sec) => {
-        const activeItems = (sec.items || []).filter(
-          (it) => it.is_active !== false && (Boolean(it.image_url?.trim()) || Boolean(it.display_title?.trim()))
-        );
+        const activeItems = (sec.items || []).filter((it) => {
+          if (it.is_active === false) return false;
+          const matchedProd = findMatchedProduct(allProducts, {
+            productId: (it as any).product_id,
+            itemId: it.id,
+            targetUrl: it.target_url,
+            displayTitle: it.display_title,
+          });
+          const hasImg = Boolean(it.image_url?.trim()) || Boolean(matchedProd?.thumbnail_url?.trim());
+          const hasTitle = Boolean(it.display_title?.trim()) || Boolean(matchedProd?.title?.trim());
+          return hasImg || hasTitle;
+        });
         if (activeItems.length === 0) return null;
 
         return (
@@ -282,50 +348,62 @@ export const SectionGroupsBlock: React.FC<{
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-              {activeItems.map((item) => (
-                <div key={item.id} className="flex flex-col">
-                  {/* Hộp trắng: Bìa sách 3D đứng một mình ở giữa hộp */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4 h-48 sm:h-52 flex items-center justify-center shadow-2xs hover:border-gray-300 transition">
+              {activeItems.map((item) => {
+                const matchedProd = findMatchedProduct(allProducts, {
+                  productId: (item as any).product_id,
+                  itemId: item.id,
+                  targetUrl: item.target_url,
+                  displayTitle: item.display_title,
+                });
+                const displayTitle = (item.display_title || matchedProd?.title || '').trim();
+                const targetUrl = item.target_url || (matchedProd ? buildProductUrl(matchedProd.category_slug, matchedProd.slug) : '#');
+                const imageUrl = (item.image_url || matchedProd?.thumbnail_url || '').trim();
+
+                return (
+                  <div key={item.id} className="flex flex-col">
+                    {/* Hộp trắng: Bìa sách 3D đứng một mình ở giữa hộp */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-4 h-48 sm:h-52 flex items-center justify-center shadow-2xs hover:border-gray-300 transition">
+                      <SmartLink
+                        to={targetUrl}
+                        className="w-full h-full flex items-center justify-center"
+                      >
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={displayTitle || ''}
+                            className="h-40 sm:h-44 w-auto object-contain mx-auto drop-shadow-md hover:scale-105 transition-transform duration-200 block"
+                          />
+                        ) : (
+                          <div className="w-24 h-36 bg-gray-50 rounded border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 font-bold text-xs p-2 text-center">
+                            <svg className="w-6 h-6 mb-1 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <span>Bìa 3D</span>
+                          </div>
+                        )}
+                      </SmartLink>
+                    </div>
+
+                    {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
                     <SmartLink
-                      to={item.target_url}
-                      className="w-full h-full flex items-center justify-center"
+                      to={targetUrl}
+                      className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
                     >
-                      {item.image_url && item.image_url.trim() ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.display_title || ''}
-                          className="h-40 sm:h-44 w-auto object-contain mx-auto drop-shadow-md hover:scale-105 transition-transform duration-200 block"
-                        />
-                      ) : (
-                        <div className="w-24 h-36 bg-gray-50 rounded border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 font-bold text-xs p-2 text-center">
-                          <svg className="w-6 h-6 mb-1 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                          </svg>
-                          <span>Bìa 3D</span>
-                        </div>
-                      )}
+                      Đọc thử
                     </SmartLink>
+
+                    {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
+                    {displayTitle && (
+                      <SmartLink
+                        to={targetUrl}
+                        className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
+                      >
+                        {displayTitle}
+                      </SmartLink>
+                    )}
                   </div>
-
-                  {/* Nút Đọc thử màu đỏ ngay dưới hộp */}
-                  <SmartLink
-                    to={item.target_url}
-                    className="block w-full text-center py-2 text-xs font-bold text-white bg-[#e60049] hover:bg-[#cc0041] rounded-xs transition shadow-xs mt-2.5"
-                  >
-                    Đọc thử
-                  </SmartLink>
-
-                  {/* Tên tài liệu in đậm căn giữa bên dưới nút Đọc thử */}
-                  {item.display_title && (
-                    <SmartLink
-                      to={item.target_url}
-                      className="block text-center font-bold text-xs sm:text-[13px] text-gray-900 leading-snug hover:text-[#e60049] transition mt-2 px-1 line-clamp-2"
-                    >
-                      {item.display_title}
-                    </SmartLink>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         );
