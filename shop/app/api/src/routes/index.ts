@@ -94,6 +94,7 @@ router.post(
 );
 router.get('/admin/block-previews/:type', adminAuthMiddleware, adminController.getBlockPreviewImage);
 router.get('/admin/users', adminAuthMiddleware, adminController.getUsers);
+router.get('/admin/users/:id/library', adminAuthMiddleware, adminController.getUserLibrary);
 router.put('/admin/users/:id/role', adminAuthMiddleware, adminController.updateUserRoleAndStatus);
 router.delete(
   '/admin/users/:id/sessions',

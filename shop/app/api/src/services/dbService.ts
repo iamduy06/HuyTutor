@@ -2210,6 +2210,32 @@ export const dbService = {
     return counts;
   },
 
+  async getUserLibraryCountMap(): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (shouldTrySupabaseAuth() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('user_library')
+        .select('user_id')
+        .eq('is_active', true);
+      if (error) handleSupabaseAuthError(error);
+      if (!error && Array.isArray(data)) {
+        for (const item of data) {
+          if (item.user_id) {
+            counts.set(item.user_id, (counts.get(item.user_id) || 0) + 1);
+          }
+        }
+        return counts;
+      }
+    }
+    const db = loadLocalDb();
+    for (const item of db.user_library || []) {
+      if (item.user_id && item.is_active !== false) {
+        counts.set(item.user_id, (counts.get(item.user_id) || 0) + 1);
+      }
+    }
+    return counts;
+  },
+
   async getUserSessions(userId: string): Promise<SeedUserSession[]> {
     const now = new Date();
     if (shouldTrySupabaseAuth() && supabaseAdmin) {

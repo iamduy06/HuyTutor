@@ -1187,13 +1187,15 @@ export const adminController = {
    */
   async getUsers(_req: Request, res: Response): Promise<void> {
     try {
-      const [users, sessionCountMap] = await Promise.all([
+      const [users, sessionCountMap, libraryCountMap] = await Promise.all([
         dbService.getAllUsers(),
         dbService.getActiveSessionCountMap(),
+        dbService.getUserLibraryCountMap(),
       ]);
       const enrichedUsers = users.map((u) => ({
         ...toPublicUserProfile(u),
         activeSessions: sessionCountMap.get(u.id) || 0,
+        purchasedDocumentsCount: libraryCountMap.get(u.id) || 0,
       }));
 
       res.json({
@@ -1271,6 +1273,167 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi thu hồi phiên đăng nhập.',
+      });
+    }
+  },
+
+  /**
+   * GET /api/admin/users/:id/library
+   * Lấy danh sách chi tiết các tài liệu đã mua trong Tủ sách của một thành viên
+   */
+  async getUserLibrary(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = String(req.params.id || '').trim();
+      if (!userId) {
+        res.status(400).json({
+          ok: false,
+          success: false,
+          error: 'Thiếu ID người dùng (userId).',
+        });
+        return;
+      }
+
+      const user = await dbService.getUserById(userId);
+      if (!user) {
+        res.status(404).json({
+          ok: false,
+          success: false,
+          error: `Không tìm thấy tài khoản người dùng với ID: ${userId}`,
+        });
+        return;
+      }
+
+      const [libraryItems, allProducts, userOrders] = await Promise.all([
+        dbService.getUserLibrary(userId),
+        dbService.getProducts({ includeInactive: true }),
+        dbService.getUserOrders(userId, user.email),
+      ]);
+
+      const enrichedItems = libraryItems.map((item) => {
+        const cleanSlug = String(item.product_slug || '').toLowerCase().trim();
+        const matchedProd = allProducts.find(
+          (p) =>
+            (p.slug && String(p.slug).toLowerCase().trim() === cleanSlug) ||
+            (p.id && String(p.id).toLowerCase().trim() === cleanSlug) ||
+            p.title === item.product_title
+        );
+        const matchedFormat = matchedProd?.formats?.find(
+          (f: any) => f.format_code === item.format_code
+        );
+        const resolvedDriveUrl = item.access_drive_url || matchedFormat?.drive_url || '';
+        const fallbackPrice = Number(matchedFormat?.price || 0);
+
+        let paidAmount = fallbackPrice;
+        const matchedOrder = userOrders.find(
+          (o) =>
+            o.payment_status === 'paid' &&
+            ((item.order_code && o.order_code === item.order_code) ||
+              (item.order_id && o.id === item.order_id) ||
+              (Array.isArray(o.items) &&
+                o.items.some(
+                  (it) =>
+                    ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+                      (it.product_title || '').trim() === (item.product_title || '').trim()) &&
+                    it.format_code === item.format_code
+                )))
+        );
+
+        if (matchedOrder && Array.isArray(matchedOrder.items)) {
+          const orderItem = matchedOrder.items.find(
+            (it) =>
+              ((it.product_id || '').toLowerCase().trim() === cleanSlug ||
+                (it.product_title || '').trim() === (item.product_title || '').trim()) &&
+              it.format_code === item.format_code
+          );
+          const baseItemPrice = orderItem ? Number(orderItem.unit_price) : fallbackPrice;
+
+          const actualOrderPaid =
+            typeof matchedOrder.final_amount === 'number'
+              ? matchedOrder.final_amount
+              : typeof matchedOrder.total_amount === 'number'
+              ? matchedOrder.total_amount
+              : -1;
+
+          if (matchedOrder.items.length === 1 && actualOrderPaid >= 0) {
+            paidAmount = actualOrderPaid;
+          } else {
+            let discountRate = 0;
+            const subtotal = Number(matchedOrder.subtotal_amount || 0);
+            const totalPaid = actualOrderPaid >= 0 ? actualOrderPaid : Number(matchedOrder.total_amount || 0);
+            const discountAmt =
+              typeof matchedOrder.discount_amount === 'number' && matchedOrder.discount_amount > 0
+                ? matchedOrder.discount_amount
+                : subtotal > totalPaid && totalPaid > 0
+                ? subtotal - totalPaid
+                : 0;
+
+            if (discountAmt > 0 && subtotal > 0) {
+              discountRate = discountAmt / subtotal;
+            } else if (
+              typeof matchedOrder.discount_percent === 'number' &&
+              matchedOrder.discount_percent > 0
+            ) {
+              discountRate = matchedOrder.discount_percent / 100;
+            }
+            paidAmount = Math.max(0, Math.round(baseItemPrice * (1 - discountRate)));
+          }
+        }
+
+        return {
+          id: item.id,
+          user_id: item.user_id,
+          order_id: item.order_id,
+          title: item.product_title,
+          product_title: item.product_title,
+          product_slug: item.product_slug,
+          format: item.format_code,
+          format_code: item.format_code,
+          thumbnail_url: matchedProd?.thumbnail_url || '',
+          access_drive_url: resolvedDriveUrl,
+          order_code: item.order_code || matchedOrder?.order_code || '',
+          final_price: paidAmount,
+          paid_amount: paidAmount,
+          activated_at: item.granted_at,
+          granted_at: item.granted_at,
+          download_count: Number(item.download_count || 0),
+          is_active: item.is_active !== false,
+          watermarked_pdf_url: item.watermarked_pdf_url || '',
+        };
+      });
+
+      const totalDocuments = enrichedItems.length;
+      const totalSpent = enrichedItems.reduce((sum, it) => sum + (it.final_price || 0), 0);
+      const distinctOrderCodes = new Set(
+        enrichedItems.map((it) => it.order_code).filter(Boolean)
+      );
+      const totalOrders = distinctOrderCodes.size;
+
+      res.json({
+        ok: true,
+        success: true,
+        data: {
+          items: enrichedItems,
+          summary: {
+            totalDocuments,
+            totalSpent,
+            totalOrders,
+          },
+        },
+        items: enrichedItems,
+        summary: {
+          totalDocuments,
+          totalSpent,
+          totalOrders,
+        },
+      });
+    } catch (err: any) {
+      console.error('[adminController] Error fetching user library:', err);
+      res.status(500).json({
+        ok: false,
+        success: false,
+        error: err?.message || 'Lỗi hệ thống khi tải danh sách tài liệu người dùng.',
+        detail: String(err),
+        stack: err?.stack,
       });
     }
   },
