@@ -34,6 +34,7 @@ interface AdminProductDetailBuilderProps {
   allProducts: Product[];
   onChangeBlocks: (blocks: ProductDetailBlockItem[]) => void;
   showToast: (msg: string) => void;
+  defaultExpanded?: boolean;
 }
 
 const DETAIL_BLOCK_META: Record<
@@ -120,7 +121,9 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
   allProducts,
   onChangeBlocks,
   showToast,
+  defaultExpanded = false,
 }) => {
+  const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [showLivePreview, setShowLivePreview] = useState<boolean>(false);
   const [bulkTopicInputMap, setBulkTopicInputMap] = useState<Record<string, string>>({});
@@ -494,88 +497,116 @@ export const AdminProductDetailBuilder: React.FC<AdminProductDetailBuilderProps>
   )?.config as SampleGroupsBlockConfig | undefined;
 
   return (
-    <div className="space-y-6">
-      {/* Top Header Controls */}
-      <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-extrabold text-[#e60049] uppercase flex items-center gap-2">
-            <span>Quản lý Khối Động Trang Chi Tiết (${buildProductUrl(product.category_slug, product.slug)})</span>
-            <span className="text-[10px] bg-pink-100 text-[#e60049] font-black px-2 py-0.5 rounded">
-              {blocks.length} KHỐI
-            </span>
-          </h2>
-          <p className="text-xs text-gray-600 mt-1">
-            Tự do thêm/xóa, bật/tắt, đổi vị trí Lên/Xuống từng phần và tải nhiều nhóm trang ảnh A4 đọc thử trực tiếp lên Cloudflare R2.
-          </p>
-        </div>
+    <div className="space-y-4">
+      {/* Top Header Controls (Collapsible) */}
+      <div className="bg-white border border-gray-200 rounded-md shadow-2xs overflow-hidden">
+        <div
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer select-none hover:bg-gray-50/80 transition"
+          role="button"
+          aria-expanded={isExpanded}
+        >
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm sm:text-base font-extrabold text-[#e60049] uppercase flex items-center gap-2 flex-wrap">
+              <span>Quản lý Khối Động Trang Chi Tiết (${buildProductUrl(product.category_slug, product.slug)})</span>
+              <span className="text-[10px] bg-pink-100 text-[#e60049] font-black px-2 py-0.5 rounded">
+                {blocks.length} KHỐI
+              </span>
+            </h2>
+            <p className="text-xs text-gray-600 mt-1">
+              Tự do thêm/xóa, bật/tắt, đổi vị trí Lên/Xuống từng phần và tải nhiều nhóm trang ảnh A4 đọc thử trực tiếp lên Cloudflare R2.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleInitializeStandardBlocks}
-            className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs px-3.5 py-2 rounded-sm transition"
-          >
-            Khởi tạo mẫu 6 Phần chuẩn
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowLivePreview(!showLivePreview)}
-            className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3.5 py-2 rounded-sm transition"
-          >
-            {showLivePreview ? 'Ẩn Xem trước' : '👁️ Xem trước Trang Chi Tiết'}
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {isExpanded && (
+              <div
+                className="flex flex-wrap items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={handleInitializeStandardBlocks}
+                  className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs px-3.5 py-1.5 rounded-sm transition cursor-pointer"
+                >
+                  Khởi tạo mẫu 6 Phần chuẩn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLivePreview(!showLivePreview)}
+                  className="border border-gray-300 bg-white hover:border-[#e60049] text-gray-700 font-bold text-xs px-3.5 py-1.5 rounded-sm transition cursor-pointer"
+                >
+                  {showLivePreview ? 'Ẩn Xem trước' : '👁️ Xem trước'}
+                </button>
+              </div>
+            )}
+            <span className="text-gray-600 p-1 flex items-center justify-center">
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Xem trước Live Preview */}
-      {showLivePreview && (
-        <div className="bg-gray-100 border-2 border-dashed border-pink-300 rounded-md p-4">
-          <div className="text-xs font-bold text-[#e60049] uppercase mb-3 flex items-center justify-between">
-            <span>Live Preview: Giao diện Trang Chi Tiết Sản Phẩm thực tế</span>
-            <span className="text-[10px] text-gray-500 font-normal">Cập nhật tức thời theo cấu hình bên dưới</span>
-          </div>
-          <div className="bg-white rounded border border-gray-200 p-4 max-h-[600px] overflow-y-auto">
-            <UniversalBlockRenderer
-              blocks={blocks}
-              context={{
-                pageType: 'product_detail',
-                product: previewProductObj as Product,
-                allProducts,
-              }}
-              selectedFormat={previewSelectedFormat}
-              onSelectFormat={(fmt) => setPreviewSelectedFormat(fmt)}
-              onBuyNow={() => showToast('Nút Đặt hàng sẽ thêm vào Giỏ & chuyển tới Thanh toán.')}
-              onAddToCart={() => showToast('Đã thêm sản phẩm vào Giỏ hàng.')}
-            />
-          </div>
+      {isExpanded && (
+        <div className="space-y-6 pt-2">
+          {/* Xem trước Live Preview */}
+          {showLivePreview && (
+            <div className="bg-gray-100 border-2 border-dashed border-pink-300 rounded-md p-4">
+              <div className="text-xs font-bold text-[#e60049] uppercase mb-3 flex items-center justify-between">
+                <span>Live Preview: Giao diện Trang Chi Tiết Sản Phẩm thực tế</span>
+                <span className="text-[10px] text-gray-500 font-normal">Cập nhật tức thời theo cấu hình bên dưới</span>
+              </div>
+              <div className="bg-white rounded border border-gray-200 p-4 max-h-[600px] overflow-y-auto">
+                <UniversalBlockRenderer
+                  blocks={blocks}
+                  context={{
+                    pageType: 'product_detail',
+                    product: previewProductObj as Product,
+                    allProducts,
+                  }}
+                  selectedFormat={previewSelectedFormat}
+                  onSelectFormat={(fmt) => setPreviewSelectedFormat(fmt)}
+                  onBuyNow={() => showToast('Nút Đặt hàng sẽ thêm vào Giỏ & chuyển tới Thanh toán.')}
+                  onAddToCart={() => showToast('Đã thêm sản phẩm vào Giỏ hàng.')}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Block Repeater & Universal Picker */}
+          <UniversalBlockCardRepeater
+            pageTitle={`Trang Chi Tiết (${product.title || 'Sản phẩm'})`}
+            pageRouteLabel={buildProductUrl(product.category_slug, product.slug)}
+            blocks={blocks}
+            onBlocksChange={(newBlocks) => onChangeBlocks(newBlocks)}
+            allProducts={allProducts}
+            context={{
+              pageType: 'product_detail',
+              product: previewProductObj as Product,
+              allProducts,
+            }}
+            quickAddTypes={[
+              { type: 'product_hero', label: 'Hero Sản Phẩm' },
+              { type: 'product_intro', label: 'Hộp Xám Giới Thiệu' },
+              { type: 'topic_accordion', label: 'Bản Xem Thử Accordion' },
+              { type: 'sample_groups', label: 'Nhóm Đọc Thử A4' },
+              { type: 'bottom_cta', label: 'Nút Đặt Hàng CTA' },
+              { type: 'related_products', label: 'Sản Phẩm Gợi Ý' },
+              { type: 'gift_preview_download', label: 'Quà Tặng Tải Ngay' },
+              { type: 'gift_cross_sell', label: 'Quà Tặng Bán Kèm' },
+              { type: 'gift_donate_cta', label: 'Ủng Hộ Donate' },
+              { type: 'custom_html', label: 'Mã HTML' },
+            ]}
+          />
         </div>
       )}
-
-      {/* Block Repeater & Universal Picker */}
-      <UniversalBlockCardRepeater
-        pageTitle={`Trang Chi Tiết (${product.title || 'Sản phẩm'})`}
-        pageRouteLabel={buildProductUrl(product.category_slug, product.slug)}
-        blocks={blocks}
-        onBlocksChange={(newBlocks) => onChangeBlocks(newBlocks)}
-        allProducts={allProducts}
-        context={{
-          pageType: 'product_detail',
-          product: previewProductObj as Product,
-          allProducts,
-        }}
-        quickAddTypes={[
-          { type: 'product_hero', label: 'Hero Sản Phẩm' },
-          { type: 'product_intro', label: 'Hộp Xám Giới Thiệu' },
-          { type: 'topic_accordion', label: 'Bản Xem Thử Accordion' },
-          { type: 'sample_groups', label: 'Nhóm Đọc Thử A4' },
-          { type: 'bottom_cta', label: 'Nút Đặt Hàng CTA' },
-          { type: 'related_products', label: 'Sản Phẩm Gợi Ý' },
-          { type: 'gift_preview_download', label: 'Quà Tặng Tải Ngay' },
-          { type: 'gift_cross_sell', label: 'Quà Tặng Bán Kèm' },
-          { type: 'gift_donate_cta', label: 'Ủng Hộ Donate' },
-          { type: 'custom_html', label: 'Mã HTML' },
-        ]}
-      />
     </div>
   );
 };

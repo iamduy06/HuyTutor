@@ -402,6 +402,8 @@ export const AdminPage: React.FC = () => {
 
   const [uploadingThumb, setUploadingThumb] = useState(false);
   const [newPreviewImageUrl, setNewPreviewImageUrl] = useState('');
+  const [isFormatsExpanded, setIsFormatsExpanded] = useState(false);
+  const [isDecksExpanded, setIsDecksExpanded] = useState(false);
 
   const loadOverview = async () => {
     setLoading(true);
@@ -474,6 +476,8 @@ export const AdminPage: React.FC = () => {
       detail_blocks: syncedBlocks,
       linked_deck_ids: Array.isArray(prod.linked_deck_ids) ? [...prod.linked_deck_ids] : [],
     });
+    setIsFormatsExpanded(false);
+    setIsDecksExpanded(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -505,6 +509,8 @@ export const AdminPage: React.FC = () => {
       formats: DEFAULT_FORMATS.map((f) => ({ ...f })),
       linked_deck_ids: [],
     });
+    setIsFormatsExpanded(false);
+    setIsDecksExpanded(false);
   };
 
   // Upload file ảnh bìa Thumbnail trực tiếp lên Cloudflare R2 qua Backend API
@@ -1397,6 +1403,7 @@ export const AdminPage: React.FC = () => {
                       <AdminProductDetailBuilder
                         product={currentDetailProduct}
                         allProducts={products}
+                        defaultExpanded={true}
                         onChangeBlocks={(nextBlocks) => {
                           const heroBlock = nextBlocks.find((b) => b.type === 'product_hero');
                           const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;
@@ -1722,219 +1729,270 @@ export const AdminPage: React.FC = () => {
               </div>
 
               {/* 3. Bảng cấu hình 5 Định dạng & Giá riêng biệt + Ánh xạ Google Form tự động */}
-              <div className="border border-gray-200 rounded-md p-4 space-y-3">
-                <div className="text-xs font-extrabold text-gray-900 uppercase">
-                  [CẤU HÌNH 5 ĐỊNH DẠNG HIỂN THỊ &amp; GIÁ BÁN RIÊNG BIỆT] - [Cấu hình bật bán, giá bán và liên kết tài liệu Google Drive cho từng định dạng]
+              <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs">
+                <div
+                  onClick={() => setIsFormatsExpanded(!isFormatsExpanded)}
+                  className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-gray-50/80 transition"
+                  role="button"
+                  aria-expanded={isFormatsExpanded}
+                >
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-xs font-extrabold text-gray-900 uppercase">
+                      [CẤU HÌNH 5 ĐỊNH DẠNG HIỂN THỊ &amp; GIÁ BÁN RIÊNG BIỆT] - [Cấu hình bật bán, giá bán và liên kết tài liệu Google Drive cho từng định dạng]
+                    </span>
+                    <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-sm shrink-0">
+                      {(editingProduct.formats || DEFAULT_FORMATS).filter((f) => f.is_active).length}/5 định dạng đang bật
+                    </span>
+                  </div>
+                  <span className="text-gray-700 p-1 flex items-center justify-center shrink-0">
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isFormatsExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse border border-gray-200">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-800 font-bold">
-                        <th className="border border-gray-200 p-2 text-left">Bật bán</th>
-                        <th className="border border-gray-200 p-2 text-left">
-                          Định dạng trên Web
-                        </th>
-                        <th className="border border-gray-200 p-2 text-left">Giá bán (VNĐ)</th>
-                        <th className="border border-gray-200 p-2 text-left">
-                          Đường link Google Drive (File gốc / Thư mục)
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(editingProduct.formats || DEFAULT_FORMATS).map((fmt) => (
-                        <tr key={fmt.format_code}>
-                          <td className="border border-gray-200 p-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={fmt.is_active}
-                              onChange={(e) =>
-                                handleFormatChange(
-                                  fmt.format_code,
-                                  'is_active',
-                                  e.target.checked
-                                )
-                              }
-                              className="accent-[#e60049] w-4 h-4"
-                            />
-                          </td>
-                          <td className="border border-gray-200 p-2 font-bold text-gray-900">
-                            {fmt.format_code}
-                          </td>
-                          <td className="border border-gray-200 p-2">
-                            <input
-                              type="number"
-                              min={0}
-                              step={1000}
-                              placeholder="Để trống"
-                              value={fmt.price === 0 || fmt.price === '' || fmt.price === undefined || fmt.price === null ? '' : fmt.price}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                handleFormatChange(
-                                  fmt.format_code,
-                                  'price',
-                                  raw === '' ? ('' as any) : Number(raw)
-                                );
-                              }}
-                              className="w-32 border border-gray-300 rounded-sm px-2 py-1 text-xs font-bold"
-                            />
-                          </td>
-                          <td className="border border-gray-200 p-2">
-                            {fmt.format_code === 'Flashcard' ? (
-                              <div className="flex items-center gap-1.5 text-gray-400 italic text-[11px] py-1">
-                                <span className="inline-block w-2 h-2 rounded-full bg-blue-400"></span>
-                                Tự động xử lý tài khoản Flashcard
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
+
+                {isFormatsExpanded && (
+                  <div className="p-4 pt-0 border-t border-gray-100 space-y-3">
+                    <div className="overflow-x-auto mt-3">
+                      <table className="w-full text-xs border-collapse border border-gray-200">
+                        <thead>
+                          <tr className="bg-gray-100 text-gray-800 font-bold">
+                            <th className="border border-gray-200 p-2 text-left">Bật bán</th>
+                            <th className="border border-gray-200 p-2 text-left">
+                              Định dạng trên Web
+                            </th>
+                            <th className="border border-gray-200 p-2 text-left">Giá bán (VNĐ)</th>
+                            <th className="border border-gray-200 p-2 text-left">
+                              Đường link Google Drive (File gốc / Thư mục)
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(editingProduct.formats || DEFAULT_FORMATS).map((fmt) => (
+                            <tr key={fmt.format_code}>
+                              <td className="border border-gray-200 p-2 text-center">
                                 <input
-                                  type="url"
-                                  value={fmt.drive_url || ''}
-                                  placeholder="https://drive.google.com/..."
+                                  type="checkbox"
+                                  checked={fmt.is_active}
                                   onChange={(e) =>
                                     handleFormatChange(
                                       fmt.format_code,
-                                      'drive_url',
-                                      e.target.value
+                                      'is_active',
+                                      e.target.checked
                                     )
                                   }
-                                  className="w-full min-w-[220px] border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                                  className="accent-[#e60049] w-4 h-4"
                                 />
-                                {fmt.drive_url && (
-                                  <a
-                                    href={fmt.drive_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title="Mở thử liên kết"
-                                    className="text-gray-600 hover:text-[#e60049] text-xs px-2 py-1 border border-gray-200 rounded-sm hover:border-[#e60049] transition shrink-0 whitespace-nowrap"
-                                  >
-                                    Mở thử
-                                  </a>
+                              </td>
+                              <td className="border border-gray-200 p-2 font-bold text-gray-900">
+                                {fmt.format_code}
+                              </td>
+                              <td className="border border-gray-200 p-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1000}
+                                  placeholder="Để trống"
+                                  value={fmt.price === 0 || fmt.price === '' || fmt.price === undefined || fmt.price === null ? '' : fmt.price}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    handleFormatChange(
+                                      fmt.format_code,
+                                      'price',
+                                      raw === '' ? ('' as any) : Number(raw)
+                                    );
+                                  }}
+                                  className="w-32 border border-gray-300 rounded-sm px-2 py-1 text-xs font-bold"
+                                />
+                              </td>
+                              <td className="border border-gray-200 p-2">
+                                {fmt.format_code === 'Flashcard' ? (
+                                  <div className="flex items-center gap-1.5 text-gray-400 italic text-[11px] py-1">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-blue-400"></span>
+                                    Tự động xử lý tài khoản Flashcard
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="url"
+                                      value={fmt.drive_url || ''}
+                                      placeholder="https://drive.google.com/..."
+                                      onChange={(e) =>
+                                        handleFormatChange(
+                                          fmt.format_code,
+                                          'drive_url',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full min-w-[220px] border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono"
+                                    />
+                                    {fmt.drive_url && (
+                                      <a
+                                        href={fmt.drive_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Mở thử liên kết"
+                                        className="text-gray-600 hover:text-[#e60049] text-xs px-2 py-1 border border-gray-200 rounded-sm hover:border-[#e60049] transition shrink-0 whitespace-nowrap"
+                                      >
+                                        Mở thử
+                                      </a>
+                                    )}
+                                  </div>
                                 )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* KHỐI LIÊN KẾT BỘ THẺ FLASHCARD (DECKS) */}
-              <div className="border border-gray-200 rounded-sm p-4 space-y-3 bg-white">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
-                  <div className="text-xs font-extrabold text-gray-900 uppercase">
-                    [LIÊN KẾT BỘ THẺ FLASHCARD (DECKS)] - [Chọn một hoặc nhiều bộ thẻ Flashcard cấp quyền cho tài khoản học sinh khi mua]
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-sm">
+              <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs">
+                <div
+                  onClick={() => setIsDecksExpanded(!isDecksExpanded)}
+                  className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-gray-50/80 transition"
+                  role="button"
+                  aria-expanded={isDecksExpanded}
+                >
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-xs font-extrabold text-gray-900 uppercase">
+                      [LIÊN KẾT BỘ THẺ FLASHCARD (DECKS)] - [Chọn một hoặc nhiều bộ thẻ Flashcard cấp quyền cho tài khoản học sinh khi mua]
+                    </span>
+                    <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-sm shrink-0">
                       Đã chọn: {(editingProduct.linked_deck_ids || []).length} bộ thẻ
                     </span>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
                     {(editingProduct.linked_deck_ids || []).length > 0 && (
                       <button
                         type="button"
-                        onClick={() => setEditingProduct((prev) => ({ ...prev, linked_deck_ids: [] }))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingProduct((prev) => ({ ...prev, linked_deck_ids: [] }));
+                        }}
                         className="text-[11px] text-gray-500 hover:text-red-600 underline font-medium cursor-pointer"
                       >
                         Bỏ chọn tất cả
                       </button>
                     )}
+                    <span className="text-gray-700 p-1 flex items-center justify-center">
+                      <svg
+                        className={`w-4 h-4 transition-transform duration-200 ${isDecksExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
                   </div>
                 </div>
 
-                {/* Danh sách thẻ đã chọn (Pill tags có nút xoá) */}
-                {(editingProduct.linked_deck_ids || []).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-gray-200 rounded-sm">
-                    {(editingProduct.linked_deck_ids || []).map((id) => {
-                      const deck = flashcardDecks.find((d) => d.id === id);
-                      return (
-                        <span
-                          key={id}
-                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-300 text-blue-900 text-xs rounded-sm shadow-xs font-medium"
+                {isDecksExpanded && (
+                  <div className="p-4 pt-0 border-t border-gray-100 space-y-3">
+                    {/* Danh sách thẻ đã chọn (Pill tags có nút xoá) */}
+                    {(editingProduct.linked_deck_ids || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-gray-200 rounded-sm mt-3">
+                        {(editingProduct.linked_deck_ids || []).map((id) => {
+                          const deck = flashcardDecks.find((d) => d.id === id);
+                          return (
+                            <span
+                              key={id}
+                              className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-blue-300 text-blue-900 text-xs rounded-sm shadow-xs font-medium"
+                            >
+                              <span className="truncate max-w-[200px]" title={deck?.title || id}>
+                                {deck?.title || id}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDeck(id)}
+                                className="text-gray-400 hover:text-red-600 font-bold ml-0.5 leading-none cursor-pointer"
+                                title="Gỡ bộ thẻ này"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Ô tìm kiếm bộ thẻ */}
+                    <div className="relative mt-2">
+                      <input
+                        type="text"
+                        value={deckSearchQuery}
+                        onChange={(e) => setDeckSearchQuery(e.target.value)}
+                        placeholder="Tìm kiếm bộ thẻ Flashcard theo tên, mô tả hoặc trình độ..."
+                        className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 font-medium"
+                      />
+                      {deckSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setDeckSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
                         >
-                          <span className="truncate max-w-[200px]" title={deck?.title || id}>
-                            {deck?.title || id}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDeck(id)}
-                            className="text-gray-400 hover:text-red-600 font-bold ml-0.5 leading-none cursor-pointer"
-                            title="Gỡ bộ thẻ này"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      );
-                    })}
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Danh sách các bộ thẻ có thể chọn */}
+                    <div className="border border-gray-200 rounded-sm max-h-56 overflow-y-auto divide-y divide-gray-100 bg-white">
+                      {filteredDecks.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-gray-400 italic">
+                          {flashcardDecks.length === 0
+                            ? 'Chưa có bộ thẻ Flashcard nào trong hệ thống.'
+                            : 'Không tìm thấy bộ thẻ nào khớp với từ khóa tìm kiếm.'}
+                        </div>
+                      ) : (
+                        filteredDecks.map((deck) => {
+                          const isSelected = (editingProduct.linked_deck_ids || []).includes(deck.id);
+                          return (
+                            <label
+                              key={deck.id}
+                              className={`flex items-start gap-2.5 p-2.5 cursor-pointer text-xs transition select-none ${
+                                isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleDeck(deck.id)}
+                                className="mt-0.5 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-gray-900 truncate">
+                                    {deck.title}
+                                  </span>
+                                  {deck.level && (
+                                    <span className="px-1.5 py-0.2 bg-gray-100 text-gray-600 text-[10px] font-mono rounded-sm border border-gray-200 uppercase">
+                                      {deck.level}
+                                    </span>
+                                  )}
+                                </div>
+                                {deck.description && (
+                                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                                    {deck.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 )}
-
-                {/* Ô tìm kiếm bộ thẻ */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={deckSearchQuery}
-                    onChange={(e) => setDeckSearchQuery(e.target.value)}
-                    placeholder="Tìm kiếm bộ thẻ Flashcard theo tên, mô tả hoặc trình độ..."
-                    className="w-full border border-gray-300 rounded-sm px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 font-medium"
-                  />
-                  {deckSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setDeckSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {/* Danh sách các bộ thẻ có thể chọn */}
-                <div className="border border-gray-200 rounded-sm max-h-56 overflow-y-auto divide-y divide-gray-100 bg-white">
-                  {filteredDecks.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-gray-400 italic">
-                      {flashcardDecks.length === 0
-                        ? 'Chưa có bộ thẻ Flashcard nào trong hệ thống.'
-                        : 'Không tìm thấy bộ thẻ nào khớp với từ khóa tìm kiếm.'}
-                    </div>
-                  ) : (
-                    filteredDecks.map((deck) => {
-                      const isSelected = (editingProduct.linked_deck_ids || []).includes(deck.id);
-                      return (
-                        <label
-                          key={deck.id}
-                          className={`flex items-start gap-2.5 p-2.5 cursor-pointer text-xs transition select-none ${
-                            isSelected ? 'bg-blue-50/60' : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleToggleDeck(deck.id)}
-                            className="mt-0.5 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-gray-900 truncate">
-                                {deck.title}
-                              </span>
-                              {deck.level && (
-                                <span className="px-1.5 py-0.2 bg-gray-100 text-gray-600 text-[10px] font-mono rounded-sm border border-gray-200 uppercase">
-                                  {deck.level}
-                                </span>
-                              )}
-                            </div>
-                            {deck.description && (
-                              <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                                {deck.description}
-                              </p>
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
               </div>
 
               {/* 4. Trình thiết kế Bố cục Động Trang cấp 2 (6 Phần chuẩn huytutor.io.vn) */}
