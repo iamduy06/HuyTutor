@@ -107,16 +107,29 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
     throw new Error('Missing required environment variable: GOOGLE_FORM_ACTION_URL');
   }
 
-  const now = new Date();
+  // Thời gian thực tế của đơn hàng (lấy từ paid_at, created_at hoặc hiện tại)
+  const baseDate = order.paid_at
+    ? new Date(order.paid_at)
+    : order.created_at
+    ? new Date(order.created_at)
+    : new Date();
+
   // Chuyển sang múi giờ Việt Nam (UTC+7)
-  const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  const year = vnTime.getUTCFullYear().toString();
-  const month = (vnTime.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = vnTime.getUTCDate().toString().padStart(2, '0');
+  const vnTime = new Date(baseDate.getTime() + 7 * 60 * 60 * 1000);
   const hour = vnTime.getUTCHours().toString().padStart(2, '0');
   const minute = vnTime.getUTCMinutes().toString().padStart(2, '0');
-  const saleDate = `${year}-${month}-${day}`;
   const saleTime = `${hour}:${minute}`;
+
+  // Tự động bù +1 ngày RIÊNG cho trường Ngày mua hàng khi gửi vào Google Form:
+  // Do Google Form server parse trường Date tại 00:00:00 UTC, khiến giờ Việt Nam (GMT+7) bị lùi 7 tiếng
+  // qua ranh giới nửa đêm về hôm trước (17:00:00 ngày hôm qua).
+  // Việc bù +1 ngày chỉ áp dụng cho người đi form (payload gửi Google Form) để Google Sheet ghi nhận
+  // đúng 100% ngày thực tế của đơn hàng, trong khi dữ liệu trong database vẫn lưu ngày chuẩn 100%.
+  const formDate = new Date(vnTime.getTime() + 24 * 60 * 60 * 1000);
+  const formYear = formDate.getUTCFullYear().toString();
+  const formMonth = (formDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const formDay = formDate.getUTCDate().toString().padStart(2, '0');
+  const formSaleDate = `${formYear}-${formMonth}-${formDay}`;
 
   const mappedNote = mapFormatToGoogleFormNote(order.selected_format as UiFormatCode);
 
@@ -158,11 +171,11 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
     // 1. Tên khách hàng (Paragraph)
     'entry.528749633': order.customer_name || 'Khách hàng',
 
-    // 2. Ngày mua hàng (Date - Google Form yêu cầu các field con _year, _month, _day)
-    'entry.598112260_year': year,
-    'entry.598112260_month': month,
-    'entry.598112260_day': day,
-    'entry.598112260': saleDate,
+    // 2. Ngày mua hàng (Bù +1 ngày để khi Google Form chuyển đổi múi giờ UTC, kết quả lưu vào Sheet luôn đúng 100% ngày thực tế)
+    'entry.598112260_year': formYear,
+    'entry.598112260_month': formMonth,
+    'entry.598112260_day': formDay,
+    'entry.598112260': formSaleDate,
 
     // 3. Thời gian thanh toán (Time - Google Form yêu cầu các field con _hour, _minute)
     'entry.1044261621_hour': hour,
