@@ -86,11 +86,10 @@ const RenderModeSelector: React.FC<RenderModeSelectorProps> = ({
               key={m.mode}
               type="button"
               onClick={() => onChange(m.mode)}
-              className={`text-left p-3 rounded-xs border transition flex flex-col justify-between ${
-                isSelected
+              className={`text-left p-3 rounded-xs border transition flex flex-col justify-between ${isSelected
                   ? 'border-[#e60049] bg-pink-50/50 shadow-2xs ring-1 ring-[#e60049]'
                   : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
@@ -98,9 +97,8 @@ const RenderModeSelector: React.FC<RenderModeSelectorProps> = ({
                   <span>{m.label}</span>
                 </span>
                 <span
-                  className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-xs ${
-                    isSelected ? 'bg-[#e60049] text-white' : 'bg-gray-100 text-gray-600'
-                  }`}
+                  className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-xs ${isSelected ? 'bg-[#e60049] text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
                 >
                   {m.tag}
                 </span>
@@ -140,16 +138,16 @@ const CustomPageBlocksManager: React.FC<CustomPageBlocksManagerProps> = ({
         type === 'image_only'
           ? 'Hình ảnh minh họa'
           : type === 'banner_hero'
-          ? 'Banner nổi bật'
-          : type === 'rich_text'
-          ? 'Đoạn văn bản'
-          : type === 'cards_grid'
-          ? 'Lưới tính năng'
-          : type === 'accordion_faq'
-          ? 'Câu hỏi thường gặp'
-          : type === 'custom_html'
-          ? 'Mã HTML Tùy Biến'
-          : 'Kêu gọi hành động',
+            ? 'Banner nổi bật'
+            : type === 'rich_text'
+              ? 'Đoạn văn bản'
+              : type === 'cards_grid'
+                ? 'Lưới tính năng'
+                : type === 'accordion_faq'
+                  ? 'Câu hỏi thường gặp'
+                  : type === 'custom_html'
+                    ? 'Mã HTML Tùy Biến'
+                    : 'Kêu gọi hành động',
       subtitle: '',
       content: '',
       image_url: '',
@@ -158,14 +156,14 @@ const CustomPageBlocksManager: React.FC<CustomPageBlocksManagerProps> = ({
       items:
         type === 'cards_grid' || type === 'accordion_faq'
           ? [
-              {
-                id: 'item_1',
-                title: type === 'accordion_faq' ? 'Câu hỏi mới?' : 'Mục 1',
-                desc: type === 'accordion_faq' ? 'Câu trả lời chi tiết' : 'Mô tả chi tiết mục 1',
-                icon: '★',
-                link: '',
-              },
-            ]
+            {
+              id: 'item_1',
+              title: type === 'accordion_faq' ? 'Câu hỏi mới?' : 'Mục 1',
+              desc: type === 'accordion_faq' ? 'Câu trả lời chi tiết' : 'Mô tả chi tiết mục 1',
+              icon: '★',
+              link: '',
+            },
+          ]
           : undefined,
       is_active: true,
       html_content:
@@ -290,11 +288,10 @@ const CustomPageBlocksManager: React.FC<CustomPageBlocksManagerProps> = ({
               <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-xs ${
-                      block.type === 'custom_html'
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-xs ${block.type === 'custom_html'
                         ? 'bg-purple-100 text-purple-700 border border-purple-200'
                         : 'bg-pink-100 text-[#e60049]'
-                    }`}
+                      }`}
                   >
                     {block.type}
                   </span>
@@ -936,10 +933,10 @@ export const AdminUtilityPagesCms: React.FC = () => {
         title: 'Ủng hộ tác giả Huy Tutor (Donate)',
         message:
           'Cảm ơn Quý Thầy/Cô và các bạn đã tin tưởng sử dụng kho tài liệu miễn phí và các bộ đề của Huy Tutor. Mọi sự ủng hộ đều là nguồn động lực to lớn để đội ngũ tiếp tục biên soạn thêm nhiều tài liệu chất lượng.',
-        bank_name: siteConfigs?.payment_instructions?.sepay?.bankName || 'MBBank',
-        account_number: siteConfigs?.payment_instructions?.sepay?.accountNumber || '0358999147',
+        bank_name: siteConfigs?.payment_instructions?.sepay?.bankName || '',
+        account_number: siteConfigs?.payment_instructions?.sepay?.accountNumber || '',
         account_holder:
-          siteConfigs?.payment_instructions?.sepay?.accountHolder || 'HO KINH DOANH HUY CRECOM',
+          siteConfigs?.payment_instructions?.sepay?.accountHolder || '',
         default_amount: 50000,
       }
     );
@@ -1510,8 +1507,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
             />
           );
         }
-        const bank = encodeURIComponent(donateConfig.bank_name || 'MBBank');
-        const acc = encodeURIComponent(donateConfig.account_number || '0358999147');
+        const bank = encodeURIComponent(donateConfig.bank_name || '');
+        const acc = encodeURIComponent(donateConfig.account_number || '');
         const amount = donateConfig.default_amount || 50000;
         const des = encodeURIComponent('UNG HO HUY TUTOR');
         const qrUrl = `https://qr.sepay.vn/img?bank=${bank}&acc=${acc}&template=compact2&amount=${amount}&des=${des}`;
@@ -1572,11 +1569,10 @@ export const AdminUtilityPagesCms: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowPreview(!showPreview)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xs transition border flex items-center gap-1.5 ${
-              showPreview
+            className={`px-3 py-1.5 text-xs font-bold rounded-xs transition border flex items-center gap-1.5 ${showPreview
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                 : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
-            }`}
+              }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${showPreview ? 'bg-emerald-500 animate-ping' : 'bg-gray-400'}`}
@@ -1624,11 +1620,10 @@ export const AdminUtilityPagesCms: React.FC = () => {
             key={tab.id}
             type="button"
             onClick={() => setActiveSubTab(tab.id as any)}
-            className={`px-3 py-2 text-xs font-bold rounded-t-xs transition whitespace-nowrap ${
-              activeSubTab === tab.id
+            className={`px-3 py-2 text-xs font-bold rounded-t-xs transition whitespace-nowrap ${activeSubTab === tab.id
                 ? 'bg-[#e60049] text-white shadow-xs'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -2293,17 +2288,15 @@ export const AdminUtilityPagesCms: React.FC = () => {
                       key={page.id || idx}
                       type="button"
                       onClick={() => setSelectedPageIndex(idx)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-xs transition whitespace-nowrap border flex items-center gap-1.5 ${
-                        selectedPageIndex === idx
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xs transition whitespace-nowrap border flex items-center gap-1.5 ${selectedPageIndex === idx
                           ? 'bg-[#e60049] text-white border-[#e60049]'
                           : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                      }`}
+                        }`}
                     >
                       <span>{page.title}</span>
                       <span
-                        className={`text-[9px] px-1 py-0.2 rounded-xs ${
-                          page.is_active ? 'bg-emerald-600 text-white' : 'bg-gray-400 text-white'
-                        }`}
+                        className={`text-[9px] px-1 py-0.2 rounded-xs ${page.is_active ? 'bg-emerald-600 text-white' : 'bg-gray-400 text-white'
+                          }`}
                       >
                         {page.is_active ? 'Bật' : 'Ẩn'}
                       </span>
@@ -2461,9 +2454,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
                     type="button"
                     title="Chế độ Desktop (100%)"
                     onClick={() => setPreviewViewport('desktop')}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${
-                      previewViewport === 'desktop' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${previewViewport === 'desktop' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
                   >
                     Desktop
                   </button>
@@ -2471,9 +2463,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
                     type="button"
                     title="Chế độ Tablet (768px)"
                     onClick={() => setPreviewViewport('tablet')}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${
-                      previewViewport === 'tablet' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${previewViewport === 'tablet' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
                   >
                     Tablet
                   </button>
@@ -2481,9 +2472,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
                     type="button"
                     title="Chế độ Mobile (375px)"
                     onClick={() => setPreviewViewport('mobile')}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${
-                      previewViewport === 'mobile' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-xs transition ${previewViewport === 'mobile' ? 'bg-[#e60049] text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
                   >
                     Mobile
                   </button>
@@ -2493,13 +2483,12 @@ export const AdminUtilityPagesCms: React.FC = () => {
               {/* KHUNG MÔ PHỎNG NỘI DUNG VIEWPORT */}
               <div className="p-3 bg-gray-200/70 overflow-x-auto flex justify-center">
                 <div
-                  className={`bg-white border border-gray-300 rounded-xs shadow-md transition-all duration-300 max-h-[calc(100vh-160px)] overflow-y-auto ${
-                    previewViewport === 'desktop'
+                  className={`bg-white border border-gray-300 rounded-xs shadow-md transition-all duration-300 max-h-[calc(100vh-160px)] overflow-y-auto ${previewViewport === 'desktop'
                       ? 'w-full'
                       : previewViewport === 'tablet'
-                      ? 'w-[768px]'
-                      : 'w-[375px]'
-                  }`}
+                        ? 'w-[768px]'
+                        : 'w-[375px]'
+                    }`}
                 >
                   {renderLivePreviewContent()}
                 </div>
@@ -2512,8 +2501,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
                   {previewViewport === 'desktop'
                     ? '100% Full Width'
                     : previewViewport === 'tablet'
-                    ? '768px (iPad)'
-                    : '375px (iPhone)'}
+                      ? '768px (iPad)'
+                      : '375px (iPhone)'}
                 </span>
               </div>
             </div>

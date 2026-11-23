@@ -319,6 +319,16 @@ export const apiClient = {
     });
   },
 
+  async sendTelegramTestMessage(payload?: {
+    chat_id?: string;
+    bot_token?: string;
+  }): Promise<{ ok: boolean; message: string; messageId?: number }> {
+    return requestJson<{ ok: boolean; message: string; messageId?: number }>('/api/admin/telegram/test', {
+      method: 'POST',
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+  },
+
   async getProductDetail(slug: string): Promise<{
     ok: boolean;
     product: Product;

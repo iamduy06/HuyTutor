@@ -9,6 +9,8 @@ import { AdminComboCms } from '../components/AdminComboCms';
 import { AdminFlashcardCms } from '../components/AdminFlashcardCms';
 import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminCampaignFrameCms } from '../components/AdminCampaignFrameCms';
+import { AdminTelegramConfigCms } from '../components/AdminTelegramConfigCms';
+import { AdminGoogleAnalyticsCms } from '../components/AdminGoogleAnalyticsCms';
 import { AdminMediaManager } from '../components/AdminMediaManager';
 import { R2ImageUploader } from '../components/R2ImageUploader';
 import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
@@ -3082,6 +3084,12 @@ export const AdminPage: React.FC = () => {
         {/* TAB 5: CẤU HÌNH MENU HEADER & FOOTER */}
         {activeTab === 'configs' && (
           <div className="space-y-6">
+            {/* Cấu hình Thông báo Telegram */}
+            <AdminTelegramConfigCms showToast={showToast} />
+
+            {/* Cấu hình Google Analytics 4 */}
+            <AdminGoogleAnalyticsCms showToast={showToast} />
+
             {/* 1. Cấu hình Menu Header */}
             <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
