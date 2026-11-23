@@ -16,6 +16,22 @@ function sanitizeProductForPublic(product: SeedProduct): any {
   };
 }
 
+/**
+ * Loại bỏ các thông tin bảo mật (như Telegram bot_token) khỏi siteConfigs
+ * trước khi gửi trả về cho khách xem web công khai.
+ */
+function sanitizeSiteConfigsForPublic(configs: any): any {
+  if (!configs) return configs;
+  const sanitized = { ...configs };
+  if (sanitized.telegram_notifications) {
+    sanitized.telegram_notifications = {
+      ...sanitized.telegram_notifications,
+      bot_token: '', // Bảo mật: không bao giờ để lộ bot token ra web client công khai
+    };
+  }
+  return sanitized;
+}
+
 export const catalogController = {
   /**
    * GET /api/catalog/init
@@ -41,7 +57,7 @@ export const catalogController = {
         categories,
         comboRules,
         products,
-        siteConfigs,
+        siteConfigs: sanitizeSiteConfigsForPublic(siteConfigs),
         clientRegion: {
           country: req.clientCountry || 'VN',
           isVietnam: req.isVietnam !== false,

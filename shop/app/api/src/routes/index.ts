@@ -68,6 +68,8 @@ router.get('/admin/menus', adminAuthMiddleware, adminController.getMenus);
 router.put('/admin/menus', adminAuthMiddleware, adminController.updateMenus);
 router.get('/admin/configs', adminAuthMiddleware, adminController.getSiteConfigs);
 router.put('/admin/configs/:key', adminAuthMiddleware, adminController.updateSiteConfig);
+router.put('/admin/site-configs/:key', adminAuthMiddleware, adminController.updateSiteConfig);
+router.post('/admin/telegram/test', adminAuthMiddleware, adminController.testTelegramNotification);
 router.post('/admin/upload-presign', adminAuthMiddleware, adminController.createUploadPresign);
 router.post(
   '/admin/upload-file',

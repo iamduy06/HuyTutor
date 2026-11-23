@@ -4,6 +4,7 @@ import { dbService, SeedOrder, SeedOrderItem, SeedProductFormat } from '../servi
 import { isValidUiFormat, UiFormatCode, mapFormatToGoogleFormNote } from '../constants/formatMapping';
 import { buildPaymentInstruction } from '../services/paymentService';
 import { GOOGLE_FORM_CUSTOMER_GROUPS } from '../services/googleFormService';
+import { telegramService } from '../services/telegramService';
 
 /**
  * Hàm tính toán khấu trừ nâng cấp định dạng PDF -> Word theo Phương án B:
@@ -922,6 +923,12 @@ export const orderController = {
       };
 
       const savedOrder = await dbService.createOrder(newOrder);
+
+      // Bắn thông báo Telegram đơn hàng mới tạo (non-blocking async)
+      telegramService.notifyNewOrderCreated(savedOrder).catch((teleErr: any) => {
+        console.warn('[orderController.createOrder] Telegram notification error:', teleErr?.message || teleErr);
+      });
+
       const paymentInstruction = buildPaymentInstruction(savedOrder);
 
       res.status(201).json({

@@ -99,3 +99,30 @@ INSERT INTO public.navigation_items (menu_id, label, url, order_index, is_highli
 (10, 'Cẩm nang từ vựng miễn phí', '/gifts#cam-nang', 2, false),
 (10, 'Tài liệu đọc thử trích đoạn', '/gifts#doc-thu', 3, false);
 
+-- 4. CẤU HÌNH THÔNG BÁO TELEGRAM & GOOGLE ANALYTICS
+INSERT INTO public.site_configs (key, value, description)
+VALUES
+(
+    'telegram_notifications',
+    '{
+        "is_active": true,
+        "notify_on_order_created": true,
+        "notify_on_order_paid": true,
+        "chat_id": "",
+        "bot_token": ""
+    }'::jsonb,
+    'Cấu hình thông báo đơn hàng và thanh toán về Bot Telegram'
+),
+(
+    'google_analytics',
+    '{
+        "is_active": false,
+        "measurement_id": "",
+        "gtm_id": "",
+        "track_pageviews": true,
+        "track_ecommerce": true
+    }'::jsonb,
+    'Cấu hình đo lường Google Analytics 4 và Google Tag Manager'
+)
+ON CONFLICT (key) DO NOTHING;
+

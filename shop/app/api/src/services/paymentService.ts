@@ -22,7 +22,7 @@ export interface PaymentInitInfo {
 }
 
 export function buildPaymentInstruction(order: SeedOrder): PaymentInitInfo {
-  const bankName = process.env.SEPAY_BANK_NAME || 'MBBank';
+  const bankName = process.env.SEPAY_BANK_NAME || '';
   const bankAccount = process.env.SEPAY_BANK_ACCOUNT || '';
   const accountHolder = process.env.SEPAY_ACCOUNT_HOLDER || '';
   const exchangeRate = exchangeRateService.getEffectiveRateSync();

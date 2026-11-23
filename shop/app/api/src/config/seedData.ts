@@ -257,6 +257,22 @@ export interface HomepageBlockItem {
   config: any;
 }
 
+export interface TelegramNotificationConfig {
+  is_active: boolean;
+  notify_on_order_created: boolean;
+  notify_on_order_paid: boolean;
+  chat_id: string;
+  bot_token: string;
+}
+
+export interface GoogleAnalyticsConfig {
+  is_active: boolean;
+  measurement_id: string;
+  gtm_id?: string;
+  track_pageviews?: boolean;
+  track_ecommerce?: boolean;
+}
+
 export interface SiteConfigs {
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
@@ -267,12 +283,28 @@ export interface SiteConfigs {
   homepage_notice_text?: HomepageNoticeTextConfig;
   homepage_bottom_banner?: HomepageBottomBannerConfig;
   homepage_blocks?: HomepageBlockItem[];
+  telegram_notifications?: TelegramNotificationConfig;
+  google_analytics?: GoogleAnalyticsConfig;
   [key: string]: any;
 }
 
 export const INITIAL_SITE_CONFIGS: SiteConfigs = {
   footer_social_links: [],
   footer_policy_links: [],
+  telegram_notifications: {
+    is_active: true,
+    notify_on_order_created: true,
+    notify_on_order_paid: true,
+    chat_id: '',
+    bot_token: '',
+  },
+  google_analytics: {
+    is_active: false,
+    measurement_id: '',
+    gtm_id: '',
+    track_pageviews: true,
+    track_ecommerce: true,
+  },
 };
 
 export const INITIAL_CATEGORIES: CategoryRecord[] = [];

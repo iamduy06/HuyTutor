@@ -14,6 +14,7 @@ import {
   uploadBufferToR2,
 } from '../services/r2Service';
 import { submitOrderToGoogleForm } from '../services/googleFormService';
+import { telegramService } from '../services/telegramService';
 import { isSupabaseConfigured, supabaseAdmin } from '../config/supabase';
 import { mediaCleanupService } from '../services/mediaCleanupService';
 import type { CleanupReport } from '../services/mediaCleanupService';
@@ -1164,6 +1165,14 @@ export const adminController = {
         };
       }
 
+      // 4. Bắn thông báo Telegram đơn hàng đã thanh toán thành công (non-blocking async)
+      telegramService.notifyOrderPaid(updatedOrder || order, {
+        gateway: 'manual',
+        referenceCode: paymentRefId,
+      }).catch((teleErr: any) => {
+        console.warn('[adminController.manualConfirmPayment] Telegram notification error:', teleErr?.message || teleErr);
+      });
+
       res.json({
         ok: true,
         message: `Đã duyệt thanh toán thủ công cho đơn hàng ${order.order_code} thành công.`,
@@ -1577,6 +1586,45 @@ export const adminController = {
       res.status(500).json({
         ok: false,
         error: err?.message || 'Lỗi lấy danh sách Flashcard Decks.',
+      });
+    }
+  },
+
+  /**
+   * POST /api/admin/telegram/test
+   * Gửi tin nhắn kiểm thử kết nối Bot Telegram từ Admin CMS
+   * Quy chuẩn GEMINI.md §4: Tuyến đường /admin hiển thị chi tiết lỗi kỹ thuật khi thất bại
+   */
+  async testTelegramNotification(req: Request, res: Response): Promise<void> {
+    try {
+      const { chat_id, bot_token } = req.body || {};
+      const result = await telegramService.sendTestMessage({
+        chat_id: chat_id ? String(chat_id).trim() : undefined,
+        bot_token: bot_token ? String(bot_token).trim() : undefined,
+      });
+
+      if (!result.ok) {
+        res.status(400).json({
+          ok: false,
+          error: result.error || 'Gửi tin nhắn kiểm thử Telegram thất bại.',
+          details: result.details,
+        });
+        return;
+      }
+
+      res.json({
+        ok: true,
+        message: result.message || 'Đã gửi tin nhắn kiểm thử Telegram thành công!',
+        messageId: result.messageId,
+        details: result.details,
+      });
+    } catch (err: any) {
+      console.error('[adminController.testTelegramNotification] Error:', err);
+      // Quy chuẩn GEMINI.md §4: Tuyến đường /admin hiển thị chi tiết lỗi kỹ thuật
+      res.status(500).json({
+        ok: false,
+        error: err?.message || 'Lỗi kiểm thử thông báo Telegram.',
+        details: err?.stack || String(err),
       });
     }
   },

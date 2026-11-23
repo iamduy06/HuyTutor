@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
 import { extractOrderCodeFromContent } from '../services/paymentService';
 import { submitOrderToGoogleForm } from '../services/googleFormService';
+import { telegramService } from '../services/telegramService';
 
 export const webhookController = {
   /**
@@ -133,6 +134,15 @@ export const webhookController = {
 
       const formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
 
+      // Bắn thông báo Telegram đơn hàng đã thanh toán thành công qua SePay (non-blocking)
+      telegramService.notifyOrderPaid(updatedOrder || order, {
+        transferAmount,
+        referenceCode,
+        gateway: 'sepay',
+      }).catch((teleErr: any) => {
+        console.warn('[webhookController.handleSepayWebhook] Telegram notification error:', teleErr?.message || teleErr);
+      });
+
       res.json({
         ok: true,
         orderCode: order.order_code,
@@ -220,6 +230,14 @@ export const webhookController = {
       });
 
       const formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
+
+      // Bắn thông báo Telegram đơn hàng đã thanh toán thành công qua PayPal (non-blocking)
+      telegramService.notifyOrderPaid(updatedOrder || order, {
+        referenceCode: paypalTxId,
+        gateway: 'paypal',
+      }).catch((teleErr: any) => {
+        console.warn('[webhookController.handlePaypalWebhook] Telegram notification error:', teleErr?.message || teleErr);
+      });
 
       res.json({
         ok: true,
