@@ -99,8 +99,11 @@ INSERT INTO public.navigation_items (menu_id, label, url, order_index, is_highli
 (10, 'Cẩm nang từ vựng miễn phí', '/gifts#cam-nang', 2, false),
 (10, 'Tài liệu đọc thử trích đoạn', '/gifts#doc-thu', 3, false);
 
+-- Đảm bảo có cột description nếu bảng đã tồn tại từ trước
+ALTER TABLE public.site_configs ADD COLUMN IF NOT EXISTS description TEXT;
+
 -- 4. CẤU HÌNH THÔNG BÁO TELEGRAM & GOOGLE ANALYTICS
-INSERT INTO public.site_configs (key, value, description)
+INSERT INTO public.site_configs (key, value)
 VALUES
 (
     'telegram_notifications',
@@ -108,21 +111,22 @@ VALUES
         "is_active": true,
         "notify_on_order_created": true,
         "notify_on_order_paid": true,
-        "chat_id": "",
+        "chat_id": "-1004365184788",
         "bot_token": ""
-    }'::jsonb,
-    'Cấu hình thông báo đơn hàng và thanh toán về Bot Telegram'
+    }'::jsonb
 ),
 (
     'google_analytics',
     '{
-        "is_active": false,
-        "measurement_id": "",
-        "gtm_id": "",
+        "is_active": true,
+        "measurement_id": "G-H2SNLBF2VH",
+        "gtm_id": "GTM-MTRDVN3N",
         "track_pageviews": true,
-        "track_ecommerce": true
-    }'::jsonb,
-    'Cấu hình đo lường Google Analytics 4 và Google Tag Manager'
+        "track_ecommerce": true,
+        "anonymize_ip": true
+    }'::jsonb
 )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE
+SET value = EXCLUDED.value,
+    updated_at = NOW();
 
