@@ -271,7 +271,25 @@ export interface SiteConfigs {
   donate_page_config?: DonatePageConfig;
   campaign_frame?: CampaignFrameConfig;
   checkout_config?: CheckoutConfig;
+  telegram_notifications?: TelegramNotificationConfig;
+  google_analytics?: GoogleAnalyticsConfig;
   [key: string]: any;
+}
+
+export interface TelegramNotificationConfig {
+  is_active: boolean;
+  notify_on_order_created: boolean;
+  notify_on_order_paid: boolean;
+  chat_id: string;
+  bot_token: string;
+}
+
+export interface GoogleAnalyticsConfig {
+  is_active: boolean;
+  measurement_id: string;
+  gtm_id?: string;
+  track_pageviews?: boolean;
+  track_ecommerce?: boolean;
 }
 
 export interface CategoryItem {
@@ -1062,6 +1080,8 @@ export interface OrderRecord {
   created_at: string;
   items: OrderItemRecord[];
 }
+
+export type Order = OrderRecord;
 
 /**
  * ============================================================================

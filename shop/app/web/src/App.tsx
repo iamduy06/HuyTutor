@@ -11,6 +11,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { SampleModal } from './components/SampleModal';
 import { SearchModal } from './components/SearchModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
+import { AnalyticsTracker } from './components/AnalyticsTracker';
 import { AuthProvider } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
 import { AdminPage } from './pages/AdminPage';
@@ -41,6 +42,7 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <StoreProvider>
+          <AnalyticsTracker />
           <div className="min-h-screen flex flex-col bg-white text-[#222222]">
             <Header />
             <div className="flex-1">

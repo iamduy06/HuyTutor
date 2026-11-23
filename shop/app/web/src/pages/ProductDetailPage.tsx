@@ -6,6 +6,7 @@ import { buildInitialDetailBlocksFromProduct } from '../components/DynamicProduc
 import { UniversalBlockRenderer } from '../components/UniversalBlockRenderer';
 import { useStore } from '../context/StoreContext';
 import { Product, UiFormatCode } from '../types';
+import { trackViewItem } from '../utils/analytics';
 
 const FRONTEND_SLUG_ALIAS_MAP: Record<string, string> = {
   chotha: '30-de-chot-ha',
@@ -101,6 +102,16 @@ export const ProductDetailPage: React.FC = () => {
     const allBlocks = buildInitialDetailBlocksFromProduct(product);
     return allBlocks.filter((b) => b.is_active !== false);
   }, [product]);
+
+  useEffect(() => {
+    if (product) {
+      const activeFormatObj =
+        product.formats?.find((f) => f.format_code === selectedFormat) ||
+        product.formats?.[0];
+      const price = typeof activeFormatObj?.price === 'number' ? activeFormatObj.price : 0;
+      trackViewItem(product, selectedFormat || activeFormatObj?.format_code, price);
+    }
+  }, [product?.id]);
 
   if (!product) {
     return (

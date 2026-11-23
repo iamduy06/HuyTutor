@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { getClientErrorMessage } from '../utils/errorHandler';
+import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import {
   CUSTOMER_GROUP_OPTIONS,
   CustomerGroupType,
@@ -180,7 +181,33 @@ export const CheckoutModal: React.FC = () => {
     return totalAmount;
   }, [effectiveCheckoutItems, displaySubtotal, discountPercent, totalAmount]);
 
+  const hasTrackedBeginCheckoutRef = useRef<boolean>(false);
+  const hasTrackedPurchaseRef = useRef<string | null>(null);
+
+  // Theo dõi sự kiện bắt đầu thanh toán (begin_checkout)
+  useEffect(() => {
+    if (isCheckoutOpen && effectiveCheckoutItems.length > 0) {
+      if (!hasTrackedBeginCheckoutRef.current) {
+        hasTrackedBeginCheckoutRef.current = true;
+        trackBeginCheckout(effectiveCheckoutItems, displayTotal);
+      }
+    } else if (!isCheckoutOpen) {
+      hasTrackedBeginCheckoutRef.current = false;
+    }
+  }, [isCheckoutOpen, effectiveCheckoutItems, displayTotal]);
+
+  // Theo dõi sự kiện đặt mua thành công (purchase)
+  useEffect(() => {
+    if (createdOrder && createdOrder.payment_status === 'paid') {
+      if (hasTrackedPurchaseRef.current !== createdOrder.order_code) {
+        hasTrackedPurchaseRef.current = createdOrder.order_code;
+        trackPurchase(createdOrder);
+      }
+    }
+  }, [createdOrder?.order_code, createdOrder?.payment_status]);
+
   const handleClose = () => {
+    hasTrackedBeginCheckoutRef.current = false;
     setCheckoutItems([]);
     deselectAllCartItems();
     setIsCheckoutOpen(false);

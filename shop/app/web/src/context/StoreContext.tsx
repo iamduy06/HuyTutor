@@ -21,6 +21,7 @@ import {
   detectComboTransitionNotice,
   ComboCartEvaluation,
 } from '../utils/comboPricingEngine';
+import { trackAddToCart } from '../utils/analytics';
 
 export interface StoreContextValue {
   isLoading: boolean;
@@ -285,6 +286,20 @@ export function hydrateCompactCart(
 const DEFAULT_SITE_CONFIGS: SiteConfigs = {
   footer_social_links: [],
   footer_policy_links: [],
+  telegram_notifications: {
+    is_active: true,
+    notify_on_order_created: true,
+    notify_on_order_paid: true,
+    chat_id: '',
+    bot_token: '',
+  },
+  google_analytics: {
+    is_active: true,
+    measurement_id: '',
+    gtm_id: '',
+    track_pageviews: true,
+    track_ecommerce: true,
+  },
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -1076,6 +1091,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         showToast(`Đã thêm "${product.title}" (${formatCode}) vào giỏ hàng.`);
       }
+      trackAddToCart([
+        {
+          product,
+          formatCode,
+          quantity: 1,
+          price: unitPrice,
+        },
+      ]);
       return;
     }
 
@@ -1111,6 +1134,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     showToast(`Đã thêm gói Flashcard "${product.title}" vào giỏ hàng.`);
+    trackAddToCart([
+      {
+        product,
+        formatCode,
+        quantity,
+        price: unitPrice,
+      },
+    ]);
   };
 
   const buyNow = (product: Product, formatCode: UiFormatCode, quantity = 1) => {
@@ -1330,6 +1361,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     showToast(`Đã thêm gói "${pkg.title}" (${formatCode}) vào giỏ hàng.`);
+
+    trackAddToCart(
+      unownedProducts.map((p) => {
+        let unitPrice = resolveFormatPrice(p, formatCode);
+        const status = checkOwnershipStatus(p.slug, formatCode);
+        if (status.isUpgrade) {
+          const pdfPrice = resolveFormatPrice(p, 'PDF');
+          const upgradeOffset = Math.min(pdfPrice, unitPrice);
+          unitPrice = Math.max(0, unitPrice - upgradeOffset);
+        }
+        return {
+          product: p,
+          formatCode,
+          quantity: 1,
+          price: unitPrice,
+        };
+      })
+    );
 
     if (actionType === 'open_checkout') {
       if (!user) {
