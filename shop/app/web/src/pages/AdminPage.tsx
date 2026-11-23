@@ -1025,7 +1025,7 @@ export const AdminPage: React.FC = () => {
                     : 'text-gray-700 hover:bg-gray-100 font-medium'
                 }`}
               >
-                <span>2. Menu Header &amp; Footer</span>
+                <span>2. Cấu hình Hệ thống (Telegram, GA4, Menu)</span>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                     activeTab === 'configs' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
