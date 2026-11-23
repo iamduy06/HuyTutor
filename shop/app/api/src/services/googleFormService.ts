@@ -107,16 +107,15 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
     throw new Error('Missing required environment variable: GOOGLE_FORM_ACTION_URL');
   }
 
-  const now = new Date();
+  // Sử dụng thời gian thanh toán thực tế của đơn hàng (paid_at), nếu không có dùng created_at hoặc thời gian hiện tại
+  const rawDate = order.paid_at ? new Date(order.paid_at) : (order.created_at ? new Date(order.created_at) : new Date());
   // Chuyển sang múi giờ Việt Nam (UTC+7)
-  const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const vnTime = new Date(rawDate.getTime() + 7 * 60 * 60 * 1000);
   const year = vnTime.getUTCFullYear().toString();
   const month = (vnTime.getUTCMonth() + 1).toString().padStart(2, '0');
   const day = vnTime.getUTCDate().toString().padStart(2, '0');
   const hour = vnTime.getUTCHours().toString().padStart(2, '0');
   const minute = vnTime.getUTCMinutes().toString().padStart(2, '0');
-  const saleDate = `${year}-${month}-${day}`;
-  const saleTime = `${hour}:${minute}`;
 
   const mappedNote = mapFormatToGoogleFormNote(order.selected_format as UiFormatCode);
 
@@ -158,16 +157,16 @@ export async function submitOrderToGoogleForm(order: SeedOrder): Promise<GoogleF
     // 1. Tên khách hàng (Paragraph)
     'entry.528749633': order.customer_name || 'Khách hàng',
 
-    // 2. Ngày mua hàng (Date - Google Form yêu cầu các field con _year, _month, _day)
+    // 2. Ngày mua hàng (Google Form Date input chỉ nhận các sub-fields _year, _month, _day.
+    // TUYỆT ĐỐI KHÔNG gửi base field entry.598112260 vì parser server của Google Form sẽ coi chuỗi YYYY-MM-DD là UTC midnight
+    // và quy đổi sang múi giờ PST (California, UTC-8), làm ngày bị lùi 1 ngày thành hôm qua!)
     'entry.598112260_year': year,
     'entry.598112260_month': month,
     'entry.598112260_day': day,
-    'entry.598112260': saleDate,
 
-    // 3. Thời gian thanh toán (Time - Google Form yêu cầu các field con _hour, _minute)
+    // 3. Thời gian thanh toán (Google Form Time input chỉ nhận các sub-fields _hour, _minute)
     'entry.1044261621_hour': hour,
     'entry.1044261621_minute': minute,
-    'entry.1044261621': saleTime,
 
     // 4. Địa chỉ (chỉ khi xuất HĐ)
     'entry.681163783': order.need_invoice ? order.invoice_address || '' : '',
