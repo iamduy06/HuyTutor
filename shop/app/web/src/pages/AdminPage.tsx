@@ -11,6 +11,7 @@ import { AdminUtilityPagesCms } from '../components/AdminUtilityPagesCms';
 import { AdminCampaignFrameCms } from '../components/AdminCampaignFrameCms';
 import { AdminTelegramConfigCms } from '../components/AdminTelegramConfigCms';
 import { AdminGoogleAnalyticsCms } from '../components/AdminGoogleAnalyticsCms';
+import { AdminFooterBusinessInfoCms } from '../components/AdminFooterBusinessInfoCms';
 import { AdminMediaManager } from '../components/AdminMediaManager';
 import { R2ImageUploader } from '../components/R2ImageUploader';
 import { R2MultiImageUploader } from '../components/R2MultiImageUploader';
@@ -3404,6 +3405,9 @@ export const AdminPage: React.FC = () => {
                 </table>
               </div>
             </div>
+
+            {/* Cấu hình Thông tin Hộ Kinh Doanh Footer */}
+            <AdminFooterBusinessInfoCms showToast={showToast} />
 
             {/* 2. Cấu hình Mạng Xã Hội Footer */}
             <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">

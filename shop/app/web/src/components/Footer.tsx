@@ -4,6 +4,7 @@ import { SmartLink } from './SmartLink';
 
 export const Footer: React.FC = () => {
   const { siteConfigs } = useStore();
+  const businessInfo = siteConfigs?.footer_business_info;
 
   const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [
     { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
@@ -38,13 +39,23 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Cột 2: Thông tin Hộ Kinh Doanh (Cố định chuẩn xác) */}
+          {/* Cột 2: Thông tin Hộ Kinh Doanh (Đồng bộ động 100% từ site_configs) */}
           <div className="md:col-span-5 text-[11px] text-gray-700 space-y-2 leading-relaxed">
-            <p className="font-bold text-gray-900 uppercase">HỘ KINH DOANH HUY CRECOM</p>
-            <p>Địa chỉ: Phường An Khánh, thành phố Hồ Chí Minh</p>
-            <p>Zalo: 0358999147</p>
-            <p>Email: huymdcc@gmail.com</p>
-            <p>Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!</p>
+            {businessInfo?.business_name && (
+              <p className="font-bold text-gray-900 uppercase">{businessInfo.business_name}</p>
+            )}
+            {businessInfo?.address && (
+              <p>Địa chỉ: {businessInfo.address}</p>
+            )}
+            {businessInfo?.zalo && (
+              <p>Zalo: {businessInfo.zalo}</p>
+            )}
+            {businessInfo?.email && (
+              <p>Email: {businessInfo.email}</p>
+            )}
+            {businessInfo?.companion_message && (
+              <p>{businessInfo.companion_message}</p>
+            )}
           </div>
 
           {/* Cột 3: Điều khoản & Mạng xã hội (Lấy động từ Bảng Cấu Hình site_configs) */}
