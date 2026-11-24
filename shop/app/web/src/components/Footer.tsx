@@ -4,7 +4,7 @@ import { SmartLink } from './SmartLink';
 
 export const Footer: React.FC = () => {
   const { siteConfigs } = useStore();
-  const businessInfo = siteConfigs?.footer_business_info;
+  const infoSections = siteConfigs?.footer_info_sections;
 
   const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [
     { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
@@ -39,23 +39,48 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Cột 2: Thông tin Hộ Kinh Doanh (Đồng bộ động 100% từ site_configs) */}
-          <div className="md:col-span-5 text-[11px] text-gray-700 space-y-2 leading-relaxed">
-            {businessInfo?.business_name && (
-              <p className="font-bold text-gray-900 uppercase">{businessInfo.business_name}</p>
-            )}
-            {businessInfo?.address && (
-              <p>Địa chỉ: {businessInfo.address}</p>
-            )}
-            {businessInfo?.zalo && (
-              <p>Zalo: {businessInfo.zalo}</p>
-            )}
-            {businessInfo?.email && (
-              <p>Email: {businessInfo.email}</p>
-            )}
-            {businessInfo?.companion_message && (
-              <p>{businessInfo.companion_message}</p>
-            )}
+          {/* Cột 2: Thông tin Header & Content (Đồng bộ động 100% từ site_configs) */}
+          <div className="md:col-span-5 text-[11px] text-gray-700 space-y-4 leading-relaxed">
+            {Array.isArray(infoSections) &&
+              infoSections.map((sec, sIdx) => (
+                <div key={sec.id || sIdx} className="space-y-1.5">
+                  {sec.header && (
+                    sec.header_url?.trim() ? (
+                      <a
+                        href={sec.header_url.trim()}
+                        target={sec.header_url.startsWith('http') ? '_blank' : undefined}
+                        rel="noreferrer"
+                        className="font-bold text-gray-900 uppercase hover:text-[#e60049] transition block"
+                      >
+                        {sec.header}
+                      </a>
+                    ) : (
+                      <p className="font-bold text-gray-900 uppercase">{sec.header}</p>
+                    )
+                  )}
+
+                  {sec.items?.map((item, iIdx) => {
+                    if (!item?.text?.trim()) return null;
+
+                    if (item.url?.trim()) {
+                      return (
+                        <div key={item.id || iIdx}>
+                          <a
+                            href={item.url.trim()}
+                            target={item.url.startsWith('http') ? '_blank' : undefined}
+                            rel="noreferrer"
+                            className="hover:text-[#e60049] transition hover:underline"
+                          >
+                            {item.text}
+                          </a>
+                        </div>
+                      );
+                    }
+
+                    return <p key={item.id || iIdx}>{item.text}</p>;
+                  })}
+                </div>
+              ))}
           </div>
 
           {/* Cột 3: Điều khoản & Mạng xã hội (Lấy động từ Bảng Cấu Hình site_configs) */}
@@ -82,11 +107,10 @@ export const Footer: React.FC = () => {
                     rel="noreferrer"
                     aria-label={social.label}
                     title={social.label}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center transition overflow-hidden shrink-0 ${
-                      iconSrc
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition overflow-hidden shrink-0 ${iconSrc
                         ? 'bg-white border border-gray-200 hover:border-[#e60049] hover:scale-105 shadow-2xs'
                         : 'bg-gray-900 text-white hover:bg-[#e60049] text-[11px] font-bold'
-                    }`}
+                      }`}
                   >
                     {iconSrc ? (
                       <img

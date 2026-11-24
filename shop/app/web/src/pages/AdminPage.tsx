@@ -3406,7 +3406,7 @@ export const AdminPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Cấu hình Thông tin Hộ Kinh Doanh Footer */}
+            {/* Cấu hình Thông tin Header & Content Footer */}
             <AdminFooterBusinessInfoCms showToast={showToast} />
 
             {/* 2. Cấu hình Mạng Xã Hội Footer */}

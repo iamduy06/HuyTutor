@@ -246,16 +246,21 @@ export interface CampaignFrameConfig {
   slug_match_mode?: CampaignSlugMatchMode;
 }
 
-export interface FooterBusinessInfo {
-  business_name?: string;
-  address?: string;
-  zalo?: string;
-  email?: string;
-  companion_message?: string;
+export interface FooterContentItem {
+  id: string;
+  text: string;
+  url?: string;
+}
+
+export interface FooterBlockSection {
+  id: string;
+  header: string;
+  header_url?: string;
+  items: FooterContentItem[];
 }
 
 export interface SiteConfigs {
-  footer_business_info?: FooterBusinessInfo;
+  footer_info_sections?: FooterBlockSection[];
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
   homepage_hero?: HomepageHeroConfig;
