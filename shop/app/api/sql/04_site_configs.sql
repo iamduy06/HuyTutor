@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS public.site_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
+-- Tự động bổ sung cột description nếu bảng đã tồn tại từ trước mà chưa có cột này
+ALTER TABLE public.site_configs ADD COLUMN IF NOT EXISTS description TEXT;
+
 -- Bật Row Level Security cho site_configs
 ALTER TABLE public.site_configs ENABLE ROW LEVEL SECURITY;
 
