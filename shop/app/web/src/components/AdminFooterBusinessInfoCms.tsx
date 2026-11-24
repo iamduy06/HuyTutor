@@ -36,8 +36,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
   // Trạng thái thu gọn/mở rộng từng khối con bên trong (Mặc định thu gọn theo GEMINI.md)
   const [isPreviewExpanded, setIsPreviewExpanded] = useState<boolean>(false);
   const [isBrandExpanded, setIsBrandExpanded] = useState<boolean>(false);
-  const [isSectionsExpanded, setIsSectionsExpanded] = useState<boolean>(false);
-  const [expandedSectionIds, setExpandedSectionIds] = useState<Record<string, boolean>>({});
+  const [isSectionExpanded, setIsSectionExpanded] = useState<boolean>(false);
   const [isPoliciesExpanded, setIsPoliciesExpanded] = useState<boolean>(false);
   const [isSocialsExpanded, setIsSocialsExpanded] = useState<boolean>(false);
 
@@ -46,11 +45,37 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     return siteConfigs?.footer_brand || EMPTY_BRAND;
   });
 
-  // 2. Cấu hình Cột 2: Các khối Header & Content (Không gán default value)
-  const [sections, setSections] = useState<FooterBlockSection[]>(() => {
-    return Array.isArray(siteConfigs?.footer_info_sections)
-      ? siteConfigs.footer_info_sections
-      : [];
+  // 2. Cấu hình Cột 2: Tiêu đề Header & Các dòng nội dung (1 khối duy nhất, không lặp lại)
+  const [header, setHeader] = useState<string>(() => {
+    if (
+      Array.isArray(siteConfigs?.footer_info_sections) &&
+      siteConfigs.footer_info_sections.length > 0
+    ) {
+      return siteConfigs.footer_info_sections[0].header || '';
+    }
+    return '';
+  });
+
+  const [headerUrl, setHeaderUrl] = useState<string>(() => {
+    if (
+      Array.isArray(siteConfigs?.footer_info_sections) &&
+      siteConfigs.footer_info_sections.length > 0
+    ) {
+      return siteConfigs.footer_info_sections[0].header_url || '';
+    }
+    return '';
+  });
+
+  const [items, setItems] = useState<FooterContentItem[]>(() => {
+    if (
+      Array.isArray(siteConfigs?.footer_info_sections) &&
+      siteConfigs.footer_info_sections.length > 0
+    ) {
+      return Array.isArray(siteConfigs.footer_info_sections[0].items)
+        ? siteConfigs.footer_info_sections[0].items
+        : [];
+    }
+    return [];
   });
 
   // 3. Cấu hình Cột 3A: Liên kết Chính sách & Hỗ trợ Footer (Không gán default value)
@@ -77,8 +102,14 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
         home_url: siteConfigs.footer_brand.home_url || '',
       });
     }
-    if (Array.isArray(siteConfigs?.footer_info_sections)) {
-      setSections(siteConfigs.footer_info_sections);
+    if (
+      Array.isArray(siteConfigs?.footer_info_sections) &&
+      siteConfigs.footer_info_sections.length > 0
+    ) {
+      const firstSec = siteConfigs.footer_info_sections[0];
+      setHeader(firstSec.header || '');
+      setHeaderUrl(firstSec.header_url || '');
+      setItems(Array.isArray(firstSec.items) ? firstSec.items : []);
     }
     if (Array.isArray(siteConfigs?.footer_policy_links)) {
       setPolicies(siteConfigs.footer_policy_links);
@@ -94,24 +125,12 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
   ]);
 
   // ==========================================
-  // XỬ LÝ ĐÓNG / MỞ TỪNG KHỐI CON
+  // XỬ LÝ ĐÓNG / MỞ TOÀN BỘ CÁC KHỐI CON
   // ==========================================
-  const toggleSectionItem = (secKey: string) => {
-    setExpandedSectionIds((prev) => ({
-      ...prev,
-      [secKey]: !prev[secKey],
-    }));
-  };
-
   const handleExpandAllSubBlocks = () => {
     setIsPreviewExpanded(true);
     setIsBrandExpanded(true);
-    setIsSectionsExpanded(true);
-    const allSecs: Record<string, boolean> = {};
-    sections.forEach((sec, idx) => {
-      allSecs[sec.id || `sec_${idx}`] = true;
-    });
-    setExpandedSectionIds(allSecs);
+    setIsSectionExpanded(true);
     setIsPoliciesExpanded(true);
     setIsSocialsExpanded(true);
   };
@@ -119,8 +138,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
   const handleCollapseAllSubBlocks = () => {
     setIsPreviewExpanded(false);
     setIsBrandExpanded(false);
-    setIsSectionsExpanded(false);
-    setExpandedSectionIds({});
+    setIsSectionExpanded(false);
     setIsPoliciesExpanded(false);
     setIsSocialsExpanded(false);
   };
@@ -177,84 +195,29 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
   };
 
   // ==========================================
-  // XỬ LÝ CỘT 2: HEADER & CONTENT SECTIONS
+  // XỬ LÝ CỘT 2: HEADER & CÁC DÒNG NỘI DUNG (1 KHỐI DUY NHẤT)
   // ==========================================
-  const handleAddSection = () => {
-    const newId = `sec_${Date.now()}`;
-    const newSec: FooterBlockSection = {
-      id: newId,
-      header: '',
-      header_url: '',
-      items: [],
-    };
-    setSections((prev) => [...prev, newSec]);
-    setExpandedSectionIds((prev) => ({ ...prev, [newId]: true }));
-    setIsSectionsExpanded(true);
-  };
-
-  const handleRemoveSection = (sIdx: number) => {
-    const secToRemove = sections[sIdx];
-    const secKey = secToRemove?.id || `sec_${sIdx}`;
-    setSections((prev) => prev.filter((_, idx) => idx !== sIdx));
-    setExpandedSectionIds((prev) => {
-      const next = { ...prev };
-      delete next[secKey];
-      return next;
-    });
-  };
-
-  const handleUpdateSectionHeader = (
-    sIdx: number,
-    field: 'header' | 'header_url',
-    value: string
-  ) => {
-    setSections((prev) =>
-      prev.map((sec, idx) => (idx === sIdx ? { ...sec, [field]: value } : sec))
-    );
-  };
-
-  const handleAddItem = (sIdx: number) => {
+  const handleAddItem = () => {
     const newItem: FooterContentItem = {
       id: `item_${Date.now()}`,
       text: '',
       url: '',
     };
-    setSections((prev) =>
-      prev.map((sec, idx) =>
-        idx === sIdx ? { ...sec, items: [...(sec.items || []), newItem] } : sec
-      )
-    );
-    const secKey = sections[sIdx]?.id || `sec_${sIdx}`;
-    setExpandedSectionIds((prev) => ({ ...prev, [secKey]: true }));
+    setItems((prev) => [...prev, newItem]);
+    setIsSectionExpanded(true);
   };
 
-  const handleRemoveItem = (sIdx: number, iIdx: number) => {
-    setSections((prev) =>
-      prev.map((sec, idx) =>
-        idx === sIdx
-          ? { ...sec, items: (sec.items || []).filter((_, cIdx) => cIdx !== iIdx) }
-          : sec
-      )
-    );
+  const handleRemoveItem = (iIdx: number) => {
+    setItems((prev) => prev.filter((_, idx) => idx !== iIdx));
   };
 
   const handleUpdateItem = (
-    sIdx: number,
     iIdx: number,
     field: 'text' | 'url',
     value: string
   ) => {
-    setSections((prev) =>
-      prev.map((sec, idx) =>
-        idx === sIdx
-          ? {
-              ...sec,
-              items: (sec.items || []).map((it, cIdx) =>
-                cIdx === iIdx ? { ...it, [field]: value } : it
-              ),
-            }
-          : sec
-      )
+    setItems((prev) =>
+      prev.map((it, idx) => (idx === iIdx ? { ...it, [field]: value } : it))
     );
   };
 
@@ -405,16 +368,18 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
         home_url: (brandConfig.home_url || '').trim() || '/',
       };
 
-      const cleanedSections: FooterBlockSection[] = sections.map((sec, idx) => ({
-        id: sec.id || `sec_${idx + 1}`,
-        header: (sec.header || '').trim(),
-        header_url: (sec.header_url || '').trim(),
-        items: (sec.items || []).map((it, iIdx) => ({
-          id: it.id || `item_${idx + 1}_${iIdx + 1}`,
-          text: (it.text || '').trim(),
-          url: (it.url || '').trim(),
-        })),
-      }));
+      const cleanedSections: FooterBlockSection[] = [
+        {
+          id: 'main',
+          header: header.trim(),
+          header_url: headerUrl.trim(),
+          items: items.map((it, idx) => ({
+            id: it.id || `item_${idx + 1}`,
+            text: (it.text || '').trim(),
+            url: (it.url || '').trim(),
+          })),
+        },
+      ];
 
       const cleanedPolicies: FooterPolicyLink[] = policies.map((pol, idx) => ({
         id: pol.id || `pol_${idx + 1}`,
@@ -472,13 +437,13 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
             THÔNG TIN FOOTER
           </span>
           <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
-            [CẤU HÌNH TOÀN DIỆN CHÂN TRANG (FOOTER)] - [QUẢN LÝ TẬP TRUNG LOGO, SLOGAN, CÁC KHỐI TIÊU ĐỀ HEADER, DÒNG NỘI DUNG, LIÊN KẾT CHÍNH SÁCH VÀ MẠNG XÃ HỘI TẠI FOOTER]
+            [CẤU HÌNH TOÀN DIỆN CHÂN TRANG (FOOTER)] - [QUẢN LÝ TẬP TRUNG LOGO, SLOGAN, TIÊU ĐỀ HEADER, DÒNG NỘI DUNG, LIÊN KẾT CHÍNH SÁCH VÀ MẠNG XÃ HỘI TẠI FOOTER]
           </h2>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
-            {sections.length} KHỐI HEADER • {policies.length} CHÍNH SÁCH • {socials.length} KÊNH MXH
+            {items.length} DÒNG NỘI DUNG • {policies.length} CHÍNH SÁCH • {socials.length} KÊNH MXH
           </span>
           <span className="text-gray-600 p-1 flex items-center justify-center">
             <svg
@@ -593,66 +558,58 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                   </div>
 
                   {/* Cột 2 Live Preview: Header & Content lines */}
-                  <div className="md:col-span-5 text-[11px] text-gray-700 space-y-4 leading-relaxed">
-                    {sections.length === 0 ? (
-                      <p className="text-gray-400 italic">(Chưa có khối Header nào)</p>
+                  <div className="md:col-span-5 text-[11px] text-gray-700 space-y-2 leading-relaxed">
+                    {header ? (
+                      headerUrl.trim() ? (
+                        <a
+                          href={headerUrl.trim()}
+                          target={headerUrl.startsWith('http') ? '_blank' : undefined}
+                          rel="noreferrer"
+                          className="font-bold text-gray-900 uppercase hover:text-[#e60049] transition inline-flex items-center gap-1"
+                        >
+                          <span>{header}</span>
+                          <span className="text-[9px] text-[#e60049] font-normal lowercase font-mono">🔗 link</span>
+                        </a>
+                      ) : (
+                        <p className="font-bold text-gray-900 uppercase">{header}</p>
+                      )
                     ) : (
-                      sections.map((sec, sIdx) => (
-                        <div key={sec.id || sIdx} className="space-y-1.5">
-                          {sec.header ? (
-                            sec.header_url?.trim() ? (
-                              <a
-                                href={sec.header_url.trim()}
-                                target={sec.header_url.startsWith('http') ? '_blank' : undefined}
-                                rel="noreferrer"
-                                className="font-bold text-gray-900 uppercase hover:text-[#e60049] transition inline-flex items-center gap-1"
-                              >
-                                <span>{sec.header}</span>
-                                <span className="text-[9px] text-[#e60049] font-normal lowercase font-mono">🔗 link</span>
-                              </a>
-                            ) : (
-                              <p className="font-bold text-gray-900 uppercase">{sec.header}</p>
-                            )
-                          ) : (
-                            <p className="font-bold text-gray-400 italic uppercase">
-                              (Chưa nhập tiêu đề Header #{sIdx + 1})
+                      <p className="font-bold text-gray-400 italic uppercase">
+                        (Chưa nhập tiêu đề Header)
+                      </p>
+                    )}
+
+                    {items.length === 0 ? (
+                      <p className="text-gray-400 italic text-[10px]">(Chưa có dòng nội dung)</p>
+                    ) : (
+                      items.map((item, iIdx) => {
+                        if (!item.text?.trim()) {
+                          return (
+                            <p key={item.id || iIdx} className="text-gray-400 italic text-[10px]">
+                              (Dòng #{iIdx + 1}: Chưa nhập nội dung)
                             </p>
-                          )}
+                          );
+                        }
 
-                          {!sec.items || sec.items.length === 0 ? (
-                            <p className="text-gray-400 italic text-[10px]">(Chưa có dòng nội dung)</p>
-                          ) : (
-                            sec.items.map((item, iIdx) => {
-                              if (!item.text?.trim()) {
-                                return (
-                                  <p key={item.id || iIdx} className="text-gray-400 italic text-[10px]">
-                                    (Dòng #{iIdx + 1}: Chưa nhập nội dung)
-                                  </p>
-                                );
-                              }
+                        if (item.url?.trim()) {
+                          return (
+                            <div key={item.id || iIdx} className="flex items-center gap-1.5">
+                              <a
+                                href={item.url.trim()}
+                                target={item.url.startsWith('http') ? '_blank' : undefined}
+                                rel="noreferrer"
+                                className="text-blue-700 hover:text-[#e60049] hover:underline transition font-medium"
+                                title={`Liên kết tới: ${item.url}`}
+                              >
+                                {item.text}
+                              </a>
+                              <span className="text-[9px] text-gray-400 font-mono">({item.url.trim()})</span>
+                            </div>
+                          );
+                        }
 
-                              if (item.url?.trim()) {
-                                return (
-                                  <div key={item.id || iIdx} className="flex items-center gap-1.5">
-                                    <a
-                                      href={item.url.trim()}
-                                      target={item.url.startsWith('http') ? '_blank' : undefined}
-                                      rel="noreferrer"
-                                      className="text-blue-700 hover:text-[#e60049] hover:underline transition font-medium"
-                                      title={`Liên kết tới: ${item.url}`}
-                                    >
-                                      {item.text}
-                                    </a>
-                                    <span className="text-[9px] text-gray-400 font-mono">({item.url.trim()})</span>
-                                  </div>
-                                );
-                              }
-
-                              return <p key={item.id || iIdx}>{item.text}</p>;
-                            })
-                          )}
-                        </div>
-                      ))
+                        return <p key={item.id || iIdx}>{item.text}</p>;
+                      })
                     )}
                   </div>
 
@@ -863,17 +820,17 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
           </div>
 
           {/* ========================================================= */}
-          {/* PHẦN 2: CẤU HÌNH CÁC KHỐI HEADER & CONTENT (CỘT 2 FOOTER) */}
+          {/* PHẦN 2: CẤU HÌNH TIÊU ĐỀ & NỘI DUNG FOOTER (CỘT 2)        */}
           {/* ========================================================= */}
           <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs">
             <div
               role="button"
               tabIndex={0}
-              onClick={() => setIsSectionsExpanded(!isSectionsExpanded)}
+              onClick={() => setIsSectionExpanded(!isSectionExpanded)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setIsSectionsExpanded(!isSectionsExpanded);
+                  setIsSectionExpanded(!isSectionExpanded);
                 }
               }}
               className="w-full flex items-center justify-between p-3 bg-gray-50/70 border-b border-gray-200 cursor-pointer select-none transition hover:bg-gray-100/70"
@@ -883,28 +840,18 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                   CỘT 2
                 </span>
                 <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                  CÁC KHỐI HEADER &amp; DÒNG NỘI DUNG (KÈM LINK TÙY CHỌN)
+                  CẤU HÌNH TIÊU ĐỀ &amp; DÒNG NỘI DUNG FOOTER
                 </h3>
               </div>
 
               <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddSection();
-                  }}
-                  className="bg-white border border-gray-300 hover:border-[#e60049] text-gray-800 hover:text-[#e60049] font-bold text-xs px-2.5 py-1 rounded-sm transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                >
-                  <span>+ Thêm khối Header mới</span>
-                </button>
                 <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
-                  {sections.length} KHỐI HEADER
+                  {items.length} DÒNG NỘI DUNG
                 </span>
                 <span className="text-gray-600 p-1 flex items-center justify-center">
                   <svg
                     className={`w-4 h-4 transition-transform duration-200 ${
-                      isSectionsExpanded ? 'rotate-180' : ''
+                      isSectionExpanded ? 'rotate-180' : ''
                     }`}
                     fill="none"
                     stroke="currentColor"
@@ -921,195 +868,115 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
               </div>
             </div>
 
-            {isSectionsExpanded && (
-              <div className="p-4 bg-gray-50/50 space-y-3">
-                {sections.length === 0 ? (
-                  <div className="p-6 bg-white border border-gray-200 rounded-sm text-center text-gray-400 italic text-xs">
-                    Chưa có khối Header nào. Bấm &quot;+ Thêm khối Header mới&quot; để tạo.
+            {isSectionExpanded && (
+              <div className="p-4 bg-gray-50/50 space-y-4">
+                {/* Ô nhập tiêu đề và link của Header */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white p-3 border border-gray-200 rounded-sm">
+                  <div className="md:col-span-7 space-y-1">
+                    <label className="block text-[11px] font-bold text-gray-700">
+                      Tiêu đề Header (in đậm, viết hoa) <span className="text-[#e60049]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={header}
+                      onChange={(e) => setHeader(e.target.value)}
+                      placeholder="VD: HỘ KINH DOANH HUY CRECOM"
+                      className="w-full text-xs border border-gray-300 rounded-sm px-2.5 py-1.5 font-bold uppercase focus:outline-none focus:border-[#e60049]"
+                    />
                   </div>
-                ) : (
-                  sections.map((sec, sIdx) => {
-                    const secKey = sec.id || `sec_${sIdx}`;
-                    const isSecOpen = Boolean(expandedSectionIds[secKey]);
 
-                    return (
-                      <div
-                        key={secKey}
-                        className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs"
-                      >
-                        {/* Thanh tiêu đề của từng khối nhỏ Header (Bấm để thu gọn/mở rộng) */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleSectionItem(secKey)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              toggleSectionItem(secKey);
-                            }
-                          }}
-                          className="w-full flex items-center justify-between p-3 bg-gray-50/90 border-b border-gray-200 cursor-pointer select-none transition hover:bg-gray-100/80"
-                        >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
-                              KHỐI #{sIdx + 1}
-                            </span>
-                            <span className="text-xs font-extrabold text-gray-800">
-                              {sec.header?.trim() ? sec.header.trim() : '(Chưa nhập tiêu đề Header)'}
-                            </span>
-                          </div>
+                  <div className="md:col-span-5 space-y-1">
+                    <label className="block text-[11px] font-bold text-gray-700">
+                      Link cho Header (Tùy chọn - để trống nếu không click)
+                    </label>
+                    <input
+                      type="text"
+                      value={headerUrl}
+                      onChange={(e) => setHeaderUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full text-xs border border-gray-300 rounded-sm px-2.5 py-1.5 font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
+                    />
+                  </div>
+                </div>
 
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-gray-100 text-gray-600">
-                              {sec.items?.length || 0} DÒNG NỘI DUNG
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveSection(sIdx);
-                              }}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-0.5 rounded text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                              title="Xóa khối Header này"
+                {/* Bảng danh sách các dòng Content bên dưới Header */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-gray-700 uppercase">
+                      Các dòng nội dung (Content lines)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="text-[11px] text-[#e60049] hover:underline font-bold cursor-pointer"
+                    >
+                      + Thêm dòng Content
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto border border-gray-200 rounded-sm bg-white">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                        <tr>
+                          <th className="border-b border-gray-200 p-2 w-12 text-center">STT</th>
+                          <th className="border-b border-gray-200 p-2">Nội dung hiển thị (Văn bản thuần)</th>
+                          <th className="border-b border-gray-200 p-2 w-72">
+                            Đường dẫn liên kết (URL - Để trống nếu là plain text)
+                          </th>
+                          <th className="border-b border-gray-200 p-2 w-16 text-center">Xóa</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-4 text-center text-gray-400 italic">
+                              Chưa có dòng nội dung nào. Bấm &quot;+ Thêm dòng Content&quot; để thêm.
+                            </td>
+                          </tr>
+                        ) : (
+                          items.map((item, iIdx) => (
+                            <tr
+                              key={item.id || iIdx}
+                              className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0"
                             >
-                              <span>🗑 Xóa</span>
-                            </button>
-                            <span className="text-gray-600 p-0.5 flex items-center justify-center">
-                              <svg
-                                className={`w-4 h-4 transition-transform duration-200 ${
-                                  isSecOpen ? 'rotate-180' : ''
-                                }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Nội dung chi tiết của từng khối nhỏ khi mở rộng */}
-                        {isSecOpen && (
-                          <div className="p-4 space-y-4 bg-gray-50/30">
-                            {/* Ô nhập tiêu đề và link của Header */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white p-3 border border-gray-200 rounded-sm">
-                              <div className="md:col-span-7 space-y-1">
-                                <label className="block text-[11px] font-bold text-gray-700">
-                                  Tiêu đề Header (in đậm, viết hoa) <span className="text-[#e60049]">*</span>
-                                </label>
+                              <td className="p-2 text-center text-gray-500 font-mono text-[11px]">
+                                {iIdx + 1}
+                              </td>
+                              <td className="p-2">
                                 <input
                                   type="text"
-                                  value={sec.header}
-                                  onChange={(e) => handleUpdateSectionHeader(sIdx, 'header', e.target.value)}
-                                  placeholder="VD: HỘ KINH DOANH HUY CRECOM"
-                                  className="w-full text-xs border border-gray-300 rounded-sm px-2.5 py-1.5 font-bold uppercase focus:outline-none focus:border-[#e60049]"
+                                  value={item.text}
+                                  onChange={(e) => handleUpdateItem(iIdx, 'text', e.target.value)}
+                                  placeholder="VD: Địa chỉ: Phường An Khánh... hoặc Zalo: 0358999147"
+                                  className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs focus:outline-none focus:border-[#e60049]"
                                 />
-                              </div>
-
-                              <div className="md:col-span-5 space-y-1">
-                                <label className="block text-[11px] font-bold text-gray-700">
-                                  Link cho Header (Tùy chọn - để trống nếu không click)
-                                </label>
+                              </td>
+                              <td className="p-2">
                                 <input
                                   type="text"
-                                  value={sec.header_url || ''}
-                                  onChange={(e) => handleUpdateSectionHeader(sIdx, 'header_url', e.target.value)}
-                                  placeholder="https://..."
-                                  className="w-full text-xs border border-gray-300 rounded-sm px-2.5 py-1.5 font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
+                                  value={item.url || ''}
+                                  onChange={(e) => handleUpdateItem(iIdx, 'url', e.target.value)}
+                                  placeholder="VD: https://zalo.me/0358999147 hoặc mailto:..."
+                                  className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
                                 />
-                              </div>
-                            </div>
-
-                            {/* Bảng danh sách các dòng Content bên dưới Header */}
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-gray-700 uppercase">
-                                  Các dòng nội dung (Content lines) thuộc khối #{sIdx + 1}
-                                </span>
+                              </td>
+                              <td className="p-2 text-center">
                                 <button
                                   type="button"
-                                  onClick={() => handleAddItem(sIdx)}
-                                  className="text-[11px] text-[#e60049] hover:underline font-bold cursor-pointer"
+                                  onClick={() => handleRemoveItem(iIdx)}
+                                  title="Xóa dòng này"
+                                  className="w-5 h-5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-full inline-flex items-center justify-center font-bold text-[10px] transition cursor-pointer"
                                 >
-                                  + Thêm dòng Content
+                                  ✕
                                 </button>
-                              </div>
-
-                              <div className="overflow-x-auto border border-gray-200 rounded-sm bg-white">
-                                <table className="w-full text-left text-xs">
-                                  <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
-                                    <tr>
-                                      <th className="border-b border-gray-200 p-2 w-12 text-center">STT</th>
-                                      <th className="border-b border-gray-200 p-2">Nội dung hiển thị (Văn bản thuần)</th>
-                                      <th className="border-b border-gray-200 p-2 w-72">
-                                        Đường dẫn liên kết (URL - Để trống nếu là plain text)
-                                      </th>
-                                      <th className="border-b border-gray-200 p-2 w-16 text-center">Xóa</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {!sec.items || sec.items.length === 0 ? (
-                                      <tr>
-                                        <td colSpan={4} className="p-4 text-center text-gray-400 italic">
-                                          Chưa có dòng nội dung nào. Bấm &quot;+ Thêm dòng Content&quot; để thêm.
-                                        </td>
-                                      </tr>
-                                    ) : (
-                                      sec.items.map((item, iIdx) => (
-                                        <tr
-                                          key={item.id || iIdx}
-                                          className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0"
-                                        >
-                                          <td className="p-2 text-center text-gray-500 font-mono text-[11px]">
-                                            {iIdx + 1}
-                                          </td>
-                                          <td className="p-2">
-                                            <input
-                                              type="text"
-                                              value={item.text}
-                                              onChange={(e) => handleUpdateItem(sIdx, iIdx, 'text', e.target.value)}
-                                              placeholder="VD: Địa chỉ: Phường An Khánh... hoặc Zalo: 0358999147"
-                                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs focus:outline-none focus:border-[#e60049]"
-                                            />
-                                          </td>
-                                          <td className="p-2">
-                                            <input
-                                              type="text"
-                                              value={item.url || ''}
-                                              onChange={(e) => handleUpdateItem(sIdx, iIdx, 'url', e.target.value)}
-                                              placeholder="VD: https://zalo.me/0358999147 hoặc mailto:..."
-                                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
-                                            />
-                                          </td>
-                                          <td className="p-2 text-center">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleRemoveItem(sIdx, iIdx)}
-                                              title="Xóa dòng này"
-                                              className="w-5 h-5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-full inline-flex items-center justify-center font-bold text-[10px] transition cursor-pointer"
-                                            >
-                                              ✕
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </div>
+                              </td>
+                            </tr>
+                          ))
                         )}
-                      </div>
-                    );
-                  })
-                )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </div>
