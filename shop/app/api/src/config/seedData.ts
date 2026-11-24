@@ -273,7 +273,16 @@ export interface GoogleAnalyticsConfig {
   track_ecommerce?: boolean;
 }
 
+export interface FooterBusinessInfo {
+  business_name?: string;
+  address?: string;
+  zalo?: string;
+  email?: string;
+  companion_message?: string;
+}
+
 export interface SiteConfigs {
+  footer_business_info?: FooterBusinessInfo;
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
   homepage_hero?: HomepageHeroConfig;
@@ -291,6 +300,13 @@ export interface SiteConfigs {
 export const INITIAL_SITE_CONFIGS: SiteConfigs = {
   footer_social_links: [],
   footer_policy_links: [],
+  footer_business_info: {
+    business_name: 'HỘ KINH DOANH HUY CRECOM',
+    address: 'Phường An Khánh, thành phố Hồ Chí Minh',
+    zalo: '0358999147',
+    email: 'huymdcc@gmail.com',
+    companion_message: 'Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!',
+  },
   telegram_notifications: {
     is_active: true,
     notify_on_order_created: true,

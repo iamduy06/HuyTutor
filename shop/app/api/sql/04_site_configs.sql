@@ -46,6 +46,17 @@ VALUES
         {"id": "donate", "label": "Ủng hộ tác giả (Donate)", "url": "/donate", "order_index": 4, "is_active": true}
     ]'::jsonb,
     'Danh sách liên kết chính sách & điều khoản hiển thị tại Footer'
+),
+(
+    'footer_business_info',
+    '{
+        "business_name": "HỘ KINH DOANH HUY CRECOM",
+        "address": "Phường An Khánh, thành phố Hồ Chí Minh",
+        "zalo": "0358999147",
+        "email": "huymdcc@gmail.com",
+        "companion_message": "Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!"
+    }'::jsonb,
+    'Thông tin Hộ kinh doanh và liên hệ hiển thị tại Cột 2 Footer'
 )
 ON CONFLICT (key) DO NOTHING;
 

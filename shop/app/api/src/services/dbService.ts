@@ -774,6 +774,7 @@ export const dbService = {
             footer_policy_links: Array.isArray(configMap['footer_policy_links'])
               ? configMap['footer_policy_links']
               : [],
+            footer_business_info: configMap['footer_business_info'] || null,
             homepage_hero: configMap['homepage_hero'] || null,
             homepage_top_banner: configMap['homepage_top_banner'] || null,
             homepage_categories_grid: configMap['homepage_categories_grid'] || null,
