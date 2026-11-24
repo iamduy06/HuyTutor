@@ -286,7 +286,15 @@ export interface FooterBlockSection {
   items: FooterContentItem[];
 }
 
+export interface FooterBrandConfig {
+  logo_url?: string;
+  logo_alt?: string;
+  slogan?: string;
+  home_url?: string;
+}
+
 export interface SiteConfigs {
+  footer_brand?: FooterBrandConfig;
   footer_info_sections?: FooterBlockSection[];
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
@@ -303,6 +311,12 @@ export interface SiteConfigs {
 }
 
 export const INITIAL_SITE_CONFIGS: SiteConfigs = {
+  footer_brand: {
+    logo_url: '/logo.png',
+    logo_alt: 'Huy Tutor',
+    slogan: 'Chuẩn mực & Chi tiết',
+    home_url: '/',
+  },
   footer_social_links: [],
   footer_policy_links: [],
   footer_info_sections: [

@@ -82,6 +82,16 @@ VALUES
         }
     ]'::jsonb,
     'Cấu hình danh sách các Header và dòng nội dung (kèm link tùy chọn) tại Cột 2 Footer'
+),
+(
+    'footer_brand',
+    '{
+        "logo_url": "/logo.png",
+        "logo_alt": "Huy Tutor",
+        "slogan": "Chuẩn mực & Chi tiết",
+        "home_url": "/"
+    }'::jsonb,
+    'Cấu hình Logo và Slogan hiển thị tại Cột 1 Footer'
 )
 ON CONFLICT (key) DO NOTHING;
 

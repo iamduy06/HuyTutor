@@ -767,7 +767,27 @@ export const dbService = {
             ];
           }
 
+          // Tự động kiểm tra và seed vào Supabase nếu chưa có footer_info_sections hoặc footer_brand
+          if (!configMap['footer_info_sections'] && INITIAL_SITE_CONFIGS.footer_info_sections) {
+            await supabaseAdmin.from('site_configs').upsert({
+              key: 'footer_info_sections',
+              value: INITIAL_SITE_CONFIGS.footer_info_sections,
+              updated_at: new Date().toISOString(),
+            });
+            configMap['footer_info_sections'] = INITIAL_SITE_CONFIGS.footer_info_sections;
+          }
+
+          if (!configMap['footer_brand'] && INITIAL_SITE_CONFIGS.footer_brand) {
+            await supabaseAdmin.from('site_configs').upsert({
+              key: 'footer_brand',
+              value: INITIAL_SITE_CONFIGS.footer_brand,
+              updated_at: new Date().toISOString(),
+            });
+            configMap['footer_brand'] = INITIAL_SITE_CONFIGS.footer_brand;
+          }
+
           return {
+            footer_brand: configMap['footer_brand'] || INITIAL_SITE_CONFIGS.footer_brand || null,
             footer_social_links: Array.isArray(configMap['footer_social_links'])
               ? configMap['footer_social_links']
               : [],
