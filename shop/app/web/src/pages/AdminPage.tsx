@@ -1411,7 +1411,7 @@ export const AdminPage: React.FC = () => {
                       <AdminProductDetailBuilder
                         product={currentDetailProduct}
                         allProducts={products}
-                        defaultExpanded={true}
+                        defaultExpanded={false}
                         onChangeBlocks={(nextBlocks) => {
                           const heroBlock = nextBlocks.find((b) => b.type === 'product_hero');
                           const heroImg = (heroBlock?.config as ProductHeroBlockConfig)?.image_url;

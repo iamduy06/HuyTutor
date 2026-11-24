@@ -107,7 +107,18 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
               }`}
             >
               {/* Block Header Toolbar: Title khối - Mô tả của khối đó */}
-              <div className="p-3.5 flex flex-wrap items-center justify-between gap-3 bg-gray-50 border-b border-gray-100">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setEditingBlockId(isEditing ? null : block.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setEditingBlockId(isEditing ? null : block.id);
+                  }
+                }}
+                className="p-3.5 flex flex-wrap items-center justify-between gap-3 bg-gray-50 border-b border-gray-100 cursor-pointer select-none transition hover:bg-gray-100/70"
+              >
                 <div className="max-w-[70%]">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-gray-500 w-5">#{index + 1}</span>
@@ -124,7 +135,10 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div
+                  className="flex items-center gap-1.5 flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     disabled={index === 0}
@@ -157,13 +171,22 @@ export const UniversalBlockCardRepeater: React.FC<UniversalBlockCardRepeaterProp
                   <button
                     type="button"
                     onClick={() => setEditingBlockId(isEditing ? null : block.id)}
-                    className={`text-[11px] font-bold px-3 py-1 rounded-sm border transition ${
+                    className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-sm border transition cursor-pointer ${
                       isEditing
                         ? 'bg-[#e60049] text-white border-[#e60049]'
                         : 'bg-white text-gray-700 border-gray-300 hover:border-[#e60049]'
                     }`}
+                    title={isEditing ? 'Đóng cấu hình' : 'Mở rộng cấu hình'}
                   >
-                    {isEditing ? 'Đóng cấu hình' : 'Chỉnh sửa'}
+                    <span>{isEditing ? 'Đóng' : 'Sửa'}</span>
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${isEditing ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
                   <button
                     type="button"
