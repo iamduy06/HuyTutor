@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FooterBlockSection, FooterContentItem, FooterBrandConfig } from '../types';
+import {
+  FooterBlockSection,
+  FooterContentItem,
+  FooterBrandConfig,
+  FooterSocialLink,
+  FooterPolicyLink,
+} from '../types';
 import { apiClient } from '../api/client';
 import { getClientErrorMessage } from '../utils/errorHandler';
 
@@ -8,42 +14,12 @@ interface AdminFooterBusinessInfoCmsProps {
   showToast?: (msg: string) => void;
 }
 
-const DEFAULT_BRAND: FooterBrandConfig = {
-  logo_url: '/logo.png',
-  logo_alt: 'Huy Tutor',
-  slogan: 'Chuẩn mực & Chi tiết',
-  home_url: '/',
+const EMPTY_BRAND: FooterBrandConfig = {
+  logo_url: '',
+  logo_alt: '',
+  slogan: '',
+  home_url: '',
 };
-
-const DEFAULT_SECTIONS: FooterBlockSection[] = [
-  {
-    id: 'sec_main',
-    header: 'HỘ KINH DOANH HUY CRECOM',
-    header_url: '',
-    items: [
-      {
-        id: 'item_1',
-        text: 'Địa chỉ: Phường An Khánh, thành phố Hồ Chí Minh',
-        url: '',
-      },
-      {
-        id: 'item_2',
-        text: 'Zalo: 0358999147',
-        url: 'https://zalo.me/0358999147',
-      },
-      {
-        id: 'item_3',
-        text: 'Email: huymdcc@gmail.com',
-        url: 'mailto:huymdcc@gmail.com',
-      },
-      {
-        id: 'item_4',
-        text: 'Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!',
-        url: '',
-      },
-    ],
-  },
-];
 
 export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProps> = ({
   showToast: propShowToast,
@@ -51,45 +27,67 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
   const { siteConfigs, updateSiteConfig, showToast: storeShowToast } = useStore();
   const showToast = propShowToast || storeShowToast;
 
+  // Trạng thái thu gọn/mở rộng (Mặc định thu gọn theo GEMINI.md)
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
+  const [uploadingSocialIdx, setUploadingSocialIdx] = useState<number | null>(null);
 
-  // Cấu hình Cột 1: Logo & Slogan
+  // 1. Cấu hình Cột 1: Logo & Slogan (Không gán default value)
   const [brandConfig, setBrandConfig] = useState<FooterBrandConfig>(() => {
-    return siteConfigs?.footer_brand || DEFAULT_BRAND;
+    return siteConfigs?.footer_brand || EMPTY_BRAND;
   });
 
-  // Cấu hình Cột 2: Các khối Header & Content
+  // 2. Cấu hình Cột 2: Các khối Header & Content (Không gán default value)
   const [sections, setSections] = useState<FooterBlockSection[]>(() => {
-    if (
-      Array.isArray(siteConfigs?.footer_info_sections) &&
-      siteConfigs.footer_info_sections.length > 0
-    ) {
-      return siteConfigs.footer_info_sections;
-    }
-    return DEFAULT_SECTIONS;
+    return Array.isArray(siteConfigs?.footer_info_sections)
+      ? siteConfigs.footer_info_sections
+      : [];
   });
 
-  // Đồng bộ cấu hình từ siteConfigs
+  // 3. Cấu hình Cột 3A: Liên kết Chính sách & Hỗ trợ Footer (Không gán default value)
+  const [policies, setPolicies] = useState<FooterPolicyLink[]>(() => {
+    return Array.isArray(siteConfigs?.footer_policy_links)
+      ? siteConfigs.footer_policy_links
+      : [];
+  });
+
+  // 4. Cấu hình Cột 3B: Đường dẫn Mạng xã hội Footer (Không gán default value)
+  const [socials, setSocials] = useState<FooterSocialLink[]>(() => {
+    return Array.isArray(siteConfigs?.footer_social_links)
+      ? siteConfigs.footer_social_links
+      : [];
+  });
+
+  // Đồng bộ cấu hình từ Store / DB
   useEffect(() => {
     if (siteConfigs?.footer_brand) {
       setBrandConfig({
-        logo_url: siteConfigs.footer_brand.logo_url || '/logo.png',
-        logo_alt: siteConfigs.footer_brand.logo_alt || 'Huy Tutor',
-        slogan: siteConfigs.footer_brand.slogan ?? 'Chuẩn mực & Chi tiết',
-        home_url: siteConfigs.footer_brand.home_url || '/',
+        logo_url: siteConfigs.footer_brand.logo_url || '',
+        logo_alt: siteConfigs.footer_brand.logo_alt || '',
+        slogan: siteConfigs.footer_brand.slogan || '',
+        home_url: siteConfigs.footer_brand.home_url || '',
       });
     }
-    if (
-      Array.isArray(siteConfigs?.footer_info_sections) &&
-      siteConfigs.footer_info_sections.length > 0
-    ) {
+    if (Array.isArray(siteConfigs?.footer_info_sections)) {
       setSections(siteConfigs.footer_info_sections);
     }
-  }, [siteConfigs?.footer_brand, siteConfigs?.footer_info_sections]);
+    if (Array.isArray(siteConfigs?.footer_policy_links)) {
+      setPolicies(siteConfigs.footer_policy_links);
+    }
+    if (Array.isArray(siteConfigs?.footer_social_links)) {
+      setSocials(siteConfigs.footer_social_links);
+    }
+  }, [
+    siteConfigs?.footer_brand,
+    siteConfigs?.footer_info_sections,
+    siteConfigs?.footer_policy_links,
+    siteConfigs?.footer_social_links,
+  ]);
 
-  // Upload Logo lên Cloudflare R2
+  // ==========================================
+  // XỬ LÝ CỘT 1: LOGO & SLOGAN
+  // ==========================================
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -120,7 +118,6 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     }
   };
 
-  // Xóa ảnh Logo trên Cloudflare R2 (quay về logo mặc định /logo.png)
   const handleDeleteLogo = async () => {
     const currentUrl = brandConfig.logo_url;
     if (currentUrl && currentUrl.startsWith('http')) {
@@ -132,34 +129,14 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     }
     setBrandConfig((prev) => ({
       ...prev,
-      logo_url: '/logo.png',
+      logo_url: '',
     }));
-    showToast('Đã xóa ảnh Logo trên R2, quay về Logo mặc định.');
+    showToast('Đã xóa ảnh Logo trên R2.');
   };
 
-  // Lưu toàn bộ cấu hình Footer (Logo, Slogan, Header, Content)
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      await updateSiteConfig('footer_brand', brandConfig);
-      await updateSiteConfig('footer_info_sections', sections);
-      showToast('Đã lưu cấu hình Footer (Logo, Slogan & Nội dung) thành công!');
-    } catch (err: any) {
-      const errorMsg = getClientErrorMessage(err, true);
-      showToast(errorMsg || 'Lỗi khi lưu cấu hình Footer.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResetToDefault = () => {
-    setBrandConfig(DEFAULT_BRAND);
-    setSections(DEFAULT_SECTIONS);
-    showToast('Đã đặt lại cấu hình mẫu ban đầu (chưa lưu vào DB cho đến khi bấm Lưu).');
-  };
-
-  // Thao tác khối Header
+  // ==========================================
+  // XỬ LÝ CỘT 2: HEADER & CONTENT SECTIONS
+  // ==========================================
   const handleAddSection = () => {
     const newSec: FooterBlockSection = {
       id: `sec_${Date.now()}`,
@@ -195,7 +172,6 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     );
   };
 
-  // Thao tác dòng Content
   const handleAddItem = (sIdx: number) => {
     const newItem: FooterContentItem = {
       id: `item_${Date.now()}`,
@@ -239,6 +215,158 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     );
   };
 
+  // ==========================================
+  // XỬ LÝ CỘT 3A: LIÊN KẾT CHÍNH SÁCH
+  // ==========================================
+  const handleAddPolicyRow = () => {
+    const newId = `pol_${Date.now()}`;
+    setPolicies((prev) => [
+      ...prev,
+      {
+        id: newId,
+        label: 'Chính sách mới',
+        url: '/terms-of-service',
+        order_index: prev.length + 1,
+        is_active: true,
+      },
+    ]);
+  };
+
+  const handleDeletePolicyRow = (idx: number) => {
+    setPolicies((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdatePolicy = (
+    idx: number,
+    field: keyof FooterPolicyLink,
+    value: any
+  ) => {
+    setPolicies((prev) =>
+      prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p))
+    );
+  };
+
+  // ==========================================
+  // XỬ LÝ CỘT 3B: MẠNG XÃ HỘI & ICON R2
+  // ==========================================
+  const handleAddSocialRow = () => {
+    const newId = `soc_${Date.now()}`;
+    setSocials((prev) => [
+      ...prev,
+      {
+        id: newId,
+        platform: 'custom',
+        label: 'Kênh mới',
+        url: 'https://',
+        icon: '★',
+        icon_url: '',
+        is_active: true,
+      },
+    ]);
+  };
+
+  const handleUploadSocialIcon = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    idx: number
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSocialIdx(idx);
+    try {
+      const oldUrl = socials[idx]?.icon_url;
+      const res = await apiClient.uploadFile(file, { folder: 'social-icons' });
+
+      // Nếu đang thay thế ảnh cũ trên R2, xóa ảnh cũ vật lý
+      if (oldUrl && oldUrl !== res.url && oldUrl.startsWith('http')) {
+        apiClient.deleteR2File(oldUrl).catch((err) => {
+          console.warn('[AdminFooterCms] Lỗi xóa file R2 cũ:', err);
+        });
+      }
+
+      setSocials((prev) =>
+        prev.map((s, i) =>
+          i === idx ? { ...s, icon_url: res.url, icon: res.url } : s
+        )
+      );
+      showToast('Tải ảnh biểu tượng lên Cloudflare R2 thành công!');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi tải ảnh biểu tượng lên R2.');
+    } finally {
+      setUploadingSocialIdx(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteSocialIcon = async (idx: number) => {
+    const currentUrl =
+      socials[idx]?.icon_url ||
+      (socials[idx]?.icon?.startsWith('http') ? socials[idx]?.icon : '');
+
+    if (currentUrl) {
+      try {
+        await apiClient.deleteR2File(currentUrl);
+      } catch (err) {
+        console.warn('[AdminFooterCms] Lỗi xóa file icon R2:', err);
+      }
+    }
+
+    setSocials((prev) =>
+      prev.map((s, i) =>
+        i === idx
+          ? {
+              ...s,
+              icon_url: '',
+              icon: s.platform ? s.platform.charAt(0).toUpperCase() : '★',
+            }
+          : s
+      )
+    );
+    showToast('Đã xóa hình ảnh biểu tượng khỏi Cloudflare R2.');
+  };
+
+  const handleDeleteSocialRow = async (idx: number) => {
+    const soc = socials[idx];
+    if (soc?.icon_url) {
+      apiClient.deleteR2File(soc.icon_url).catch(() => {});
+    } else if (soc?.icon && soc.icon.startsWith('http')) {
+      apiClient.deleteR2File(soc.icon).catch(() => {});
+    }
+    setSocials((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateSocial = (
+    idx: number,
+    field: keyof FooterSocialLink,
+    value: any
+  ) => {
+    setSocials((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
+    );
+  };
+
+  // ==========================================
+  // LƯU TOÀN BỘ CẤU HÌNH FOOTER ĐỒNG BỘ
+  // ==========================================
+  const handleSaveAll = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSaving(true);
+    try {
+      await Promise.all([
+        updateSiteConfig('footer_brand', brandConfig),
+        updateSiteConfig('footer_info_sections', sections),
+        updateSiteConfig('footer_policy_links', policies),
+        updateSiteConfig('footer_social_links', socials),
+      ]);
+      showToast('Đã lưu toàn bộ cấu hình Chân trang (Footer) thành công!');
+    } catch (err: any) {
+      const errorMsg = getClientErrorMessage(err, true);
+      showToast(errorMsg || 'Lỗi khi lưu toàn bộ cấu hình Footer.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const totalItemsCount = sections.reduce(
     (acc, sec) => acc + (sec.items ? sec.items.length : 0),
     0
@@ -246,7 +374,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
 
   return (
     <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs mb-6">
-      {/* Header Khối CMS */}
+      {/* Header Khối CMS Gộp chuẩn GEMINI.md Điều 5 */}
       <div
         role="button"
         tabIndex={0}
@@ -264,13 +392,13 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
             THÔNG TIN FOOTER
           </span>
           <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
-            [CẤU HÌNH LOGO, SLOGAN &amp; NỘI DUNG FOOTER] - [QUẢN LÝ ẢNH LOGO, SLOGAN, CÁC TIÊU ĐỀ HEADER VÀ CÁC DÒNG NỘI DUNG (KÈM LINK TÙY CHỌN) TẠI FOOTER]
+            [CẤU HÌNH TOÀN DIỆN CHÂN TRANG (FOOTER)] - [QUẢN LÝ ẢNH LOGO, SLOGAN, THÔNG TIN DOANH NGHIỆP, LIÊN KẾT CHÍNH SÁCH VÀ MẠNG XÃ HỘI TẠI FOOTER]
           </h2>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
-            {sections.length} KHỐI HEADER ({totalItemsCount} DÒNG)
+            {sections.length} KHỐI HEADER • {policies.length} CHÍNH SÁCH • {socials.length} KÊNH MXH
           </span>
           <span className="text-gray-600 p-1 flex items-center justify-center">
             <svg
@@ -285,40 +413,46 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
         </div>
       </div>
 
-      {/* Nội dung Khối CMS */}
+      {/* Nội dung Khối CMS Khi mở rộng */}
       {isExpanded && (
-        <form onSubmit={handleSave} className="p-5 space-y-6">
-          {/* Khung Live Preview trực quan mô phỏng cả Cột 1 và Cột 2 */}
+        <form onSubmit={handleSaveAll} className="p-5 space-y-6">
+          {/* ========================================================= */}
+          {/* KHUNG LIVE PREVIEW TRỰC QUAN MÔ PHỎNG ĐỦ 3 CỘT THỰC TẾ    */}
+          {/* ========================================================= */}
           <div className="bg-gray-50 border border-gray-200 rounded-sm p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[10px] font-extrabold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                XEM TRƯỚC HIỂN THỊ THỰC TẾ (CỘT 1 LOGO &amp; CỘT 2 NỘI DUNG FOOTER)
+                XEM TRƯỚC HIỂN THỊ THỰC TẾ CHÂN TRANG (MÔ PHỎNG TOÀN DIỆN 3 CỘT)
               </span>
               <span className="text-[10px] text-gray-400 italic">
-                Mô phỏng màu sắc, logo, slogan và các dòng liên kết đúng thực tế
+                Cập nhật tức thời theo cấu hình bên dưới • Tương thích 100% với giao diện khách hàng
               </span>
             </div>
 
             <div className="bg-[#fff0f3] p-5 rounded-sm border border-pink-100 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
               {/* Cột 1 Live Preview: Logo & Slogan */}
-              <div className="md:col-span-4 flex flex-col items-start gap-1">
-                <img
-                  src={brandConfig.logo_url || '/logo.png'}
-                  alt={brandConfig.logo_alt || 'Huy Tutor'}
-                  className="h-8 w-auto object-contain"
-                />
-                <div className="text-[10px] text-gray-500 font-medium">
-                  {brandConfig.slogan || '(Chưa nhập slogan)'}
-                </div>
+              <div className="md:col-span-3 flex flex-col items-start gap-1">
+                {brandConfig.logo_url ? (
+                  <img
+                    src={brandConfig.logo_url}
+                    alt={brandConfig.logo_alt || 'Logo'}
+                    className="h-8 w-auto object-contain"
+                  />
+                ) : (
+                  <div className="text-[10px] text-gray-400 italic">(Chưa có Logo)</div>
+                )}
+                {brandConfig.slogan ? (
+                  <div className="text-[10px] text-gray-500 font-medium">
+                    {brandConfig.slogan}
+                  </div>
+                ) : null}
               </div>
 
               {/* Cột 2 Live Preview: Header & Content lines */}
-              <div className="md:col-span-8 text-[11px] text-gray-700 space-y-4 leading-relaxed">
+              <div className="md:col-span-5 text-[11px] text-gray-700 space-y-4 leading-relaxed">
                 {sections.length === 0 ? (
-                  <p className="text-gray-400 italic">
-                    (Chưa có khối Header nào)
-                  </p>
+                  <p className="text-gray-400 italic">(Chưa có khối Header nào)</p>
                 ) : (
                   sections.map((sec, sIdx) => (
                     <div key={sec.id || sIdx} className="space-y-1.5">
@@ -337,10 +471,12 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                           <p className="font-bold text-gray-900 uppercase">{sec.header}</p>
                         )
                       ) : (
-                        <p className="font-bold text-gray-400 italic uppercase">(Chưa nhập tiêu đề Header #{sIdx + 1})</p>
+                        <p className="font-bold text-gray-400 italic uppercase">
+                          (Chưa nhập tiêu đề Header #{sIdx + 1})
+                        </p>
                       )}
 
-                      {(!sec.items || sec.items.length === 0) ? (
+                      {!sec.items || sec.items.length === 0 ? (
                         <p className="text-gray-400 italic text-[10px]">(Chưa có dòng nội dung)</p>
                       ) : (
                         sec.items.map((item, iIdx) => {
@@ -376,10 +512,73 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                   ))
                 )}
               </div>
+
+              {/* Cột 3 Live Preview: Điều khoản, Chính sách & Mạng xã hội */}
+              <div className="md:col-span-4 text-[11px] text-gray-700 space-y-3">
+                {/* Danh sách chính sách */}
+                <div className="space-y-1.5">
+                  {policies
+                    .filter((p) => p.is_active)
+                    .map((pol, idx) => (
+                      <div key={pol.id || idx}>
+                        <a
+                          href={pol.url}
+                          className="hover:text-[#e60049] transition text-gray-700 hover:underline block"
+                        >
+                          {pol.label}
+                        </a>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Các kênh mạng xã hội */}
+                <div className="pt-2 border-t border-pink-200/60">
+                  <div className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase">
+                    Kênh kết nối chính thức:
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {socials
+                      .filter((s) => s.is_active)
+                      .map((soc, idx) => {
+                        const hasImg = !!(
+                          soc.icon_url ||
+                          (soc.icon &&
+                            (soc.icon.startsWith('http') ||
+                              soc.icon.startsWith('/') ||
+                              soc.icon.startsWith('data:')))
+                        );
+                        const imgSrc = soc.icon_url || (hasImg ? soc.icon : '');
+
+                        return (
+                          <a
+                            key={soc.id || idx}
+                            href={soc.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={soc.label || soc.platform}
+                            className="w-7 h-7 rounded-sm bg-white border border-pink-200 flex items-center justify-center text-xs font-bold text-gray-700 hover:border-[#e60049] hover:text-[#e60049] transition shadow-2xs overflow-hidden"
+                          >
+                            {hasImg ? (
+                              <img
+                                src={imgSrc}
+                                alt={soc.label}
+                                className="w-full h-full object-contain p-0.5"
+                              />
+                            ) : (
+                              <span>{soc.icon || soc.platform.charAt(0).toUpperCase()}</span>
+                            )}
+                          </a>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* PHẦN 1: CẤU HÌNH LOGO & SLOGAN (CỘT 1 FOOTER) */}
+          {/* ========================================================= */}
+          {/* PHẦN 1: CẤU HÌNH LOGO & SLOGAN (CỘT 1 FOOTER)             */}
+          {/* ========================================================= */}
           <div className="border border-gray-200 rounded-sm bg-gray-50/50 p-4 space-y-4">
             <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
               <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
@@ -398,20 +597,26 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                 </label>
                 <div className="flex items-center gap-3">
                   <div className="relative inline-flex items-center justify-center h-14 w-28 bg-[#fff0f3] border border-gray-300 rounded p-1 group">
-                    <img
-                      src={brandConfig.logo_url || '/logo.png'}
-                      alt={brandConfig.logo_alt || 'Huy Tutor'}
-                      className="max-h-full max-w-full object-contain"
-                    />
-                    {brandConfig.logo_url && brandConfig.logo_url !== '/logo.png' && (
-                      <button
-                        type="button"
-                        onClick={handleDeleteLogo}
-                        title="Xóa ảnh Logo khỏi Cloudflare R2 (quay về logo mặc định)"
-                        className="absolute -top-2 -right-2 z-10 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center font-bold text-[10px] shadow border border-white cursor-pointer transition"
-                      >
-                        ✕
-                      </button>
+                    {brandConfig.logo_url ? (
+                      <>
+                        <img
+                          src={brandConfig.logo_url}
+                          alt={brandConfig.logo_alt || 'Logo Footer'}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleDeleteLogo}
+                          title="Xóa ảnh Logo vĩnh viễn khỏi Cloudflare R2"
+                          className="absolute -top-2 -right-2 z-10 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center font-bold text-[10px] shadow border border-white cursor-pointer transition"
+                        >
+                          ✕
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 italic text-center px-1">
+                        (Chưa có ảnh Logo)
+                      </span>
                     )}
                   </div>
 
@@ -444,7 +649,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                   type="text"
                   value={brandConfig.slogan || ''}
                   onChange={(e) => setBrandConfig({ ...brandConfig, slogan: e.target.value })}
-                  placeholder="Chuẩn mực & Chi tiết"
+                  placeholder="Nhập slogan thương hiệu (nếu có)..."
                   className="w-full text-xs border border-gray-300 rounded-sm px-3 py-2 focus:outline-none focus:border-[#e60049]"
                 />
                 <p className="text-[10px] text-gray-500">
@@ -471,7 +676,9 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
             </div>
           </div>
 
+          {/* ========================================================= */}
           {/* PHẦN 2: CẤU HÌNH CÁC KHỐI HEADER & CONTENT (CỘT 2 FOOTER) */}
+          {/* ========================================================= */}
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-gray-200 pb-2">
               <div className="flex items-center gap-2">
@@ -571,7 +778,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                         </tr>
                       </thead>
                       <tbody>
-                        {(!sec.items || sec.items.length === 0) ? (
+                        {!sec.items || sec.items.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="p-4 text-center text-gray-400 italic">
                               Chưa có dòng nội dung nào. Bấm &quot;+ Thêm dòng Content&quot; để thêm.
@@ -579,7 +786,10 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                           </tr>
                         ) : (
                           sec.items.map((item, iIdx) => (
-                            <tr key={item.id || iIdx} className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0">
+                            <tr
+                              key={item.id || iIdx}
+                              className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0"
+                            >
                               <td className="p-2 text-center text-gray-500 font-mono text-[11px]">
                                 {iIdx + 1}
                               </td>
@@ -622,21 +832,279 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
             ))}
           </div>
 
-          {/* Thanh nút bấm hành động */}
-          <div className="flex items-center justify-between border-t border-gray-200 pt-4">
-            <button
-              type="button"
-              onClick={handleResetToDefault}
-              disabled={isSaving}
-              className="text-xs text-gray-600 hover:text-gray-900 font-bold px-3 py-2 rounded-sm border border-gray-300 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
-            >
-              Khôi phục mẫu ban đầu
-            </button>
+          {/* ========================================================= */}
+          {/* PHẦN 3: CẤU HÌNH LIÊN KẾT CHÍNH SÁCH (CỘT 3A FOOTER)      */}
+          {/* ========================================================= */}
+          <div className="border border-gray-200 rounded-sm bg-gray-50/50 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
+                  CỘT 3A
+                </span>
+                <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                  CẤU HÌNH LIÊN KẾT CHÍNH SÁCH FOOTER
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddPolicyRow}
+                className="bg-white border border-gray-300 hover:border-[#e60049] text-gray-800 hover:text-[#e60049] font-bold text-xs px-3 py-1.5 rounded-sm transition cursor-pointer flex items-center gap-1 shadow-2xs"
+              >
+                <span>+ Thêm Liên Kết Chính Sách</span>
+              </button>
+            </div>
 
+            <div className="overflow-x-auto border border-gray-200 rounded-sm bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                  <tr>
+                    <th className="border-b border-gray-200 p-2.5 w-16 text-center">Thứ tự</th>
+                    <th className="border-b border-gray-200 p-2.5 w-60">Tên liên kết (Label)</th>
+                    <th className="border-b border-gray-200 p-2.5">Đường dẫn trang (URL)</th>
+                    <th className="border-b border-gray-200 p-2.5 w-24 text-center">Hiển thị</th>
+                    <th className="border-b border-gray-200 p-2.5 w-16 text-center">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {policies.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-gray-400 italic">
+                        Chưa có liên kết chính sách nào. Bấm &quot;+ Thêm Liên Kết Chính Sách&quot; để tạo.
+                      </td>
+                    </tr>
+                  ) : (
+                    policies.map((pol, idx) => (
+                      <tr key={pol.id || idx} className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0">
+                        <td className="p-2 text-center">
+                          <input
+                            type="number"
+                            value={pol.order_index}
+                            onChange={(e) =>
+                              handleUpdatePolicy(idx, 'order_index', Number(e.target.value))
+                            }
+                            className="w-12 border border-gray-300 rounded-sm text-center py-1 text-xs"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="text"
+                            value={pol.label}
+                            onChange={(e) => handleUpdatePolicy(idx, 'label', e.target.value)}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-semibold focus:outline-none focus:border-[#e60049]"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="text"
+                            value={pol.url}
+                            onChange={(e) => handleUpdatePolicy(idx, 'url', e.target.value)}
+                            className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
+                          />
+                        </td>
+                        <td className="p-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={pol.is_active}
+                            onChange={(e) =>
+                              handleUpdatePolicy(idx, 'is_active', e.target.checked)
+                            }
+                            className="w-4 h-4 text-[#e60049] rounded"
+                          />
+                        </td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePolicyRow(idx)}
+                            className="w-5 h-5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-full inline-flex items-center justify-center font-bold text-[10px] transition cursor-pointer"
+                            title="Xóa liên kết này"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* PHẦN 4: CẤU HÌNH MẠNG XÃ HỘI (CỘT 3B FOOTER)              */}
+          {/* ========================================================= */}
+          <div className="border border-gray-200 rounded-sm bg-gray-50/50 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
+                  CỘT 3B
+                </span>
+                <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                  CẤU HÌNH ĐƯỜNG DẪN MẠNG XÃ HỘI FOOTER
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddSocialRow}
+                className="bg-white border border-gray-300 hover:border-[#e60049] text-gray-800 hover:text-[#e60049] font-bold text-xs px-3 py-1.5 rounded-sm transition cursor-pointer flex items-center gap-1 shadow-2xs"
+              >
+                <span>+ Thêm Kênh MXH</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-gray-200 rounded-sm bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-[#fff0f3] text-gray-900 font-extrabold uppercase text-[10px]">
+                  <tr>
+                    <th className="border-b border-gray-200 p-2.5 w-28">Nền tảng</th>
+                    <th className="border-b border-gray-200 p-2.5 w-36">Tên hiển thị</th>
+                    <th className="border-b border-gray-200 p-2.5">Đường dẫn (URL chính thức)</th>
+                    <th className="border-b border-gray-200 p-2.5 w-52 text-center">
+                      Biểu tượng (Tải ảnh R2 / Ký tự)
+                    </th>
+                    <th className="border-b border-gray-200 p-2.5 w-20 text-center">Kích hoạt</th>
+                    <th className="border-b border-gray-200 p-2.5 w-16 text-center">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {socials.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-gray-400 italic">
+                        Chưa có kênh mạng xã hội nào. Bấm &quot;+ Thêm Kênh MXH&quot; để tạo.
+                      </td>
+                    </tr>
+                  ) : (
+                    socials.map((soc, idx) => {
+                      const hasImage = !!(
+                        soc.icon_url ||
+                        (soc.icon &&
+                          (soc.icon.startsWith('http') ||
+                            soc.icon.startsWith('/') ||
+                            soc.icon.startsWith('data:')))
+                      );
+                      const imageSrc = soc.icon_url || (hasImage ? soc.icon : '');
+
+                      return (
+                        <tr
+                          key={soc.id || idx}
+                          className="hover:bg-gray-50/80 border-b border-gray-100 last:border-b-0"
+                        >
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={soc.platform}
+                              onChange={(e) => handleUpdateSocial(idx, 'platform', e.target.value)}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={soc.label}
+                              onChange={(e) => handleUpdateSocial(idx, 'label', e.target.value)}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={soc.url}
+                              onChange={(e) => handleUpdateSocial(idx, 'url', e.target.value)}
+                              className="w-full border border-gray-300 rounded-sm px-2 py-1 text-xs font-mono text-gray-700"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-center justify-center gap-2">
+                              {hasImage ? (
+                                <div className="relative inline-flex items-center justify-center w-8 h-8 bg-gray-50 border border-gray-300 rounded p-0.5 group shrink-0">
+                                  {/* Nút X đỏ hình tròn xóa vĩnh viễn trên R2 */}
+                                  <button
+                                    type="button"
+                                    title="Xóa hình ảnh biểu tượng khỏi Cloudflare R2"
+                                    onClick={() => handleDeleteSocialIcon(idx)}
+                                    className="absolute -top-2 -right-2 z-10 w-4.5 h-4.5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow border border-white cursor-pointer transition"
+                                  >
+                                    ✕
+                                  </button>
+                                  <img
+                                    src={imageSrc}
+                                    alt={soc.label}
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                              ) : null}
+
+                              {/* Nút tải ảnh hoặc đổi ảnh */}
+                              <label
+                                className={`inline-flex items-center gap-1 px-2 py-1 bg-white border border-dashed border-gray-300 hover:border-[#e60049] text-gray-700 hover:text-[#e60049] rounded cursor-pointer text-[10px] font-bold transition shrink-0 ${
+                                  uploadingSocialIdx === idx ? 'opacity-50 pointer-events-none' : ''
+                                }`}
+                              >
+                                {uploadingSocialIdx === idx ? (
+                                  <span className="text-[#e60049]">Đang tải...</span>
+                                ) : (
+                                  <span>{hasImage ? '🔄 Đổi ảnh' : '📤 Tải ảnh'}</span>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleUploadSocialIcon(e, idx)}
+                                  disabled={uploadingSocialIdx === idx}
+                                  className="hidden"
+                                />
+                              </label>
+
+                              {/* Nhập text ký tự dự phòng nếu không có ảnh */}
+                              {!hasImage && (
+                                <input
+                                  type="text"
+                                  title="Ký tự văn bản hiển thị nếu chưa có ảnh (ví dụ: f, ▶, Zalo)"
+                                  value={soc.icon || ''}
+                                  placeholder="f"
+                                  onChange={(e) =>
+                                    handleUpdateSocial(idx, 'icon', e.target.value)
+                                  }
+                                  className="w-8 border border-gray-300 rounded text-center py-1 text-xs shrink-0"
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={soc.is_active}
+                              onChange={(e) =>
+                                handleUpdateSocial(idx, 'is_active', e.target.checked)
+                              }
+                              className="w-4 h-4 text-[#e60049] rounded"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSocialRow(idx)}
+                              className="w-5 h-5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-full inline-flex items-center justify-center font-bold text-[10px] transition cursor-pointer"
+                              title="Xóa kênh này"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* THANH NÚT BẤM HÀNH ĐỘNG MASTER                            */}
+          {/* ========================================================= */}
+          <div className="flex items-center justify-end border-t border-gray-200 pt-4">
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-extrabold text-xs px-6 py-2 rounded-sm transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className="bg-[#e60049] hover:bg-[#cc0041] text-white font-extrabold text-xs px-6 py-2.5 rounded-sm transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               {isSaving ? (
                 <>
@@ -646,17 +1114,24 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                     fill="none"
                     viewBox="0 0 24 24"
                   >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
                     <path
                       className="opacity-75"
                       fill="currentColor"
                       d="M4 12a8 8 0 018-8v8z"
                     ></path>
                   </svg>
-                  <span>Đang lưu...</span>
+                  <span>Đang lưu toàn bộ Footer...</span>
                 </>
               ) : (
-                <span>Lưu Toàn Bộ Cấu Hình Footer</span>
+                <span>💾 Lưu Toàn Bộ Cấu Hình Footer</span>
               )}
             </button>
           </div>
@@ -665,3 +1140,5 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     </div>
   );
 };
+
+export const AdminFooterCms = AdminFooterBusinessInfoCms;

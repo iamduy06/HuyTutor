@@ -4,41 +4,31 @@ import { SmartLink } from './SmartLink';
 
 export const Footer: React.FC = () => {
   const { siteConfigs } = useStore();
-  const infoSections = siteConfigs?.footer_info_sections;
+  const infoSections = siteConfigs?.footer_info_sections || [];
   const brand = siteConfigs?.footer_brand;
-  const logoSrc = brand?.logo_url || '/logo.png';
-  const logoAlt = brand?.logo_alt || 'Huy Tutor';
-  const slogan = brand?.slogan !== undefined ? brand.slogan : 'Chuẩn mực & Chi tiết';
+  const logoSrc = brand?.logo_url || '';
+  const logoAlt = brand?.logo_alt || '';
+  const slogan = brand?.slogan || '';
   const homeUrl = brand?.home_url || '/';
 
-  const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [
-    { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
-    { id: 'privacy', label: 'Chính sách bảo mật', url: '/privacy-policy', order_index: 2, is_active: true },
-    { id: 'payment', label: 'Chính sách thanh toán & giao hàng', url: '/payment-delivery-policy', order_index: 3, is_active: true },
-    { id: 'refund', label: 'Chính sách hoàn tiền', url: '/refund-policy', order_index: 4, is_active: true },
-    { id: 'copyright', label: 'Chính sách bản quyền', url: '/copyright-policy', order_index: 5, is_active: true },
-    { id: 'faq', label: 'Câu hỏi thường gặp (FAQ)', url: '/faq', order_index: 6, is_active: true },
-    { id: 'donate', label: 'Ủng hộ tác giả (Donate)', url: '/donate', order_index: 7, is_active: true },
-  ];
-
-  const socialLinks = siteConfigs?.footer_social_links?.filter((s) => s.is_active) || [
-    { id: 'facebook', platform: 'facebook', label: 'Facebook Huy Tutor', url: 'https://facebook.com', icon: 'f', is_active: true },
-    { id: 'youtube', platform: 'youtube', label: 'YouTube Huy Tutor', url: 'https://youtube.com', icon: '▶', is_active: true },
-  ];
+  const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [];
+  const socialLinks = siteConfigs?.footer_social_links?.filter((s) => s.is_active) || [];
 
   return (
     <footer className="mt-14">
       <div className="bg-[#fff0f3] py-10 px-4 border-t border-pink-100">
         <div className="max-w-[920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Cột 1: Logo & Slogan (Đồng bộ động từ site_configs) */}
+          {/* Cột 1: Logo & Slogan (Đồng bộ động 100% từ site_configs) */}
           <div className="md:col-span-3 flex flex-col items-start gap-1">
-            <SmartLink to={homeUrl} aria-label={logoAlt}>
-              <img
-                src={logoSrc}
-                alt={logoAlt}
-                className="h-8 w-auto object-contain"
-              />
-            </SmartLink>
+            {logoSrc ? (
+              <SmartLink to={homeUrl} aria-label={logoAlt || 'Huy Tutor'}>
+                <img
+                  src={logoSrc}
+                  alt={logoAlt || 'Huy Tutor'}
+                  className="h-8 w-auto object-contain"
+                />
+              </SmartLink>
+            ) : null}
             {slogan && (
               <div className="text-[10px] text-gray-500 font-medium">
                 {slogan}
