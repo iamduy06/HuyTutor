@@ -11,7 +11,7 @@ export const AdminGoogleAnalyticsCms: React.FC<AdminGoogleAnalyticsCmsProps> = (
   const { siteConfigs, updateSiteConfig, showToast: storeShowToast } = useStore();
   const showToast = propShowToast || storeShowToast;
 
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [formConfig, setFormConfig] = useState<GoogleAnalyticsConfig>({

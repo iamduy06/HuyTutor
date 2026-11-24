@@ -221,7 +221,10 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // State cho Tab 5: Cấu hình Menu Header & Footer
+  // State cho Tab 2: Cấu hình Menu Header & Footer (Mặc định thu gọn theo GEMINI.md)
+  const [isHeaderMenusExpanded, setIsHeaderMenusExpanded] = useState<boolean>(false);
+  const [isSocialsExpanded, setIsSocialsExpanded] = useState<boolean>(false);
+  const [isPoliciesExpanded, setIsPoliciesExpanded] = useState<boolean>(false);
   const [adminMenus, setAdminMenus] = useState<MenuItem[]>([]);
   const [adminSocials, setAdminSocials] = useState<FooterSocialLink[]>([]);
   const [adminPolicies, setAdminPolicies] = useState<FooterPolicyLink[]>([]);
@@ -3092,16 +3095,51 @@ export const AdminPage: React.FC = () => {
             <AdminGoogleAnalyticsCms showToast={showToast} />
 
             {/* 1. Cấu hình Menu Header */}
-            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    1. Cấu hình Danh sách Menu Header (100% Dynamic)
+            <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs mb-6">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsHeaderMenusExpanded(!isHeaderMenusExpanded)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsHeaderMenusExpanded(!isHeaderMenusExpanded);
+                  }
+                }}
+                className="w-full flex items-center justify-between p-4 bg-gray-50/70 border-b border-gray-200 cursor-pointer select-none transition hover:bg-gray-100/70"
+              >
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white tracking-wider">
+                    MENU HEADER
+                  </span>
+                  <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                    [CẤU HÌNH DANH SÁCH MENU HEADER] - [QUẢN LÝ TOÀN BỘ MENU CHÍNH VÀ MENU CON HIỂN THỊ ĐA CẤP TRÊN THANH ĐIỀU HƯỚNG VÀ MOBILE NAV]
                   </h2>
-                  <p className="text-xs text-gray-600">
-                    Toàn bộ menu trên thanh điều hướng chính và mobile nav được đồng bộ động từ cơ sở dữ liệu.
-                  </p>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
+                    {adminMenus.length} MỤC MENU
+                  </span>
+                  <span className="text-gray-600 p-1 flex items-center justify-center">
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isHeaderMenusExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
+              {isHeaderMenusExpanded && (
+                <div className="p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <p className="text-xs text-gray-600">
+                      Toàn bộ menu trên thanh điều hướng chính và mobile nav được đồng bộ động từ cơ sở dữ liệu.
+                    </p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -3404,19 +3442,56 @@ export const AdminPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+                </div>
+              )}
             </div>
 
             {/* Cấu hình Thông tin Header & Content Footer */}
             <AdminFooterBusinessInfoCms showToast={showToast} />
 
             {/* 2. Cấu hình Mạng Xã Hội Footer */}
-            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    [CẤU HÌNH ĐƯỜNG DẪN MẠNG XÃ HỘI FOOTER] - [Quản lý liên kết các kênh mạng xã hội chính thức (Facebook, YouTube, TikTok, Zalo) hiển thị ở góc Footer]
+            <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs mb-6">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsSocialsExpanded(!isSocialsExpanded)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsSocialsExpanded(!isSocialsExpanded);
+                  }
+                }}
+                className="w-full flex items-center justify-between p-4 bg-gray-50/70 border-b border-gray-200 cursor-pointer select-none transition hover:bg-gray-100/70"
+              >
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white tracking-wider">
+                    MẠNG XÃ HỘI FOOTER
+                  </span>
+                  <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                    [CẤU HÌNH LIÊN KẾT MẠNG XÃ HỘI FOOTER] - [QUẢN LÝ LIÊN KẾT CÁC KÊNH MẠNG XÃ HỘI CHÍNH THỨC (FACEBOOK, YOUTUBE, ZALO...) HIỂN THỊ TẠI FOOTER]
                   </h2>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
+                    {adminSocials.length} KÊNH MXH
+                  </span>
+                  <span className="text-gray-600 p-1 flex items-center justify-center">
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isSocialsExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
+              {isSocialsExpanded && (
+                <div className="p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -3596,19 +3671,56 @@ export const AdminPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+                </div>
+              )}
             </div>
 
             {/* 3. Cấu hình Liên kết Chính sách & Hỗ trợ Footer */}
-            <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold text-[#e60049] uppercase">
-                    3. Cấu hình Liên kết Chính sách &amp; Hỗ trợ Footer
+            <div className="border border-gray-200 rounded-sm bg-white overflow-hidden shadow-2xs mb-6">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsPoliciesExpanded(!isPoliciesExpanded)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsPoliciesExpanded(!isPoliciesExpanded);
+                  }
+                }}
+                className="w-full flex items-center justify-between p-4 bg-gray-50/70 border-b border-gray-200 cursor-pointer select-none transition hover:bg-gray-100/70"
+              >
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-[#e60049] text-white tracking-wider">
+                    CHÍNH SÁCH FOOTER
+                  </span>
+                  <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
+                    [CẤU HÌNH LIÊN KẾT CHÍNH SÁCH FOOTER] - [QUẢN LÝ DANH SÁCH LIÊN KẾT ĐIỀU KHOẢN, CHÍNH SÁCH BẢO MẬT, THANH TOÁN VÀ DONATE Ở CỘT 3 FOOTER]
                   </h2>
-                  <p className="text-xs text-gray-600">
-                    Quản lý danh sách các liên kết Điều khoản sử dụng, Chính sách bảo mật, FAQ và Donate hiển thị ở cột 3 Footer.
-                  </p>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800">
+                    {adminPolicies.length} LIÊN KẾT CHÍNH SÁCH
+                  </span>
+                  <span className="text-gray-600 p-1 flex items-center justify-center">
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${isPoliciesExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
+              {isPoliciesExpanded && (
+                <div className="p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <p className="text-xs text-gray-600">
+                      Quản lý danh sách các liên kết Điều khoản sử dụng, Chính sách bảo mật, FAQ và Donate hiển thị ở cột 3 Footer.
+                    </p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -3722,6 +3834,8 @@ export const AdminPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+                </div>
+              )}
             </div>
           </div>
         )}
