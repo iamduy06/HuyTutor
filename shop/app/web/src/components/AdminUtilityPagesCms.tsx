@@ -758,8 +758,8 @@ export const AdminUtilityPagesCms: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
 
-  // Live Preview Settings
-  const [showPreview, setShowPreview] = useState<boolean>(true);
+  // Live Preview Settings (Mặc định thu gọn)
+  const [showPreview, setShowPreview] = useState<boolean>(false);
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
 
   // FAQ open state for preview

@@ -66,12 +66,12 @@ export const AdminCampaignFrameCms: React.FC = () => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [productCodeSearch, setProductCodeSearch] = useState<string>('');
 
-  // State Accordions đóng/mở cho 4 nhóm
+  // State Accordions đóng/mở cho 4 nhóm (Mặc định thu gọn)
   const [accordionsOpen, setAccordionsOpen] = useState<Record<SlugGroupKey, boolean>>({
-    core: true,
-    category_level1: true,
-    product_level2: true,
-    utility_policy_custom: true,
+    core: false,
+    category_level1: false,
+    product_level2: false,
+    utility_policy_custom: false,
   });
 
   // Trích xuất toàn bộ slug tĩnh & động của toàn hệ thống
@@ -731,12 +731,9 @@ export const AdminCampaignFrameCms: React.FC = () => {
                         {/* Header Accordion */}
                         <div
                           onClick={() => toggleAccordion(groupKey)}
-                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition"
+                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500 text-xs font-mono">
-                              {isOpen ? '▼' : '▶'}
-                            </span>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-purple-600 text-white">
                               {meta.badge}
                             </span>
@@ -763,6 +760,20 @@ export const AdminCampaignFrameCms: React.FC = () => {
                             >
                               Bỏ chọn nhóm
                             </button>
+                            <span
+                              onClick={() => toggleAccordion(groupKey)}
+                              className="text-gray-500 p-1 flex items-center justify-center cursor-pointer hover:text-gray-800"
+                              title={isOpen ? 'Thu gọn' : 'Mở rộng'}
+                            >
+                              <svg
+                                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
                           </div>
                         </div>
 
@@ -845,12 +856,9 @@ export const AdminCampaignFrameCms: React.FC = () => {
                         {/* Header Accordion */}
                         <div
                           onClick={() => toggleAccordion(groupKey)}
-                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition"
+                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500 text-xs font-mono">
-                              {isOpen ? '▼' : '▶'}
-                            </span>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-blue-600 text-white">
                               {meta.badge}
                             </span>
@@ -877,6 +885,20 @@ export const AdminCampaignFrameCms: React.FC = () => {
                             >
                               Bỏ chọn nhóm
                             </button>
+                            <span
+                              onClick={() => toggleAccordion(groupKey)}
+                              className="text-gray-500 p-1 flex items-center justify-center cursor-pointer hover:text-gray-800"
+                              title={isOpen ? 'Thu gọn' : 'Mở rộng'}
+                            >
+                              <svg
+                                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
                           </div>
                         </div>
 
@@ -964,12 +986,9 @@ export const AdminCampaignFrameCms: React.FC = () => {
                         {/* Header Accordion */}
                         <div
                           onClick={() => toggleAccordion(groupKey)}
-                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition"
+                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500 text-xs font-mono">
-                              {isOpen ? '▼' : '▶'}
-                            </span>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-amber-600 text-white">
                               {meta.badge}
                             </span>
@@ -996,6 +1015,20 @@ export const AdminCampaignFrameCms: React.FC = () => {
                             >
                               Bỏ chọn nhóm
                             </button>
+                            <span
+                              onClick={() => toggleAccordion(groupKey)}
+                              className="text-gray-500 p-1 flex items-center justify-center cursor-pointer hover:text-gray-800"
+                              title={isOpen ? 'Thu gọn' : 'Mở rộng'}
+                            >
+                              <svg
+                                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
                           </div>
                         </div>
 
@@ -1130,12 +1163,9 @@ export const AdminCampaignFrameCms: React.FC = () => {
                         {/* Header Accordion */}
                         <div
                           onClick={() => toggleAccordion(groupKey)}
-                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition"
+                          className="bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 flex items-center justify-between cursor-pointer border-b border-gray-200 transition select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500 text-xs font-mono">
-                              {isOpen ? '▼' : '▶'}
-                            </span>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-teal-600 text-white">
                               {meta.badge}
                             </span>
@@ -1162,6 +1192,20 @@ export const AdminCampaignFrameCms: React.FC = () => {
                             >
                               Bỏ chọn nhóm
                             </button>
+                            <span
+                              onClick={() => toggleAccordion(groupKey)}
+                              className="text-gray-500 p-1 flex items-center justify-center cursor-pointer hover:text-gray-800"
+                              title={isOpen ? 'Thu gọn' : 'Mở rộng'}
+                            >
+                              <svg
+                                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
                           </div>
                         </div>
 
