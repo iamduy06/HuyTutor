@@ -273,16 +273,21 @@ export interface GoogleAnalyticsConfig {
   track_ecommerce?: boolean;
 }
 
-export interface FooterBusinessInfo {
-  business_name?: string;
-  address?: string;
-  zalo?: string;
-  email?: string;
-  companion_message?: string;
+export interface FooterContentItem {
+  id: string;
+  text: string;
+  url?: string;
+}
+
+export interface FooterBlockSection {
+  id: string;
+  header: string;
+  header_url?: string;
+  items: FooterContentItem[];
 }
 
 export interface SiteConfigs {
-  footer_business_info?: FooterBusinessInfo;
+  footer_info_sections?: FooterBlockSection[];
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
   homepage_hero?: HomepageHeroConfig;
@@ -300,13 +305,35 @@ export interface SiteConfigs {
 export const INITIAL_SITE_CONFIGS: SiteConfigs = {
   footer_social_links: [],
   footer_policy_links: [],
-  footer_business_info: {
-    business_name: 'HỘ KINH DOANH HUY CRECOM',
-    address: 'Phường An Khánh, thành phố Hồ Chí Minh',
-    zalo: '0358999147',
-    email: 'huymdcc@gmail.com',
-    companion_message: 'Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!',
-  },
+  footer_info_sections: [
+    {
+      id: 'sec_main',
+      header: 'HỘ KINH DOANH HUY CRECOM',
+      header_url: '',
+      items: [
+        {
+          id: 'item_1',
+          text: 'Địa chỉ: Phường An Khánh, thành phố Hồ Chí Minh',
+          url: '',
+        },
+        {
+          id: 'item_2',
+          text: 'Zalo: 0358999147',
+          url: 'https://zalo.me/0358999147',
+        },
+        {
+          id: 'item_3',
+          text: 'Email: huymdcc@gmail.com',
+          url: 'mailto:huymdcc@gmail.com',
+        },
+        {
+          id: 'item_4',
+          text: 'Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!',
+          url: '',
+        },
+      ],
+    },
+  ],
   telegram_notifications: {
     is_active: true,
     notify_on_order_created: true,

@@ -48,15 +48,37 @@ VALUES
     'Danh sách liên kết chính sách & điều khoản hiển thị tại Footer'
 ),
 (
-    'footer_business_info',
-    '{
-        "business_name": "HỘ KINH DOANH HUY CRECOM",
-        "address": "Phường An Khánh, thành phố Hồ Chí Minh",
-        "zalo": "0358999147",
-        "email": "huymdcc@gmail.com",
-        "companion_message": "Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!"
-    }'::jsonb,
-    'Thông tin Hộ kinh doanh và liên hệ hiển thị tại Cột 2 Footer'
+    'footer_info_sections',
+    '[
+        {
+            "id": "sec_main",
+            "header": "HỘ KINH DOANH HUY CRECOM",
+            "header_url": "",
+            "items": [
+                {
+                    "id": "item_1",
+                    "text": "Địa chỉ: Phường An Khánh, thành phố Hồ Chí Minh",
+                    "url": ""
+                },
+                {
+                    "id": "item_2",
+                    "text": "Zalo: 0358999147",
+                    "url": "https://zalo.me/0358999147"
+                },
+                {
+                    "id": "item_3",
+                    "text": "Email: huymdcc@gmail.com",
+                    "url": "mailto:huymdcc@gmail.com"
+                },
+                {
+                    "id": "item_4",
+                    "text": "Hân hạnh được đồng hành lâu dài cùng Quý Thầy/Cô và các bạn!",
+                    "url": ""
+                }
+            ]
+        }
+    ]'::jsonb,
+    'Cấu hình danh sách các Header và dòng nội dung (kèm link tùy chọn) tại Cột 2 Footer'
 )
 ON CONFLICT (key) DO NOTHING;
 
