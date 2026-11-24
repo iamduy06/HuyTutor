@@ -5,6 +5,11 @@ import { SmartLink } from './SmartLink';
 export const Footer: React.FC = () => {
   const { siteConfigs } = useStore();
   const infoSections = siteConfigs?.footer_info_sections;
+  const brand = siteConfigs?.footer_brand;
+  const logoSrc = brand?.logo_url || '/logo.png';
+  const logoAlt = brand?.logo_alt || 'Huy Tutor';
+  const slogan = brand?.slogan !== undefined ? brand.slogan : 'Chuẩn mực & Chi tiết';
+  const homeUrl = brand?.home_url || '/';
 
   const policyLinks = siteConfigs?.footer_policy_links?.filter((p) => p.is_active) || [
     { id: 'terms', label: 'Điều khoản sử dụng', url: '/terms-of-service', order_index: 1, is_active: true },
@@ -25,18 +30,20 @@ export const Footer: React.FC = () => {
     <footer className="mt-14">
       <div className="bg-[#fff0f3] py-10 px-4 border-t border-pink-100">
         <div className="max-w-[920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Cột 1: Logo & Slogan (Cố định chuẩn nhận diện) */}
+          {/* Cột 1: Logo & Slogan (Đồng bộ động từ site_configs) */}
           <div className="md:col-span-3 flex flex-col items-start gap-1">
-            <SmartLink to="/" aria-label="Huy Tutor Trang chủ">
+            <SmartLink to={homeUrl} aria-label={logoAlt}>
               <img
-                src="/logo.png"
-                alt="Huy Tutor"
+                src={logoSrc}
+                alt={logoAlt}
                 className="h-8 w-auto object-contain"
               />
             </SmartLink>
-            <div className="text-[10px] text-gray-500 font-medium">
-              Chuẩn mực &amp; Chi tiết
-            </div>
+            {slogan && (
+              <div className="text-[10px] text-gray-500 font-medium">
+                {slogan}
+              </div>
+            )}
           </div>
 
           {/* Cột 2: Thông tin Header & Content (Đồng bộ động 100% từ site_configs) */}

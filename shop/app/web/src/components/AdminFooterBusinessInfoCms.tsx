@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FooterBlockSection, FooterContentItem } from '../types';
+import { FooterBlockSection, FooterContentItem, FooterBrandConfig } from '../types';
+import { apiClient } from '../api/client';
 import { getClientErrorMessage } from '../utils/errorHandler';
 
 interface AdminFooterBusinessInfoCmsProps {
   showToast?: (msg: string) => void;
 }
+
+const DEFAULT_BRAND: FooterBrandConfig = {
+  logo_url: '/logo.png',
+  logo_alt: 'Huy Tutor',
+  slogan: 'Chuẩn mực & Chi tiết',
+  home_url: '/',
+};
 
 const DEFAULT_SECTIONS: FooterBlockSection[] = [
   {
@@ -45,7 +53,14 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
 
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
 
+  // Cấu hình Cột 1: Logo & Slogan
+  const [brandConfig, setBrandConfig] = useState<FooterBrandConfig>(() => {
+    return siteConfigs?.footer_brand || DEFAULT_BRAND;
+  });
+
+  // Cấu hình Cột 2: Các khối Header & Content
   const [sections, setSections] = useState<FooterBlockSection[]>(() => {
     if (
       Array.isArray(siteConfigs?.footer_info_sections) &&
@@ -56,35 +71,95 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     return DEFAULT_SECTIONS;
   });
 
-  // Đồng bộ cấu hình từ siteConfigs khi có thay đổi
+  // Đồng bộ cấu hình từ siteConfigs
   useEffect(() => {
+    if (siteConfigs?.footer_brand) {
+      setBrandConfig({
+        logo_url: siteConfigs.footer_brand.logo_url || '/logo.png',
+        logo_alt: siteConfigs.footer_brand.logo_alt || 'Huy Tutor',
+        slogan: siteConfigs.footer_brand.slogan ?? 'Chuẩn mực & Chi tiết',
+        home_url: siteConfigs.footer_brand.home_url || '/',
+      });
+    }
     if (
       Array.isArray(siteConfigs?.footer_info_sections) &&
       siteConfigs.footer_info_sections.length > 0
     ) {
       setSections(siteConfigs.footer_info_sections);
     }
-  }, [siteConfigs?.footer_info_sections]);
+  }, [siteConfigs?.footer_brand, siteConfigs?.footer_info_sections]);
 
+  // Upload Logo lên Cloudflare R2
+  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const oldUrl = brandConfig.logo_url;
+      const res = await apiClient.uploadFile(file, { folder: 'logos' });
+
+      // Nếu ảnh cũ nằm trên R2, xóa file vật lý cũ
+      if (oldUrl && oldUrl.startsWith('http') && oldUrl !== res.url) {
+        apiClient.deleteR2File(oldUrl).catch((err) => {
+          console.warn('[AdminFooterCms] Lỗi xóa ảnh R2 cũ:', err);
+        });
+      }
+
+      setBrandConfig((prev) => ({
+        ...prev,
+        logo_url: res.url,
+      }));
+      showToast('Tải ảnh Logo lên Cloudflare R2 thành công!');
+    } catch (err: any) {
+      const errorMsg = getClientErrorMessage(err, true);
+      showToast(errorMsg || 'Lỗi khi tải ảnh Logo lên R2.');
+    } finally {
+      setIsUploadingLogo(false);
+      e.target.value = '';
+    }
+  };
+
+  // Xóa ảnh Logo trên Cloudflare R2 (quay về logo mặc định /logo.png)
+  const handleDeleteLogo = async () => {
+    const currentUrl = brandConfig.logo_url;
+    if (currentUrl && currentUrl.startsWith('http')) {
+      try {
+        await apiClient.deleteR2File(currentUrl);
+      } catch (err) {
+        console.warn('[AdminFooterCms] Lỗi xóa file R2:', err);
+      }
+    }
+    setBrandConfig((prev) => ({
+      ...prev,
+      logo_url: '/logo.png',
+    }));
+    showToast('Đã xóa ảnh Logo trên R2, quay về Logo mặc định.');
+  };
+
+  // Lưu toàn bộ cấu hình Footer (Logo, Slogan, Header, Content)
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
+      await updateSiteConfig('footer_brand', brandConfig);
       await updateSiteConfig('footer_info_sections', sections);
-      showToast('Đã lưu cấu hình Header & Content Footer thành công!');
+      showToast('Đã lưu cấu hình Footer (Logo, Slogan & Nội dung) thành công!');
     } catch (err: any) {
       const errorMsg = getClientErrorMessage(err, true);
-      showToast(errorMsg || 'Lỗi khi lưu cấu hình Header & Content Footer.');
+      showToast(errorMsg || 'Lỗi khi lưu cấu hình Footer.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleResetToDefault = () => {
+    setBrandConfig(DEFAULT_BRAND);
     setSections(DEFAULT_SECTIONS);
     showToast('Đã đặt lại cấu hình mẫu ban đầu (chưa lưu vào DB cho đến khi bấm Lưu).');
   };
 
+  // Thao tác khối Header
   const handleAddSection = () => {
     const newSec: FooterBlockSection = {
       id: `sec_${Date.now()}`,
@@ -103,7 +178,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
 
   const handleRemoveSection = (sIdx: number) => {
     if (sections.length <= 1) {
-      if (!window.confirm('Bạn có chắc chắn muốn xóa khối Header duy nhất này không?')) {
+      if (!window.confirm('Bạn có chắc chắn muốn xóa khối Header này không?')) {
         return;
       }
     }
@@ -120,6 +195,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
     );
   };
 
+  // Thao tác dòng Content
   const handleAddItem = (sIdx: number) => {
     const newItem: FooterContentItem = {
       id: `item_${Date.now()}`,
@@ -188,7 +264,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
             THÔNG TIN FOOTER
           </span>
           <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase">
-            [CẤU HÌNH THÔNG TIN HEADER &amp; NỘI DUNG FOOTER] - [QUẢN LÝ CÁC TIÊU ĐỀ HEADER VÀ CÁC DÒNG NỘI DUNG (KÈM LINK TÙY CHỌN) HIỂN THỊ TẠI CỘT 2 FOOTER]
+            [CẤU HÌNH LOGO, SLOGAN &amp; NỘI DUNG FOOTER] - [QUẢN LÝ ẢNH LOGO, SLOGAN, CÁC TIÊU ĐỀ HEADER VÀ CÁC DÒNG NỘI DUNG (KÈM LINK TÙY CHỌN) TẠI FOOTER]
           </h2>
         </div>
 
@@ -212,88 +288,200 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
       {/* Nội dung Khối CMS */}
       {isExpanded && (
         <form onSubmit={handleSave} className="p-5 space-y-6">
-          {/* Khung Live Preview trực quan */}
+          {/* Khung Live Preview trực quan mô phỏng cả Cột 1 và Cột 2 */}
           <div className="bg-gray-50 border border-gray-200 rounded-sm p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                XEM TRƯỚC HIỂN THỊ THỰC TẾ (CỘT 2 FOOTER)
+                XEM TRƯỚC HIỂN THỊ THỰC TẾ (CỘT 1 LOGO &amp; CỘT 2 NỘI DUNG FOOTER)
               </span>
               <span className="text-[10px] text-gray-400 italic">
-                Dòng có link sẽ đổi màu khi hover và bấm mở được; dòng không có link là văn bản thuần.
+                Mô phỏng màu sắc, logo, slogan và các dòng liên kết đúng thực tế
               </span>
             </div>
 
-            <div className="bg-[#fff0f3] p-4 rounded-sm border border-pink-100 text-[11px] text-gray-700 space-y-4 leading-relaxed">
-              {sections.length === 0 ? (
-                <p className="text-gray-400 italic text-center py-2">
-                  (Chưa có khối Header nào. Bấm &quot;+ Thêm khối Header mới&quot; bên dưới để tạo.)
-                </p>
-              ) : (
-                sections.map((sec, sIdx) => (
-                  <div key={sec.id || sIdx} className="space-y-1.5">
-                    {sec.header ? (
-                      sec.header_url?.trim() ? (
-                        <a
-                          href={sec.header_url.trim()}
-                          target={sec.header_url.startsWith('http') ? '_blank' : undefined}
-                          rel="noreferrer"
-                          className="font-bold text-gray-900 uppercase hover:text-[#e60049] transition inline-flex items-center gap-1"
-                        >
-                          <span>{sec.header}</span>
-                          <span className="text-[9px] text-[#e60049] font-normal lowercase font-mono">🔗 link</span>
-                        </a>
+            <div className="bg-[#fff0f3] p-5 rounded-sm border border-pink-100 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+              {/* Cột 1 Live Preview: Logo & Slogan */}
+              <div className="md:col-span-4 flex flex-col items-start gap-1">
+                <img
+                  src={brandConfig.logo_url || '/logo.png'}
+                  alt={brandConfig.logo_alt || 'Huy Tutor'}
+                  className="h-8 w-auto object-contain"
+                />
+                <div className="text-[10px] text-gray-500 font-medium">
+                  {brandConfig.slogan || '(Chưa nhập slogan)'}
+                </div>
+              </div>
+
+              {/* Cột 2 Live Preview: Header & Content lines */}
+              <div className="md:col-span-8 text-[11px] text-gray-700 space-y-4 leading-relaxed">
+                {sections.length === 0 ? (
+                  <p className="text-gray-400 italic">
+                    (Chưa có khối Header nào)
+                  </p>
+                ) : (
+                  sections.map((sec, sIdx) => (
+                    <div key={sec.id || sIdx} className="space-y-1.5">
+                      {sec.header ? (
+                        sec.header_url?.trim() ? (
+                          <a
+                            href={sec.header_url.trim()}
+                            target={sec.header_url.startsWith('http') ? '_blank' : undefined}
+                            rel="noreferrer"
+                            className="font-bold text-gray-900 uppercase hover:text-[#e60049] transition inline-flex items-center gap-1"
+                          >
+                            <span>{sec.header}</span>
+                            <span className="text-[9px] text-[#e60049] font-normal lowercase font-mono">🔗 link</span>
+                          </a>
+                        ) : (
+                          <p className="font-bold text-gray-900 uppercase">{sec.header}</p>
+                        )
                       ) : (
-                        <p className="font-bold text-gray-900 uppercase">{sec.header}</p>
-                      )
-                    ) : (
-                      <p className="font-bold text-gray-400 italic uppercase">(Chưa nhập tiêu đề Header #{sIdx + 1})</p>
-                    )}
+                        <p className="font-bold text-gray-400 italic uppercase">(Chưa nhập tiêu đề Header #{sIdx + 1})</p>
+                      )}
 
-                    {(!sec.items || sec.items.length === 0) ? (
-                      <p className="text-gray-400 italic text-[10px]">(Chưa có dòng nội dung nào trong Header này)</p>
-                    ) : (
-                      sec.items.map((item, iIdx) => {
-                        if (!item.text?.trim()) {
-                          return (
-                            <p key={item.id || iIdx} className="text-gray-400 italic text-[10px]">
-                              (Dòng #{iIdx + 1}: Chưa nhập nội dung)
-                            </p>
-                          );
-                        }
+                      {(!sec.items || sec.items.length === 0) ? (
+                        <p className="text-gray-400 italic text-[10px]">(Chưa có dòng nội dung)</p>
+                      ) : (
+                        sec.items.map((item, iIdx) => {
+                          if (!item.text?.trim()) {
+                            return (
+                              <p key={item.id || iIdx} className="text-gray-400 italic text-[10px]">
+                                (Dòng #{iIdx + 1}: Chưa nhập nội dung)
+                              </p>
+                            );
+                          }
 
-                        if (item.url?.trim()) {
-                          return (
-                            <div key={item.id || iIdx} className="flex items-center gap-1.5">
-                              <a
-                                href={item.url.trim()}
-                                target={item.url.startsWith('http') ? '_blank' : undefined}
-                                rel="noreferrer"
-                                className="text-blue-700 hover:text-[#e60049] hover:underline transition font-medium"
-                                title={`Liên kết tới: ${item.url}`}
-                              >
-                                {item.text}
-                              </a>
-                              <span className="text-[9px] text-gray-400 font-mono">({item.url.trim()})</span>
-                            </div>
-                          );
-                        }
+                          if (item.url?.trim()) {
+                            return (
+                              <div key={item.id || iIdx} className="flex items-center gap-1.5">
+                                <a
+                                  href={item.url.trim()}
+                                  target={item.url.startsWith('http') ? '_blank' : undefined}
+                                  rel="noreferrer"
+                                  className="text-blue-700 hover:text-[#e60049] hover:underline transition font-medium"
+                                  title={`Liên kết tới: ${item.url}`}
+                                >
+                                  {item.text}
+                                </a>
+                                <span className="text-[9px] text-gray-400 font-mono">({item.url.trim()})</span>
+                              </div>
+                            );
+                          }
 
-                        return <p key={item.id || iIdx}>{item.text}</p>;
-                      })
-                    )}
-                  </div>
-                ))
-              )}
+                          return <p key={item.id || iIdx}>{item.text}</p>;
+                        })
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Danh sách các Khối Header */}
-          <div className="space-y-5">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+          {/* PHẦN 1: CẤU HÌNH LOGO & SLOGAN (CỘT 1 FOOTER) */}
+          <div className="border border-gray-200 rounded-sm bg-gray-50/50 p-4 space-y-4">
+            <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+              <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
+                CỘT 1
+              </span>
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
-                DANH SÁCH CÁC KHỐI HEADER &amp; CÁC DÒNG CONTENT NỘI DUNG
+                CẤU HÌNH LOGO &amp; SLOGAN THƯƠNG HIỆU
               </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-white p-4 border border-gray-200 rounded-sm">
+              {/* Ảnh Logo */}
+              <div className="md:col-span-5 space-y-2">
+                <label className="block text-xs font-bold text-gray-800">
+                  Ảnh Logo Footer
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="relative inline-flex items-center justify-center h-14 w-28 bg-[#fff0f3] border border-gray-300 rounded p-1 group">
+                    <img
+                      src={brandConfig.logo_url || '/logo.png'}
+                      alt={brandConfig.logo_alt || 'Huy Tutor'}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                    {brandConfig.logo_url && brandConfig.logo_url !== '/logo.png' && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteLogo}
+                        title="Xóa ảnh Logo khỏi Cloudflare R2 (quay về logo mặc định)"
+                        className="absolute -top-2 -right-2 z-10 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center font-bold text-[10px] shadow border border-white cursor-pointer transition"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <label
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-dashed border-gray-300 hover:border-[#e60049] text-gray-700 hover:text-[#e60049] rounded cursor-pointer text-xs font-bold transition shadow-2xs ${
+                      isUploadingLogo ? 'opacity-50 pointer-events-none' : ''
+                    }`}
+                  >
+                    <span>{isUploadingLogo ? 'Đang tải lên R2...' : '📤 Tải ảnh Logo lên R2'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadLogo}
+                      disabled={isUploadingLogo}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Ảnh sẽ được tải trực tiếp lên Cloudflare R2 theo định dạng chuẩn 12 chữ số.
+                </p>
+              </div>
+
+              {/* Dòng chữ Slogan */}
+              <div className="md:col-span-4 space-y-1.5">
+                <label className="block text-xs font-bold text-gray-800">
+                  Dòng chữ Slogan (Phụ đề dưới Logo)
+                </label>
+                <input
+                  type="text"
+                  value={brandConfig.slogan || ''}
+                  onChange={(e) => setBrandConfig({ ...brandConfig, slogan: e.target.value })}
+                  placeholder="Chuẩn mực & Chi tiết"
+                  className="w-full text-xs border border-gray-300 rounded-sm px-3 py-2 focus:outline-none focus:border-[#e60049]"
+                />
+                <p className="text-[10px] text-gray-500">
+                  Hiển thị ngay dưới ảnh Logo ở Cột 1 Footer.
+                </p>
+              </div>
+
+              {/* Đường dẫn khi click Logo */}
+              <div className="md:col-span-3 space-y-1.5">
+                <label className="block text-xs font-bold text-gray-800">
+                  Link khi bấm vào Logo
+                </label>
+                <input
+                  type="text"
+                  value={brandConfig.home_url || '/'}
+                  onChange={(e) => setBrandConfig({ ...brandConfig, home_url: e.target.value })}
+                  placeholder="/"
+                  className="w-full text-xs border border-gray-300 rounded-sm px-3 py-2 font-mono text-gray-700 focus:outline-none focus:border-[#e60049]"
+                />
+                <p className="text-[10px] text-gray-500">
+                  Mặc định là trang chủ (&quot;/&quot;).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* PHẦN 2: CẤU HÌNH CÁC KHỐI HEADER & CONTENT (CỘT 2 FOOTER) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#e60049] text-white text-[10px] font-black px-2 py-0.5 rounded-sm">
+                  CỘT 2
+                </span>
+                <h3 className="text-xs font-black text-gray-800 uppercase tracking-wide">
+                  CÁC KHỐI HEADER &amp; DÒNG NỘI DUNG (KÈM LINK TÙY CHỌN)
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={handleAddSection}
@@ -468,7 +656,7 @@ export const AdminFooterBusinessInfoCms: React.FC<AdminFooterBusinessInfoCmsProp
                   <span>Đang lưu...</span>
                 </>
               ) : (
-                <span>Lưu Cấu Hình Footer</span>
+                <span>Lưu Toàn Bộ Cấu Hình Footer</span>
               )}
             </button>
           </div>

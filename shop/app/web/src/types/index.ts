@@ -259,7 +259,15 @@ export interface FooterBlockSection {
   items: FooterContentItem[];
 }
 
+export interface FooterBrandConfig {
+  logo_url?: string;
+  logo_alt?: string;
+  slogan?: string;
+  home_url?: string;
+}
+
 export interface SiteConfigs {
+  footer_brand?: FooterBrandConfig;
   footer_info_sections?: FooterBlockSection[];
   footer_social_links: FooterSocialLink[];
   footer_policy_links: FooterPolicyLink[];
