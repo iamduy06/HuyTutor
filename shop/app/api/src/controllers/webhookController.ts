@@ -133,6 +133,9 @@ export const webhookController = {
       });
 
       const formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
+      if (!formSyncResult.allSuccess) {
+        console.warn(`[SePay Webhook] Google Form sync cảnh báo cho đơn ${order.order_code}:`, formSyncResult);
+      }
 
       // Bắn thông báo Telegram đơn hàng đã thanh toán thành công qua SePay (non-blocking)
       telegramService.notifyOrderPaid(updatedOrder || order, {
@@ -143,11 +146,14 @@ export const webhookController = {
         console.warn('[webhookController.handleSepayWebhook] Telegram notification error:', teleErr?.message || teleErr);
       });
 
+      // Phương án A: Chuẩn hóa response trả về cho cổng thanh toán SePay.
+      // Tuyệt đối không để lộ chi tiết nội bộ Google Form sync, chỉ trả về các thông tin chuẩn hoá của giao dịch.
       res.json({
         ok: true,
         orderCode: order.order_code,
         paymentStatus: 'paid',
-        googleFormSync: formSyncResult,
+        paidAt: updatedOrder?.paid_at || new Date().toISOString(),
+        message: 'Giao dịch đã được xác thực và xử lý thành công.',
       });
     } catch (err: any) {
       res.status(500).json({
@@ -230,6 +236,9 @@ export const webhookController = {
       });
 
       const formSyncResult = await submitOrderToGoogleForm(updatedOrder || order);
+      if (!formSyncResult.allSuccess) {
+        console.warn(`[PayPal Webhook] Google Form sync cảnh báo cho đơn ${order.order_code}:`, formSyncResult);
+      }
 
       // Bắn thông báo Telegram đơn hàng đã thanh toán thành công qua PayPal (non-blocking)
       telegramService.notifyOrderPaid(updatedOrder || order, {
@@ -239,11 +248,13 @@ export const webhookController = {
         console.warn('[webhookController.handlePaypalWebhook] Telegram notification error:', teleErr?.message || teleErr);
       });
 
+      // Chuẩn hóa response trả về cho cổng thanh toán PayPal
       res.json({
         ok: true,
         orderCode: order.order_code,
         paymentStatus: 'paid',
-        googleFormSync: formSyncResult,
+        paidAt: updatedOrder?.paid_at || new Date().toISOString(),
+        message: 'Giao dịch đã được xác thực và xử lý thành công.',
       });
     } catch (err: any) {
       res.status(500).json({
